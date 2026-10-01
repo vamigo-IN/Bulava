@@ -1,0 +1,70 @@
+{
+  "name": "bulava",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Bulava.in - India-first event, invitation, RSVP and media platform",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:packages": "pnpm -r --filter \"./packages/**\" --filter \"./templates\" build",
+    "build": "pnpm build:packages && pnpm -r --filter \"./apps/**\" build",
+    "dev:api": "pnpm --filter @bulava/api dev",
+    "dev:web": "pnpm --filter @bulava/web dev",
+    "dev:admin": "pnpm --filter @bulava/admin dev",
+    "dev:workers": "pnpm --parallel --filter @bulava/worker --filter @bulava/media-worker --filter @bulava/video-worker dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @bulava/api test:e2e",
+    "db:generate": "pnpm --filter @bulava/database generate",
+    "db:migrate": "pnpm --filter @bulava/database migrate:dev",
+    "db:deploy": "pnpm --filter @bulava/database migrate:deploy",
+    "db:seed": "pnpm --filter @bulava/database seed",
+    "infra:up": "docker compose up -d postgres redis storage mailpit",
+    "infra:down": "docker compose down",
+    "lint": "eslint .",
+    "smoke:ui": "node infrastructure/scripts/ui-smoke.mjs",
+    "smoke:admin": "node infrastructure/scripts/admin-smoke.mjs",
+    "a11y": "node infrastructure/scripts/a11y-check.mjs --out a11y-report",
+    "admin:set-role": "pnpm --filter @bulava/database set-role",
+    "admin:reset-mfa": "pnpm --filter @bulava/database reset-mfa"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@next/eslint-plugin-next": "15.5.26",
+    "@types/node": "^22.15.0",
+    "axe-core": "^4.10.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
+    "puppeteer-core": "24",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "@nestjs/core",
+      "sharp",
+      "unrs-resolver",
+      "@remotion/compositor-win32-x64-msvc",
+      "@remotion/compositor-linux-x64-musl",
+      "@remotion/compositor-linux-x64-gnu",
+      "@sentry/cli"
+    ],
+    "overrides": {
+      "@types/react": "19.1.12",
+      "@types/react-dom": "19.1.9",
+      "react": "19.1.1",
+      "react-dom": "19.1.1",
+      "deepmerge-ts": "^8.0.2",
+      "postcss": "^8.5.28",
+      "sharp": "0.35.5",
+      "js-yaml@5": "^5.4.2"
+    }
+  }
+}

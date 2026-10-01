@@ -1,0 +1,335 @@
+import { Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
+import { hashPassword, isLinkMode, permissionsForEventRole, type EventPermission, type EventRole } from '@bulava/auth';
+import { isSupportedLanguage } from '@bulava/localization';
+import {
+  slugify,
+  validateEventDetails,
+  type CreateEventInput,
+  type UpdateEventInput,
+} from '@bulava/validation';
+import type { Prisma } from '@bulava/database';
+import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { AppError } from '../../common/errors/app-error';
+import type { RequestMeta } from '../../common/decorators/auth.decorators';
+import type { EventAccessContext } from '../../common/request-context';
+import { AuditService } from '../audit/audit.service';
+import { EntitlementsService } from '../entitlements/entitlements.service';
+import { openRegistrationByDefault } from '../registrations/registration-defaults';
+import { ShareLinkService } from './share-link.service';
+import { FEATURE_KEYS } from '@bulava/validation';
+
+const eventInclude = {
+  accessPolicy: { select: { mode: true, pinHash: true, requireOtp: true } },
+  _count: { select: { functions: { where: { deletedAt: null } }, guests: { where: { deletedAt: null } } } },
+} satisfies Prisma.EventInclude;
+
+type EventWithPolicy = Prisma.EventGetPayload<{ include: typeof eventInclude }>;
+
+export interface EventDto {
+  id: string;
+  typeKey: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  language: string;
+  timezone: string;
+  status: string;
+  visibility: string;
+  accessMode: string;
+  hasPin: boolean;
+  requireOtp: boolean;
+  startDate: Date | null;
+  endDate: Date | null;
+  details: unknown;
+  counts: { functions: number; guests: number };
+  role?: string;
+  /** What the caller may do in this event; the dashboard shows only what they can use. */
+  permissions?: EventPermission[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+function toDto(event: EventWithPolicy, role?: string): EventDto {
+  return {
+    id: event.id,
+    typeKey: event.typeKey,
+    title: event.title,
+    slug: event.slug,
+    description: event.description,
+    language: event.language,
+    timezone: event.timezone,
+    status: event.status,
+    visibility: event.visibility,
+    accessMode: event.accessPolicy.mode,
+    hasPin: event.accessPolicy.pinHash !== null,
+    requireOtp: event.accessPolicy.requireOtp,
+    startDate: event.startDate,
+    endDate: event.endDate,
+    details: event.details,
+    counts: { functions: event._count.functions, guests: event._count.guests },
+    ...(role ? { role, permissions: permissionsForEventRole(role as EventRole) } : {}),
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
+  };
+}
+
+interface DefaultItem {
+  name: string;
+  slug: string;
+}
+
+function asDefaultItems(value: Prisma.JsonValue): DefaultItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((v) => {
+    if (typeof v !== 'object' || v === null || Array.isArray(v)) return [];
+    const { name, slug } = v as Record<string, unknown>;
+    return typeof name === 'string' && typeof slug === 'string' ? [{ name, slug }] : [];
+  });
+}
+
+/** The system group every new guest joins automatically. */
+export const ALL_GUESTS_SLUG = 'all-guests';
+
+@Injectable()
+export class EventsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly entitlements: EntitlementsService,
+    private readonly shareLinks: ShareLinkService,
+  ) {}
+
+  async listForUser(userId: string): Promise<EventDto[]> {
+    const memberships = await this.prisma.eventMember.findMany({
+      where: { userId, event: { deletedAt: null } },
+      include: { event: { include: eventInclude } },
+      orderBy: { event: { createdAt: 'desc' } },
+    });
+    return memberships.map((m) => toDto(m.event, m.role));
+  }
+
+  async get(access: EventAccessContext): Promise<EventDto> {
+    const event = await this.prisma.event.findFirst({
+      where: { id: access.eventId, deletedAt: null },
+      include: eventInclude,
+    });
+    if (!event) throw AppError.notFound('Event');
+    return toDto(event, access.role);
+  }
+
+  async create(userId: string, input: CreateEventInput, meta: RequestMeta): Promise<EventDto> {
+    const type = await this.prisma.eventType.findFirst({ where: { key: input.typeKey, enabled: true } });
+    if (!type) throw new AppError('INVALID_EVENT_TYPE', 'Unknown event type.');
+    if (!isSupportedLanguage(input.language)) throw new AppError('UNSUPPORTED_LANGUAGE', 'Unsupported language.');
+
+    const details = validateEventDetails(type.detailsSchemaKey, input.details);
+    if (!details.success) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'Event details are invalid.',
+        details.error.issues.map((i) => ({ path: ['details', ...i.path].join('.'), message: i.message })),
+      );
+    }
+
+    // Free events count against events.max; events with a purchase do not.
+    const features = await this.entitlements.forUser(userId);
+    const freeEvents = await this.prisma.event.count({
+      where: { ownerId: userId, deletedAt: null, status: { notIn: ['ARCHIVED', 'CANCELLED'] } },
+    });
+    const paidEvents = await this.prisma.entitlement.findMany({
+      where: { userId, eventId: { not: null } },
+      select: { eventId: true },
+      distinct: ['eventId'],
+    });
+    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.EVENTS_MAX, Math.max(0, freeEvents - paidEvents.length));
+
+    const slug = `${slugify(input.title) || 'event'}-${randomBytes(4).toString('hex').slice(0, 6)}`;
+
+    const event = await this.prisma.$transaction(async (tx) => {
+      const policy = await tx.accessPolicy.create({ data: { mode: input.accessMode } });
+      const created = await tx.event.create({
+        data: {
+          ownerId: userId,
+          typeKey: type.key,
+          title: input.title,
+          slug,
+          description: input.description ?? null,
+          language: input.language,
+          timezone: input.timezone,
+          visibility: input.visibility,
+          accessPolicyId: policy.id,
+          details: details.data as Prisma.InputJsonValue,
+          members: { create: { userId, role: 'OWNER' } },
+        },
+      });
+
+      // Every event gets an "All Guests" system group.
+      const groups = asDefaultItems(type.defaultGroups);
+      const groupSeeds = input.applyDefaults ? groups : groups.filter((g) => g.slug === ALL_GUESTS_SLUG);
+      if (!groupSeeds.some((g) => g.slug === ALL_GUESTS_SLUG)) {
+        groupSeeds.unshift({ name: 'All Guests', slug: ALL_GUESTS_SLUG });
+      }
+      await tx.guestGroup.createMany({
+        data: groupSeeds.map((g, index) => ({
+          eventId: created.id,
+          name: g.name,
+          slug: g.slug,
+          kind: g.slug === ALL_GUESTS_SLUG ? 'SYSTEM' : 'CUSTOM',
+          sortOrder: index,
+        })),
+      });
+
+      if (input.applyDefaults) {
+        const maxFunctions = EntitlementsService.limit(features, FEATURE_KEYS.FUNCTIONS_MAX);
+        const defaults = asDefaultItems(type.defaultFunctions);
+        await tx.eventFunction.createMany({
+          data: (maxFunctions === null ? defaults : defaults.slice(0, maxFunctions)).map((f, index) => ({
+            eventId: created.id,
+            name: f.name,
+            slug: f.slug,
+            sortOrder: index,
+          })),
+        });
+      }
+
+      // Shared by one link: registration starts open, and a secret link is made at once.
+      if (isLinkMode(input.accessMode)) await openRegistrationByDefault(tx, created.id, { always: true });
+      if (input.accessMode === 'SECRET_TOKEN') await this.shareLinks.ensureSecretLink(tx, created.id);
+
+      await this.audit.record(
+        {
+          actorType: 'USER',
+          actorId: userId,
+          action: 'event.created',
+          targetType: 'Event',
+          targetId: created.id,
+          eventId: created.id,
+          metadata: { typeKey: type.key, accessMode: input.accessMode },
+          meta,
+        },
+        tx,
+      );
+      return tx.event.findUniqueOrThrow({ where: { id: created.id }, include: eventInclude });
+    });
+
+    return toDto(event, 'OWNER');
+  }
+
+  async update(access: EventAccessContext, input: UpdateEventInput, meta: RequestMeta): Promise<EventDto> {
+    const event = await this.prisma.event.findFirst({
+      where: { id: access.eventId, deletedAt: null },
+      include: { type: true, accessPolicy: true },
+    });
+    if (!event) throw AppError.notFound('Event');
+
+    if (input.status && input.status !== event.status && !access.permissions.includes('event.publish')) {
+      throw AppError.forbidden('You cannot change the event status.');
+    }
+    if (input.language && !isSupportedLanguage(input.language)) {
+      throw new AppError('UNSUPPORTED_LANGUAGE', 'Unsupported language.');
+    }
+    let details: Prisma.InputJsonValue | undefined;
+    if (input.details) {
+      const parsed = validateEventDetails(event.type.detailsSchemaKey, input.details);
+      if (!parsed.success) throw new AppError('VALIDATION_FAILED', 'Event details are invalid.');
+      details = parsed.data as Prisma.InputJsonValue;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (input.requireOtp !== undefined && input.requireOtp !== event.accessPolicy.requireOtp) {
+        await tx.accessPolicy.update({ where: { id: event.accessPolicyId }, data: { requireOtp: input.requireOtp } });
+        await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'event.otp_policy_changed', targetType: 'Event', targetId: event.id, eventId: event.id, metadata: { requireOtp: input.requireOtp }, meta }, tx);
+      }
+      if (input.pin !== undefined) {
+        await tx.accessPolicy.update({
+          where: { id: event.accessPolicyId },
+          data: { pinHash: input.pin === null ? null : await hashPassword(input.pin) },
+        });
+        await this.audit.record(
+          { actorType: 'USER', actorId: access.userId, action: input.pin === null ? 'event.pin_removed' : 'event.pin_set', targetType: 'Event', targetId: event.id, eventId: event.id, meta },
+          tx,
+        );
+      }
+      if (input.accessMode && input.accessMode !== event.accessPolicy.mode) {
+        await tx.accessPolicy.update({ where: { id: event.accessPolicyId }, data: { mode: input.accessMode } });
+        if (input.accessMode === 'SECRET_TOKEN') await this.shareLinks.ensureSecretLink(tx, event.id);
+        // From personal invitations to one shared link: people can register from it.
+        if (isLinkMode(input.accessMode) && !isLinkMode(event.accessPolicy.mode)) await openRegistrationByDefault(tx, event.id, { always: true });
+        await this.audit.record(
+          {
+            actorType: 'USER',
+            actorId: access.userId,
+            action: 'event.access_changed',
+            targetType: 'Event',
+            targetId: event.id,
+            eventId: event.id,
+            metadata: { from: event.accessPolicy.mode, to: input.accessMode },
+            meta,
+          },
+          tx,
+        );
+      }
+      if (input.status && input.status !== event.status) {
+        await this.audit.record(
+          {
+            actorType: 'USER',
+            actorId: access.userId,
+            action: 'event.status_changed',
+            targetType: 'Event',
+            targetId: event.id,
+            eventId: event.id,
+            metadata: { from: event.status, to: input.status },
+            meta,
+          },
+          tx,
+        );
+      }
+      return tx.event.update({
+        where: { id: event.id },
+        data: {
+          title: input.title,
+          description: input.description,
+          language: input.language,
+          timezone: input.timezone,
+          visibility: input.visibility,
+          status: input.status,
+          details,
+        },
+        include: eventInclude,
+      });
+    });
+    return toDto(updated, access.role);
+  }
+
+  async softDelete(access: EventAccessContext, meta: RequestMeta): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.event.updateMany({
+        where: { id: access.eventId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      if (result.count === 0) throw AppError.notFound('Event');
+      // Deleting an event immediately kills every invitation link.
+      await tx.invitation.updateMany({
+        where: { eventId: access.eventId, status: { not: 'REVOKED' } },
+        data: { status: 'REVOKED', revokedAt: new Date() },
+      });
+      await tx.invitationToken.updateMany({
+        where: { eventId: access.eventId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.audit.record(
+        {
+          actorType: 'USER',
+          actorId: access.userId,
+          action: 'event.deleted',
+          targetType: 'Event',
+          targetId: access.eventId,
+          eventId: access.eventId,
+          meta,
+        },
+        tx,
+      );
+    });
+  }
+}

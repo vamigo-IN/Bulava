@@ -1,0 +1,30 @@
+{
+  "name": "@bulava/media-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Media pipeline: validate, EXIF strip, resize, thumbnails, moderation routing.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node ../../infrastructure/scripts/with-env.cjs tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@bulava/database": "workspace:*",
+    "@bulava/queue": "workspace:*",
+    "pino": "^9.0.0",
+    "sharp": "0.35.5",
+    "@bulava/storage": "workspace:*",
+    "@sentry/node": "^11.1.0"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "tsx": "4.23.15",
+    "@types/node": "^22.15.0",
+    "pino-pretty": "^13.0.0"
+  }
+}

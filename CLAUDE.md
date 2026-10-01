@@ -1,0 +1,45 @@
+# Bulava: notes for Claude Code
+
+The master product and engineering specification was provided in the first session. The architecture it produced is in `docs/architecture.md`. Read that file and `docs/decisions.md` before changing anything structural.
+
+## Rules
+
+- Event platform first. Never hard-code wedding assumptions, event types, pricing, translations or template layouts. Categories, languages, plans and templates are DB rows or catalog data.
+- EVENT, FUNCTION, AUDIENCE and ACCESS POLICY stay separate models. Guest visibility is decided only by `evaluateFunctionAccess` in `packages/auth`.
+- Tenant routes are nested under `/api/v1/events/:eventId/...` and decorated with `@RequireEventPermission(...)`. Services must scope every query by `access.eventId`. Never take tenant ids from the request body. Staff routes use `@RequirePlatformPermission(...)`.
+- Validate input with shared Zod schemas from `@bulava/validation` (`@ZodBody(Schema)`).
+- Throw `AppError('<CODE>', message)`. Add new codes to `ErrorCode` and an `error.<CODE>` key to the English catalog (and Hindi for guest-facing codes).
+- UI strings use `t('key')`. Web keys live in `packages/localization/src/catalogs/` (Hindi for guest-facing strings); admin console keys live in `apps/admin/src/lib/i18n.ts`.
+- Templates are data. New visual features (sections, openings, ornaments, hero variants) go into `packages/template-engine` and the schema enums, then templates select them in `templates/src`. Run the catalog tests: every template must pass the check matrix.
+- Commissioned paintings are `artworks` in the definition: full-canvas transparent layers (licensed image assets, each listed in `assets`) that become the same `SceneArt` as drawn scenes. Browsers load them only through `/api/v1/public/template-assets/:id`; never hand out raw storage keys. The artist brief is docs/illustration-brief.md.
+- Illustrated scenes (`template-engine/src/art`) are shared by website heroes, films and posters: draw on the 1200×800 canvas with the story inside x 415–785 (what every phone shows), text in the top ~55% and art in the bottom ~45%, position with inline styles (no Tailwind inside scene layers), use `rand()`/`r2()` instead of `Math.random`/raw trig (hydration), and never build JSX at module load (Remotion defines `React` late). A new font family needs a loader in `apps/video-worker/remotion/fonts.ts`. Render film stills to check a change (see docs/templates.md).
+- Marketing and dashboard UI follow docs/web-design.md: lucide icons (no emoji), `data-header-tone` on every full-width marketing section, CSS entrances above the fold and `Reveal` below it, every effect off for reduced motion, and no inputs or selects in the dashboard shell.
+- Template text uses the contrast-corrected ink variables (`--t-text`, `--t-*-ink`, `--t-on-*`), never raw palette colours; `pnpm a11y` must report no serious issues.
+- Pages that show account, guest or event data are listed in `apps/web/src/lib/private-routes.ts` and render per request (`export const dynamic = 'force-dynamic'`), so they get the nonce CSP. Never add inline `<script>` tags; third-party scripts load from client effects on marketing pages only.
+- Guest-facing links (invitations, album QR codes) get their origin from `EventLinksService.guestOrigin(eventId)` (custom domains), never from `WEB_ORIGIN` directly.
+- Write security-relevant changes to the audit log (`AuditService.record`, pass `tx` inside transactions).
+- Object storage is private: serve files only through signed URLs issued after an authorization check, and verify uploads server-side.
+- Schema changes go through Prisma migrations. Hand-written SQL (partial indexes, checks) goes at the end of the migration file. When `migrate dev` refuses to run non-interactively, generate SQL with `prisma migrate diff --script` into a new migration folder.
+- Never run `prisma migrate reset` or truncate shared databases. The e2e suites are non-destructive by design.
+- Never commit secrets. `.env` holds real credentials locally; test runs should point storage at local SeaweedFS, not the real R2 bucket.
+- NestJS constructor parameter types must be value imports (no `import type`), or dependency injection breaks.
+- Never derive an update schema with `.partial()` from a schema that has `.default()`s: Zod 4 fills in defaults inside partial objects and silently resets omitted fields. Build update schemas from default-free fields (see ADR-024).
+- Functions exported from a `'use client'` module cannot be called in server components; put shared helpers in plain modules (e.g. `apps/web/src/lib/guest-view.ts`).
+- Production shares a server with other sites (ADR-030): the stack publishes only `bulava-nginx` on `127.0.0.1:${BULAVA_HTTP_PORT}`, never 80/443 or `0.0.0.0`. Keep http-level Nginx settings inside `infrastructure/nginx/` (the host site in `nginx/host/` is one server block with no `default_server`), host names come from `.env.production`, and CPU limits must stay settings (a limit above the host's CPU count stops the container).
+- Staff routes require two-step sign-in in production (`STAFF_MFA_REQUIRED`). Guest logistics and seating never grant access; reminders are sent only by the worker.
+- Site settings and integrations (branding, SEO, trackers, custom code, Razorpay, SMTP, WhatsApp, Maps, custom domains) are rows in `platform_settings`, edited only by the Super Admin (ADR-033). Read them through `SettingsStore` / `PlatformSettingsService`, never `process.env`; a new group or field goes into `packages/validation/src/settings.ts`, its secrets into `SETTING_SECRETS` (encrypted, write-only, never returned or logged), and an old environment variable into `envFallback`. `GET /public/site-config` must never carry a secret. Storage stays in the environment.
+- There is exactly one Super Admin (a database index). Never assign `SUPER_ADMIN`: it is handed over (`/admin/staff/transfer-super-admin`) or moved with `pnpm admin:set-role <email> SUPER_ADMIN --replace`. Give new staff features their own platform permission in `packages/auth/src/permissions.ts` (Super-Admin-only ones go in `SUPER_ONLY`), and mirror it in the console's `PlatformPermission` type and `perm.*` labels.
+- WhatsApp messages count against the plan's `messaging.whatsapp.max`. Anything that queues WhatsApp notifications calls `lockWhatsAppAllowance(tx, eventId)` inside its transaction before counting what is left.
+- E2e tests that need the Super Admin borrow the one seat and give it back, and restore any settings they change (see `super-admin.e2e-spec.ts`).
+- Tests and browser checks are deliberately not committed (`.gitignore`): keep them in the working copy, run them before releases, and never `git add -f` them. CI runs lint, typecheck, builds and the security scans only.
+
+## Commands
+
+```bash
+pnpm infra:up && pnpm build:packages   # after changing any package, rebuild it (apps consume dist/)
+pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e
+node infrastructure/scripts/ui-smoke.mjs --out <dir>          # needs web, api and workers running
+ADMIN_EMAIL=… ADMIN_PASSWORD=… node infrastructure/scripts/admin-smoke.mjs --out <dir>
+```
+
+On Windows the shell tool can mangle quotes and collapse `\\` in heredocs. Write TS/TSX files with the file-writing tool, or generate strings with `chr(92)` in Python. Stopping a background dev server may leave its `node` child holding the port; stop that process id.

@@ -1,0 +1,152 @@
+import { AuthAwareLink } from '@/components/marketing/account-links';
+import { ArrowLeft, ArrowRight, BookOpen, Check, Music, Play, Sparkles } from 'lucide-react';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { createTranslator, getLanguage, type MessageKey } from '@bulava/localization';
+import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
+import { TemplateCard } from '@/components/marketing/template-card';
+import { TemplatePreviewSwitcher } from '@/components/marketing/template-preview-switcher';
+import { getPlans, getTemplate, getTemplates, tierPrice } from '@/lib/server-api';
+
+export const revalidate = 60;
+
+const t = createTranslator('en');
+
+export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
+  const { key } = await params;
+  const tpl = await getTemplate(key);
+  if (!tpl) return { title: 'Template not found' };
+  return {
+    title: `${tpl.name} · ${tpl.category} invitation template`,
+    description: tpl.description ?? undefined,
+    alternates: { canonical: `/templates/${tpl.key}` },
+  };
+}
+
+export default async function TemplateDetailPage({ params }: { params: Promise<{ key: string }> }) {
+  const { key } = await params;
+  const [tpl, plans, all] = await Promise.all([getTemplate(key), getPlans(), getTemplates()]);
+  if (!tpl?.definition) notFound();
+  const price = tierPrice(tpl.tier, plans);
+  const related = all.filter((x) => x.key !== tpl.key && x.definition && x.outputs.some((o) => tpl.outputs.includes(o)) && x.tags.some((g) => tpl.tags.includes(g))).slice(0, 4);
+  const chip = 'inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-3 py-1 text-gold-700 ring-1 ring-gold-200';
+
+  return (
+    <>
+      <SiteHeader />
+      <main className="relative isolate bg-ivory">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(ellipse_55%_60%_at_30%_0%,rgba(227,197,133,0.3),transparent_70%)]" />
+        <div className="mx-auto max-w-7xl px-4 pt-10 pb-28 sm:px-6">
+          <Link href="/templates" className="group/back inline-flex items-center gap-2 text-sm font-medium text-brand-700">
+            <ArrowLeft aria-hidden className="size-4 transition-transform duration-300 group-hover/back:-translate-x-1" />
+            <span className="link-grow">{t('templates.detail.back')}</span>
+          </Link>
+          <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1fr)_420px]">
+            <TemplatePreviewSwitcher
+              definition={tpl.definition}
+              eventType={tpl.eventTypes[0] ?? 'WEDDING'}
+              labels={{ mobile: t('templates.detail.mobile'), desktop: t('templates.detail.desktop'), note: t('templates.detail.previewNote'), playOpening: t('signature.play') }}
+            />
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-[2rem] border border-gold-200/80 bg-white p-7 shadow-lift sm:p-8">
+                <p className="text-[11px] font-semibold tracking-[0.25em] text-gold-600 uppercase">{tpl.category}</p>
+                <h1 className="mt-2 font-display text-5xl leading-[1.02] tracking-tight">{tpl.name}</h1>
+                {tpl.description ? <p className="mt-4 text-lg leading-relaxed text-stone-600">{tpl.description}</p> : null}
+                {tpl.definition.website && tpl.definition.website.intro !== 'none' ? (
+                  <ul className="mt-5 flex flex-wrap gap-2 text-sm">
+                    <li className={chip}>
+                      <Sparkles aria-hidden className="size-3.5" />
+                      {t('signature.opens', { intro: t(`intro.name.${tpl.definition.website.intro}` as MessageKey) })}
+                    </li>
+                    {tpl.definition.capabilities.editable.music ? (
+                      <li className={chip}>
+                        <Music aria-hidden className="size-3.5" />
+                        {t('signature.music')}
+                      </li>
+                    ) : null}
+                    {tpl.tags.includes('signature') ? (
+                      <li className={chip}>
+                        <BookOpen aria-hidden className="size-3.5" />
+                        {t('signature.menu')}
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+                <div className="mt-7 flex items-baseline gap-3 border-t border-gold-100 pt-6">
+                  <p className="font-display text-4xl">{price ?? t('template.free')}</p>
+                  {price ? <p className="text-sm text-stone-500">{t('template.included', { plan: t(`filter.tier.${tpl.tier}`) })}</p> : null}
+                </div>
+                <AuthAwareLink
+                  signedOutHref={`/signup?template=${tpl.key}`}
+                  signedInHref={`/dashboard/events/new?template=${tpl.key}`}
+                  className="group/cta mt-6 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-night-900 font-semibold text-ivory shadow-[0_16px_34px_-16px_rgba(19,7,11,0.85)] transition-colors duration-300 hover:bg-brand-700"
+                >
+                  {t('template.use')}
+                  <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
+                </AuthAwareLink>
+                {tpl.definition.type === 'WEBSITE' ? (
+                  <Link
+                    href={`/templates/${tpl.key}/demo`}
+                    className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-gold-300 font-semibold text-brand-700 transition-colors duration-300 hover:border-gold-500 hover:bg-gold-100/60"
+                  >
+                    <Play aria-hidden className="size-3.5 fill-current" />
+                    {t('templates.detail.demo')}
+                  </Link>
+                ) : null}
+              </div>
+              <dl className="mt-5 space-y-5 rounded-[2rem] border border-gold-200/80 bg-white/70 p-7 text-sm">
+                {tpl.tags.length ? (
+                  <div>
+                    <dt className="font-semibold text-ink">{t('templates.detail.for')}</dt>
+                    <dd className="mt-2 flex flex-wrap gap-2">
+                      {tpl.tags.map((g) => (
+                        <Link key={g} href={`/templates?tag=${g}`} className="rounded-full bg-sand px-3 py-1 capitalize transition-colors duration-300 hover:bg-gold-200">
+                          {g.replace(/-/g, ' ')}
+                        </Link>
+                      ))}
+                    </dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="font-semibold text-ink">{t('templates.detail.languages')}</dt>
+                  <dd className="mt-1.5 text-stone-600">{tpl.languages.map((l) => getLanguage(l).nativeName).join(' · ')}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-ink">{t('templates.detail.includes')}</dt>
+                  <dd>
+                    <ul className="mt-3 space-y-2.5 text-stone-600">
+                      {([1, 2, 3, 4, 5] as const).map((n) => (
+                        <li key={n} className="flex gap-2.5">
+                          <span aria-hidden className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-gold-100 text-gold-700">
+                            <Check className="size-3" strokeWidth={3} />
+                          </span>
+                          {t(`templates.detail.include.${n}`)}
+                        </li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              </dl>
+            </aside>
+          </div>
+          {related.length ? (
+            <section className="mt-28" aria-labelledby="related-title">
+              <h2 id="related-title" className="text-center font-display text-4xl tracking-tight">
+                {t('home.grid.title')}
+              </h2>
+              <ul className="mt-12 grid grid-cols-1 gap-x-6 gap-y-16 min-[520px]:grid-cols-2 lg:grid-cols-4">
+                {related.map((r) => (
+                  <li key={r.key}>
+                    <TemplateCard template={r} t={t} priceLabel={tierPrice(r.tier, plans)} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
+      </main>
+      <SiteFooter />
+    </>
+  );
+}

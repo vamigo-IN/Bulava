@@ -1,0 +1,22 @@
+{
+  "name": "@bulava/auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure authorization and access-policy logic plus crypto helpers. No I/O.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@types/node": "^22.15.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

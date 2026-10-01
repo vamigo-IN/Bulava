@@ -1,0 +1,27 @@
+{
+  "name": "@bulava/template-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Data-driven website renderer (React sections). Source package: compiled by the consuming Next.js app.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@bulava/template-schema": "workspace:*",
+    "@bulava/localization": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@types/node": "^22.15.0",
+    "@types/react": "19.1.12",
+    "react": "19.1.1"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@bulava/domains",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Custom domains for events: hostname rules, DNS verification and TLS providers (Cloudflare for SaaS).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@bulava/database": "workspace:*"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@types/node": "^22.15.0"
+  }
+}

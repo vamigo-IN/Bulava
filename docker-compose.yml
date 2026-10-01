@@ -1,0 +1,259 @@
+# Development stack.
+#   docker compose up -d --build   -> everything in containers (web :3000, admin :3001, api :4000)
+#   pnpm infra:up                  -> postgres, redis, storage and mailpit only (run the apps on the host)
+# Ports are bound to 127.0.0.1, so nothing is reachable from other machines.
+# The app containers always use the local SeaweedFS storage below, never the real
+# bucket that .env may point at, so local uploads cannot reach production data.
+name: bulava
+
+# Shared by api, migrate-dependent apps and workers: local services instead of the host addresses in .env.
+x-app-env: &app-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-bulava}:${POSTGRES_PASSWORD:-bulava_dev_password}@postgres:5432/${POSTGRES_DB:-bulava}?schema=public
+  REDIS_URL: redis://redis:6379
+  # Plain HTTP locally; production mode refuses insecure cookies and dev secrets.
+  NODE_ENV: development
+  LOG_FORMAT: json
+  # Local object storage: containers reach it as storage:9000, browsers as localhost:9000.
+  R2_ENDPOINT: http://storage:9000
+  R2_PUBLIC_ENDPOINT: http://localhost:9000
+  R2_REGION: us-east-1
+  R2_ACCESS_KEY: bulava
+  R2_SECRET_KEY: bulava_dev_secret
+  R2_BUCKET: bulava-dev
+  STORAGE_AUTO_CREATE_BUCKET: "true"
+  # Every email lands in Mailpit (http://localhost:8025).
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  SMTP_USER: ""
+  SMTP_PASSWORD: ""
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bulava-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bulava}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bulava_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-bulava}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [bulava-network]
+
+  redis:
+    image: redis:7-alpine
+    container_name: bulava-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [bulava-network]
+
+  # S3-compatible object storage for development (production uses Cloudflare R2).
+  # SeaweedFS: MinIO no longer publishes community images. Buckets are private;
+  # all access goes through short-lived signed URLs. Credentials: infrastructure/docker/storage/s3.json
+  storage:
+    image: chrislusf/seaweedfs:latest
+    container_name: bulava-storage
+    restart: unless-stopped
+    command:
+      - server
+      - -dir=/data
+      - -ip.bind=0.0.0.0
+      - -s3
+      - -s3.port=9000
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -s3.allowedOrigins=${STORAGE_CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      - -master.volumeSizeLimitMB=512
+      - -volume.max=0
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - storage-data:/data
+      - ./infrastructure/docker/storage/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:9333/cluster/status >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [bulava-network]
+
+  # Catches all outgoing email in development. UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: bulava-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    networks: [bulava-network]
+
+  # Applies migrations and the seed (reference data, templates, the platform admin
+  # from ADMIN_EMAIL / ADMIN_PASSWORD in .env), then exits.
+  migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+      target: migrate
+    image: bulava/migrate:dev
+    container_name: bulava-migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bulava}:${POSTGRES_PASSWORD:-bulava_dev_password}@postgres:5432/${POSTGRES_DB:-bulava}?schema=public
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Platform Admin}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    networks: [bulava-network]
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    image: bulava/api:dev
+    container_name: bulava-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      TRUST_PROXY: uniquelocal
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      storage: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    ports:
+      - "127.0.0.1:4000:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [bulava-network]
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+        WEB_ORIGIN: http://localhost:3000
+        # Browsers load photos from local storage; the Content-Security-Policy must allow it.
+        STORAGE_PUBLIC_ORIGIN: http://localhost:9000
+    image: bulava/web:dev
+    container_name: bulava-web
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:4000
+      WEB_ORIGIN: http://localhost:3000
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [bulava-network]
+
+  admin:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/admin.Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+        STORAGE_PUBLIC_ORIGIN: http://localhost:9000
+    image: bulava/admin:dev
+    container_name: bulava-admin
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:4000
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:3001:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [bulava-network]
+
+  # Notifications, email, reminders, lifecycle and domain checks.
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+      args: { APP: worker }
+    image: bulava/worker:dev
+    container_name: bulava-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      WORKER_HEALTH_PORT: "4101"
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [bulava-network]
+
+  # Photo processing (EXIF removal, WebP renditions).
+  media-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+      args: { APP: media-worker }
+    image: bulava/media-worker:dev
+    container_name: bulava-media-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      WORKER_HEALTH_PORT: "4102"
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [bulava-network]
+
+  # Video and card rendering (Remotion + Chrome). The largest image; the first build takes a while.
+  video-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/video-worker.Dockerfile
+    image: bulava/video-worker:dev
+    container_name: bulava-video-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      # Its own Chrome loads photos, so signed links must use the address inside Docker.
+      R2_PUBLIC_ENDPOINT: http://storage:9000
+      WORKER_HEALTH_PORT: "4103"
+    shm_size: 1gb
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [bulava-network]
+
+volumes:
+  postgres-data:
+  redis-data:
+  storage-data:
+
+networks:
+  bulava-network:
+    name: bulava-network

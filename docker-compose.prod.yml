@@ -1,0 +1,282 @@
+# Bulava production stack. Built to share a server with other sites:
+#
+#   cp .env.production.example .env.production   # fill in real values (never commit it)
+#   docker compose -f docker-compose.prod.yml --env-file .env.production pull   # or build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# The server's own Nginx terminates TLS and proxies Bulava's hostnames to the
+# bulava-nginx container, the only published port, bound to 127.0.0.1 (never 80/443).
+# PostgreSQL and Redis stay on the internal network. Object storage is Cloudflare R2.
+# CPU and memory limits come from .env.production. Video rendering is opt-in
+# (COMPOSE_PROFILES=video). See docs/deployment.md for the full runbook.
+
+name: bulava
+
+x-node-service: &node-service
+  restart: unless-stopped
+  env_file: .env.production
+  environment: &node-env
+    NODE_ENV: production
+    DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    LOG_FORMAT: json
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  logging: &logging
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+  networks: [bulava-network]
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: bulava-nginx
+    restart: unless-stopped
+    # The stock entrypoints drop privileges themselves; nothing may gain them back.
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      # Only the server's own Nginx talks to this (infrastructure/nginx/host/).
+      - "127.0.0.1:${BULAVA_HTTP_PORT:-18090}:80"
+    environment:
+      # templates/*.template -> conf.d/*.conf at start-up; only BULAVA_* are substituted.
+      NGINX_ENVSUBST_FILTER: "^BULAVA_"
+      BULAVA_DOMAIN: ${BULAVA_DOMAIN:?set BULAVA_DOMAIN in .env.production}
+      BULAVA_ADMIN_DOMAIN: ${BULAVA_ADMIN_DOMAIN:?set BULAVA_ADMIN_DOMAIN in .env.production}
+      BULAVA_API_DOMAIN: ${BULAVA_API_DOMAIN:?set BULAVA_API_DOMAIN in .env.production}
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/templates:/etc/nginx/templates:ro
+      - ./infrastructure/nginx/snippets:/etc/nginx/snippets:ro
+    depends_on:
+      web: { condition: service_healthy }
+      admin: { condition: service_healthy }
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128m }
+    logging: *logging
+    networks: [bulava-network]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: bulava-postgres
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    shm_size: 256mb
+    logging: *logging
+    networks: [bulava-network]
+
+  redis:
+    image: redis:7-alpine
+    container_name: bulava-redis
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    # BullMQ requires noeviction; AOF keeps queued jobs across restarts.
+    # An empty password would turn authentication off, so the variable is required.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.production}", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    logging: *logging
+    networks: [bulava-network]
+
+  # One-off: apply Prisma migrations, reference data, the template catalog and
+  # Bulava's original music before the API starts. Idempotent on every deploy.
+  migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+      target: migrate
+    image: ${IMAGE_PREFIX:-bulava}/migrate:${BULAVA_VERSION:-latest}
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Platform Admin}
+      ADMIN_RESET_PASSWORD: ${ADMIN_RESET_PASSWORD:-false}
+      # Upload the original tracks (packages/database/seed-assets) to R2 once.
+      # Only the storage variables are passed, not the rest of .env.production.
+      SEED_ORIGINAL_MUSIC: "true"
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_REGION: ${R2_REGION:-auto}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY}
+      R2_SECRET_KEY: ${R2_SECRET_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    depends_on:
+      postgres: { condition: service_healthy }
+    logging: *logging
+    networks: [bulava-network]
+
+  api:
+    <<: *node-service
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    image: ${IMAGE_PREFIX:-bulava}/api:${BULAVA_VERSION:-latest}
+    container_name: bulava-api
+    environment:
+      <<: *node-env
+      # Nginx is the only hop in front of the API on the Docker network.
+      TRUST_PROXY: uniquelocal
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "${API_CPUS:-1}", memory: "${API_MEMORY:-768m}" }
+
+  web:
+    <<: *node-service
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+        STORAGE_PUBLIC_ORIGIN: ${STORAGE_PUBLIC_ORIGIN}
+        WEB_ORIGIN: ${WEB_ORIGIN}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
+        NEXT_PUBLIC_GA4_ID: ${NEXT_PUBLIC_GA4_ID:-}
+    image: ${IMAGE_PREFIX:-bulava}/web:${BULAVA_VERSION:-latest}
+    container_name: bulava-web
+    env_file: []
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:4000
+      WEB_ORIGIN: ${WEB_ORIGIN}
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "${WEB_CPUS:-1}", memory: "${WEB_MEMORY:-512m}" }
+
+  admin:
+    <<: *node-service
+    build:
+      context: .
+      dockerfile: infrastructure/docker/admin.Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+        STORAGE_PUBLIC_ORIGIN: ${STORAGE_PUBLIC_ORIGIN}
+    image: ${IMAGE_PREFIX:-bulava}/admin:${BULAVA_VERSION:-latest}
+    container_name: bulava-admin
+    env_file: []
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:4000
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "${ADMIN_CPUS:-0.5}", memory: "${ADMIN_MEMORY:-384m}" }
+
+  worker:
+    <<: *node-service
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+      args: { APP: worker }
+    image: ${IMAGE_PREFIX:-bulava}/worker:${BULAVA_VERSION:-latest}
+    container_name: bulava-worker
+    environment:
+      <<: *node-env
+      WORKER_HEALTH_PORT: "4101"
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "${WORKER_CPUS:-0.5}", memory: "${WORKER_MEMORY:-384m}" }
+
+  media-worker:
+    <<: *node-service
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+      args: { APP: media-worker }
+    image: ${IMAGE_PREFIX:-bulava}/media-worker:${BULAVA_VERSION:-latest}
+    container_name: bulava-media-worker
+    environment:
+      <<: *node-env
+      WORKER_HEALTH_PORT: "4102"
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "${MEDIA_WORKER_CPUS:-1}", memory: "${MEDIA_WORKER_MEMORY:-768m}" }
+
+  # Video and card rendering (Remotion + Chrome) is the heaviest load: opt in with
+  # COMPOSE_PROFILES=video on a server with CPUs and memory to spare.
+  video-worker:
+    <<: *node-service
+    build:
+      context: .
+      dockerfile: infrastructure/docker/video-worker.Dockerfile
+    image: ${IMAGE_PREFIX:-bulava}/video-worker:${BULAVA_VERSION:-latest}
+    container_name: bulava-video-worker
+    profiles: [video]
+    # Chrome needs a larger /dev/shm; frames are written to /tmp while rendering.
+    shm_size: 1gb
+    volumes:
+      - video-tmp:/tmp
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "${VIDEO_WORKER_CPUS:-1}", memory: "${VIDEO_WORKER_MEMORY:-3g}" }
+
+volumes:
+  postgres-data:
+  redis-data:
+  video-tmp:
+
+networks:
+  bulava-network:
+    name: bulava-network
+    driver: bridge

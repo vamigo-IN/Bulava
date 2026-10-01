@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3600" height="2400" viewBox="0 0 3600 2400" font-family="Arial, Helvetica, sans-serif">
+  <title>Bulava painted scene: safe areas on the 3600 × 2400 canvas</title>
+  <defs>
+    <pattern id="hatch" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="40" stroke="#d97706" stroke-width="6" stroke-opacity="0.35"/>
+    </pattern>
+  </defs>
+  <!-- Canvas -->
+  <rect x="0" y="0" width="3600" height="2400" fill="#f8f6f1"/>
+  <!-- Art zone: bottom 45% -->
+  <rect x="0" y="1320" width="3600" height="1080" fill="#2e7d5b" fill-opacity="0.18"/>
+  <!-- Text zone: top 55% -->
+  <rect x="0" y="0" width="3600" height="1320" fill="url(#hatch)"/>
+  <!-- May be trimmed on wide screens -->
+  <rect x="0" y="0" width="3600" height="240" fill="#57534e" fill-opacity="0.25"/>
+  <!-- 9:16 video strip -->
+  <rect x="1125" y="0" width="1350" height="2400" fill="#2563eb" fill-opacity="0.08" stroke="#2563eb" stroke-width="8" stroke-dasharray="30 20"/>
+  <!-- Always visible, on every phone -->
+  <rect x="1250" y="0" width="1100" height="2400" fill="#2563eb" fill-opacity="0.12" stroke="#1d4ed8" stroke-width="12"/>
+  <!-- Centre text column -->
+  <rect x="1250" y="260" width="1100" height="990" fill="none" stroke="#b91c1c" stroke-width="10" stroke-dasharray="40 24"/>
+  <!-- Zone boundary -->
+  <line x1="0" y1="1320" x2="3600" y2="1320" stroke="#d97706" stroke-width="8"/>
+
+  <g font-size="60" fill="#1c1917">
+    <text x="1800" y="150" text-anchor="middle" font-size="52" fill="#44403c">Top 240 px: may be trimmed on wide screens</text>
+    <text x="1800" y="620" text-anchor="middle" font-weight="bold" fill="#b91c1c">Names and date</text>
+    <text x="1800" y="700" text-anchor="middle" fill="#b91c1c">are set in this column:</text>
+    <text x="1800" y="780" text-anchor="middle" fill="#b91c1c">keep it calm</text>
+    <text x="220" y="880" font-weight="bold" fill="#b45309">Text zone</text>
+    <text x="220" y="960" fill="#b45309">top 55% (y 0–1320)</text>
+    <text x="220" y="1040" fill="#b45309">sky, moon, soft clouds</text>
+    <text x="220" y="1700" font-weight="bold" fill="#1f5c43">Art zone</text>
+    <text x="220" y="1780" fill="#1f5c43">bottom 45% (y 1320–2400)</text>
+    <text x="220" y="1860" fill="#1f5c43">architecture, water, trees</text>
+    <text x="1800" y="1620" text-anchor="middle" font-weight="bold" fill="#1d4ed8">Seen on every phone</text>
+    <text x="1800" y="1700" text-anchor="middle" fill="#1d4ed8">x 1250–2350: main subject here</text>
+    <text x="1800" y="1860" text-anchor="middle" font-size="48" fill="#1d4ed8">dashed: 9:16 video, x 1125–2475</text>
+    <text x="2560" y="1700" font-weight="bold" fill="#1f5c43">Wide screens</text>
+    <text x="2560" y="1780" fill="#1f5c43">see the full width:</text>
+    <text x="2560" y="1860" fill="#1f5c43">finish the sides</text>
+    <text x="1800" y="2340" text-anchor="middle" font-size="52" fill="#44403c">Bottom edge is anchored: never trimmed</text>
+  </g>
+</svg>

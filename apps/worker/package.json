@@ -1,0 +1,34 @@
+{
+  "name": "@bulava/worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "General background worker: notifications, email, analytics, exports, cleanup.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node ../../infrastructure/scripts/with-env.cjs tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@bulava/auth": "workspace:*",
+    "@bulava/database": "workspace:*",
+    "@bulava/domains": "workspace:*",
+    "@bulava/localization": "workspace:*",
+    "@bulava/queue": "workspace:*",
+    "@bulava/settings": "workspace:*",
+    "@bulava/storage": "workspace:*",
+    "@sentry/node": "^11.1.0",
+    "nodemailer": "^10.0.12",
+    "pino": "^9.0.0"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "tsx": "4.23.15",
+    "@types/node": "^22.15.0",
+    "pino-pretty": "^13.0.0"
+  }
+}

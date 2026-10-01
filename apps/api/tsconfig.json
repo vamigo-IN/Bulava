@@ -1,0 +1,14 @@
+{
+  "extends": "@bulava/config/tsconfig.node.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "../..",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "declaration": false,
+    "declarationMap": false,
+    "isolatedModules": false,
+    "types": ["node", "jest"]
+  },
+  "include": ["src", "test"]
+}

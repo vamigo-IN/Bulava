@@ -1,0 +1,91 @@
+# Deploy after CI succeeds (spec §75). Staging follows main; production follows v* tags.
+# Protect the "production" environment in GitHub (required reviewers) so releases need approval.
+#
+# Per environment, set these secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS,
+# and optionally DEPLOY_PATH (default /opt/bulava). The server holds .env.production itself;
+# secrets never pass through CI. An environment without DEPLOY_HOST is skipped, so pushes do
+# not fail before a server is set up for it.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.workflow_run.head_branch == 'main' && 'staging' || 'production' }}
+    concurrency:
+      group: deploy-${{ github.event.workflow_run.head_branch == 'main' && 'staging' || 'production' }}
+      cancel-in-progress: false
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/bulava' }}
+    steps:
+      - name: Check the deploy target
+        id: target
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          if [ -n "$DEPLOY_HOST" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No DEPLOY_HOST secret in this environment yet; skipping the deploy."
+          fi
+      - name: Configure SSH
+        if: steps.target.outputs.configured == 'true'
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Pull images and roll out
+        if: steps.target.outputs.configured == 'true'
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "SHA='$SHA' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          git fetch --quiet origin
+          git checkout --quiet --force "$SHA"
+          export BULAVA_VERSION="$SHA"
+          compose() { docker compose -f docker-compose.prod.yml --env-file .env.production "$@"; }
+          compose pull --quiet
+          # Back up before migrations touch the schema (skipped on the very first deploy).
+          if [ -n "$(compose ps --status running -q postgres)" ]; then
+            infrastructure/scripts/backup-postgres.sh
+          fi
+          compose up -d --remove-orphans
+          # Wait for every long-running service's healthcheck (the migrate job exits by design).
+          # The list follows the enabled profiles (COMPOSE_PROFILES=video adds the video worker).
+          for svc in $(compose config --services | grep -vx migrate | grep -vx postgres | grep -vx redis); do
+            state=unknown
+            for _ in $(seq 1 60); do
+              state=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(compose ps -q "$svc")")
+              [ "$state" = healthy ] && break
+              sleep 5
+            done
+            if [ "$state" != healthy ]; then
+              echo "$svc is $state"
+              compose logs --tail 80 "$svc"
+              exit 1
+            fi
+          done
+          compose ps
+          docker image prune -f --filter "until=168h" >/dev/null
+          REMOTE
+      - name: Smoke check
+        if: steps.target.outputs.configured == 'true'
+        run: |
+          host="${{ vars.PUBLIC_WEB_ORIGIN || 'https://bulava.in' }}"
+          api="${{ vars.PUBLIC_API_ORIGIN || 'https://api.bulava.in' }}"
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "$api/health"
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors -o /dev/null "$host/"

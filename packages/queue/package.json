@@ -1,0 +1,25 @@
+{
+  "name": "@bulava/queue",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BullMQ queue names, typed job payloads and connection helpers.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "bullmq": "5.81.5"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@types/node": "^22.15.0"
+  }
+}

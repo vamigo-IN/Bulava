@@ -1,0 +1,44 @@
+{
+  "name": "@bulava/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node ../../infrastructure/scripts/with-env.cjs next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bulava/localization": "workspace:*",
+    "@bulava/template-engine": "workspace:*",
+    "@bulava/template-schema": "workspace:*",
+    "@bulava/validation": "workspace:*",
+    "@bulava/video-engine": "workspace:*",
+    "@gsap/react": "^2.1.2",
+    "@hookform/resolvers": "^5.0.0",
+    "@remotion/player": "4.0.529",
+    "@tanstack/react-query": "^5.0.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "framer-motion": "^13.4.6",
+    "gsap": "^3.15.0",
+    "lenis": "^1.3.26",
+    "lucide-react": "^0.542.0",
+    "next": "15.5.26",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "react-hook-form": "^7.0.0",
+    "remotion": "4.0.529",
+    "tailwind-merge": "^3.0.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "5.9.3"
+  }
+}

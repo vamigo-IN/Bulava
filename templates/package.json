@@ -1,0 +1,22 @@
+{
+  "name": "@bulava/template-catalog",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Seed catalog of template definitions (data). Seeded into the database; editable in Template Studio.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bulava/template-schema": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@types/node": "^22.15.0"
+  }
+}

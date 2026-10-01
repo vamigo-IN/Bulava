@@ -1,0 +1,1712 @@
+// Bulava data model.
+// Conventions:
+//  - All primary keys are UUIDv7 (time-ordered, non-sequential, safe to expose).
+//  - Every tenant-owned row carries eventId (directly or via its parent) so that
+//    every query can be scoped to an event the actor is authorized for.
+//  - EVENT, FUNCTION, AUDIENCE (groups/assignments) and ACCESS POLICY are
+//    separate models. Never collapse them into one permission field.
+//  - Timestamps are stored in UTC; rendering uses Event.timezone.
+//  - Soft delete via deletedAt where user data is involved.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  // Generated inside this package so it ships with it (pnpm deploy / Docker).
+  output          = "../generated/client"
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+// ───────────────────────────── Identity ─────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+/// Staff roles. Exactly one SUPER_ADMIN may exist (a partial unique index enforces it);
+/// the role changes hands only through the transfer endpoint.
+enum PlatformRole {
+  USER
+  SUPPORT
+  PLATFORM_ADMIN
+  SUPER_ADMIN
+  CONTENT_MANAGER
+  FINANCE_MANAGER
+}
+
+model User {
+  id                   String       @id @default(uuid(7)) @db.Uuid
+  email                String?      @unique @db.Citext
+  phone                String?      @unique
+  name                 String
+  passwordHash         String?
+  /// Google account id ("sub") for "Continue with Google"; null when not linked.
+  googleSub            String?      @unique
+  emailVerifiedAt      DateTime?
+  phoneVerifiedAt      DateTime?
+  locale               String       @default("en")
+  status               UserStatus   @default(ACTIVE)
+  platformRole         PlatformRole @default(USER)
+  /// Two-step sign-in (TOTP). The shared secret is AES-GCM encrypted with TOKEN_ENCRYPTION_KEY.
+  totpSecretCiphertext String?
+  totpEnabledAt        DateTime?
+  /// Last accepted time step, so a code cannot be used twice.
+  totpLastStep         Int?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  deletedAt            DateTime?
+
+  sessions         Session[]
+  ownedEvents      Event[]              @relation("EventOwner")
+  eventMemberships EventMember[]
+  orgMemberships   OrganizationMember[]
+  auditLogs        AuditLog[]
+  orders           Order[]
+  entitlements     Entitlement[]
+  consents         Consent[]
+  recoveryCodes    MfaRecoveryCode[]
+  memberInvites    EventMemberInvite[]  @relation("MemberInvitesSent")
+
+  @@map("users")
+}
+
+/// Refresh-token session. Only a SHA-256 hash of the refresh token is stored.
+/// Tokens rotate on every refresh; reuse of a rotated token revokes the family.
+model Session {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  familyId   String    @db.Uuid
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  rotatedAt  DateTime?
+  userAgent  String?
+  ipAddress  String?
+  /// True when the sign-in that started this session family passed two-step verification.
+  mfa        Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+/// One-time recovery codes for two-step sign-in. Only SHA-256 hashes are stored.
+model MfaRecoveryCode {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @db.Uuid
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@map("mfa_recovery_codes")
+}
+
+/// OTP challenges for phone/email verification and guest identity checks.
+model OtpChallenge {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  purpose     String
+  target      String
+  codeHash    String
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([target, purpose])
+  @@map("otp_challenges")
+}
+
+model Consent {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String?  @db.Uuid
+  guestId   String?  @db.Uuid
+  kind      String
+  granted   Boolean
+  version   String
+  source    String?
+  createdAt DateTime @default(now())
+
+  user  User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guest Guest? @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([guestId])
+  @@map("consents")
+}
+
+// ───────────────────── Organizations (planner / agency) ─────────────────────
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+model Organization {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  name      String
+  slug      String    @unique
+  kind      String    @default("PERSONAL")
+  settings  Json      @default("{}")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  members OrganizationMember[]
+  events  Event[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
+  role           OrganizationRole
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+// ───────────────────────────── Events ─────────────────────────────
+
+/// Event categories are data, not an enum, so new categories need no migration.
+model EventType {
+  key              String   @id
+  name             String
+  description      String?
+  /// Suggested functions, e.g. [{"name":"Haldi","slug":"haldi"}]
+  defaultFunctions Json     @default("[]")
+  /// Suggested guest groups, e.g. [{"name":"Bride Family","slug":"bride-family"}]
+  defaultGroups    Json     @default("[]")
+  /// Key of the details schema in @bulava/validation (eventDetailsSchemas).
+  detailsSchemaKey String?
+  enabled          Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  events Event[]
+
+  @@map("event_types")
+}
+
+enum EventStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+  CANCELLED
+}
+
+/// Discoverability only. Who can open content is decided by AccessPolicy.
+enum Visibility {
+  LISTED
+  UNLISTED
+}
+
+model Event {
+  id                 String      @id @default(uuid(7)) @db.Uuid
+  ownerId            String      @db.Uuid
+  organizationId     String?     @db.Uuid
+  typeKey            String
+  title              String
+  slug               String      @unique
+  description        String?
+  coverImageAssetId  String?     @db.Uuid
+  language           String      @default("en")
+  timezone           String      @default("Asia/Kolkata")
+  status             EventStatus @default(DRAFT)
+  visibility         Visibility  @default(UNLISTED)
+  accessPolicyId     String      @unique @db.Uuid
+  startDate          DateTime?
+  endDate            DateTime?
+  /// Category-specific details, e.g. wedding couple names. Validated per EventType.
+  details            Json        @default("{}")
+  settings           Json        @default("{}")
+  /// Guests may add their own arrival/departure details from their invitation.
+  collectGuestTravel Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
+
+  owner        User          @relation("EventOwner", fields: [ownerId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  type         EventType     @relation(fields: [typeKey], references: [key])
+  accessPolicy AccessPolicy  @relation("EventAccessPolicy", fields: [accessPolicyId], references: [id])
+
+  members              EventMember[]
+  functions            EventFunction[]
+  venues               Venue[]
+  guests               Guest[]
+  groups               GuestGroup[]
+  invitations          Invitation[]
+  invitationTokens     InvitationToken[]
+  rsvps                RSVP[]
+  rsvpQuestions        RSVPQuestion[]
+  announcements        Announcement[]
+  templateSelections   EventTemplateSelection[]
+  videoJobs            VideoJob[]
+  mediaRooms           MediaRoom[]
+  qrCodes              QRCode[]
+  checkIns             CheckIn[]
+  functionGuests       FunctionGuest[]
+  groupMembers         GuestGroupMember[]
+  registrationSettings EventRegistrationSettings?
+  registrations        Registration[]
+  seatAssignments      SeatAssignment[]
+  guestStays           GuestStay[]
+  guestTravel          GuestTravel[]
+  reminderSettings     EventReminderSettings?
+  domain               EventDomain?
+  memberInvites        EventMemberInvite[]
+
+  @@index([ownerId, deletedAt])
+  @@index([organizationId])
+  @@index([visibility, status])
+  @@map("events")
+}
+
+enum EventRole {
+  OWNER
+  ADMIN
+  CO_HOST
+  FUNCTION_MANAGER
+  GUEST_MANAGER
+  MEDIA_MANAGER
+  PHOTOGRAPHER
+}
+
+model EventMember {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  eventId     String    @db.Uuid
+  userId      String    @db.Uuid
+  role        EventRole
+  /// Optional restriction for FUNCTION_MANAGER; empty = all functions.
+  functionIds String[]  @default([]) @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@map("event_members")
+}
+
+enum MemberInviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  /// Too many wrong codes; the host sends a new invitation.
+  LOCKED
+}
+
+/// A team invitation for an email with no Bulava account yet: an emailed link
+/// plus a 6-digit code. The code has no time limit; it works once, and the
+/// invitation locks after too many wrong tries. At most one PENDING invitation
+/// per event and email (partial unique index in the migration).
+model EventMemberInvite {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  eventId      String             @db.Uuid
+  /// Lower-cased.
+  email        String
+  role         EventRole
+  /// Optional restriction for FUNCTION_MANAGER, as on EventMember.
+  functionIds  String[]           @default([]) @db.Uuid
+  /// SHA-256 of the link token.
+  tokenHash    String             @unique
+  /// HMAC of the 6-digit code (never stored in plain text).
+  codeHash     String
+  attempts     Int                @default(0)
+  status       MemberInviteStatus @default(PENDING)
+  invitedById  String?            @db.Uuid
+  acceptedById String?            @db.Uuid
+  acceptedAt   DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  invitedBy User? @relation("MemberInvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([eventId, status])
+  @@index([email, status])
+  @@map("event_member_invites")
+}
+
+enum AccessMode {
+  PUBLIC
+  PRIVATE_LINK
+  INVITE_ONLY
+  GROUP_RESTRICTED
+  SECRET_TOKEN
+}
+
+/// How access is verified. Every Event owns one (required). An EventFunction
+/// may own one as an override; null means "inherit the event policy".
+model AccessPolicy {
+  id                  String     @id @default(uuid(7)) @db.Uuid
+  mode                AccessMode @default(INVITE_ONLY)
+  /// scrypt hash of an optional PIN (PRIVATE_LINK).
+  pinHash             String?
+  requireOtp          Boolean    @default(false)
+  /// SECRET_TOKEN: the event's shared secret link (?k=<token>). SHA-256 for
+  /// lookup, AES-GCM ciphertext so the host can copy it again; "New link"
+  /// replaces both and the old link stops working.
+  linkTokenHash       String?    @unique
+  linkTokenCiphertext String?
+  /// The secret link stops working at this time.
+  linkExpiresAt       DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  event    Event?         @relation("EventAccessPolicy")
+  function EventFunction? @relation("FunctionAccessPolicy")
+
+  @@map("access_policies")
+}
+
+model Venue {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  eventId    String   @db.Uuid
+  name       String
+  address    String?
+  city       String?
+  state      String?
+  country    String   @default("IN")
+  postalCode String?
+  latitude   Decimal? @db.Decimal(9, 6)
+  longitude  Decimal? @db.Decimal(9, 6)
+  mapUrl     String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  functions EventFunction[]
+
+  @@index([eventId])
+  @@map("venues")
+}
+
+enum FunctionStatus {
+  DRAFT
+  SCHEDULED
+  POSTPONED
+  CANCELLED
+  COMPLETED
+}
+
+model EventFunction {
+  id              String         @id @default(uuid(7)) @db.Uuid
+  eventId         String         @db.Uuid
+  name            String
+  slug            String
+  description     String?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  venueId         String?        @db.Uuid
+  visibility      Visibility     @default(LISTED)
+  accessPolicyId  String?        @unique @db.Uuid
+  themeId         String?        @db.Uuid
+  status          FunctionStatus @default(SCHEDULED)
+  sortOrder       Int            @default(0)
+  settings        Json           @default("{}")
+  /// The start time the last reminder was sent for; a new time makes the function due again.
+  reminderSentFor DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  event          Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue          Venue?                  @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  accessPolicy   AccessPolicy?           @relation("FunctionAccessPolicy", fields: [accessPolicyId], references: [id])
+  theme          Theme?                  @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  audienceGroups FunctionAudienceGroup[]
+  guests         FunctionGuest[]
+  invitations    Invitation[]
+  rsvps          RSVP[]
+  rsvpQuestions  RSVPQuestion[]
+  mediaRooms     MediaRoom[]
+  mediaAlbums    MediaAlbum[]
+  checkIns       CheckIn[]
+  seats          SeatAssignment[]
+
+  @@unique([eventId, slug])
+  @@index([eventId, sortOrder])
+  @@map("event_functions")
+}
+
+// ───────────────────────────── Audience ─────────────────────────────
+
+enum GuestStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Guest {
+  id                String      @id @default(uuid(7)) @db.Uuid
+  eventId           String      @db.Uuid
+  name              String
+  phone             String?
+  email             String?     @db.Citext
+  address           String?
+  notes             String?
+  guestType         String      @default("ADULT")
+  /// Event-day flags for the welcome desk (spec §52).
+  isVip             Boolean     @default(false)
+  /// Dietary needs, e.g. "Jain" or "Vegetarian, no onion or garlic".
+  dietary           String?
+  status            GuestStatus @default(ACTIVE)
+  preferredLanguage String?
+  metadata          Json        @default("{}")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
+
+  event        Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  groups       GuestGroupMember[]
+  functions    FunctionGuest[]
+  invitations  Invitation[]
+  rsvps        RSVP[]
+  checkIns     CheckIn[]
+  consents     Consent[]
+  registration Registration?
+  seats        SeatAssignment[]
+  stay         GuestStay?
+  travel       GuestTravel[]
+
+  @@index([eventId, deletedAt])
+  @@index([eventId, phone])
+  @@index([eventId, email])
+  @@map("guests")
+}
+
+enum GuestGroupKind {
+  SYSTEM
+  CUSTOM
+}
+
+model GuestGroup {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  eventId     String         @db.Uuid
+  name        String
+  slug        String
+  description String?
+  kind        GuestGroupKind @default(CUSTOM)
+  color       String?
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  event     Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  members   GuestGroupMember[]
+  functions FunctionAudienceGroup[]
+
+  @@unique([eventId, slug])
+  @@index([eventId])
+  @@map("guest_groups")
+}
+
+model GuestGroupMember {
+  groupId   String   @db.Uuid
+  guestId   String   @db.Uuid
+  eventId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  group GuestGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  guest Guest      @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  event Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, guestId])
+  @@index([guestId])
+  @@index([eventId])
+  @@map("guest_group_members")
+}
+
+/// Group-based audience: every member of the group is part of the function audience.
+model FunctionAudienceGroup {
+  functionId String   @db.Uuid
+  groupId    String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  function EventFunction @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  group    GuestGroup    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([functionId, groupId])
+  @@index([groupId])
+  @@map("function_audience_groups")
+}
+
+enum FunctionInvitationStatus {
+  NOT_SENT
+  SENT
+  OPENED
+}
+
+enum RSVPStatus {
+  PENDING
+  ATTENDING
+  DECLINED
+  MAYBE
+}
+
+/// Direct guest <-> function assignment. allowed=false is an explicit deny that
+/// overrides any group-based audience.
+model FunctionGuest {
+  functionId       String                   @db.Uuid
+  guestId          String                   @db.Uuid
+  eventId          String                   @db.Uuid
+  invitationStatus FunctionInvitationStatus @default(NOT_SENT)
+  /// Denormalized from RSVP for fast dashboards; written in the same transaction.
+  rsvpStatus       RSVPStatus               @default(PENDING)
+  allowed          Boolean                  @default(true)
+  plusOneAllowed   Boolean                  @default(false)
+  /// Maximum attendees for this guest (including the guest).
+  guestLimit       Int                      @default(1)
+  notes            String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  function EventFunction @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  guest    Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  event    Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([functionId, guestId])
+  @@index([guestId])
+  @@index([eventId, rsvpStatus])
+  @@map("function_guests")
+}
+
+// ───────────────────────────── Invitations ─────────────────────────────
+
+enum InvitationStatus {
+  ACTIVE
+  SENT
+  OPENED
+  RESPONDED
+  REVOKED
+  EXPIRED
+}
+
+/// An invitation to a guest. functionId null = event-wide invitation covering
+/// every function the guest is authorized for; non-null = function-specific.
+model Invitation {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  eventId     String           @db.Uuid
+  guestId     String           @db.Uuid
+  functionId  String?          @db.Uuid
+  status      InvitationStatus @default(ACTIVE)
+  sentAt      DateTime?
+  openedAt    DateTime?
+  acceptedAt  DateTime?
+  declinedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdById String?          @db.Uuid
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  event      Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest      Guest                @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  function   EventFunction?       @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  tokens     InvitationToken[]
+  deliveries InvitationDelivery[]
+  rsvps      RSVP[]
+
+  @@index([eventId, status])
+  @@index([guestId])
+  @@index([functionId])
+  @@map("invitations")
+}
+
+/// Secret access token. The raw token is never stored in plaintext: tokenHash
+/// (SHA-256) is used for lookup; tokenCiphertext (AES-256-GCM) lets hosts copy
+/// the link again without regenerating it.
+model InvitationToken {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  invitationId    String    @db.Uuid
+  eventId         String    @db.Uuid
+  tokenHash       String    @unique
+  tokenCiphertext String
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+  maxUses         Int?
+  useCount        Int       @default(0)
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId])
+  @@index([eventId])
+  @@map("invitation_tokens")
+}
+
+enum DeliveryChannel {
+  WHATSAPP_LINK
+  WHATSAPP_API
+  SMS
+  EMAIL
+  PUSH
+  MANUAL
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model InvitationDelivery {
+  id                String          @id @default(uuid(7)) @db.Uuid
+  invitationId      String          @db.Uuid
+  channel           DeliveryChannel
+  status            DeliveryStatus  @default(QUEUED)
+  provider          String?
+  providerMessageId String?
+  error             String?
+  sentAt            DateTime?
+  createdAt         DateTime        @default(now())
+
+  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId])
+  @@map("invitation_deliveries")
+}
+
+// ───────────────────────────── RSVP ─────────────────────────────
+
+/// functionId null = event-level RSVP. Partial unique indexes (see migration SQL)
+/// guarantee at most one event-level and one per-function RSVP per guest.
+model RSVP {
+  id            String     @id @default(uuid(7)) @db.Uuid
+  eventId       String     @db.Uuid
+  guestId       String     @db.Uuid
+  functionId    String?    @db.Uuid
+  invitationId  String?    @db.Uuid
+  status        RSVPStatus
+  attendeeCount Int        @default(1)
+  message       String?
+  source        String     @default("INVITATION")
+  respondedAt   DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  event      Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest      Guest          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  function   EventFunction? @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  invitation Invitation?    @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+  answers    RSVPAnswer[]
+
+  @@index([eventId, functionId, status])
+  @@index([guestId])
+  @@index([functionId])
+  @@map("rsvps")
+}
+
+enum RSVPQuestionType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  SINGLE_CHOICE
+  MULTI_CHOICE
+}
+
+model RSVPQuestion {
+  id         String           @id @default(uuid(7)) @db.Uuid
+  eventId    String           @db.Uuid
+  /// null = asked for every function RSVP; otherwise only for this function.
+  functionId String?          @db.Uuid
+  key        String
+  /// Label per locale: {"en":"Meal preference","hi":"भोजन वरीयता"}
+  label      Json
+  type       RSVPQuestionType
+  /// [{"value":"veg","label":{"en":"Vegetarian"}}]
+  options    Json             @default("[]")
+  required   Boolean          @default(false)
+  sortOrder  Int              @default(0)
+  active     Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  event    Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  function EventFunction? @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  answers  RSVPAnswer[]
+
+  @@unique([eventId, key])
+  @@map("rsvp_questions")
+}
+
+model RSVPAnswer {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  rsvpId     String   @db.Uuid
+  questionId String   @db.Uuid
+  value      Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rsvp     RSVP         @relation(fields: [rsvpId], references: [id], onDelete: Cascade)
+  question RSVPQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([rsvpId, questionId])
+  @@map("rsvp_answers")
+}
+
+model Announcement {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  eventId     String    @db.Uuid
+  title       String
+  body        String
+  /// {"all":true} | {"functionIds":[...]} | {"groupIds":[...]} | {"guestIds":[...]}
+  audience    Json
+  createdById String?   @db.Uuid
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("announcements")
+}
+
+model CheckIn {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  eventId     String   @db.Uuid
+  guestId     String   @db.Uuid
+  functionId  String?  @db.Uuid
+  checkedInAt DateTime @default(now())
+  checkedInBy String?  @db.Uuid
+  headcount   Int      @default(1)
+  method      String   @default("QR")
+
+  event    Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest    Guest          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  function EventFunction? @relation(fields: [functionId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, functionId])
+  @@index([guestId])
+  @@map("check_ins")
+}
+
+// ───────────────────────────── Localization ─────────────────────────────
+
+model Language {
+  code       String  @id
+  name       String
+  nativeName String
+  script     String
+  direction  String  @default("ltr")
+  enabled    Boolean @default(true)
+  sortOrder  Int     @default(0)
+
+  @@map("languages")
+}
+
+/// DB-managed translation overrides/additions on top of bundled catalogs.
+model Translation {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  namespace String
+  key       String
+  locale    String
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@unique([namespace, key, locale])
+  @@map("translations")
+}
+
+// ───────────────────────── Templates & Assets ─────────────────────────
+
+enum TemplateType {
+  WEBSITE
+  VIDEO
+  DIGITAL_CARD
+  EMAIL
+  SOCIAL
+}
+
+enum TemplateTier {
+  FREE
+  STANDARD
+  PREMIUM
+}
+
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
+}
+
+model Template {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  key              String         @unique
+  name             String
+  description      String?
+  category         String
+  style            String?
+  tier             TemplateTier   @default(STANDARD)
+  /**
+   * Marketing badge: NEW, POPULAR, BESTSELLER.
+   */
+  badge            String?
+  featured         Boolean        @default(false)
+  sortOrder        Int            @default(0)
+  eventTypes       String[]       @default([])
+  languages        String[]       @default([])
+  outputs          TemplateType[]
+  isPremium        Boolean        @default(false)
+  tags             String[]       @default([])
+  status           TemplateStatus @default(DRAFT)
+  thumbnailAssetId String?        @db.Uuid
+  previewAssetId   String?        @db.Uuid
+  currentVersionId String?        @unique @db.Uuid
+  /// Soft delete: hidden everywhere (staff can restore). Events keep their pinned version,
+  /// and the catalog seed never recreates a deleted template.
+  deletedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  versions       TemplateVersion[] @relation("TemplateVersions")
+  currentVersion TemplateVersion?  @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id])
+
+  @@index([status, category])
+  @@index([status, featured, sortOrder])
+  @@index([deletedAt])
+  @@map("templates")
+}
+
+model TemplateVersion {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  templateId  String         @db.Uuid
+  version     Int
+  type        TemplateType
+  /// Validated by @bulava/template-schema.
+  definition  Json
+  status      TemplateStatus @default(DRAFT)
+  changelog   String?
+  publishedAt DateTime?
+  createdById String?        @db.Uuid
+  createdAt   DateTime       @default(now())
+
+  template   Template                 @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+  currentOf  Template?                @relation("TemplateCurrentVersion")
+  sections   TemplateSection[]
+  assets     TemplateAsset[]
+  selections EventTemplateSelection[]
+  videoJobs  VideoJob[]
+
+  @@unique([templateId, version])
+  @@map("template_versions")
+}
+
+model TemplateSection {
+  id                String @id @default(uuid(7)) @db.Uuid
+  templateVersionId String @db.Uuid
+  sectionKey        String
+  sortOrder         Int
+  props             Json   @default("{}")
+
+  templateVersion TemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+
+  @@index([templateVersionId])
+  @@map("template_sections")
+}
+
+model Theme {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  key       String   @unique
+  name      String
+  tokens    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  functions EventFunction[]
+
+  @@map("themes")
+}
+
+model EventTemplateSelection {
+  id                String       @id @default(uuid(7)) @db.Uuid
+  eventId           String       @db.Uuid
+  output            TemplateType
+  templateVersionId String       @db.Uuid
+  /// Only properties the template marks as editable are accepted.
+  customization     Json         @default("{}")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  event           Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  templateVersion TemplateVersion @relation(fields: [templateVersionId], references: [id])
+
+  @@unique([eventId, output])
+  @@map("event_template_selections")
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  SVG
+  AUDIO
+  FONT
+  LOTTIE
+}
+
+enum AssetStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+  ARCHIVED
+}
+
+model AssetLicense {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  licenseType         String
+  provider            String
+  source              String?
+  licenseDocumentKey  String?
+  purchaseReference   String?
+  commercialUse       Boolean
+  onDemandUse         Boolean
+  socialMediaUse      Boolean   @default(false)
+  attributionRequired Boolean   @default(false)
+  attributionText     String?
+  expiresAt           DateTime?
+  verifiedAt          DateTime?
+  verifiedById        String?   @db.Uuid
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  assets Asset[]
+  music  Music[]
+
+  @@index([expiresAt])
+  @@map("asset_licenses")
+}
+
+model Asset {
+  id           String      @id @default(uuid(7)) @db.Uuid
+  name         String
+  type         AssetType
+  category     String
+  tags         String[]    @default([])
+  storageKey   String      @unique
+  thumbnailKey String?
+  mimeType     String
+  sizeBytes    BigInt
+  width        Int?
+  height       Int?
+  /// Widths of the WebP renditions the media worker made (templates/assets/<id>-w<width>.webp).
+  renditions   Int[]       @default([])
+  licenseId    String?     @db.Uuid
+  status       AssetStatus @default(PENDING_REVIEW)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  license   AssetLicense?   @relation(fields: [licenseId], references: [id])
+  templates TemplateAsset[]
+
+  @@index([category, status])
+  @@map("assets")
+}
+
+model TemplateAsset {
+  templateVersionId String @db.Uuid
+  assetId           String @db.Uuid
+
+  templateVersion TemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  asset           Asset           @relation(fields: [assetId], references: [id])
+
+  @@id([templateVersionId, assetId])
+  @@index([assetId])
+  @@map("template_assets")
+}
+
+model Music {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  title           String
+  artist          String?
+  durationSeconds Int
+  storageKey      String      @unique
+  collection      String      @default("LICENSED")
+  licenseId       String      @db.Uuid
+  status          AssetStatus @default(PENDING_REVIEW)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  license AssetLicense @relation(fields: [licenseId], references: [id])
+
+  @@map("music")
+}
+
+// ───────────────────────────── Video ─────────────────────────────
+
+enum VideoJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model VideoJob {
+  id                String         @id @default(uuid(7)) @db.Uuid
+  eventId           String         @db.Uuid
+  templateVersionId String         @db.Uuid
+  status            VideoJobStatus @default(QUEUED)
+  input             Json
+  progress          Int            @default(0)
+  error             String?
+  attempts          Int            @default(0)
+  requestedById     String?        @db.Uuid
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  templateVersion TemplateVersion  @relation(fields: [templateVersionId], references: [id])
+  outputs         GeneratedVideo[]
+
+  @@index([status, createdAt])
+  @@index([eventId])
+  @@map("video_jobs")
+}
+
+model GeneratedVideo {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  videoJobId      String   @db.Uuid
+  storageKey      String   @unique
+  width           Int
+  height          Int
+  durationSeconds Float
+  sizeBytes       BigInt
+  watermarked     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  videoJob VideoJob @relation(fields: [videoJobId], references: [id], onDelete: Cascade)
+
+  @@map("generated_videos")
+}
+
+// ───────────────────────────── Media ─────────────────────────────
+
+enum GalleryVisibility {
+  PUBLIC
+  PRIVATE
+  INVITE_ONLY
+  FUNCTION_RESTRICTED
+}
+
+enum ModerationMode {
+  AUTO_APPROVE
+  MANUAL_APPROVAL
+  AI_ASSISTED
+}
+
+/// An event's photo album. Each event has one main album (isMain; a partial
+/// unique index allows only one) with a single upload link, gallery and live
+/// wall, organised into sub-albums (MediaAlbum). The hidden Design photos room
+/// is the only other room.
+model MediaRoom {
+  id                  String            @id @default(uuid(7)) @db.Uuid
+  eventId             String            @db.Uuid
+  functionId          String?           @db.Uuid
+  name                String
+  slug                String
+  isMain              Boolean           @default(false)
+  galleryVisibility   GalleryVisibility @default(INVITE_ONLY)
+  moderationMode      ModerationMode    @default(AUTO_APPROVE)
+  uploadsEnabled      Boolean           @default(true)
+  downloadPolicy      Json              @default("{\"guestsCanDownload\":false,\"originalQuality\":false}")
+  liveWallEnabled     Boolean           @default(false)
+  /// Secret link for the live photo wall (/wall/<token>): SHA-256 for lookup,
+  /// AES-GCM ciphertext so the host can copy it again. Rotating replaces both.
+  wallTokenHash       String?           @unique
+  wallTokenCiphertext String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  function    EventFunction?    @relation(fields: [functionId], references: [id], onDelete: SetNull)
+  items       MediaItem[]
+  albums      MediaAlbum[]
+  permissions MediaPermission[]
+
+  @@unique([eventId, slug])
+  @@index([eventId])
+  @@map("media_rooms")
+}
+
+enum MediaAlbumKind {
+  /// Photos not tied to a function. One per main album.
+  GENERAL
+  /// One per function, kept in step with the event's functions.
+  FUNCTION
+  /// Added by the host (pre-wedding shoot, family portraits...).
+  CUSTOM
+}
+
+/// A sub-album (folder) of an event's main album. Guests and photographers
+/// pick one when they upload; the host decides which ones the guest gallery
+/// and the live wall show. Partial unique indexes allow one GENERAL album per
+/// room and one album per function.
+model MediaAlbum {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  roomId        String         @db.Uuid
+  eventId       String         @db.Uuid
+  kind          MediaAlbumKind
+  /// FUNCTION albums keep their function's name in step.
+  name          String
+  functionId    String?        @db.Uuid
+  showInGallery Boolean        @default(true)
+  showOnWall    Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  room     MediaRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  function EventFunction? @relation(fields: [functionId], references: [id], onDelete: SetNull)
+  items    MediaItem[]
+
+  @@index([eventId])
+  @@index([roomId, sortOrder])
+  @@map("media_albums")
+}
+
+enum MediaItemStatus {
+  UPLOADING
+  PROCESSING
+  PENDING_MODERATION
+  APPROVED
+  REJECTED
+  DELETED
+}
+
+enum MediaPrivacy {
+  PUBLIC
+  EVENT_ONLY
+  GROUP_ONLY
+  PRIVATE
+}
+
+model MediaItem {
+  id              String          @id @default(uuid(7)) @db.Uuid
+  roomId          String          @db.Uuid
+  /// The sub-album; null only for design photos.
+  albumId         String?         @db.Uuid
+  eventId         String          @db.Uuid
+  uploaderGuestId String?         @db.Uuid
+  uploaderUserId  String?         @db.Uuid
+  uploaderName    String?
+  kind            String
+  originalKey     String          @unique
+  optimizedKey    String?
+  thumbnailKey    String?
+  mimeType        String
+  sizeBytes       BigInt
+  width           Int?
+  height          Int?
+  status          MediaItemStatus @default(UPLOADING)
+  privacy         MediaPrivacy    @default(EVENT_ONLY)
+  moderationNotes String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  room  MediaRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  album MediaAlbum? @relation(fields: [albumId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, status, createdAt])
+  @@index([albumId, status, createdAt])
+  @@index([eventId])
+  @@map("media_items")
+}
+
+/// Per-room permission for a principal (ROLE, GROUP or GUEST).
+model MediaPermission {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  roomId        String  @db.Uuid
+  principalType String
+  principalId   String
+  canUpload     Boolean @default(false)
+  canView       Boolean @default(false)
+  canDownload   Boolean @default(false)
+  canDelete     Boolean @default(false)
+  canModerate   Boolean @default(false)
+
+  room MediaRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, principalType, principalId])
+  @@map("media_permissions")
+}
+
+enum QRType {
+  EVENT
+  FUNCTION
+  PHOTO_UPLOAD
+  GALLERY
+  CHECK_IN
+  INVITATION
+}
+
+model QRCode {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  eventId   String    @db.Uuid
+  type      QRType
+  targetId  String?   @db.Uuid
+  code      String    @unique
+  active    Boolean   @default(true)
+  scanCount Int       @default(0)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, type])
+  @@map("qr_codes")
+}
+
+// ───────────────────────────── Commerce ─────────────────────────────
+
+model PricingPlan {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  key         String   @unique
+  name        String
+  description String?
+  priceMinor  Int
+  currency    String   @default("INR")
+  interval    String   @default("ONE_TIME")
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  features PlanFeature[]
+  orders   Order[]
+
+  @@map("pricing_plans")
+}
+
+/// Feature limit per plan, e.g. featureKey="media.photos.max" limit=500.
+model PlanFeature {
+  id         String  @id @default(uuid(7)) @db.Uuid
+  planId     String  @db.Uuid
+  featureKey String
+  enabled    Boolean @default(true)
+  limit      Int?
+
+  plan PricingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureKey])
+  @@map("plan_features")
+}
+
+model Coupon {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  code           String    @unique
+  percentOff     Int?
+  amountOffMinor Int?
+  maxRedemptions Int?
+  redemptions    Int       @default(0)
+  validFrom      DateTime?
+  validUntil     DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  orders Order[]
+
+  @@map("coupons")
+}
+
+enum OrderStatus {
+  CREATED
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+model Order {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  userId          String      @db.Uuid
+  eventId         String?     @db.Uuid
+  planId          String      @db.Uuid
+  couponId        String?     @db.Uuid
+  amountMinor     Int
+  currency        String      @default("INR")
+  status          OrderStatus @default(CREATED)
+  providerOrderId String?     @unique
+  /// PURCHASE (checkout) or ADMIN_GRANT (a complimentary upgrade by the Super Admin).
+  kind            String      @default("PURCHASE")
+  /// Why a grant was made (required for ADMIN_GRANT).
+  note            String?
+  grantedById     String?     @db.Uuid
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user     User        @relation(fields: [userId], references: [id])
+  plan     PricingPlan @relation(fields: [planId], references: [id])
+  coupon   Coupon?     @relation(fields: [couponId], references: [id])
+  payments Payment[]
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@map("orders")
+}
+
+model Payment {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  orderId           String    @db.Uuid
+  provider          String    @default("RAZORPAY")
+  providerPaymentId String    @unique
+  status            String
+  amountMinor       Int
+  rawWebhook        Json?
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model Entitlement {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @db.Uuid
+  eventId    String?   @db.Uuid
+  featureKey String
+  /**
+   * false switches a feature off (e.g. branding.watermark removed).
+   */
+  enabled    Boolean   @default(true)
+  limit      Int?
+  used       Int       @default(0)
+  sourceType String
+  sourceId   String?
+  validFrom  DateTime  @default(now())
+  validUntil DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, featureKey])
+  @@index([eventId, featureKey])
+  @@map("entitlements")
+}
+
+// ───────────────────────────── Platform ─────────────────────────────
+
+/// Platform settings managed by the Super Admin (one row per group: site, seo,
+/// tracking, code, payments, email, whatsapp, maps, domains, storage). `secrets`
+/// holds AES-GCM ciphertexts (TOKEN_ENCRYPTION_KEY) that are never sent to a browser.
+model PlatformSetting {
+  key         String   @id
+  value       Json     @default("{}")
+  secrets     Json     @default("{}")
+  /// Result of the last connection check: { ok, steps, checkedAt }.
+  lastCheck   Json?
+  updatedById String?  @db.Uuid
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("platform_settings")
+}
+
+model Notification {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  eventId   String?   @db.Uuid
+  userId    String?   @db.Uuid
+  guestId   String?   @db.Uuid
+  type      String
+  channel   String
+  payload   Json
+  status    String    @default("QUEUED")
+  error     String?
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([eventId])
+  @@map("notifications")
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  name       String
+  eventId    String?  @db.Uuid
+  userId     String?  @db.Uuid
+  guestId    String?  @db.Uuid
+  properties Json     @default("{}")
+  occurredAt DateTime @default(now())
+
+  @@index([name, occurredAt])
+  @@index([eventId, name])
+  @@map("analytics_events")
+}
+
+/// who / did what / to what / when / from where / result
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  actorType  String
+  actorId    String?  @db.Uuid
+  action     String
+  targetType String
+  targetId   String?
+  eventId    String?  @db.Uuid
+  result     String   @default("SUCCESS")
+  metadata   Json     @default("{}")
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
+}
+
+/// Customer testimonials shown on the marketing site. Admin-managed; only
+/// real, consented quotes may be published.
+model Testimonial {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  quote      String
+  authorName String
+  location   String?
+  eventLabel String?
+  rating     Int      @default(5)
+  consentAt  DateTime
+  published  Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([published, sortOrder])
+  @@map("testimonials")
+}
+
+// ───────────────────────── Public registration (spec §89) ─────────────────────────
+
+enum RegistrationStatus {
+  PENDING
+  CONFIRMED
+  WAITLISTED
+  REJECTED
+  CANCELLED
+}
+
+/// Self-registration for PUBLIC and PRIVATE_LINK events. No row = registration off.
+model EventRegistrationSettings {
+  eventId          String    @id @db.Uuid
+  enabled          Boolean   @default(false)
+  /// Extra form fields, validated by RegistrationFieldsSchema (@bulava/validation).
+  fields           Json      @default("[]")
+  /// Confirmed places; null = no cap beyond the plan's guest limit.
+  maxRegistrations Int?
+  approvalRequired Boolean   @default(false)
+  waitlistEnabled  Boolean   @default(false)
+  closesAt         DateTime?
+  /// Registered guests join this group so hosts can target functions at them.
+  groupId          String?   @db.Uuid
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_registration_settings")
+}
+
+/// One registration per guest record. The guest is created when someone registers.
+model Registration {
+  id          String             @id @default(uuid(7)) @db.Uuid
+  eventId     String             @db.Uuid
+  guestId     String             @unique @db.Uuid
+  status      RegistrationStatus
+  answers     Json               @default("{}")
+  decidedById String?            @db.Uuid
+  decidedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, status, createdAt])
+  @@map("registrations")
+}
+
+// ───────────────────────────── Guest logistics (spec §52–53) ─────────────────────────────
+
+/// A guest's table at one function. Seating is not access: a seat never lets
+/// anyone into a function, and a guest only sees seats for functions they can see.
+model SeatAssignment {
+  functionId String   @db.Uuid
+  guestId    String   @db.Uuid
+  eventId    String   @db.Uuid
+  tableLabel String
+  seatLabel  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  function EventFunction @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  guest    Guest         @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  event    Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([functionId, guestId])
+  @@index([eventId, functionId])
+  @@index([guestId])
+  @@map("seat_assignments")
+}
+
+/// Where a guest stays during the event. Shown only to that guest.
+model GuestStay {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  eventId    String    @db.Uuid
+  guestId    String    @unique @db.Uuid
+  hotelName  String
+  address    String?
+  mapUrl     String?
+  roomNumber String?
+  roomType   String?
+  checkInAt  DateTime?
+  checkOutAt DateTime?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, hotelName])
+  @@map("guest_stays")
+}
+
+enum TravelDirection {
+  ARRIVAL
+  DEPARTURE
+}
+
+enum TravelMode {
+  FLIGHT
+  TRAIN
+  ROAD
+  BUS
+  OTHER
+}
+
+/// A guest's arrival or departure, entered by the host or by the guest.
+/// `pickupRequested` means a pickup on arrival or a drop on departure.
+model GuestTravel {
+  id              String          @id @default(uuid(7)) @db.Uuid
+  eventId         String          @db.Uuid
+  guestId         String          @db.Uuid
+  direction       TravelDirection
+  mode            TravelMode
+  /// Airline, train or operator, e.g. "IndiGo" or "Shatabdi Express".
+  carrier         String?
+  /// Flight or train number, or a vehicle registration.
+  reference       String?
+  /// Arrival time for ARRIVAL, departure time for DEPARTURE.
+  at              DateTime
+  /// Airport, station or city, e.g. "Jaipur Airport (JAI)".
+  place           String?
+  travellers      Int             @default(1)
+  pickupRequested Boolean         @default(false)
+  /// Host's arrangement shown to the guest, e.g. "Driver Ramesh, white Innova".
+  pickupNote      String?
+  /// Last edited from the invitation page (not by the host team).
+  enteredByGuest  Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@unique([guestId, direction])
+  @@index([eventId, direction, at])
+  @@map("guest_travel")
+}
+
+/// Automatic reminders for one event (spec §49). The worker sends them; the
+/// sent markers make every run idempotent across worker replicas.
+model EventReminderSettings {
+  eventId                String    @id @db.Uuid
+  /// Remind invited guests who have not replied, at this moment (null = off).
+  rsvpReminderAt         DateTime?
+  rsvpReminderSentAt     DateTime?
+  rsvpReminderRecipients Int?
+  /// Remind guests who have not declined this many hours before each function (null = off).
+  functionReminderHours  Int?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([rsvpReminderAt])
+  @@map("event_reminder_settings")
+}
+
+enum DomainStatus {
+  PENDING
+  ACTIVE
+  FAILED
+}
+
+/// A host's own domain for their event (a plan feature). Ownership is proven
+/// with a DNS TXT record; traffic reaches Bulava through a CNAME (or A records)
+/// and TLS comes from Cloudflare for SaaS or the operator's own setup.
+model EventDomain {
+  id                String       @id @default(uuid(7)) @db.Uuid
+  eventId           String       @unique @db.Uuid
+  /// Lower-case, punycode, e.g. "amanweddsriya.com". Several events may claim a
+  /// hostname; only one claim can be verified at a time (partial unique index).
+  hostname          String
+  status            DomainStatus @default(PENDING)
+  verificationToken String
+  verifiedAt        DateTime?
+  /// Custom hostname id at the TLS provider (Cloudflare), when one is used.
+  providerId        String?
+  sslStatus         String?
+  /// Why the last check did not activate the domain (TXT_MISSING, ROUTING_MISSING, SSL_PENDING, PROVIDER_ERROR, EXPIRED, TAKEN).
+  lastError         String?
+  /// Consecutive failed checks of an active domain; it is switched off after a few.
+  failedChecks      Int          @default(0)
+  lastCheckedAt     DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([hostname])
+  @@index([status, lastCheckedAt])
+  @@map("event_domains")
+}

@@ -1,0 +1,7 @@
+# gitleaks: the default rules, plus the one value that only exists for local development.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Development-only TOKEN_ENCRYPTION_KEY (base64 of 'dev-only-token-encryption-key-32'); the API refuses it in production (apps/api/src/config/env.ts)"
+regexes = ['''^ZGV2LW9ubHktdG9rZW4tZW5jcnlwdGlvbi1rZXktMzI=$''']

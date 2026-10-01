@@ -1,0 +1,45 @@
+{
+  "name": "@bulava/video-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Renders video invitations with Remotion + FFmpeg from BullMQ jobs.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node ../../infrastructure/scripts/with-env.cjs tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p remotion/tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "bundle": "node dist/bundle.js"
+  },
+  "dependencies": {
+    "@bulava/database": "workspace:*",
+    "@bulava/queue": "workspace:*",
+    "pino": "^9.0.0",
+    "@bulava/storage": "workspace:*",
+    "@bulava/template-schema": "workspace:*",
+    "@bulava/video-engine": "workspace:*",
+    "@bulava/localization": "workspace:*",
+    "remotion": "4.0.529",
+    "@remotion/bundler": "4.0.529",
+    "@remotion/renderer": "4.0.529",
+    "@remotion/google-fonts": "4.0.529",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "@sentry/node": "^11.1.0"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "tsx": "4.23.15",
+    "@types/node": "^22.15.0",
+    "pino-pretty": "^13.0.0",
+    "@types/react": "19.1.12"
+  },
+  "files": [
+    "dist",
+    "remotion",
+    "remotion-bundle"
+  ]
+}

@@ -1,0 +1,75 @@
+# Testing
+
+> **The test suites are not in the Git repository.** `apps/api/test/`, every `*.test.ts` and `*.spec.ts`, the Jest configuration, `apps/media-worker/src/testing.ts` and the browser checks (`ui-smoke.mjs`, `admin-smoke.mjs`, `a11y-check.mjs`, `mailpit.mjs`) are listed in `.gitignore` and live in the maintainers' working copy. CI runs lint, typecheck, builds and the security scans; run these suites locally before tagging a release.
+
+```bash
+pnpm lint          # ESLint for the whole monorepo (flat config in eslint.config.mjs)
+pnpm typecheck     # strict TypeScript in every package and app
+pnpm test          # unit tests (vitest in packages and workers, jest in the API)
+pnpm test:e2e      # API end-to-end suites against real Postgres, Redis and S3 storage
+pnpm smoke:ui      # browser smoke test of the web app (needs the stack running)
+pnpm smoke:admin   # browser smoke test of the admin console (ADMIN_EMAIL / ADMIN_PASSWORD)
+pnpm a11y          # axe-core accessibility audit, WCAG 2.1 A + AA (needs the stack running)
+```
+
+CI runs lint, typecheck, unit tests, builds and the e2e suites on every push and pull request (see [deployment.md](deployment.md#continuous-deployment)).
+
+## Unit suites
+
+| Suite | Covers |
+|---|---|
+| `packages/auth` | access-policy evaluator (the spec's wedding example, explicit deny, GROUP_RESTRICTED, invitation scope, anonymous viewers, PINs), token validation, AES-GCM, scrypt, RBAC matrices, TOTP against the RFC 4226/6238 vectors (drift, replay, recovery codes) |
+| `packages/validation` | phone normalization, slugs, event/function/guest/RSVP schemas, registration fields and `checkFormAnswers`, two-step and logistics schemas, partial updates never filling in defaults |
+| `packages/localization` | language registry, fallback chains, translation and overrides, IST formatting, wall-clock ↔ UTC |
+| `packages/template-schema` | schema, bindings, template values and fallbacks, customization rules, check matrix, WCAG contrast maths (`ensureContrast` reaches 4.5:1 on every background it is given), film backdrops (scene, camera and particle defaults and limits), painted artwork (layers listed as assets, heroes and backdrops pointing at real artwork, a backdrop is drawn or painted but not both, key and layer limits) |
+| `packages/video-engine` | text fitting for films: long titles, capitals and letter spacing shrink until every line and word fits, with a readable minimum |
+| `packages/domains` | hostname normalisation (IDN to punycode, IPs, reserved names, our own hosts), ownership record names, the Cloudflare for SaaS client |
+| `packages/storage`, `packages/queue` | key building and traversal guards, connection parsing |
+| `packages/database` | the original-music seed: uploads the bundled track once, adds it approved with an owned licence and an audit entry, never uploads or adds it twice |
+| `packages/settings` | environment fallback until a group is saved, then the console's values win (secrets copied over); keeping, replacing and clearing secrets; secrets never stored in plain text; invalid values and unknown secrets refused; one bad stored value ignored without disabling its group; WhatsApp and Maps from the environment (Maps stays off until switched on); masking to the last four characters |
+| `apps/worker` | the WhatsApp Cloud API request (template, language, body variables, number format); permanent failures (bad number, template, token) told apart from rate limits and server errors; when WhatsApp counts as set up; the site name (escaped) in every email's header and footer |
+| `templates/` (catalog) | every definition validates; unique keys; every event type and major tradition covered; tiers, videos and cards present; **the full test matrix passes for all 73 templates**; every Signature template has an opening, music, a verse and the menu; every illustrated film sets each scene inside its artwork, uses a different scene from the other films, and keeps text and cards above the art; retired keys stay out of the catalog |
+| `apps/api` (jest) | environment validation (production refuses dev secrets), exception filter (no leaks) |
+
+## End-to-end suites (`apps/api/test`)
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `vertical-slice.e2e-spec.ts` | 39 | milestone 1: signup and sessions, events, groups, functions with separate audiences and policies, guests, assignments, invitations, each guest's view, RSVP rules, access changes, tenant isolation, free-plan limits, planner members |
+| `platform.e2e-spec.ts` | 34 | template catalog and design, payments (verified checkout, webhook, forged signatures, coupons, refunds), public pages and PINs, announcements, email invitations, the event album (one per event with its QR code and a folder per function) and the media pipeline (signed upload into a folder → worker → EXIF-free renditions → gated gallery, folders hidden from guests), design photos (private design room, placed in a named spot, photos from other events refused on websites and films), check-in, video jobs with the host's colours, fonts and cover photo, OTP, exports and cloning, Template Studio including soft delete and restore (audited, publishing blocked while deleted), asset and music licensing, painted artwork (worker renditions keep transparency and the original untouched; the public route serves only approved, licensed art in a published template, picks the rendition by width, signs cacheable URLs, and stops when the licence lapses; staff preview URLs), account deletion |
+| `registration.e2e-spec.ts` | 6 | public registration: availability, consent and answers, capacity and waiting list, duplicates, cancellation and promotion, approval, PIN gating, closing time |
+| `team.e2e-spec.ts` | 10 | adding people who have an account; each member's permissions with the event; inviting an email without an account (link and 6-digit code emailed, only hashes stored); wrong codes counted and locking after five, a new code unlocking; creating the account and joining signed in, once; joining after signing up in the meantime, only as the invited email; cancelling; escalation rules for owner and admins; removal |
+| `share-link.e2e-spec.ts` | 9 | one link per link-shared event; secret links stored as hash and ciphertext, opened by header or cookie, registering through them, expiry with a clear error and a new date, replacement, a copy's own key; who sees and changes the link; registration open by default per mode, on mode changes and for older events without a setting |
+| `album.e2e-spec.ts` | 6 | a folder per function kept in step with renames, additions and removals; photographers upload into a folder without approval while guests wait; guests offered their functions' folders with the current one suggested and other folders refused; host folders created, renamed, removed (photos to General) and photos moved; function-restricted galleries per guest; older events with several albums folded into one with their printed QR codes still working |
+| `lifecycle.e2e-spec.ts` | 2 | event completion and archiving; retention purge of storage and rows while orders and audit survive |
+| `mfa.e2e-spec.ts` | 6 | staff blocked until two-step sign-in; enrolment with password and live code; encrypted secret and hashed recovery codes; other sessions ended; two-step login; replay refused; challenge limits; recovery codes once; refresh keeps the flag; turning off |
+| `logistics.e2e-spec.ts` | 7 | VIP, dietary, stay and travel; seating separate from access; each guest sees only their own details; guest-entered travel without host notes; exports in the event time zone; check-in desk details; deletion with the guest |
+| `live-wall.e2e-spec.ts` | 4 | opt-in secret links (hash + ciphertext); only approved, shareable photos from folders shown on the wall, through signed URLs; removal; rotation; closing with the event; partial album updates keep moderation |
+| `reminders.e2e-spec.ts` | 4 | schedule validation; RSVP reminders only to non-responders, once; delivery re-checks and language; function reminders by access and declines; moved functions become due again; switching off |
+| `google.e2e-spec.ts` | 6 | Google sign-in against a local mock OpenID provider (JWKS + PKCE-checking token endpoint): sign-up; state bound to the browser and single use; tokens for another app, with a wrong nonce or issuer refused; unverified emails refused; no silent merge into a password account; linking while signed in; two-step accounts get a challenge; unlinking needs a password; setting and changing passwords |
+| `super-admin.e2e-spec.ts` | 15 | one Super Admin enforced by the database and never assignable; what each of the six roles can open (everyone else gets 404); role changes apply on the next request and only the Super Admin makes them; the Super Admin protected, staff accounts left to the Super Admin; two-step reset confirmed with the password; settings saved and validated with write-only, encrypted secrets that never reach responses or the audit log; the public site configuration with branding and trackers and no secrets; CSP sources validated; logo uploads checked in storage and served by signed redirect; the storage check end to end; complimentary upgrades (who may give them, per-event and yearly rules, premium templates unlocked exactly as by a purchase, no refund, revocation ending access at once); profiles with templates used and billing hidden from roles without it; order states (abandoned, awaiting, failed, paid, coupon, complimentary, revoked), filters, totals and no raw gateway payloads; the handover with password and two-step code. The suite borrows the one Super Admin seat and restores it and every setting it changed |
+| `whatsapp.e2e-spec.ts` | 5 | WhatsApp off until the Super Admin sets it up (and hidden from pricing); plan allowance required; two sends racing for the last messages never overspend or message a guest twice; the worker sends the approved template with each guest's own working link; a wrong number is recorded as failed and not charged, a rate limit is retried; reminders on WhatsApp while the allowance lasts and by email otherwise, with the site name in the email |
+| `domains.e2e-spec.ts` | 6 | custom domains with a fake DNS resolver and certificate provider: plan gating; hostname rules; ownership, routing and TLS before going live; routing lookups follow the event (archived yes, deleted no); guest links and QR codes on the domain; RSVPs accepted from it and forged origins refused; unverified claims cannot squat; a live name cannot be taken; the worker switches off lapsed domains; a lapsed name changes hands; removal releases the certificate |
+
+The suites are **non-destructive**. `global-setup.js` applies migrations with `prisma migrate deploy` to the dedicated `bulava_test` database and runs the seed; every run uses unique emails and data, so nothing is ever reset or truncated. `setup-env.js` refuses to run against the development database. Redis uses DB 1.
+
+Point storage at a local S3 (SeaweedFS from `pnpm infra:up`) when running the suites; they upload and delete real objects.
+
+## Browser smoke tests
+
+The scripts drive real Chrome (Remotion's Chrome Headless Shell, or `CHROME_PATH`) against a running stack and fail on page errors, console errors, hydration errors and 5xx responses. Screenshots go to `--out`. The UI smoke and the accessibility check follow a team invitation through Mailpit (`MAILPIT_URL`, default `http://localhost:8025`), so the worker must be able to send email: locally, give it the `SMTP_*` values from `.env.example`. Run them against a production build of the web app (`NODE_ENV=production` with `next build`, then `next start -p 3000`; the variable must be set because `.env` says `development`): `next dev` compiles each page on first visit and recompiles when files change, which makes long runs slow and flaky.
+
+- **`infrastructure/scripts/ui-smoke.mjs`** — marketing pages (and that the public header shows the signed-in account); sign-up and event creation through the UI; every dashboard tab (including Registrations and Stay & travel with its sub-tabs); reminder settings; the guest invitation (with stay, table and the guest adding travel plans), photo upload and staff check-in pages on a phone viewport; three photos shared through the album QR, processed by the media worker and shown on the live wall; a photographer invited by email who joins with the code from Mailpit (a wrong code first), sees only Photos, is told another section is not part of their role, and cannot reuse the code; the Signature collection with replayed openings; a second host whose public event shows its share link on the overview and Invitations pages and plays music after the opening; an anonymous visitor registering and opening their personal invitation; and two-step sign-in (turn on in Account, sign out, sign in with a code). It also checks the Content-Security-Policy: private pages carry a nonce policy with `'strict-dynamic'` and no `'unsafe-inline'`, every script on them carries the nonce, nonces differ between requests, and marketing pages get the static policy.
+- **`infrastructure/scripts/admin-smoke.mjs`** — sign-in, every console page the account can open (with the Super Admin: the four Website pages, Staff & roles with the handover form opened and cancelled, and the storage *Test connection*), a user profile with each of its tabs, the orders filters, a Template Studio round trip (create → edit → save → checks → publish → archive) on a throwaway template, a real asset upload to storage, the Remotion preview of a video template, and the Security page (two-step enrolment started and cancelled, so the admin account is unchanged). Every console page must run under the strict nonce CSP.
+- **`infrastructure/scripts/a11y-check.mjs`** (`pnpm a11y`) — axe-core with the WCAG 2.1 A and AA rules on public pages, the host dashboard, guest pages (invitation, photo upload, gallery, check-in desk, live wall, public event page), the team invitation page (code and account steps) and a photographer's dashboard, every website template's full preview and every opening overlay. `--templates none|all|<key,key>` limits the template pass. It writes `a11y-report.json` to `--out` and exits 1 on serious or critical violations. The last full run covered 95 pages with none.
+- **`infrastructure/scripts/film-stills.mjs`**: renders one still per scene of video and card templates with sample data through the worker's Remotion project, for checking film and scene art changes by eye ([templates.md](templates.md#films-and-cards)).
+
+## Operational scripts
+
+- `backup-postgres.sh` / `restore-test.sh` — exercised against the dev database; the restore test restores into a throwaway container and checks migrations, users, events and templates.
+- `demo-music.mjs` — generates an original track and registers it through the admin API (useful for testing music end to end).
+
+## Still to add
+
+- Load tests for invitation views, registration and uploads.
+- Visual regression snapshots for the catalog.

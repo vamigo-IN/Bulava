@@ -1,0 +1,50 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local storage (never used for durable media)
+.data/
+generated/
+
+# Remotion build-time bundle (video worker)
+apps/video-worker/remotion-bundle/
+
+# Browser test output
+ui-shots/
+admin-shots/
+a11y-report/
+a11y/
+
+# Tests and browser checks stay in the local working copy and are not
+# published with the repository (how to run them: docs/testing.md).
+apps/api/test/
+apps/api/jest.config.js
+**/*.test.ts
+**/*.spec.ts
+apps/media-worker/src/testing.ts
+infrastructure/scripts/ui-smoke.mjs
+infrastructure/scripts/admin-smoke.mjs
+infrastructure/scripts/a11y-check.mjs
+infrastructure/scripts/mailpit.mjs

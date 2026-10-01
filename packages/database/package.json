@@ -1,0 +1,44 @@
+{
+  "name": "@bulava/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "migrate:dev": "node ../../infrastructure/scripts/with-env.cjs prisma migrate dev",
+    "migrate:deploy": "node ../../infrastructure/scripts/with-env.cjs prisma migrate deploy",
+    "migrate:reset": "node ../../infrastructure/scripts/with-env.cjs prisma migrate reset --force",
+    "seed": "node ../../infrastructure/scripts/with-env.cjs node dist/seed.js",
+    "studio": "node ../../infrastructure/scripts/with-env.cjs prisma studio",
+    "validate": "prisma validate",
+    "migrate:create": "node ../../infrastructure/scripts/with-env.cjs prisma migrate dev --create-only",
+    "seed:templates": "node ../../infrastructure/scripts/with-env.cjs node dist/seed.js --update-templates",
+    "set-role": "node ../../infrastructure/scripts/with-env.cjs node dist/set-role.js",
+    "reset-mfa": "node ../../infrastructure/scripts/with-env.cjs node dist/reset-mfa.js"
+  },
+  "dependencies": {
+    "@bulava/auth": "workspace:*",
+    "@bulava/localization": "workspace:*",
+    "@bulava/storage": "workspace:*",
+    "@bulava/template-catalog": "workspace:*",
+    "@bulava/template-schema": "workspace:*",
+    "@bulava/validation": "workspace:*",
+    "@prisma/client": "6.19.3"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "prisma": "6.19.3",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@types/node": "^22.15.0"
+  },
+  "files": [
+    "dist",
+    "generated",
+    "prisma"
+  ]
+}

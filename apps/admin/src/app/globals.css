@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+
+/* Template previews use the engine's Tailwind utilities; scan its sources too. */
+@source '../../../../packages/template-engine/src';
+
+@theme {
+  --font-sans: var(--font-noto-sans), var(--font-noto-devanagari), system-ui, sans-serif;
+  --font-display: var(--font-cormorant), var(--font-playfair), var(--font-noto-serif-devanagari), Georgia, serif;
+  --font-script: var(--font-great-vibes), var(--font-tiro-devanagari), cursive;
+
+  /* Deep maroon (brand) */
+  --color-brand-50: #fbf3f3;
+  --color-brand-100: #f6e2e2;
+  --color-brand-200: #ecc3c4;
+  --color-brand-500: #9b2c35;
+  --color-brand-600: #7a1d27;
+  --color-brand-700: #5b0e1b;
+  --color-brand-800: #4a0b16;
+  --color-brand-900: #2f0710;
+
+  /* Champagne gold */
+  --color-gold-100: #f7eedc;
+  --color-gold-200: #efdcb4;
+  --color-gold-300: #e3c585;
+  --color-gold-500: #b8892b;
+  --color-gold-600: #9c7222;
+  --color-gold-700: #7c5a19;
+
+  /* Paper tones */
+  --color-ivory: #fbf7f0;
+  --color-sand: #f3eadb;
+  --color-cream: #fffaf0;
+  --color-ink: #1c1917;
+
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-stone-50 text-ink antialiased;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-600;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .code-area {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    tab-size: 2;
+  }
+}

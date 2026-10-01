@@ -1,0 +1,37 @@
+{
+  "name": "@bulava/admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node ../../infrastructure/scripts/with-env.cjs next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bulava/template-engine": "workspace:*",
+    "@bulava/template-schema": "workspace:*",
+    "@bulava/validation": "workspace:*",
+    "@bulava/video-engine": "workspace:*",
+    "@remotion/player": "4.0.529",
+    "@tanstack/react-query": "^5.87.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.542.0",
+    "next": "15.5.26",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "remotion": "4.0.529",
+    "tailwind-merge": "^3.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@bulava/config": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "tailwindcss": "^4.1.0",
+    "typescript": "5.9.3"
+  }
+}

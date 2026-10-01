@@ -1,0 +1,21 @@
+**/node_modules
+**/dist
+**/.next
+**/generated
+**/coverage
+**/*.tsbuildinfo
+.git
+.env
+.env.*
+!.env.example
+docs
+
+# Built inside the image
+**/remotion-bundle
+**/*.log
+
+# Tests are not part of any image
+apps/api/test
+apps/media-worker/src/testing.ts
+**/*.test.ts
+**/*.spec.ts
