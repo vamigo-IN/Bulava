@@ -76,7 +76,7 @@ Docker writes its own firewall rules, so ports published on `0.0.0.0` are reacha
    ```
 
    The API refuses to start in production with development secrets, `COOKIE_SECURE=false` or disabled rate limits.
-5. **Images.** CI publishes images to GHCR (`IMAGE_PREFIX=ghcr.io/<owner>/bulava`, `BULAVA_VERSION=<git sha>`), built with the repository variable `WEB_ORIGIN`. Pull them (`docker login ghcr.io` first if the packages are private):
+5. **Images.** CI publishes images to GHCR (`IMAGE_PREFIX=ghcr.io/<owner in lowercase>/bulava`, `BULAVA_VERSION=<git sha>`), built with the repository variable `WEB_ORIGIN`. Pull them (`docker login ghcr.io` first if the packages are private):
 
    ```bash
    docker compose -f docker-compose.prod.yml --env-file .env.production pull
