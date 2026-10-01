@@ -5,7 +5,7 @@ export const revalidate = 600;
 
 /** Public pages only: marketing, templates and PUBLIC + LISTED events. Private links never appear. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const origin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+  const origin = process.env.WEB_ORIGIN || 'http://localhost:3000';
   const [templates, events] = await Promise.all([
     getTemplates(),
     serverApi<Array<{ slug: string; updatedAt: string }>>('/public/events/sitemap', { revalidate: 600 }).then((e) => e ?? []),

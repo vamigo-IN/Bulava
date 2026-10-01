@@ -88,21 +88,31 @@ jobs:
       - id: args
         name: Build arguments
         # Next.js bakes origins and public keys into the build; they come from repository variables.
+        # A variable that is not set is left out, so the Dockerfile's default applies.
         run: |
+          arg() { if [ -n "$2" ]; then echo "$1=$2"; fi; }
+          case "${{ matrix.args }}" in
+            web | admin)
+              [ -n "${{ vars.STORAGE_PUBLIC_ORIGIN }}" ] || echo "::warning::Repository variable STORAGE_PUBLIC_ORIGIN is not set; the ${{ matrix.image }} image uses the Dockerfile default."
+              ;;
+          esac
+          if [ "${{ matrix.args }}" = web ] && [ -z "${{ vars.WEB_ORIGIN }}" ]; then
+            echo "::warning::Repository variable WEB_ORIGIN is not set; the web image uses the Dockerfile default (https://bulava.in). Set it and re-run before deploying."
+          fi
           {
             echo 'list<<EOF'
             case "${{ matrix.args }}" in
               web)
                 echo "API_INTERNAL_URL=http://api:4000"
-                echo "STORAGE_PUBLIC_ORIGIN=${{ vars.STORAGE_PUBLIC_ORIGIN }}"
-                echo "WEB_ORIGIN=${{ vars.WEB_ORIGIN }}"
-                echo "NEXT_PUBLIC_POSTHOG_KEY=${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}"
-                echo "NEXT_PUBLIC_POSTHOG_HOST=${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}"
-                echo "NEXT_PUBLIC_GA4_ID=${{ vars.NEXT_PUBLIC_GA4_ID }}"
+                arg STORAGE_PUBLIC_ORIGIN "${{ vars.STORAGE_PUBLIC_ORIGIN }}"
+                arg WEB_ORIGIN "${{ vars.WEB_ORIGIN }}"
+                arg NEXT_PUBLIC_POSTHOG_KEY "${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}"
+                arg NEXT_PUBLIC_POSTHOG_HOST "${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}"
+                arg NEXT_PUBLIC_GA4_ID "${{ vars.NEXT_PUBLIC_GA4_ID }}"
                 ;;
               admin)
                 echo "API_INTERNAL_URL=http://api:4000"
-                echo "STORAGE_PUBLIC_ORIGIN=${{ vars.STORAGE_PUBLIC_ORIGIN }}"
+                arg STORAGE_PUBLIC_ORIGIN "${{ vars.STORAGE_PUBLIC_ORIGIN }}"
                 ;;
               APP=*) echo "${{ matrix.args }}" ;;
             esac

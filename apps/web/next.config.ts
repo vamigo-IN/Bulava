@@ -1,9 +1,9 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
 
-const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+const apiInternalUrl = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
 /** Origin serving signed storage URLs (R2 custom domain in production, SeaweedFS locally). */
-const storageOrigin = process.env.STORAGE_PUBLIC_ORIGIN ?? 'http://localhost:9000';
+const storageOrigin = process.env.STORAGE_PUBLIC_ORIGIN || 'http://localhost:9000';
 const analytics = {
   posthog: process.env.NEXT_PUBLIC_POSTHOG_KEY ? (process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com') : null,
   ga: process.env.NEXT_PUBLIC_GA4_ID ? 'https://www.googletagmanager.com https://www.google-analytics.com' : null,
@@ -82,7 +82,7 @@ const nextConfig: NextConfig = {
     BULAVA_CSP_STRICT: cspStrict,
     BULAVA_CSP_STATIC: cspStatic,
     // For routing requests that arrive on customers' own domains.
-    BULAVA_WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+    BULAVA_WEB_ORIGIN: process.env.WEB_ORIGIN || 'http://localhost:3000',
     BULAVA_API_INTERNAL_URL: apiInternalUrl,
   },
   reactStrictMode: true,

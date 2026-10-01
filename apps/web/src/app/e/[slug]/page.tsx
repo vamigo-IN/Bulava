@@ -28,7 +28,7 @@ const load = cache(async (slug: string): Promise<Result> => {
   const pass = jar.get(`bulava_pin_${slug}`)?.value;
   // A secret link's key, kept by the middleware when the visitor opened /e/<slug>?k=<key>.
   const linkKey = jar.get(`bulava_link_${slug}`)?.value;
-  const apiBase = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+  const apiBase = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
   try {
     const res = await fetch(`${apiBase}/api/v1/public/events/${encodeURIComponent(slug)}`, {
       cache: 'no-store',

@@ -30,7 +30,7 @@ async function loadInvitation(token: string): Promise<Result> {
   const jar = await cookies();
   const forwardedFor = incoming.get('x-forwarded-for');
   const otpPass = jar.get('bulava_otp')?.value;
-  const apiBase = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+  const apiBase = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
   try {
     const res = await fetch(`${apiBase}/api/v1/public/invitations/${encodeURIComponent(token)}`, {
       cache: 'no-store',

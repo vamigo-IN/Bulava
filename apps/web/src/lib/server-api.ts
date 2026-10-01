@@ -1,6 +1,6 @@
 import type { TemplateDefinition } from '@bulava/template-schema';
 
-const API = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+const API = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
 
 /**
  * Server-side API access for public/marketing pages. Uses Next's data cache

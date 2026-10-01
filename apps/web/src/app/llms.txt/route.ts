@@ -10,7 +10,7 @@ export const revalidate = 300;
  * published templates. Not served while search indexing is switched off.
  */
 export async function GET(): Promise<Response> {
-  const origin = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').replace(/\/$/, '');
+  const origin = (process.env.WEB_ORIGIN || 'http://localhost:3000').replace(/\/$/, '');
   const { site, seo } = await getSiteConfig();
   if (!seo.indexing) return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 

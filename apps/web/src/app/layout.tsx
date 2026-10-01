@@ -6,7 +6,7 @@ import { fontVariables } from './fonts';
 import { QueryProvider } from './providers';
 import './globals.css';
 
-const origin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+const origin = process.env.WEB_ORIGIN || 'http://localhost:3000';
 
 /** Title, description, icons, share images and verification tags come from the admin console (Site settings > SEO). */
 export async function generateMetadata(): Promise<Metadata> {

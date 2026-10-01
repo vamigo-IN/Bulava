@@ -8,7 +8,7 @@ const ALWAYS_DISALLOWED = ['/invite/', '/p/', '/checkin/', '/wall/', '/dashboard
 
 /** robots.txt from the admin console (Site settings > SEO): indexing, extra disallowed paths and AI crawlers. */
 export default async function robots(): Promise<MetadataRoute.Robots> {
-  const origin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+  const origin = process.env.WEB_ORIGIN || 'http://localhost:3000';
   const { seo } = await getSiteConfig();
   if (!seo.indexing) return { rules: [{ userAgent: '*', disallow: '/' }] };
   const blocked = Object.entries(seo.aiCrawlers)

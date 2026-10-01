@@ -1,9 +1,9 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
 
-const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+const apiInternalUrl = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
 /** Origin serving signed storage URLs (R2 custom domain in production, SeaweedFS locally). */
-const storageOrigin = process.env.STORAGE_PUBLIC_ORIGIN ?? 'http://localhost:9000';
+const storageOrigin = process.env.STORAGE_PUBLIC_ORIGIN || 'http://localhost:9000';
 const isDev = process.env.NODE_ENV === 'development';
 
 const csp = [

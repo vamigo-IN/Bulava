@@ -18,7 +18,7 @@ import { isPrivatePath } from '@/lib/private-routes';
  *    admin console need (never added to private pages).
  */
 
-const MAIN_ORIGIN = (process.env.BULAVA_WEB_ORIGIN ?? 'http://localhost:3000').replace(/\/$/, '');
+const MAIN_ORIGIN = (process.env.BULAVA_WEB_ORIGIN || 'http://localhost:3000').replace(/\/$/, '');
 const MAIN_HOST = new URL(MAIN_ORIGIN).hostname;
 const API = (process.env.BULAVA_API_INTERNAL_URL ?? 'http://127.0.0.1:4000').replace(/\/$/, '');
 

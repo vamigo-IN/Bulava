@@ -202,7 +202,7 @@ export default async function HomePage() {
   return (
     <>
       <TemplateStyles />
-      <SiteStructuredData config={siteConfig} origin={process.env.WEB_ORIGIN ?? 'http://localhost:3000'} />
+      <SiteStructuredData config={siteConfig} origin={process.env.WEB_ORIGIN || 'http://localhost:3000'} />
       <SiteHeader tone="dark" />
       <main>
         {/* ───── Act one (dark): hero, traditions, illustrated scenes ───── */}
