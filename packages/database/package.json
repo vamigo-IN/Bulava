@@ -27,11 +27,11 @@
     "@bulava/template-catalog": "workspace:*",
     "@bulava/template-schema": "workspace:*",
     "@bulava/validation": "workspace:*",
-    "@prisma/client": "6.19.3"
+    "@prisma/client": "6.19.3",
+    "prisma": "6.19.3"
   },
   "devDependencies": {
     "@bulava/config": "workspace:*",
-    "prisma": "6.19.3",
     "typescript": "5.9.3",
     "vitest": "3.2.7",
     "@types/node": "^22.15.0"

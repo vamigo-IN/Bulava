@@ -38,7 +38,7 @@ SeaweedFS binds to all interfaces inside its container (`-ip.bind=0.0.0.0`) so i
 
 | Dockerfile | Images | Base | Notes |
 |---|---|---|---|
-| `api.Dockerfile` | `api` (target `runtime`), `migrate` (target `migrate`) | node:22-alpine | `pnpm deploy --prod` output; Prisma engines for musl and Debian |
+| `api.Dockerfile` | `api` (target `runtime`), `migrate` (target `migrate`) | node:22-alpine | `pnpm deploy --prod` output; Prisma engines for musl and Debian. `migrate` is its own small image (the database package with the Prisma CLI, the seed and its music, running as `node`), with no build tools or package manager |
 | `web.Dockerfile` | `web` | node:22-alpine | Next.js standalone; build args: `API_INTERNAL_URL`, `STORAGE_PUBLIC_ORIGIN`, `WEB_ORIGIN`, `NEXT_PUBLIC_*` |
 | `admin.Dockerfile` | `admin` | node:22-alpine | Next.js standalone; build args: `API_INTERNAL_URL`, `STORAGE_PUBLIC_ORIGIN` |
 | `worker.Dockerfile` | `worker`, `media-worker` (`--build-arg APP=…`) | node:22-alpine | sharp ships prebuilt libvips for musl |

@@ -18,11 +18,19 @@ RUN pnpm --filter "@bulava/api..." build
 # Produce a self-contained folder with only production dependencies.
 RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store pnpm --filter @bulava/api deploy --prod /out \
  && cp -r packages/database/prisma /out/prisma
+# The same for the migration runner: the database package (schema, migrations, generated client,
+# seed), its production dependencies including the Prisma CLI, and the music the seed uploads.
+RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store pnpm --filter @bulava/database deploy --prod /migrate \
+ && cp -r packages/database/seed-assets /migrate/seed-assets
 
-# One-off migration runner (has the Prisma CLI). Used by the compose "migrate" service.
-FROM build AS migrate
+# One-off migration runner, used by the compose "migrate" service. A fresh base with only the
+# database package: no build tools and no package manager in the image.
+FROM node:22-alpine AS migrate
 RUN apk add --no-cache openssl
-WORKDIR /repo/packages/database
+ENV NODE_ENV=production CHECKPOINT_DISABLE=1
+WORKDIR /app
+COPY --from=build --chown=node:node /migrate ./
+USER node
 # The local Prisma CLI directly (npx would reach out to the npm registry).
 CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/seed.js"]
 
