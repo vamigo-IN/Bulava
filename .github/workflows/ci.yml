@@ -115,7 +115,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: false
       - name: Scan image for known vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        # Pinned to a commit: the action's tags were republished in 2026 (0.28.0 no longer resolves).
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}:${{ github.sha }}
           severity: CRITICAL
@@ -133,10 +134,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
+      # No install here (the audit reads the lockfile), so no pnpm cache: saving a
+      # cache for a store that does not exist fails the job.
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level=high
       # The gitleaks CLI scans the whole history; the gitleaks GitHub Action needs a
