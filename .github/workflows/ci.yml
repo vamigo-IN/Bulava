@@ -40,7 +40,15 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - name: Build apps
-        run: pnpm -r --filter "./apps/**" build
+        shell: bash
+        # Next.js downloads Google Fonts while it builds: a network hiccup is retried once,
+        # one app at a time, and a real failure is summarised on the run page.
+        run: |
+          build() { pnpm -r "$@" --filter "./apps/**" build 2>&1 | tee build.log; return "${PIPESTATUS[0]}"; }
+          if ! build && ! { echo "::warning::App build failed; retrying one app at a time"; build --workspace-concurrency=1; }; then
+            echo "::error title=App build failed::$(tail -n 40 build.log | sed -e 's/%/%25/g' -e 's/\r//g' | awk 'BEGIN{ORS="%0A"} {print}')"
+            exit 1
+          fi
         env:
           NEXT_TELEMETRY_DISABLED: '1'
 
