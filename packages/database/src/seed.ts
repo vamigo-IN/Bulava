@@ -39,10 +39,21 @@ async function main(): Promise<void> {
     }
 
     if (process.env.SEED_ORIGINAL_MUSIC === 'true') {
-      // Loaded only here, so ordinary seeds need no storage configuration.
-      const { ObjectStorage } = await import('@bulava/storage');
-      const music = await seedOriginalMusic(prisma, ObjectStorage.fromEnv());
-      console.log(`Original music: ${music.created} added to the library, ${music.uploaded} uploaded.`);
+      // Optional: a storage problem is reported, not fatal, so it cannot keep the whole site from
+      // starting. Nothing is added to the library unless the upload succeeds, so the next deploy retries.
+      try {
+        // Loaded only here, so ordinary seeds need no storage configuration.
+        const { ObjectStorage } = await import('@bulava/storage');
+        const music = await seedOriginalMusic(prisma, ObjectStorage.fromEnv());
+        console.log(`Original music: ${music.created} added to the library, ${music.uploaded} uploaded.`);
+      } catch (error) {
+        console.error(
+          `Original music was NOT uploaded: ${error instanceof Error ? error.message : String(error)}\n` +
+            'Check R2_ENDPOINT (https://<Cloudflare account ID>.r2.cloudflarestorage.com; a wrong account ID fails the TLS handshake), ' +
+            'R2_BUCKET (the bucket must exist), R2_ACCESS_KEY and R2_SECRET_KEY. The admin console tests storage under Website > Integrations > Storage. ' +
+            'The next deploy tries again.',
+        );
+      }
     }
   } finally {
     await prisma.$disconnect();
