@@ -92,6 +92,8 @@ import { SettingsStore, type SettingsDb } from '@bulava/settings';
 import { AdminSettingsController, PublicSiteController } from './modules/settings/settings.controller';
 import { SettingsChecksService } from './modules/settings/settings-checks.service';
 import { PlatformSettingsService, SETTINGS_STORE } from './modules/settings/settings.service';
+import { WhatsAppWebhookController } from './modules/whatsapp/whatsapp-webhook.controller';
+import { WhatsAppWebhookService } from './modules/whatsapp/whatsapp-webhook.service';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 import { PlatformPermissionGuard } from './common/guards/platform-permission.guard';
 
@@ -182,6 +184,7 @@ const bootConfig = loadConfig();
     PublicCheckInController,
     VideosController,
     PaymentsController,
+    WhatsAppWebhookController,
     AdminController,
     AdminUsersController,
     EventToolsController,
@@ -245,6 +248,7 @@ const bootConfig = loadConfig();
     CheckInService,
     VideosService,
     PaymentsService,
+    WhatsAppWebhookService,
     AdminService,
     AdminUsersService,
     AdminTemplatesService,
@@ -265,4 +269,4 @@ const bootConfig = loadConfig();
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

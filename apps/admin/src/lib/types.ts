@@ -375,7 +375,7 @@ export interface SettingsOverview {
     source: 'environment';
     lastCheck: SettingCheckResult | null;
   };
-  origins: { web: string; paymentsWebhook: string };
+  origins: { web: string; paymentsWebhook: string; whatsappWebhook: string };
   assetPreviews: Record<'logo' | 'favicon' | 'ogImage', string | null>;
 }
 

@@ -44,7 +44,7 @@ export default function IntegrationsPage() {
         <>
           <PaymentsForm view={overview.groups.payments} webhookUrl={overview.origins.paymentsWebhook} />
           <EmailForm view={overview.groups.email} />
-          <WhatsAppForm view={overview.groups.whatsapp} />
+          <WhatsAppForm view={overview.groups.whatsapp} webhookUrl={overview.origins.whatsappWebhook ?? ''} />
           <MapsForm view={overview.groups.maps} />
           <DomainsForm view={overview.groups.domains} webHost={new URL(overview.origins.web).hostname} />
           <StorageCard storage={overview.storage} />
@@ -142,7 +142,7 @@ function EmailForm({ view }: { view: SettingGroupView }) {
   );
 }
 
-function WhatsAppForm({ view }: { view: SettingGroupView }) {
+function WhatsAppForm({ view, webhookUrl }: { view: SettingGroupView; webhookUrl: string }) {
   const editor = useGroupEditor<WhatsApp>('whatsapp', view);
   const { draft, set } = editor;
   const saved = view.value as WhatsApp;
@@ -201,6 +201,10 @@ function WhatsAppForm({ view }: { view: SettingGroupView }) {
         />
         <TextField label={t('int.whatsapp.language')} placeholder="en" spellCheck={false} className="[&_input]:font-mono" value={draft.templateLanguage} onChange={(v) => set('templateLanguage', v)} />
       </div>
+      <h3 className="pt-2 text-sm font-semibold text-stone-900">{t('int.whatsapp.webhookTitle')}</h3>
+      <p className="-mt-2 text-xs text-stone-500">{t('int.whatsapp.webhookHint')}</p>
+      <GroupSecret editor={editor} view={view} name="webhookVerifyToken" label={t('int.whatsapp.webhookVerifyToken')} />
+      <CopyLine label={t('int.whatsapp.webhookUrl')} value={webhookUrl} />
     </SettingsCard>
   );
 }

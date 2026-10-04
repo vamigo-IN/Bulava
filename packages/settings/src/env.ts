@@ -51,7 +51,11 @@ export function envFallback(group: SettingGroup, env: NodeJS.ProcessEnv): EnvFal
           templates: { invitation: env.WHATSAPP_INVITATION_TEMPLATE || undefined, reminder: env.WHATSAPP_REMINDER_TEMPLATE || undefined },
           ...(env.WHATSAPP_TEMPLATE_LANGUAGE ? { templateLanguage: env.WHATSAPP_TEMPLATE_LANGUAGE } : {}),
         },
-        secrets: present({ accessToken: env.WHATSAPP_ACCESS_TOKEN, appSecret: env.WHATSAPP_APP_SECRET }),
+        secrets: present({
+          accessToken: env.WHATSAPP_ACCESS_TOKEN,
+          appSecret: env.WHATSAPP_APP_SECRET,
+          webhookVerifyToken: env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+        }),
       };
     case 'maps':
       // Filled in but off: maps appear on guest invitations only once the Super Admin

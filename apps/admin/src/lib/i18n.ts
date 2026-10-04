@@ -326,6 +326,12 @@ const en = {
   'int.whatsapp.reminderTemplate': 'Reminder template',
   'int.whatsapp.language': 'Template language code',
   'int.whatsapp.testTo': 'Also send Meta’s hello_world test message to (optional)',
+  'int.whatsapp.webhookTitle': 'Webhooks',
+  'int.whatsapp.webhookHint':
+    'Meta calls this URL to report message delivery status (sent, delivered, read, failed). Set up a verify token here and paste the same token into Meta App Dashboard > WhatsApp > Configuration > Webhook.',
+  'int.whatsapp.webhookVerifyToken': 'Webhook verify token',
+  'int.whatsapp.webhookUrl':
+    'Callback URL: add it in Meta App Dashboard > WhatsApp > Configuration > Webhook and subscribe to the "messages" field.',
   'int.maps': 'Google Maps',
   'int.maps.hint': 'Shows a map of the venue on invitations, using the Maps Embed API (no usage charges from Google).',
   'int.maps.enabled': 'Show maps',

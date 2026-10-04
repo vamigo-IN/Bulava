@@ -223,7 +223,7 @@ export const SETTING_SECRETS = {
   code: [],
   payments: ['keySecret', 'webhookSecret'],
   email: ['password'],
-  whatsapp: ['accessToken', 'appSecret'],
+  whatsapp: ['accessToken', 'appSecret', 'webhookVerifyToken'],
   maps: [],
   domains: ['cloudflareApiToken'],
 } as const satisfies Record<SettingGroup, readonly string[]>;

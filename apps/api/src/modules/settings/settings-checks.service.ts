@@ -57,7 +57,7 @@ export class SettingsChecksService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly queues: QueueService,
     private readonly audit: AuditService,
-  ) {}
+  ) { }
 
   async run(target: Checkable, input: z.infer<typeof RunCheckSchema>, actor: { id: string; email: string | null }, meta: RequestMeta): Promise<SettingCheckResult> {
     const steps: SettingCheckStep[] = [];
@@ -179,6 +179,11 @@ export class SettingsChecksService {
       ok: templates.invitation && templates.reminder ? true : null,
       detail: templates.invitation && templates.reminder ? `${templates.invitation}, ${templates.reminder}` : 'Add the approved template names for invitations and reminders.',
     });
+    steps.push(
+      s.secrets.appSecret && s.secrets.webhookVerifyToken
+        ? { label: 'Webhook configured', ok: true, detail: 'Delivery status updates (sent, delivered, read, failed) are verified with App Secret and Webhook Verify Token.' }
+        : { label: 'Webhook configured', ok: null, detail: 'Optional: add App Secret and Webhook Verify Token to track real-time message delivery status from Meta.' },
+    );
     if (to) {
       const number = to.replace(/[^\d]/g, '');
       const send = await fetch(`${base}/${s.value.phoneNumberId}/messages`, {

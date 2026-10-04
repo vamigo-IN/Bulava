@@ -53,7 +53,7 @@ export class PlatformSettingsService {
     @Inject(SETTINGS_STORE) private readonly store: SettingsStore,
     @Inject(STORAGE) private readonly storage: ObjectStorage,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
-  ) {}
+  ) { }
 
   get<G extends SettingGroup>(group: G) {
     return this.store.get(group);
