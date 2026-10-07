@@ -1,6 +1,10 @@
 # Bulava CI (spec §75): lint → typecheck → build → Docker build → security checks.
 # The test suites are kept outside this repository and run before each release.
 # Deployment lives in deploy.yml and only runs after this workflow succeeds.
+#
+# Actions are on their Node 24 releases, and runners are pinned to an Ubuntu version
+# (not ubuntu-latest) so an image change never alters a build without a commit.
+# pnpm's version comes from "packageManager" in package.json.
 name: CI
 
 on:
@@ -18,19 +22,16 @@ permissions:
 
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '9.15.0'
 
 jobs:
   checks:
     name: Lint, typecheck, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -41,20 +42,33 @@ jobs:
       - run: pnpm typecheck
       - name: Build apps
         shell: bash
-        # Next.js downloads Google Fonts while it builds: a network hiccup is retried once,
-        # one app at a time, and a real failure is summarised on the run page.
+        # The services build in parallel; the two Next.js apps build one after the other, because
+        # each downloads every Google Fonts family it uses while it builds (about 20, with a retry
+        # window of under a second), and two at once can trip Google's rate limit. A failure is
+        # retried once, and its reason is shown on the run page either way.
         run: |
-          build() { pnpm -r "$@" --filter "./apps/**" build 2>&1 | tee build.log; return "${PIPESTATUS[0]}"; }
-          if ! build && ! { echo "::warning::App build failed; retrying one app at a time"; build --workspace-concurrency=1; }; then
-            echo "::error title=App build failed::$(tail -n 40 build.log | sed -e 's/%/%25/g' -e 's/\r//g' | awk 'BEGIN{ORS="%0A"} {print}')"
-            exit 1
+          build() {
+            {
+              pnpm -r --filter "./apps/**" --filter '!@bulava/web' --filter '!@bulava/admin' build &&
+                pnpm --filter @bulava/web build &&
+                pnpm --filter @bulava/admin build
+            } 2>&1 | tee build.log
+            return "${PIPESTATUS[0]}"
+          }
+          annotate() { sed -e 's/%/%25/g' -e 's/\r//g' | awk 'BEGIN{ORS="%0A"} {print}'; }
+          if ! build; then
+            echo "::warning title=App build failed; retrying once::$(grep -E -i 'error|failed|ERR_PNPM|heap' build.log | tail -n 15 | annotate)"
+            if ! build; then
+              echo "::error title=App build failed::$(tail -n 40 build.log | annotate)"
+              exit 1
+            fi
           fi
         env:
           NEXT_TELEMETRY_DISABLED: '1'
 
   docker:
     name: Docker images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [checks]
     timeout-minutes: 60
     permissions:
@@ -74,13 +88,15 @@ jobs:
     env:
       PUSH: ${{ github.event_name == 'push' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Image names must be lowercase, and the repository owner may not be (vamigo-IN).
-      - name: Image name
-        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/bulava/${{ matrix.image }}" >> "$GITHUB_ENV"
-      - uses: docker/setup-buildx-action@v3
+      # A step output (not $GITHUB_ENV) so editors and linters can resolve every reference to it.
+      - id: image
+        name: Image name
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/bulava/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
       - if: env.PUSH == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -118,7 +134,7 @@ jobs:
             esac
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -127,8 +143,8 @@ jobs:
           push: ${{ env.PUSH == 'true' }}
           load: ${{ env.PUSH != 'true' }}
           tags: |
-            ${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.IMAGE }}:${{ github.ref_type == 'tag' && github.ref_name || 'main' }}
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
+            ${{ steps.image.outputs.name }}:${{ github.ref_type == 'tag' && github.ref_name || 'main' }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: false
@@ -136,27 +152,27 @@ jobs:
         # Pinned to a commit: the action's tags were republished in 2026 (0.28.0 no longer resolves).
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          image-ref: ${{ steps.image.outputs.name }}:${{ github.sha }}
           severity: CRITICAL
           ignore-unfixed: true
           exit-code: '1'
 
   security:
     name: Dependency and secret checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      # No install here (the audit reads the lockfile), so no pnpm cache: saving a
-      # cache for a store that does not exist fails the job.
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      # No install here (the audit reads the lockfile), so no dependency cache: saving one for a
+      # store that does not exist fails the job, and setup-node would otherwise cache automatically
+      # because package.json names its package manager.
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level=high
       # The gitleaks CLI scans the whole history; the gitleaks GitHub Action needs a
