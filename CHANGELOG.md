@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Faster marketing pages
+
+The home page scored 26 for performance in Lighthouse on a phone. It took 10.5 s to show its headline and blocked the main thread for 12 s. The main causes and their fixes:
+
+- **Template galleries are images.** They used to be live renders: 28 previews made about 28,000 DOM elements and 4.9 MB of HTML. They are now pre-rendered WebP previews (about 20 KB each, lazy-loaded), and so are the hero phone and the posters of films and cards. The home page's HTML went from 483 KB to about 60 KB compressed, and its DOM from 30,800 to about 2,000 elements. `infrastructure/scripts/template-previews.mjs` regenerates them ([templates.md](docs/templates.md#marketing-previews)).
+- **Trackers wait for the visitor.** Analytics and custom code load on the first scroll, tap or key press, or after 8 seconds, instead of during page load.
+- **Smaller scripts.** The error page, the site header, the sign-in form and the dashboard shell no longer pull in the whole template engine (and with it Zod, about 450 KB). A card or the hero phone loads the engine only for a template that has no preview image yet. The home page no longer uses framer-motion.
+- **The headline shows at once.** The hero title and subtitle rise into place without starting hidden.
+- **Fewer font downloads.** The rupee sign now comes from two 1 KB fonts cut from the site's own fonts and inlined in the stylesheet, so it looks the same. Devanagari text in the interface uses the device's font. Together this replaces 295 KB of extra web-font subsets.
+
+Lighthouse's mobile test of a local production build, against the production API, gave the following for the home page:
+
+| Metric | Before | After |
+|---|---|---|
+| Performance score | 26 | 84 (runs ranged from 69 to 84 as the test machine's CPU load varied) |
+| First contentful paint | 5.4 s | 1.8 s |
+| Largest contentful paint | 10.5 s | 4.0 s |
+| Total blocking time | 12.35 s | 0.11–0.6 s |
+| Page weight | 2.7 MB | 0.6 MB |
+
+`/templates` went from 1.1 MB to 250 KB of HTML.
+
 ## 1.0.0 — first production release (1 October 2026)
 
 The first version meant for real hosts and guests. Deploy it by pushing the tag `v1.0.0` (the deploy workflow sends `v*` tags to production) after working through the [go-live checklist](docs/deployment.md#go-live-checklist).

@@ -3,7 +3,7 @@
 import { ArrowRight, ArrowUpRight, CalendarDays, LayoutGrid, Plus, UsersRound } from 'lucide-react';
 import Link from 'next/link';
 import { formatEventDate } from '@bulava/localization';
-import { Mandala } from '@bulava/template-engine';
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { useT } from '@/lib/i18n';
 import { useEvents, useMe } from '@/lib/queries';
 import { Badge, Spinner } from '@/components/ui/primitives';

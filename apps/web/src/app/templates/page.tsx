@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { createTranslator, type MessageKey } from '@bulava/localization';
-import { Mandala, TemplateStyles } from '@bulava/template-engine';
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { SectionHeading, SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { TemplateCard } from '@/components/marketing/template-card';
 import { filterItems, TemplateExplorer, type ExplorerItem } from '@/components/marketing/template-explorer';
@@ -41,14 +41,13 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
   const all = { value: '', label: t('filter.all') };
   const current = { tag: one(params.tag), tier: one(params.tier), event: one(params.event), format: one(params.format) };
   const matching = filterItems(items, current);
-  // Pages of live previews: each card is real markup, so the gallery grows on request.
+  // The gallery grows on request, a page of cards at a time.
   const pages = Math.max(1, Math.min(20, Number.parseInt(one(params.page), 10) || 1));
   const shown = pages * PAGE_SIZE;
   const moreParams = new URLSearchParams({ ...Object.fromEntries(Object.entries(current).filter(([, v]) => v)), page: String(pages + 1) });
 
   return (
     <>
-      <TemplateStyles />
       <SiteHeader />
       <main className="min-h-dvh bg-ivory">
         <section className="relative isolate overflow-hidden">

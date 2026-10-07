@@ -2,9 +2,14 @@ import { Play } from 'lucide-react';
 import Link from 'next/link';
 import type { Translator } from '@bulava/localization';
 import { TiltCard } from '@/components/effects/tilt-card';
-import { backdropArt, backdropTitleTop, Ornament, SceneStill, TemplateThumbnail } from '@bulava/template-engine';
-import { sampleRenderContext } from '@bulava/template-schema';
+// Single modules, not the package entry: importing that would ship every client component
+// of the template engine (openings, music, RSVP forms) with every page that shows a card.
+import { backdropArt, backdropTitleTop, SceneStill } from '@bulava/template-engine/src/art/scenes';
+import { Ornament } from '@bulava/template-engine/src/ornaments';
+import { TemplateStyles } from '@bulava/template-engine/src/styles';
 import type { TemplateSummary } from '@/lib/server-api';
+import { cardPreview, POSTER_HEIGHT, POSTER_WIDTH, posterPreview } from '@/lib/template-previews';
+import { LiveThumbnail } from './live-thumbnail';
 
 const BADGE_STYLE = {
   NEW: 'bg-emerald-700 text-white',
@@ -12,42 +17,112 @@ const BADGE_STYLE = {
   BESTSELLER: 'bg-brand-700 text-gold-200',
 } as const;
 
-/** Server-rendered live preview of a template's first sections inside a phone frame. */
-export function TemplatePhone({ template, width = 220, height = 400, sections = 2 }: { template: TemplateSummary; width?: number; height?: number; sections?: number }) {
+const PHONE_FRAME = 'phone-frame transition-all duration-500 hover:shadow-[0_0_40px_rgba(227,197,133,0.2)]';
+
+/**
+ * A template's first sections inside a phone frame: the pre-rendered preview
+ * image when there is one (lib/template-previews), otherwise a live preview
+ * (the template engine then loads on demand). `priority` is for phones visible
+ * on arrival.
+ */
+export function TemplatePhone({
+  template,
+  width = 220,
+  height = 400,
+  sections = 2,
+  priority = false,
+}: {
+  template: TemplateSummary;
+  width?: number;
+  height?: number;
+  sections?: number;
+  priority?: boolean;
+}) {
   if (!template.definition || template.definition.type !== 'WEBSITE') {
-    return <VideoPoster template={template} width={width} height={height} />;
+    return <VideoPoster template={template} width={width} height={height} priority={priority} />;
   }
-  const ctx = sampleRenderContext({ typeKey: template.eventTypes[0] ?? 'WEDDING', noPhotos: true });
+  const preview = cardPreview(template.key);
   return (
-    <div className="phone-frame transition-all duration-500 hover:shadow-[0_0_40px_rgba(227,197,133,0.2)]" style={{ width: width + 14, height: height + 14 }}>
+    <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
       {/* Glass reflection */}
       <div className="pointer-events-none absolute inset-0 z-10 rounded-[1.8rem] bg-gradient-to-b from-white/8 via-transparent to-transparent" aria-hidden="true" />
-      <TemplateThumbnail definition={template.definition} context={ctx} width={width} height={height} sections={sections} />
+      {preview ? (
+        <img
+          src={preview}
+          alt=""
+          width={width}
+          height={height}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          className="block object-cover object-top"
+          style={{ width, height }}
+        />
+      ) : (
+        <LiveThumbnail definition={template.definition} eventType={template.eventTypes[0] ?? 'WEDDING'} width={width} height={height} sections={sections} />
+      )}
     </div>
   );
 }
 
-/** Video/card templates: the film's drawn or painted scene, or a styled poster from the template's theme. */
-function VideoPoster({ template, width, height }: { template: TemplateSummary; width: number; height: number }) {
+/** The scene a video or card template opens on (drawn or painted), if it has one. */
+function posterScene(template: TemplateSummary) {
   const definition = template.definition;
-  const c = definition?.theme.colors;
+  const colors = definition?.theme.colors;
   const backdrop = definition?.scenes?.find((s) => s.backdrop)?.backdrop;
-  const label = template.outputs.includes('VIDEO') ? '▶ Video' : 'Card';
-  const art = definition && backdrop && c ? backdropArt(definition, backdrop, c, { width: 1200 }) : null;
-  if (art && definition && backdrop && c) {
+  const art = definition && backdrop && colors ? backdropArt(definition, backdrop, colors, { width: 1200 }) : null;
+  return art && definition && backdrop && colors ? { art, definition, backdrop, colors } : null;
+}
+
+export const hasPosterScene = (template: TemplateSummary) => posterScene(template) !== null;
+
+const posterLabel = (template: TemplateSummary) => (template.outputs.includes('VIDEO') ? '▶ Video' : 'Card');
+
+/**
+ * A video or card template's scene with its title, without the phone frame (null when it
+ * has no scene). Galleries show it as a pre-rendered image (lib/template-previews), which
+ * /preview-frame photographs from this component.
+ */
+export function PosterScene({ template, width, height }: { template: TemplateSummary; width: number; height: number }) {
+  const scene = posterScene(template);
+  if (!scene) return null;
+  const { art, definition, backdrop, colors: c } = scene;
+  return (
+    <>
+      {/* The scene's motion (twinkling, swaying, floating lanterns); React adds the stylesheet once per page. */}
+      <TemplateStyles />
+      <SceneStill art={art} width={width} height={height}>
+        <div className="absolute inset-x-0 flex flex-col items-center gap-2 px-7 text-center" style={{ color: art.dark ? c.accent : c.primary, top: `${backdropTitleTop(definition, backdrop) * 100}%` }}>
+          <span className="text-[10px] font-semibold tracking-[0.35em] uppercase">{posterLabel(template)}</span>
+          <span className="font-display text-2xl leading-tight [text-shadow:0_1px_10px_rgba(0,0,0,0.25)]">{template.name}</span>
+        </div>
+      </SceneStill>
+    </>
+  );
+}
+
+/**
+ * Video/card templates: the pre-rendered poster at the gallery card's size, else the film's
+ * drawn or painted scene, or a styled poster from the template's theme.
+ */
+function VideoPoster({ template, width, height, priority }: { template: TemplateSummary; width: number; height: number; priority: boolean }) {
+  const image = width === POSTER_WIDTH && height === POSTER_HEIGHT ? posterPreview(template.key) : null;
+  if (image) {
     return (
-      <div className="phone-frame transition-all duration-500 hover:shadow-[0_0_40px_rgba(227,197,133,0.2)]" style={{ width: width + 14, height: height + 14 }}>
-        <SceneStill art={art} width={width} height={height}>
-          <div className="absolute inset-x-0 flex flex-col items-center gap-2 px-7 text-center" style={{ color: art.dark ? c.accent : c.primary, top: `${backdropTitleTop(definition, backdrop) * 100}%` }}>
-            <span className="text-[10px] font-semibold tracking-[0.35em] uppercase">{label}</span>
-            <span className="font-display text-2xl leading-tight [text-shadow:0_1px_10px_rgba(0,0,0,0.25)]">{template.name}</span>
-          </div>
-        </SceneStill>
+      <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
+        <img src={image} alt="" width={width} height={height} loading={priority ? 'eager' : 'lazy'} decoding="async" className="block" style={{ width, height }} />
       </div>
     );
   }
+  if (posterScene(template)) {
+    return (
+      <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
+        <PosterScene template={template} width={width} height={height} />
+      </div>
+    );
+  }
+  const c = template.definition?.theme.colors;
   return (
-    <div className="phone-frame transition-all duration-500 hover:shadow-[0_0_40px_rgba(227,197,133,0.2)]" style={{ width: width + 14, height: height + 14 }}>
+    <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
       <div
         className="relative flex h-full w-full flex-col items-center justify-center gap-3 overflow-hidden px-6 text-center"
         style={{ background: c ? `linear-gradient(160deg, ${c.primary}, ${c.secondary})` : '#5b0e1b', color: c?.background ?? '#fff' }}
@@ -55,7 +130,7 @@ function VideoPoster({ template, width, height }: { template: TemplateSummary; w
         {template.definition && template.definition.theme.ornament !== 'none' ? (
           <Ornament name={template.definition.theme.ornament} className="pointer-events-none absolute top-1/2 left-1/2 w-[140%] -translate-x-1/2 -translate-y-1/2 opacity-20" style={{ color: c?.accent }} />
         ) : null}
-        <span className="relative text-[10px] tracking-[0.35em] uppercase opacity-80">{label}</span>
+        <span className="relative text-[10px] tracking-[0.35em] uppercase opacity-80">{posterLabel(template)}</span>
         <span className="relative font-display text-3xl leading-tight">{template.name}</span>
         <span className="relative text-xs opacity-80">{template.category}</span>
       </div>

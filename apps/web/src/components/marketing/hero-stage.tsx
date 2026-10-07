@@ -1,14 +1,20 @@
 'use client';
 
 import { CalendarHeart, CheckCircle2, Eye } from 'lucide-react';
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { TemplateRenderer } from '@bulava/template-engine';
-import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
+import dynamic from 'next/dynamic';
+import { useEffect, useRef, type ReactNode } from 'react';
+import type { TemplateDefinition } from '@bulava/template-schema';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 
 gsap.registerPlugin(ScrollTrigger);
+
+/** Only for a template without a pre-rendered preview: the template engine loads with it. */
+const LiveScreen = dynamic(() => import('./live-template').then((m) => m.LiveScreen));
+
+/** Inner width of the hero phone's screen (the 284 px frame minus its 7 px borders). */
+const SCREEN_WIDTH = 270;
 
 export interface HeroChips {
   opened: string;
@@ -36,19 +42,37 @@ function Chip({ icon, text, className, depth, delay }: { icon: ReactNode; text: 
 }
 
 /**
- * The homepage's 3D stage: a phone playing a real, live invitation (it scrolls
- * itself, and pauses while the visitor looks), two more designs fanned out
+ * The homepage's 3D stage: a phone playing a real invitation (a pre-rendered
+ * long preview, or the live template when there is none; it scrolls itself
+ * and pauses while the visitor looks), two more designs fanned out
  * behind it, and glass "what happens next" chips floating at different depths.
  * The rig leans toward the pointer and drifts on scroll. It is lit by a soft
  * radial glow and a floor shadow rather than a panel, so it has no edges. The
  * entrance is pure CSS (it plays from the first paint, before hydration); all
  * motion stops for reduced-motion visitors.
  */
-export function HeroStage({ definition, eventType, back, chips, liveLabel }: { definition: TemplateDefinition; eventType: string; back: [ReactNode, ReactNode]; chips: HeroChips; liveLabel: string }) {
+export function HeroStage({
+  name,
+  image,
+  definition,
+  eventType,
+  back,
+  chips,
+  liveLabel,
+}: {
+  name: string;
+  /** The pre-rendered long preview (lib/template-previews); `width` and `height` are its CSS size. */
+  image?: { src: string; width: number; height: number } | null;
+  /** Rendered live only when there is no image. */
+  definition?: TemplateDefinition | null;
+  eventType: string;
+  back: [ReactNode, ReactNode];
+  chips: HeroChips;
+  liveLabel: string;
+}) {
   const stage = useRef<HTMLDivElement>(null);
   const rig = useRef<HTMLDivElement>(null);
   const screen = useRef<HTMLDivElement>(null);
-  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType }), [eventType]);
 
   // Drift as the hero scrolls away: the rig tips back, the chips rise at their own speeds.
   useGSAP(
@@ -168,9 +192,20 @@ export function HeroStage({ definition, eventType, back, chips, liveLabel }: { d
                     data-lenis-prevent
                     className="relative h-full w-full overflow-y-auto overscroll-contain bg-white [scrollbar-width:none]"
                     tabIndex={0}
-                    aria-label={definition.name}
+                    aria-label={name}
                   >
-                    <TemplateRenderer definition={definition} context={ctx} mode="preview" language="en" />
+                    {image ? (
+                      <img
+                        src={image.src}
+                        alt=""
+                        width={SCREEN_WIDTH}
+                        height={Math.round((image.height * SCREEN_WIDTH) / image.width)}
+                        decoding="async"
+                        className="block h-auto w-full"
+                      />
+                    ) : definition ? (
+                      <LiveScreen definition={definition} eventType={eventType} />
+                    ) : null}
                   </div>
                 </div>
               </div>

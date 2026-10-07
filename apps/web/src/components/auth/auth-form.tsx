@@ -12,7 +12,8 @@ import { loadSession } from '@/lib/session';
 import type { MessageKey } from '@bulava/localization';
 import { GoogleButton, useGoogleEnabled } from './google-button';
 import { errorMessage, I18nProvider, useT } from '@/lib/i18n';
-import { Mandala } from '@bulava/template-engine';
+// The single module: the package entry would bring the whole template engine (and Zod) to sign-in.
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { Alert, Button, Field, Input } from '@/components/ui/primitives';
 import { BrandLogo } from '@/components/marketing/brand-logo';
 

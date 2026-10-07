@@ -268,6 +268,28 @@ The API also checks that placed photos are approved images of the same event and
 
 Hosts edit websites in the dashboard's **Design** page (tabs *Style*, *Photos*, *Words*, *Motion & music*, *Sections*, with a live preview) and films on the **Video & cards** page (*Style* and *Photos*, with a live Remotion preview). Photos uploaded there go to a hidden per-event room, *Design photos* (private, auto-approved, no QR code), through the normal signed-upload and processing pipeline; see [media.md](media.md).
 
+## Marketing previews
+
+The home page and `/templates` show templates as pre-rendered WebP images, not live renders: 28 live previews made the home page about 28,000 DOM elements and 4.9 MB of HTML, and a phone needed seconds to draw it; the scenes of 8 film posters made `/templates` 1 MB of HTML. The images live in `apps/web/public/template-previews/`:
+
+- `<key>.webp`: a website's thumbnail, the top 390 × 780 CSS px at 2×;
+- `<key>-full.webp`: the first 2600 px of the full preview, for the hero phone;
+- `<key>-poster.webp`: a film's or card's scene with its title, at the gallery card's 220 × 400 CSS px, 2×. Films and cards without a scene keep their light gradient poster.
+
+`apps/web/src/lib/template-previews.json` lists them with content hashes, which become `?v=` in the URL so a changed image is never served from an old cache. A template without an image is still shown, drawn live as before (a website card loads the template engine on demand through `LiveThumbnail`). Every `TemplateCard` and `TemplatePhone` uses the images (including "more like this" on template pages); a template page's own preview, the demo and the dashboard's design picker keep rendering live.
+
+After adding or changing a template, regenerate them and commit the images and the manifest:
+
+```bash
+# Terminal 1: the web app with the capture route on (it 404s otherwise)
+TEMPLATE_PREVIEW_FRAMES=1 pnpm --filter @bulava/web dev
+# Terminal 2 (API running too)
+node infrastructure/scripts/template-previews.mjs                   # every template
+node infrastructure/scripts/template-previews.mjs --only key1,key2  # just these
+```
+
+The script photographs `/preview-frame/<key>` (a bare page that only exists with `TEMPLATE_PREVIEW_FRAMES=1`; `?view=card`, `full` or `poster`) with reduced motion, so openings and entrances are already settled. `--full` picks the templates that also get a long image (default `marigold-mahal`, the hero). A full run deletes images of templates that are gone. Rebuild the web app afterwards: the manifest is compiled in.
+
 ## Quality gates
 
 - **Schema and semantics**: `validateTemplateDefinition` (structure, bindings, translation keys, unique ids).

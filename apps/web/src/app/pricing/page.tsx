@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import { createTranslator } from '@bulava/localization';
-import { Mandala } from '@bulava/template-engine';
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { PricingCards } from '@/components/marketing/pricing-cards';
 import { SectionHeading, SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { getPlans } from '@/lib/server-api';

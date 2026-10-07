@@ -1,7 +1,7 @@
 import { ArrowRight, House } from 'lucide-react';
 import Link from 'next/link';
 import { createTranslator } from '@bulava/localization';
-import { Mandala } from '@bulava/template-engine';
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 
 const t = createTranslator('en');

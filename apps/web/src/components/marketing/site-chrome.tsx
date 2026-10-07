@@ -2,7 +2,8 @@ import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { createTranslator } from '@bulava/localization';
-import { Mandala } from '@bulava/template-engine';
+// The single module: the package entry would ship the template engine's client components with every page.
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import type { PublicSiteConfig } from '@bulava/validation';
 import { getSiteConfig, whatsappChatUrl } from '@/lib/site-config';
 import { cn } from '@/lib/utils';

@@ -103,6 +103,29 @@ function loadTrackers(t: PublicSiteConfig['tracking']): boolean {
   return any;
 }
 
+/** How long trackers wait for a first interaction before loading anyway. */
+const IDLE_LOAD_MS = 8000;
+
+/**
+ * Runs `load` on the visitor's first interaction (scroll, tap, key) or after
+ * IDLE_LOAD_MS, whichever comes first. Trackers cost about 1 MB of scripts and
+ * seconds of main-thread time on a phone; loading them right after hydration
+ * delayed the first render, while page views are still counted this way.
+ */
+function whenEngagedOrIdle(load: () => void) {
+  const events = ['pointerdown', 'keydown', 'touchstart', 'scroll'] as const;
+  let done = false;
+  const start = () => {
+    if (done) return;
+    done = true;
+    window.clearTimeout(timer);
+    for (const name of events) window.removeEventListener(name, start);
+    load();
+  };
+  const timer = window.setTimeout(start, IDLE_LOAD_MS);
+  for (const name of events) window.addEventListener(name, start, { once: true, passive: true });
+}
+
 /**
  * Trackers and the Super Admin's code snippets (Site settings > Tracking &
  * code), loaded only on public marketing pages, never on private pages
@@ -126,19 +149,21 @@ export function AnalyticsScripts() {
     }
     if (state.requested) return;
     state.requested = true;
-    void fetch('/api/v1/public/site-config', { credentials: 'omit' })
-      .then((res) => (res.ok ? (res.json() as Promise<{ success: boolean; data: PublicSiteConfig }>) : null))
-      .then((body) => {
-        if (!body?.success || isPrivatePath(window.location.pathname)) return;
-        const config = body.data;
-        const trackers = loadTrackers(config.tracking);
-        injectHtml(config.code.headHtml, document.head);
-        injectHtml(config.code.bodyHtml, document.body);
-        state.loaded = trackers || Boolean(config.code.headHtml.trim() || config.code.bodyHtml.trim());
-      })
-      .catch(() => {
-        state.requested = false;
-      });
+    whenEngagedOrIdle(() => {
+      void fetch('/api/v1/public/site-config', { credentials: 'omit' })
+        .then((res) => (res.ok ? (res.json() as Promise<{ success: boolean; data: PublicSiteConfig }>) : null))
+        .then((body) => {
+          if (!body?.success || isPrivatePath(window.location.pathname)) return;
+          const config = body.data;
+          const trackers = loadTrackers(config.tracking);
+          injectHtml(config.code.headHtml, document.head);
+          injectHtml(config.code.bodyHtml, document.body);
+          state.loaded = trackers || Boolean(config.code.headHtml.trim() || config.code.bodyHtml.trim());
+        })
+        .catch(() => {
+          state.requested = false;
+        });
+    });
   }, [pathname]);
   return null;
 }

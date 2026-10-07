@@ -24,7 +24,8 @@ import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import type { MessageKey } from '@bulava/localization';
-import { Mandala } from '@bulava/template-engine';
+// The single module: every event page shares this layout, and the package entry would bring the whole template engine.
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { errorMessage, useT } from '@/lib/i18n';
 import { can, canOpenSection } from '@/lib/permissions';
 import { useDesign, useEvent } from '@/lib/queries';

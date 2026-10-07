@@ -3,7 +3,9 @@
 import { House, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { createTranslator } from '@bulava/localization';
-import { Mandala } from '@bulava/template-engine';
+// Straight from its module: this boundary ships with every page, and the package's
+// entry point would bring the whole template engine (and Zod, ~450 KB) along.
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 
 const t = createTranslator('en');
 

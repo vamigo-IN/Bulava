@@ -36,7 +36,9 @@ import {
 import Link from 'next/link';
 import { Fragment } from 'react';
 import { createTranslator, type MessageKey } from '@bulava/localization';
-import { Mandala, SCENES, TemplateStyles } from '@bulava/template-engine';
+// Single modules, not the package entry (which would ship the engine's client components with the page).
+import { SCENES } from '@bulava/template-engine/src/art/scenes';
+import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { SpotlightGrid } from '@/components/effects/spotlight-grid';
 import { TiltCard } from '@/components/effects/tilt-card';
 import { AuthAwareLink } from '@/components/marketing/account-links';
@@ -51,6 +53,7 @@ import { VideoShowcase } from '@/components/marketing/video-showcase';
 import { MagneticButton } from '@/lib/motion/magnetic-button';
 import { getPlans, getStats, getTemplates, getTestimonials, tierPrice, type TemplateSummary } from '@/lib/server-api';
 import { getSiteConfig } from '@/lib/site-config';
+import { fullPreview } from '@/lib/template-previews';
 import { cn } from '@/lib/utils';
 import { Parallax, Reveal, StepsProgress } from './home-animations';
 
@@ -181,6 +184,7 @@ export default async function HomePage() {
   // The stage plays a flagship scene live; two more designs sit behind it.
   const heroLive = byKey.get('marigold-mahal') ?? websites.find((w) => w.featured) ?? websites[0];
   const heroBack = ['rajwada-royale', 'kanjeevaram-gold'].map((k) => byKey.get(k)).filter((x): x is TemplateSummary => !!x);
+  const heroImage = heroLive ? fullPreview(heroLive.key) : null;
   // Illustrated 3D scene templates, found from their data (the hero section's variant), flagships first.
   const sceneNames = new Set<string>(SCENES);
   const scenes: CoverflowItem[] = websites
@@ -201,7 +205,6 @@ export default async function HomePage() {
 
   return (
     <>
-      <TemplateStyles />
       <SiteStructuredData config={siteConfig} origin={process.env.WEB_ORIGIN || 'http://localhost:3000'} />
       <SiteHeader tone="dark" />
       <main>
@@ -225,7 +228,7 @@ export default async function HomePage() {
               <h1 id="hero-title" aria-label={t('home.hero.title')} className="mt-6 font-display text-[2.9rem] leading-[1.02] font-medium tracking-tight text-balance sm:text-6xl xl:text-[4.6rem]">
                 <RisingWords text={t('home.hero.title')} />
               </h1>
-              <p className="mt-7 max-w-xl animate-fade-in-up text-lg leading-relaxed text-pretty text-ivory/75" style={{ animationDelay: '0.55s' }}>
+              <p className="mt-7 max-w-xl animate-settle-up text-lg leading-relaxed text-pretty text-ivory/75" style={{ animationDelay: '0.2s' }}>
                 {t('home.hero.subtitle')}
               </p>
               <p className="mt-3 max-w-xl animate-fade-in-up text-base text-ivory/60" style={{ animationDelay: '0.65s' }}>
@@ -252,13 +255,16 @@ export default async function HomePage() {
             <div className="lg:col-span-6">
               {heroLive?.definition ? (
                 <HeroStage
-                  definition={heroLive.definition}
+                  name={heroLive.name}
+                  image={heroImage}
+                  // The definition is sent to the browser only when the live renderer has to draw it.
+                  definition={heroImage ? null : heroLive.definition}
                   eventType={heroLive.eventTypes[0] ?? 'WEDDING'}
                   liveLabel={t('home.hero.live')}
                   chips={{ opened: t('home.hero.chip.opened'), rsvp: t('home.hero.chip.rsvp'), event: t('home.hero.chip.event') }}
                   back={[
-                    heroBack[0] ? <TemplatePhone key="back-0" template={heroBack[0]} width={200} height={400} sections={1} /> : null,
-                    heroBack[1] ? <TemplatePhone key="back-1" template={heroBack[1]} width={200} height={400} sections={1} /> : null,
+                    heroBack[0] ? <TemplatePhone key="back-0" template={heroBack[0]} width={200} height={400} sections={1} priority /> : null,
+                    heroBack[1] ? <TemplatePhone key="back-1" template={heroBack[1]} width={200} height={400} sections={1} priority /> : null,
                   ]}
                 />
               ) : null}
