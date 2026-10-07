@@ -37,7 +37,7 @@
 | Privacy: consent records, personal data export, account deletion (anonymization), event deletion with retention purge | users controller, worker lifecycle |
 | Production config refuses dev secrets, insecure cookies and disabled rate limits | `config/env.ts` |
 | Containers run as non-root with dropped capabilities and `no-new-privileges`; API and Alpine workers use read-only filesystems; Postgres and Redis are never published | Dockerfiles, `docker-compose.prod.yml` |
-| Supply chain: `pnpm audit`, gitleaks secret scan and Trivy image scan in CI; `pnpm audit --prod` reports no known vulnerabilities at 1.0.0, with patched transitive versions pinned in the root `pnpm.overrides` where a direct dependency lags (for example `js-yaml` 5.x under `@nestjs/swagger`) | `.github/workflows/ci.yml`, `package.json` |
+| Supply chain: `pnpm audit`, gitleaks secret scan and Trivy image scan in CI; `pnpm audit --prod` reports no known vulnerabilities at 1.0.0, with patched transitive versions pinned in the root `pnpm.overrides` where a direct dependency lags (for example `js-yaml` 5.x under `@nestjs/swagger`). Images carry runtime code only: Next's file tracing skips rspack (`outputFileTracingExcludes`), the video worker's Remotion bundler is a dev dependency, and the video worker applies Debian's security updates at build time | `.github/workflows/ci.yml`, `package.json`, `infrastructure/docker/` |
 | Open-redirect protection on `?next=` in both apps | auth forms, admin login |
 
 ## Known gaps (tracked)

@@ -67,6 +67,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // Trace workspace packages from the monorepo root into the standalone bundle.
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  // Next's server references @rspack/core for rspack builds (NEXT_RSPACK) and the tracer follows it,
+  // copying rspack (a native binary, and a vendored tinypool with critical CVEs) into the image.
+  // `next start` never loads it.
+  outputFileTracingExcludes: { '*': ['**/@rspack/**'] },
   // Source-only workspace packages (React/Remotion components) compiled by Next.
   transpilePackages: ['@bulava/template-engine', '@bulava/video-engine'],
   poweredByHeader: false,

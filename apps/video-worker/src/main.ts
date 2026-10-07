@@ -4,7 +4,6 @@ import path from 'node:path';
 import pino from 'pino';
 import * as Sentry from '@sentry/node';
 import { initSentry } from './sentry';
-import { bundle } from '@remotion/bundler';
 import { ensureBrowser } from '@remotion/renderer';
 import { createPrismaClient } from '@bulava/database';
 import { connectionFromUrl, createWorker, QueueName } from '@bulava/queue';
@@ -39,7 +38,10 @@ async function main(): Promise<void> {
     serveUrl = prebuilt;
     log.info({ serveUrl }, 'Using prebuilt Remotion bundle');
   } else {
+    // The bundler (webpack, rspack) is a dev dependency: production images ship the bundle and
+    // leave the bundler out, so one without its bundle fails here rather than bundling.
     log.info('Bundling Remotion project');
+    const { bundle } = await import('@remotion/bundler');
     serveUrl = await bundle({ entryPoint: path.resolve(__dirname, '../remotion/index.ts') });
     log.info({ serveUrl }, 'Bundle ready');
   }

@@ -37,7 +37,7 @@ Development:
 pnpm --filter @bulava/video-worker dev    # bundles the Remotion project on start
 ```
 
-Production images bundle the Remotion project at build time (`node dist/bundle.js` → `remotion-bundle/`), so the worker starts instantly and needs no TypeScript sources at runtime. `REMOTION_BUNDLE_DIR` points to the bundle; if it is missing, the worker bundles on start. Outside production, and unless `REMOTION_BUNDLE_DIR` is set, the worker always bundles fresh, so a leftover local `remotion-bundle/` never renders old templates.
+Production images bundle the Remotion project at build time (`node dist/bundle.js` → `remotion-bundle/`), so the worker starts instantly and needs no TypeScript sources at runtime. `REMOTION_BUNDLE_DIR` points to the bundle. `@remotion/bundler` (with webpack and rspack) is a dev dependency, so production images do not contain it: an image without its bundle stops at start instead of bundling. Outside production, and unless `REMOTION_BUNDLE_DIR` is set, the worker always bundles fresh, so a leftover local `remotion-bundle/` never renders old templates.
 
 The image is Debian-based (`node:22-bookworm-slim`) because Chrome Headless Shell needs glibc. It installs Chrome's shared libraries and downloads the browser during the image build (`ensureBrowser`). Remotion ships its own FFmpeg. Compose gives the container a 1 GB `/dev/shm` and a `/tmp` volume for frames.
 
@@ -51,4 +51,4 @@ Remotion is **not** MIT-licensed for companies. It is free for individuals, non-
 
 - **Render fails with a Chrome launch error** — the image is missing a shared library, or `/dev/shm` is too small. Use the provided Dockerfile and compose settings.
 - **Blank text or wrong glyphs** — the worker could not reach Google Fonts. Allow outbound HTTPS.
-- **"Bundle ready" on every start in production** — `REMOTION_BUNDLE_DIR` does not contain `index.html`; rebuild the image.
+- **"Cannot find module '@remotion/bundler'" at start in production** — `REMOTION_BUNDLE_DIR` does not contain `index.html`; rebuild the image.

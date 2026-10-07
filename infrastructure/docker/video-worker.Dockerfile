@@ -15,14 +15,18 @@ RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store,sharing=locked pn
 COPY . .
 RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store pnpm install --offline --frozen-lockfile
 RUN pnpm --filter "@bulava/video-worker..." build
-# Bundle the Remotion project now so the worker starts without webpack.
+# Bundle the Remotion project now so the worker starts without webpack. @remotion/bundler
+# (webpack, rspack) is a dev dependency, so the `deploy --prod` below leaves it out.
 RUN pnpm --filter @bulava/video-worker bundle
 RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store pnpm --filter @bulava/video-worker deploy --prod /out
 
 FROM node:22-bookworm-slim AS runtime
 # Shared libraries Chrome Headless Shell needs (see remotion.dev/docs/docker),
-# plus openssl for the Prisma engine and tini as PID 1.
+# plus openssl for the Prisma engine and tini as PID 1. `upgrade` applies the security
+# fixes Debian has published since the base image was built (CI's Trivy scan fails on
+# fixable critical vulnerabilities).
 RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
  && apt-get install -y --no-install-recommends \
     ca-certificates openssl tini \
     libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libgbm1 libasound2 libxrandr2 \

@@ -21,7 +21,6 @@
     "@bulava/video-engine": "workspace:*",
     "@bulava/localization": "workspace:*",
     "remotion": "4.0.529",
-    "@remotion/bundler": "4.0.529",
     "@remotion/renderer": "4.0.529",
     "@remotion/google-fonts": "4.0.529",
     "react": "19.1.1",
@@ -30,6 +29,7 @@
   },
   "devDependencies": {
     "@bulava/config": "workspace:*",
+    "@remotion/bundler": "4.0.529",
     "typescript": "5.9.3",
     "vitest": "3.2.7",
     "tsx": "4.23.15",
