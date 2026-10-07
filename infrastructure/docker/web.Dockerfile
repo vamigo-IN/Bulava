@@ -24,7 +24,9 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store,sharing=locked pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store pnpm install --offline --frozen-lockfile
-RUN pnpm --filter "@bulava/web^..." build && pnpm --filter @bulava/web build
+# Next.js downloads Google Fonts while it builds: a network hiccup is retried once (as in CI's checks).
+RUN pnpm --filter "@bulava/web^..." build \
+ && { pnpm --filter @bulava/web build || { echo "Web build failed; retrying once"; pnpm --filter @bulava/web build; }; }
 
 FROM node:22-alpine AS runtime
 RUN apk add --no-cache tini
