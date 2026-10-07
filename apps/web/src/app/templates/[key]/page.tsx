@@ -7,6 +7,7 @@ import { createTranslator, getLanguage, type MessageKey } from '@bulava/localiza
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { TemplateCard } from '@/components/marketing/template-card';
 import { TemplatePreviewSwitcher } from '@/components/marketing/template-preview-switcher';
+import { UseTemplateButton } from '@/components/marketing/quick-start';
 import { getPlans, getTemplate, getTemplates, tierPrice } from '@/lib/server-api';
 
 export const revalidate = 60;
@@ -77,14 +78,22 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
                   <p className="font-display text-4xl">{price ?? t('template.free')}</p>
                   {price ? <p className="text-sm text-stone-500">{t('template.included', { plan: t(`filter.tier.${tpl.tier}`) })}</p> : null}
                 </div>
-                <AuthAwareLink
-                  signedOutHref={`/signup?template=${tpl.key}`}
-                  signedInHref={`/dashboard/events/new?template=${tpl.key}`}
-                  className="btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base"
-                >
-                  {t('template.use')}
-                  <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
-                </AuthAwareLink>
+                {tpl.definition.type === 'WEBSITE' ? (
+                  // Websites start with the quick start: a preview with the host's names before any sign-up.
+                  <UseTemplateButton template={{ key: tpl.key, name: tpl.name, eventTypes: tpl.eventTypes }} className="btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base">
+                    {t('template.use')}
+                    <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
+                  </UseTemplateButton>
+                ) : (
+                  <AuthAwareLink
+                    signedOutHref={`/signup?template=${tpl.key}`}
+                    signedInHref={`/dashboard/events/new?template=${tpl.key}`}
+                    className="btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base"
+                  >
+                    {t('template.use')}
+                    <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
+                  </AuthAwareLink>
+                )}
                 {tpl.definition.type === 'WEBSITE' ? (
                   <Link href={`/templates/${tpl.key}/demo`} className="btn-3d btn-3d-light mt-3 min-h-12 w-full rounded-2xl text-brand-700">
                     <Play aria-hidden className="size-3.5 fill-current" />

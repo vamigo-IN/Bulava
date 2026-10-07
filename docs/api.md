@@ -27,8 +27,10 @@ Validation errors add `error.details: [{ "path": "phone", "message": "Enter a va
 | VALIDATION_FAILED | 400 | Body or query failed the shared Zod schema |
 | UNAUTHENTICATED / SESSION_EXPIRED / INVALID_CREDENTIALS | 401 | |
 | FORBIDDEN / CSRF_REJECTED / FUNCTION_NOT_AUTHORIZED | 403 | |
+| ACCOUNT_UNVERIFIED | 403 | a provisional (WhatsApp-only) account must be secured before it publishes, pays or invites ([authentication.md](authentication.md#quick-start-whatsapp-codes-and-provisional-accounts)) |
 | NOT_FOUND / INVITATION_INVALID / EVENT_NOT_PUBLISHED | 404 | |
-| CONFLICT / EMAIL_TAKEN / SYSTEM_GROUP_PROTECTED / FUNCTION_CLOSED | 409 | |
+| CONFLICT / EMAIL_TAKEN / PHONE_TAKEN / SYSTEM_GROUP_PROTECTED / FUNCTION_CLOSED | 409 | |
+| PHONE_OTP_UNAVAILABLE | 503 | WhatsApp codes need the WhatsApp Business integration and its authentication template |
 | INVITATION_EXPIRED / INVITATION_REVOKED / INVITATION_USAGE_EXCEEDED | 410 | |
 | ATTENDEE_LIMIT_EXCEEDED / RSVP_ANSWER_INVALID / INVALID_REFERENCE / INVALID_EVENT_TYPE | 400 | |
 | PIN_REQUIRED / PIN_INVALID / OTP_REQUIRED / OTP_INVALID | 401 | guest verification |
@@ -80,6 +82,24 @@ PATCH /api/v1/events/:id            {"status":"ACTIVE"}
 ```
 
 Invitation responses include `url` (`${WEB_ORIGIN}/invite/<token>`). Creating an invitation is idempotent per guest and scope: it returns `{ created: false }` with the existing link.
+
+## Quick start (preview before paying)
+
+```http
+POST /api/v1/public/quick-start      {"templateKey":"rose-arch-card","details":{"partnerOne":"Riya","partnerTwo":"Aman"},
+                                      "date":"2026-12-14","phone":"98765 43210","acceptTerms":true,"whatsappUpdates":false}
+→ 200 { user, event: { id, previewToken, previewUrl }, whatsappSent }   (sets the session cookies)
+→ 200 { requiresOtp: true, target: "+91•••••3210" }                     (the number already has an account)
+POST /api/v1/public/quick-start/verify  { …the same body, "code":"123456" }
+GET  /api/v1/public/preview/:token   → the invitation view with watermark: true (any status, any access mode)
+POST /api/v1/events/:id/preview-token → { previewToken }               (replaces the host's preview link)
+POST /api/v1/auth/phone/otp          {"phone":"98765 43210"}            → { sent: true, target }
+POST /api/v1/auth/phone/verify       {"phone":"98765 43210","code":"123456"}  (a session, or mfaRequired / restoreRequired)
+POST /api/v1/auth/claim              {"email":"riya@example.com","password":"…"}  (signed in; a provisional account)
+PATCH /api/v1/users/me               {"name":"Riya","phone":"98765 43210","whatsappUpdates":true}
+```
+
+A draft may select any template (`PUT /events/:id/design/website`): the preview shows a watermark when the plan does not cover it. Publishing (`PATCH /events/:id {"status":"ACTIVE"}`) is where the plan is checked (`402 PLAN_UPGRADE_REQUIRED`) and where a provisional account is refused (`403 ACCOUNT_UNVERIFIED`), as are orders, sending invitations and adding team members. See [authentication.md](authentication.md#quick-start-whatsapp-codes-and-provisional-accounts).
 
 ## Guest flow
 

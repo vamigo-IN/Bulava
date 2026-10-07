@@ -85,7 +85,7 @@ export default function VideoPage() {
       </div>
       {error ? <Alert>{error}</Alert> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <ul className="grid min-w-0 grid-cols-2 gap-4 sm:grid-cols-3">
           {all.map((tpl) => {
             const locked = TIER_RANK[tpl.tier] > maxTier;
             const backdrop = tpl.definition?.scenes?.find((sc) => sc.backdrop)?.backdrop;

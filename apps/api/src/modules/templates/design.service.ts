@@ -61,8 +61,11 @@ export class DesignService {
     if (template.eventTypes.length > 0 && !template.eventTypes.includes(event.typeKey)) {
       throw new AppError('TEMPLATE_NOT_AVAILABLE', 'This template is not designed for this type of event.');
     }
-    const features = await this.entitlements.forEvent(event.id);
-    EntitlementsService.assertTemplateTier(features, template.tier);
+    // A draft may try any design (it shows with a watermark); the plan is checked when the event is published.
+    if (event.status !== 'DRAFT') {
+      const features = await this.entitlements.forEvent(event.id);
+      EntitlementsService.assertTemplateTier(features, template.tier);
+    }
 
     const parsed = validateTemplateDefinition(template.currentVersion.definition);
     if (!parsed.ok) throw new AppError('TEMPLATE_NOT_AVAILABLE', 'This template is not available.');

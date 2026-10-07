@@ -25,6 +25,9 @@ export { Mandala, Paisley, FloralCorner, GeometricStar, Confetti, ArchFrame, Tem
 export { Lotus, PeacockFeather, StarField, Laurel, Lantern, RoseWindow, GothicArch, SeaWaves, Crescent, CrestFrame, GateLeaf } from './ornaments-signature';
 export { INTRO_OPEN_EVENT, IntroOverlay, type IntroLabels, type IntroVariant } from './intro';
 export type { RenderSlots, RenderMode, SectionProps } from './types';
+export { CanvasArtboard, type ArtboardMode, type CanvasArtboardProps } from './canvas/artboard';
+export { fillBackdrop, fillStyle, fontFamilyFor, resolveColor, solidHex, textInk } from './canvas/colors';
+export { Icon as CanvasIcon } from './canvas/icons';
 
 /**
  * Layout variants each section understands (Template Studio offers these).

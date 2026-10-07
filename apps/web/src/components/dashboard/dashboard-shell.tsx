@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CalendarHeart, CheckCircle2, ChevronDown, Clapperboard, LayoutGrid, LogOut, ReceiptIndianRupee, UserCheck, UserRound, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { Bell, CalendarHeart, CheckCircle2, ChevronDown, Clapperboard, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserCheck, UserRound, Users, Wallet, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -90,7 +90,8 @@ function Notifications() {
       </button>
       <AnimatePresence>
         {open ? (
-          <motion.div {...MENU_MOTION} className={cn(MENU_PANEL, 'w-[min(22rem,calc(100vw-2rem))]')}>
+          // Phones: a panel pinned under the header, inside the screen; wider screens: a popover under the bell.
+          <motion.div {...MENU_MOTION} className={cn(MENU_PANEL, 'fixed inset-x-4 top-16 w-auto origin-top sm:absolute sm:inset-x-auto sm:top-full sm:w-[22rem] sm:origin-top-right')}>
             <p className="border-b border-gold-100 px-5 py-4 font-display text-xl">{t('notif.title')}</p>
             <ul className="max-h-96 overflow-y-auto">
               {list.data?.length ? (
@@ -240,11 +241,26 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
+      {me.data?.provisional && !pathname.startsWith('/dashboard/claim') ? (
+        // An account made from a WhatsApp number alone: it can design and preview, but must be secured to publish.
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gold-300 bg-gold-100/70 px-4 py-3 text-sm text-ink">
+            <p className="flex min-w-0 flex-1 items-start gap-2">
+              <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-gold-700" />
+              <span>{t('claim.banner')}</span>
+            </p>
+            <Link href={`/dashboard/claim?next=${encodeURIComponent(pathname)}`} className="btn-3d min-h-10 rounded-xl px-4 text-sm">
+              {t('claim.banner.cta')}
+            </Link>
+          </div>
+        </div>
+      ) : null}
       <motion.main
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="mx-auto max-w-7xl px-4 pt-4 pb-16 sm:px-6 sm:pt-6"
+        // Nothing inside may widen the page on a phone: wide content is clipped, not scrolled.
+        className="mx-auto max-w-7xl overflow-x-clip px-4 pt-4 pb-16 sm:px-6 sm:pt-6"
       >
         {me.isPending ? <Spinner label={t('common.loading')} /> : me.isError ? null : children}
       </motion.main>

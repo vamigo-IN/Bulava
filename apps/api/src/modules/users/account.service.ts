@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { generateSecureToken, hashToken, verifyPassword, type PlatformRole } from '@bulava/auth';
 import { SettingsStore } from '@bulava/settings';
-import { ACCOUNT_RESTORE_DAYS, type DeleteAccountInput } from '@bulava/validation';
+import { ACCOUNT_RESTORE_DAYS, type DeleteAccountInput, type UpdateProfileInput } from '@bulava/validation';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import { AppError } from '../../common/errors/app-error';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
@@ -39,6 +39,39 @@ export class AccountService {
     private readonly links: EventLinksService,
     @Inject(SETTINGS_STORE) private readonly store: SettingsStore,
   ) {}
+
+  /** Name, WhatsApp number (a changed number needs verifying again) and the WhatsApp-updates consent. */
+  async updateProfile(userId: string, input: UpdateProfileInput, meta: RequestMeta): Promise<PublicUser> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (input.phone && input.phone !== user.phone) {
+      const taken = await this.prisma.user.findUnique({ where: { phone: input.phone }, select: { id: true } });
+      if (taken) throw new AppError('PHONE_TAKEN', 'An account already uses this WhatsApp number.');
+    }
+    const phoneChanged = input.phone !== undefined && input.phone !== user.phone;
+    const nextPhone = input.phone === undefined ? user.phone : input.phone;
+    // Updates need a number; dropping the number withdraws the consent.
+    const wantsUpdates = input.whatsappUpdates ?? user.whatsappOptInAt !== null;
+    const optIn = nextPhone ? wantsUpdates : false;
+    const optInChanged = optIn !== (user.whatsappOptInAt !== null);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.user.update({
+        where: { id: userId },
+        data: {
+          name: input.name ?? user.name,
+          phone: nextPhone,
+          phoneVerifiedAt: phoneChanged ? null : user.phoneVerifiedAt,
+          whatsappOptInAt: optIn ? (user.whatsappOptInAt ?? new Date()) : null,
+        },
+      });
+      if (optInChanged) await tx.consent.create({ data: { userId, kind: 'whatsapp_updates', granted: optIn, version: 'whatsapp_updates@1', source: 'account' } });
+      await this.audit.record(
+        { actorType: 'USER', actorId: userId, action: 'user.profile_updated', targetType: 'User', targetId: userId, metadata: { phoneChanged, whatsappUpdates: optInChanged ? optIn : undefined }, meta },
+        tx,
+      );
+      return row;
+    });
+    return toPublicUser(updated);
+  }
 
   /** A sign-in that reached an account waiting to be deleted, still inside its restore window. */
   static restorable(user: { status: string; deletionScheduledAt: Date | null }): boolean {

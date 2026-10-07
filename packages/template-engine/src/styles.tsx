@@ -55,6 +55,40 @@ const STYLES = `
   .bulava-flip, .bulava-curtain, .bulava-3d-card, .bulava-tilt { transition: none; }
   .bulava-float-up { display: none; }
 }
+/* Canvas sections (canvas/section.tsx): the section is a query container, so the page's own width
+   (not the window's) decides between the phone and desktop artboards; previews in a phone frame stay phones. */
+.bulava-canvas { container: bulava-canvas / inline-size; position: relative; overflow: hidden; }
+.bulava-canvas-m { width: 100%; margin: 0 auto; }
+.bulava-canvas-d { display: none; }
+@container bulava-canvas (min-width: 900px) {
+  .bulava-canvas[data-desktop] .bulava-canvas-m { display: none; }
+  .bulava-canvas[data-desktop] .bulava-canvas-d { display: block; }
+  .bulava-canvas:not([data-desktop]) .bulava-canvas-m { max-width: var(--cv-max, 480px); padding: 56px 0; }
+  .bulava-canvas:not([data-desktop]) .bulava-canvas-m .bulava-artboard { border-radius: 28px; box-shadow: 0 40px 80px -40px rgba(0,0,0,0.45); }
+}
+/* Layers animate in one by one, so the section itself does not fade as a block. */
+.bulava-template.reveal-ready .bulava-canvas.bulava-reveal { opacity: 1; transform: none; transition: none; }
+.bulava-template.reveal-ready .bulava-canvas:not(.is-visible) .bulava-cv-in { opacity: 0; }
+@keyframes bulava-cv-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bulava-cv-fade-up { from { opacity: 0; transform: translateY(8%); } to { opacity: 1; transform: none; } }
+@keyframes bulava-cv-fade-down { from { opacity: 0; transform: translateY(-8%); } to { opacity: 1; transform: none; } }
+@keyframes bulava-cv-zoom { from { opacity: 0; transform: scale(0.84); } to { opacity: 1; transform: none; } }
+@keyframes bulava-cv-slide-left { from { opacity: 0; transform: translateX(10%); } to { opacity: 1; transform: none; } }
+@keyframes bulava-cv-slide-right { from { opacity: 0; transform: translateX(-10%); } to { opacity: 1; transform: none; } }
+@keyframes bulava-cv-blur { from { opacity: 0; filter: blur(14px); transform: scale(1.06); } to { opacity: 1; filter: blur(0); transform: none; } }
+@keyframes bulava-cv-pop { 0% { opacity: 0; transform: scale(0.6); } 70% { opacity: 1; transform: scale(1.06); } 100% { transform: none; } }
+.bulava-canvas.is-visible .bulava-cv-fade { animation: bulava-cv-fade var(--cv-dur, .8s) ease-out var(--cv-delay, 0s) both; }
+.bulava-canvas.is-visible .bulava-cv-fade-up { animation: bulava-cv-fade-up var(--cv-dur, .8s) cubic-bezier(0.2, 0.7, 0.2, 1) var(--cv-delay, 0s) both; }
+.bulava-canvas.is-visible .bulava-cv-fade-down { animation: bulava-cv-fade-down var(--cv-dur, .8s) cubic-bezier(0.2, 0.7, 0.2, 1) var(--cv-delay, 0s) both; }
+.bulava-canvas.is-visible .bulava-cv-zoom { animation: bulava-cv-zoom var(--cv-dur, .8s) cubic-bezier(0.2, 0.7, 0.2, 1) var(--cv-delay, 0s) both; }
+.bulava-canvas.is-visible .bulava-cv-slide-left { animation: bulava-cv-slide-left var(--cv-dur, .8s) cubic-bezier(0.2, 0.7, 0.2, 1) var(--cv-delay, 0s) both; }
+.bulava-canvas.is-visible .bulava-cv-slide-right { animation: bulava-cv-slide-right var(--cv-dur, .8s) cubic-bezier(0.2, 0.7, 0.2, 1) var(--cv-delay, 0s) both; }
+.bulava-canvas.is-visible .bulava-cv-blur { animation: bulava-cv-blur var(--cv-dur, .8s) ease-out var(--cv-delay, 0s) both; }
+.bulava-canvas.is-visible .bulava-cv-pop { animation: bulava-cv-pop var(--cv-dur, .8s) cubic-bezier(0.2, 0.7, 0.2, 1) var(--cv-delay, 0s) both; }
+@media (prefers-reduced-motion: reduce) {
+  .bulava-template.reveal-ready .bulava-canvas:not(.is-visible) .bulava-cv-in { opacity: 1; }
+  .bulava-canvas.is-visible .bulava-cv-in { animation: none; }
+}
 `;
 
 /**

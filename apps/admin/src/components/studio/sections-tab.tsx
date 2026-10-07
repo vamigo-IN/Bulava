@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, PenTool, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { SECTION_VARIANTS } from '@bulava/template-engine';
 import { BINDINGS, SECTION_KEYS, SectionInstanceSchema, type SectionKey } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
+import { emptyCanvas } from '../canvas-editor/presets';
 import { Badge, Button, Card, Input, Label, Select } from '../ui';
 import { EditError, firstIssue, JsonField, type EditorProps } from './common';
 
@@ -15,7 +16,7 @@ function uniqueId(base: string, taken: Set<string>): string {
   return `${base}-${i}`;
 }
 
-export function SectionsTab({ definition, edit }: EditorProps) {
+export function SectionsTab({ definition, edit, onOpenCanvas }: EditorProps & { onOpenCanvas?: (sectionId: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState<SectionKey>('story');
@@ -48,9 +49,12 @@ export function SectionsTab({ definition, edit }: EditorProps) {
                       // New sections go before the footer so the page still ends with it.
                       const footerAt = sections.findIndex((s) => s.section === 'footer');
                       const variant = SECTION_VARIANTS[adding]?.[0] ?? 'default';
-                      sections.splice(footerAt === -1 ? sections.length : footerAt, 0, { id, section: adding, variant, props: {} });
+                      // A canvas section starts with an empty phone artboard; the editor fills it.
+                      const instance = adding === 'canvas' ? { id, section: adding, variant, props: {}, canvas: emptyCanvas() } : { id, section: adding, variant, props: {} };
+                      sections.splice(footerAt === -1 ? sections.length : footerAt, 0, instance as (typeof sections)[number]);
                     });
                     setOpen(id);
+                    if (adding === 'canvas') onOpenCanvas?.(id);
                   }}
                 >
                   <Plus className="size-3.5" /> {t('sections.add')}
@@ -107,7 +111,15 @@ export function SectionsTab({ definition, edit }: EditorProps) {
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
-                    {isOpen ? (
+                    {isOpen && section.section === 'canvas' && section.canvas ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 bg-stone-50 p-3">
+                        <p className="text-xs text-stone-600">{t('canvas.summary', { layers: section.canvas.mobile.layers.length, desktop: section.canvas.desktop ? t('canvas.summary.desktop') : '' })}</p>
+                        <Button size="sm" onClick={() => onOpenCanvas?.(section.id)}>
+                          <PenTool className="size-3.5" /> {t('canvas.open')}
+                        </Button>
+                      </div>
+                    ) : null}
+                    {isOpen && section.section !== 'canvas' ? (
                       <div className="space-y-3 border-t border-stone-200 bg-stone-50 p-3">
                         <div>
                           <Label>{t('sections.props')}</Label>

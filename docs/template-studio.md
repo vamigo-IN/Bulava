@@ -70,7 +70,7 @@ Templates are data (see [templates.md](templates.md)). A template has immutable 
 2. **Edit** the draft in the Studio:
    - *Details* — catalog listing (name, category, style, tier, badge, featured, tags, event types, sort order) saves immediately and does not create a version. The definition's display name, description and supported languages are part of the draft.
    - *Theme & fonts* — colours, corner radius, ornament, background pattern, hero tone, opening animation, and fonts with a Devanagari fallback.
-   - *Sections* (websites) — add, reorder, remove sections, pick a layout variant, and edit each section's content bindings as JSON.
+   - *Sections* (websites) — add, reorder, remove sections, pick a layout variant, and edit each section's content bindings as JSON. A *canvas* section is a free-form design and opens the [Canvas editor](#canvas-editor).
    - *Scenes* (videos and cards) — canvas size and fps, scene length, background, transition, the illustrated scene the scene is filmed in with its camera move, particles, per-function repetition, and element JSON.
    - *Artwork* — painted scenes from commissioned layers (approved image assets, category `artwork`): order, depth and label per layer, loading colour, light or dark text, where text starts; then *Use as website hero* or *Use behind every scene*. It keeps the definition's `assets` in step so publishing checks every layer's licence, and flags layers that are not approved or not 3:2. See [templates.md](templates.md#painted-artwork) and the artist brief, [illustration-brief.md](illustration-brief.md).
    - *Customization* — what customers may change (colours, photos, text, music…), custom text fields and colour presets.
@@ -83,6 +83,16 @@ Templates are data (see [templates.md](templates.md)). A template has immutable 
 8. **Delete** (on the Templates list) soft-deletes a lookalike: it leaves the catalog, the pickers and the live list, the catalog seed never brings it back, and events using it keep their pinned version. The *Deleted* view lists deleted templates with **Restore**, which brings one back unpublished; it cannot be published while deleted.
 
 Every create, publish, status change, delete, restore and listing change is written to the audit log, and the public catalog cache is invalidated on publish, delete and restore.
+
+### Canvas editor
+
+*Sections → Add section → canvas* creates an empty phone artboard and opens the full-screen Canvas editor; *Open in Canvas editor* reopens it. The editor works on the same draft as the Studio, so Save draft, checks and publishing are unchanged. What a canvas section stores is in [templates.md](templates.md#canvas-sections).
+
+- **Stage**: the artboard with sample data (language, sample event, long names, no photos, as in the preview). Drag to move, handles to resize (Shift keeps proportions), the ring to rotate (Shift snaps to 15°). Layers snap to the artboard's edges and centre and to other layers (Alt disables); guides show what snapped. Arrow keys nudge (Shift = 10), Delete removes, Ctrl+D duplicates, `[` and `]` reorder, Ctrl+Z / Ctrl+Y undo and redo, Ctrl+S saves the draft, Escape deselects.
+- **Layers**: top-most first; drag to reorder, eye and lock toggles. *Add layer* offers text presets (heading, names in script, small label, paragraph, date line), images (from the library, or the host's cover or first photo), widgets (countdown, button, date/time/venue rows), shapes, ornaments and icons.
+- **Properties**: with nothing selected, the artboard (size, background fill, ambient effect) and the section (repeat once per function, max width on desktop, add or remove the desktop artboard, which starts as the phone design scaled to 1440 × 900). With a layer selected: position and size, alignment, the layer's own properties, when it shows (a binding that must have a value, event types) and its animation.
+- **Images**: the picker lists library images (approved first) and uploads new ones with their licence (category `canvas` by default). Picking an image adds it to the definition's `assets` (role `canvas`), so publishing checks its licence; an unapproved image can be placed but blocks publishing until it is approved.
+- **Phone first**: every canvas section has a phone artboard; the desktop artboard is optional, and without one the phone design is shown centred on wide screens.
 
 ## Assets and licences
 

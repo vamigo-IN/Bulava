@@ -10,17 +10,18 @@ import { LoginSchema, SignupSchema, z } from '@bulava/validation';
 import { ApiError, apiPost } from '@/lib/api';
 import { loadSession } from '@/lib/session';
 import type { MessageKey } from '@bulava/localization';
-import { GoogleButton, useGoogleEnabled } from './google-button';
+import { GoogleButton, useProviders } from './google-button';
+import { PhoneSignIn } from './phone-sign-in';
 import { errorMessage, I18nProvider, useT } from '@/lib/i18n';
 // The single module: the package entry would bring the whole template engine (and Zod) to sign-in.
 import { Mandala } from '@bulava/template-engine/src/ornaments';
-import { Alert, Button, Field, Input } from '@/components/ui/primitives';
+import { Alert, Button, Checkbox, Field, Input } from '@/components/ui/primitives';
 import { BrandLogo } from '@/components/marketing/brand-logo';
 
 type Mode = 'login' | 'signup';
 type FormInput = z.input<typeof SignupSchema>;
 
-const LoginFormSchema = LoginSchema.extend({ name: z.string().optional(), acceptTerms: z.boolean().optional() });
+const LoginFormSchema = LoginSchema.extend({ name: z.string().optional(), acceptTerms: z.boolean().optional(), phone: z.string().optional(), whatsappUpdates: z.boolean().optional() });
 
 const longDate = (iso: string) => {
   const d = new Date(iso);
@@ -43,10 +44,13 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   const [restore, setRestore] = useState<{ token: string; until: string | null } | null>(null);
   const form = useForm<FormInput>({
     resolver: zodResolver((mode === 'signup' ? SignupSchema : LoginFormSchema) as typeof SignupSchema),
-    defaultValues: { name: '', email: '', password: '', acceptTerms: false },
+    defaultValues: { name: '', email: '', password: '', acceptTerms: false, phone: '', whatsappUpdates: false },
   });
   const { errors, isSubmitting } = form.formState;
-  const google = useGoogleEnabled();
+  const providers = useProviders();
+  const google = providers.google;
+  /** Sign-in page: the WhatsApp-number form instead of email and password. */
+  const [byPhone, setByPhone] = useState(false);
   const accepted = form.watch('acceptTerms') === true;
   const deletedOn = mode === 'login' && params.get('deleted') ? longDate(params.get('deleted')!) : null;
 
@@ -143,6 +147,16 @@ function AuthFormInner({ mode }: { mode: Mode }) {
                 </div>
               ) : null}
               <div className="clay mt-8 rounded-[2rem] p-6 sm:p-8">
+                {mode === 'login' && byPhone ? (
+                  <PhoneSignIn
+                    onDone={finish}
+                    onChallenge={(token) => setChallenge(token)}
+                    onRestore={(token, until) => setRestore({ token, until })}
+                    onBack={() => setByPhone(false)}
+                  />
+                ) : null}
+                {mode === 'login' && byPhone ? null : (
+                <>
                 {google ? (
                   <div className="mb-6 space-y-5">
                     {mode === 'signup' ? (
@@ -181,6 +195,15 @@ function AuthFormInner({ mode }: { mode: Mode }) {
                     {(p) => <Input {...p} type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} {...form.register('password')} />}
                   </Field>
                   {mode === 'signup' ? (
+                    <>
+                      <Field label={t('auth.field.phone')} hint={t('auth.field.phoneHint')} error={errors.phone?.message}>
+                        {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" placeholder="98765 43210" {...form.register('phone')} />}
+                      </Field>
+                      {/* A separate, optional consent: never bundled with the Terms below. */}
+                      <Checkbox label={t('auth.field.whatsappUpdates')} {...form.register('whatsappUpdates')} />
+                    </>
+                  ) : null}
+                  {mode === 'signup' ? (
                     <div className="rounded-2xl bg-[#f8f2ea] p-4 shadow-clay-inset">
                       {/* Never pre-ticked: consent has to be an explicit action (DPDP Act, e-commerce rules). */}
                       <label className="flex cursor-pointer items-start gap-3 text-[0.9375rem] leading-relaxed text-stone-800">
@@ -217,6 +240,13 @@ function AuthFormInner({ mode }: { mode: Mode }) {
                     {isSubmitting ? t('common.loading') : t(mode === 'signup' ? 'auth.signup.submit' : 'auth.login.submit')}
                   </Button>
                 </form>
+                {mode === 'login' && providers.phoneOtp ? (
+                  <button type="button" className="mt-4 w-full text-center text-sm font-medium text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700" onClick={() => setByPhone(true)}>
+                    {t('auth.phone.usePhone')}
+                  </button>
+                ) : null}
+                </>
+                )}
               </div>
               <p className="mt-6 text-center text-sm text-stone-600">
                 {mode === 'signup' ? t('auth.signup.haveAccount') : t('auth.login.noAccount')}{' '}

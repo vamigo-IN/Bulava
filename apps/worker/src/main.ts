@@ -5,7 +5,7 @@ import { initSentry } from './sentry';
 import { createPrismaClient } from '@bulava/database';
 import { connectionFromUrl, createQueue, createWorker, QueueName } from '@bulava/queue';
 import { ObjectStorage } from '@bulava/storage';
-import { processAnalytics, processCleanup, processEmail, processNotification, type WorkerDeps } from './processors';
+import { processAnalytics, processCleanup, processEmail, processNotification, processWhatsApp, type WorkerDeps } from './processors';
 import { SettingsProviders } from './providers';
 import { systemResolver } from '@bulava/domains';
 import { SettingsStore, type SettingsDb } from '@bulava/settings';
@@ -63,6 +63,7 @@ async function main(): Promise<void> {
   const workers = [
     createWorker(QueueName.NOTIFICATIONS, (job) => processNotification(deps, job.data), connection, { concurrency }),
     createWorker(QueueName.EMAIL, (job) => processEmail(deps, job.data), connection, { concurrency }),
+    createWorker(QueueName.WHATSAPP, (job) => processWhatsApp(deps, job.data), connection, { concurrency }),
     createWorker(QueueName.ANALYTICS, (job) => processAnalytics(deps, job.data), connection, { concurrency: concurrency * 2 }),
     createWorker(QueueName.CLEANUP, (job) => processCleanup({ ...deps, deleteObject: (k) => storage.delete(k) }, job.data), connection, { concurrency: 1 }),
   ];

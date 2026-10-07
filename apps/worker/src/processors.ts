@@ -124,6 +124,35 @@ export async function processNotification(deps: WorkerDeps, job: JobPayloads['no
   return skip(`${n.channel} provider not configured`);
 }
 
+/**
+ * A platform message to a host's WhatsApp number (the preview link after the
+ * quick start, a sign-in code). Nothing is stored: the payload carries what to
+ * send, and a wrong number or template is logged rather than retried.
+ */
+export async function processWhatsApp(deps: WorkerDeps, job: JobPayloads['whatsapp']): Promise<string> {
+  const whatsapp = (await deps.whatsapp?.()) ?? null;
+  if (!whatsapp) {
+    deps.log.warn({ template: job.template }, 'WhatsApp message skipped: not configured');
+    return 'skipped';
+  }
+  const template = whatsapp.templates[job.template];
+  if (!template) {
+    deps.log.warn({ template: job.template }, 'WhatsApp message skipped: no approved template');
+    return 'skipped';
+  }
+  try {
+    await whatsapp.provider.sendTemplate({ to: job.to, template, language: whatsapp.language, params: job.params, copyCode: job.copyCode });
+  } catch (error) {
+    if (error instanceof WhatsAppSendError && error.permanent) {
+      deps.log.warn({ template: job.template, code: error.code, message: error.message }, 'WhatsApp message failed');
+      return 'failed';
+    }
+    throw error;
+  }
+  deps.log.info({ template: job.template }, 'WhatsApp message sent');
+  return 'sent';
+}
+
 type NotificationRow = NonNullable<Awaited<ReturnType<PrismaClient['notification']['findUnique']>>>;
 
 /** Works out what to send (and re-checks that it is still wanted); the same rules for every channel. */

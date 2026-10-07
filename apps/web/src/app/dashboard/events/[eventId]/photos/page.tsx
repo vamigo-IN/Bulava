@@ -69,7 +69,7 @@ function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string
   const t = useT();
   const save = (patch: Record<string, unknown>) => apiPatch(`/events/${eventId}/album`, patch).then(onChanged);
   return (
-    <Card className="rounded-3xl">
+    <Card className="min-w-0 rounded-3xl">
       <div className="flex flex-wrap gap-6">
         {album.qrCode ? (
           <img src={`/api/v1/events/${eventId}/album/qr.svg`} alt={t('photos.qr')} width={128} height={128} className="size-32 rounded-2xl border border-gold-200 bg-white p-1.5" />
@@ -82,9 +82,9 @@ function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {album.uploadUrl ? (
-              <div className="rounded-2xl border border-gold-200/80 bg-ivory/60 p-3">
+              <div className="min-w-0 rounded-2xl border border-gold-200/80 bg-ivory/60 p-3">
                 <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">{t('album.uploadLink')}</p>
-                <p className="mt-1 truncate font-mono text-sm" title={album.uploadUrl}>
+                <p className="mt-1 font-mono text-sm break-all" title={album.uploadUrl}>
                   {album.uploadUrl}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -97,9 +97,9 @@ function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string
               </div>
             ) : null}
             {album.galleryUrl ? (
-              <div className="rounded-2xl border border-gold-200/80 bg-ivory/60 p-3">
+              <div className="min-w-0 rounded-2xl border border-gold-200/80 bg-ivory/60 p-3">
                 <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">{t('album.galleryLink')}</p>
-                <p className="mt-1 truncate font-mono text-sm" title={album.galleryUrl}>
+                <p className="mt-1 font-mono text-sm break-all" title={album.galleryUrl}>
                   {album.galleryUrl}
                 </p>
                 <div className="mt-2">

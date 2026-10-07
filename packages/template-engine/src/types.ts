@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
-import type { Artwork, LookName, RenderContext, SectionInstance, ThemeColors } from '@bulava/template-schema';
+import type { Artwork, Fonts, LookName, RenderContext, SectionInstance, ThemeColors } from '@bulava/template-schema';
 import type { OrnamentName } from './ornaments';
 
 /** Interactive pieces the host app injects into template slots. */
@@ -42,4 +42,8 @@ export interface SectionProps {
   mode: RenderMode;
   /** The template's painted artworks (hero variant "artwork"). */
   artworks?: Record<string, Artwork>;
+  /** Effective fonts (after the host's pairing), for canvas text. */
+  fonts: Fonts;
+  /** Id of the page's RSVP section, which canvas RSVP buttons scroll to. */
+  rsvpSectionId?: string;
 }

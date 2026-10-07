@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { PlatformSettingsService } from '../settings/settings.service';
+import { assertVerifiedAccount } from '../users/account-gate';
 import { InvitationTokenService } from './invitation-token.service';
 
 const invitationInclude = {
@@ -60,6 +61,7 @@ export class InvitationsService {
    * invitation within 10 minutes is skipped so a double click cannot spam guests.
    */
   async sendByEmail(access: EventAccessContext, invitationIds: string[] | undefined, meta: RequestMeta) {
+    await assertVerifiedAccount(this.prisma, access.userId);
     const r = await this.deliver(access, 'EMAIL', invitationIds, meta);
     return { queued: r.queued, skippedNoEmail: r.missing, skippedRecent: r.recent };
   }
@@ -70,6 +72,7 @@ export class InvitationsService {
    * email, and each message counts against the event plan's WhatsApp allowance.
    */
   async sendByWhatsApp(access: EventAccessContext, invitationIds: string[] | undefined, meta: RequestMeta) {
+    await assertVerifiedAccount(this.prisma, access.userId);
     if (!(await this.settings.messaging()).whatsappInvitations) {
       throw new AppError('WHATSAPP_UNAVAILABLE', 'Sending on WhatsApp is not available right now.');
     }

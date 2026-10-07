@@ -26,6 +26,8 @@ export interface WhatsAppTemplateMessage {
   language: string;
   /** Body variables {{1}}, {{2}}, … in order. */
   params: string[];
+  /** Authentication templates: the code for the "copy code" button. */
+  copyCode?: string;
 }
 
 export interface WhatsAppProvider {
@@ -115,7 +117,15 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         template: {
           name: message.template,
           language: { code: message.language },
-          ...(message.params.length ? { components: [{ type: 'body', parameters: message.params.map((text) => ({ type: 'text', text })) }] } : {}),
+          ...(message.params.length || message.copyCode
+            ? {
+                components: [
+                  ...(message.params.length ? [{ type: 'body', parameters: message.params.map((text) => ({ type: 'text', text })) }] : []),
+                  // Authentication templates carry the code again on their copy-code (URL) button.
+                  ...(message.copyCode ? [{ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: message.copyCode }] }] : []),
+                ],
+              }
+            : {}),
         },
       }),
       signal: AbortSignal.timeout(15_000),
@@ -143,7 +153,8 @@ export class WhatsAppSendError extends Error {
 
 export interface WhatsAppChannel {
   provider: WhatsAppProvider;
-  templates: { invitation?: string; reminder?: string };
+  /** Approved template names by purpose; a missing one keeps that message off WhatsApp. */
+  templates: { invitation?: string; reminder?: string; preview?: string; otp?: string };
   language: string;
 }
 

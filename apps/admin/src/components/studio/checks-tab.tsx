@@ -65,6 +65,7 @@ export function ChecksTab({ report, running, dirty, onRun, error }: { report: Ch
                     <Th>{t('checks.case')}</Th>
                     <Th>{t('checks.empty')}</Th>
                     <Th>{t('checks.long')}</Th>
+                    {report.matrix.some((m) => m.contrast?.length) ? <Th>{t('checks.contrast')}</Th> : null}
                     {report.matrix[0]?.durationSec !== undefined ? <Th className="text-right">{t('checks.duration')}</Th> : null}
                   </tr>
                 </thead>
@@ -98,6 +99,21 @@ export function ChecksTab({ report, running, dirty, onRun, error }: { report: Ch
                           <span className="text-stone-400">{t('common.none')}</span>
                         )}
                       </Td>
+                      {report.matrix.some((m) => m.contrast?.length) ? (
+                        <Td>
+                          {row.contrast?.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {row.contrast.map((p) => (
+                                <Badge key={p} tone="warning" className="font-mono">
+                                  {p}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-stone-400">{t('common.none')}</span>
+                          )}
+                        </Td>
+                      ) : null}
                       {row.durationSec !== undefined ? <Td className="text-right tabular-nums">{row.durationSec.toFixed(1)}s</Td> : null}
                     </tr>
                   ))}

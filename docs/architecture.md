@@ -149,8 +149,8 @@ Failures retry with exponential backoff (`DEFAULT_JOB_OPTIONS`). Failed renders 
 2. **AI-assisted moderation** (`ModerationMode.AI_ASSISTED` is reserved and currently behaves like manual approval).
 3. **Planner workspace** features on top of `Organization` (the `planner.workspace` feature key exists).
 4. **Event assistant** (spec §85–86), after the core product settles.
-5. **Phone sign-in** (`User.phone` is reserved), once an SMS provider exists.
+5. **Phone sign-in over SMS**, once an SMS provider exists (WhatsApp codes are done).
 
-Done from the earlier roadmap: Google sign-in ([authentication.md](authentication.md#google-sign-in)), custom domains ([custom-domains.md](custom-domains.md)) and the nonce-based CSP ([security.md](security.md)).
+Done from the earlier roadmap: Google sign-in ([authentication.md](authentication.md#google-sign-in)), WhatsApp-number sign-in and the quick start with provisional accounts ([authentication.md](authentication.md#quick-start-whatsapp-codes-and-provisional-accounts)), custom domains ([custom-domains.md](custom-domains.md)) and the nonce-based CSP ([security.md](security.md)).
 
 Architectural decisions are recorded in [decisions.md](decisions.md).

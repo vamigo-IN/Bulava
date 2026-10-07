@@ -68,6 +68,11 @@ model User {
   deletionRequestedAt  DateTime?
   /// After this, the worker erases the account for good; until then signing in can restore it.
   deletionScheduledAt  DateTime?
+  /// Made from a WhatsApp number alone (the template page's quick start). Cleared once the
+  /// number is verified with a code, or an email and password or Google are added.
+  provisional          Boolean      @default(false)
+  /// Agreed to updates on WhatsApp (an optional consent, also kept as a Consent row).
+  whatsappOptInAt      DateTime?
 
   sessions         Session[]
   ownedEvents      Event[]              @relation("EventOwner")
@@ -253,6 +258,11 @@ model Event {
   settings           Json        @default("{}")
   /// Guests may add their own arrival/departure details from their invitation.
   collectGuestTravel Boolean     @default(false)
+  /// The host's shareable preview link (/preview/<token>): the invitation with a watermark,
+  /// before the event is published and whatever its access mode. Unguessable, replaceable.
+  previewToken       String      @unique
+  /// How the event was started: "quick_start" (the template page) or null (the dashboard).
+  source             String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   deletedAt          DateTime?

@@ -7,6 +7,7 @@ import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import type { EventAccessContext } from '../../common/request-context';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertVerifiedAccount } from '../users/account-gate';
 import { TeamInvitesService } from './team-invites.service';
 
 /**
@@ -43,6 +44,7 @@ export class MembersService {
    * does not yet (they join with the code from the email).
    */
   async add(access: EventAccessContext, input: AddMemberInput, meta: RequestMeta) {
+    await assertVerifiedAccount(this.prisma, access.userId);
     if (input.role === 'ADMIN' && access.role !== 'OWNER') throw AppError.forbidden('Only the owner can add admins.');
     const functionIds = await this.checkFunctions(access.eventId, input.role, input.functionIds);
     const user = await this.prisma.user.findFirst({ where: { email: input.email, deletedAt: null, status: 'ACTIVE' }, select: { id: true, name: true } });

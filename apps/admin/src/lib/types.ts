@@ -108,7 +108,7 @@ export interface CheckReport {
   ok: boolean;
   issues: Array<{ path: string; message: string }>;
   licenseIssues: Array<{ assetId: string; message: string }>;
-  matrix: Array<{ case: string; empty: string[]; long: string[]; durationSec?: number }>;
+  matrix: Array<{ case: string; empty: string[]; long: string[]; contrast?: string[]; durationSec?: number }>;
 }
 
 export interface License {

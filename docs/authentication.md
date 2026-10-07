@@ -2,7 +2,7 @@
 
 ## Hosts (users)
 
-Email and password, or **Continue with Google** (below). Phone sign-in is planned; `User.phone` is reserved for it. Staff use the same accounts with a platform role ([template-studio.md](template-studio.md)).
+Email and password, **Continue with Google**, or a **WhatsApp number with a one-time code** (below). Most accounts now begin on a template page: the quick start makes a *provisional* account from a WhatsApp number alone, which designs and previews but must be secured before it publishes, pays or invites. Staff use the same accounts with a platform role ([template-studio.md](template-studio.md)).
 
 | Step | Behaviour |
 |---|---|
@@ -54,6 +54,19 @@ Everything is audited (`user.login` / `user.signup` with method `google`, `user.
 2. Create an OAuth client ID of type *Web application*.
 3. Add the authorised redirect URI `<WEB_ORIGIN>/api/v1/auth/google/callback`, for example `https://bulava.in/api/v1/auth/google/callback` and, for development, `http://localhost:3000/api/v1/auth/google/callback`.
 4. Put the id and secret into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and restart the API. Set both or neither; the API refuses to start with only one.
+
+### Quick start, WhatsApp codes and provisional accounts
+
+The template page's **Use this template** opens the quick start for visitors who are not signed in: the host's names (or the honoree, or an event name), a date, a WhatsApp number and the Terms box. `POST /public/quick-start` does, in one request: creates the account (`provisional: true`, `phone`, consents `terms_of_service` + `privacy_policy` with source `quick_start`, and `whatsapp_updates` only when that second, optional box is ticked), creates the draft event with the type's default functions (the chosen day goes on the main function), applies the chosen design whatever its tier, queues the preview link to WhatsApp (when the integration has a `preview` template) and signs the browser in with the usual cookies. The response carries the event id and the preview URL. Six requests per minute per IP.
+
+| Step | Behaviour |
+|---|---|
+| A number that already has an account | The owner must prove it: the API answers `{ requiresOtp: true, target }` and sends a code; `POST /public/quick-start/verify` with the same form plus the code finishes the quick start under that account and marks the number verified. Numbers of suspended or deleted accounts get `PHONE_TAKEN`. |
+| Codes | Six digits, HMAC'd at rest in `otp_challenges` (`purpose` `phone:login` or `phone:quick-start`), 10 minutes, 5 attempts, 3 sends per number per 10 minutes. They travel only in the `whatsapp` queue (the worker sends the integration's **authentication** template with the code in the body and on its copy-code button). Without the integration or that template, production answers `PHONE_OTP_UNAVAILABLE` and the UI offers email instead; development logs the code. |
+| Sign in with a number | `POST /auth/phone/otp` `{ phone }` answers `{ sent: true, target }` whether or not the number has an account (no lookups); a code is sent only when it does. `POST /auth/phone/verify` `{ phone, code }` issues the session (or the two-step challenge, or the restore offer for an account waiting to be deleted), sets `phoneVerifiedAt` and clears `provisional`. |
+| Provisional accounts | `User.provisional` is true for an account made from a number alone. It may design, preview and edit functions, but `PATCH /events/:id { status: "ACTIVE" }`, `POST /events/:id/orders`, sending invitations and adding team members answer `403 ACCOUNT_UNVERIFIED` (`assertVerifiedAccount`). The dashboard shows a banner and **Secure my account** (`/dashboard/claim`). |
+| Securing | Any one of: a verified code on the number (`/auth/phone/verify` or the quick start's code step), `POST /auth/claim` `{ email, password }` (unique email, `user.claimed`), or linking Google. Each clears `provisional`. `GET /users/me` carries `phone`, `provisional` and `whatsappUpdates`; `PATCH /users/me` changes the name, the number (which then needs verifying again) and the updates consent (every change is a `consents` row). |
+| Sign-up form | `POST /auth/signup` also takes an optional `phone` (unique, `PHONE_TAKEN`) and `whatsappUpdates`, recorded as its own consent. |
 
 ### Cookies
 

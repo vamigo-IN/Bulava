@@ -102,7 +102,7 @@ export const TITLE: Value = {
 
 // ─────────────────────────── Text slots ───────────────────────────
 
-const SLOTS = {
+export const SLOTS = {
   tagline: { key: 'tagline', label: 'Tagline', maxLength: 80 },
   story: { key: 'story', label: 'Your story', maxLength: 1200 },
   blessings: { key: 'blessings', label: 'Blessings / family lines', maxLength: 600 },
@@ -118,7 +118,7 @@ const SLOTS = {
   quoteBy: { key: 'quoteBy', label: 'Quote attribution', maxLength: 80 },
   menu: { key: 'menu', label: 'Menu (one course per line: Course | dishes)', maxLength: 1500 },
 } as const;
-type SlotKey = keyof typeof SLOTS;
+export type SlotKey = keyof typeof SLOTS;
 
 // ─────────────────────────── Section layouts ───────────────────────────
 

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, ValueSchema } from './base';
+import { CanvasSectionSchema } from './canvas';
+
+export { ConditionSchema, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, VALUE_FORMATS, ValueSchema } from './base';
+export type { Condition, EffectName, FontFamily, Value } from './base';
 
 /**
  * TemplateDefinition v1: the JSON document stored in TemplateVersion.definition.
@@ -8,34 +13,6 @@ import { z } from 'zod';
 
 export const TEMPLATE_TYPES = ['WEBSITE', 'VIDEO', 'DIGITAL_CARD', 'EMAIL', 'SOCIAL'] as const;
 export type TemplateType = (typeof TEMPLATE_TYPES)[number];
-
-const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a #RRGGBB colour');
-const id = z.string().regex(/^[a-z0-9][a-z0-9-_]{0,63}$/i, 'Use letters, numbers, - and _');
-
-// ─────────────────────────── Values ───────────────────────────
-
-export const VALUE_FORMATS = ['date', 'dateWithWeekday', 'time', 'upper', 'lower', 'dateTime'] as const;
-
-export type Value =
-  | { literal: string | number | boolean }
-  | { binding: string; fallback?: Value; format?: (typeof VALUE_FORMATS)[number] }
-  | { t: string }
-  | { template: string; fallback?: Value };
-
-export const ValueSchema: z.ZodType<Value> = z.lazy(() =>
-  z.union([
-    z.object({ literal: z.union([z.string().max(2000), z.number(), z.boolean()]) }).strict(),
-    z
-      .object({
-        binding: z.string().regex(/^[a-zA-Z]\w*(\[\d+\])?(\.\w+(\[\d+\])?)*$/, 'Invalid binding path').max(120),
-        fallback: ValueSchema.optional(),
-        format: z.enum(VALUE_FORMATS).optional(),
-      })
-      .strict(),
-    z.object({ t: z.string().regex(/^[a-zA-Z][\w.]*$/).max(120) }).strict(),
-    z.object({ template: z.string().max(2000), fallback: ValueSchema.optional() }).strict(),
-  ]),
-);
 
 // ─────────────────────────── Theme & fonts ───────────────────────────
 
@@ -50,9 +27,6 @@ export const ThemeColorsSchema = z.object({
 });
 export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
 
-/** Decorative motifs the engine draws itself (no external assets). */
-export const ORNAMENTS = ['none', 'mandala', 'paisley', 'floral', 'geometric', 'confetti', 'lotus', 'peacock', 'stars', 'laurel'] as const;
-export const PATTERNS = ['none', 'dots', 'jaali', 'waves', 'rangoli', 'damask'] as const;
 /**
  * Design languages. A look restyles every section (backgrounds, headings,
  * cards, dividers), so two templates with different looks differ all the way
@@ -67,9 +41,6 @@ export const PATTERNS = ['none', 'dots', 'jaali', 'waves', 'rangoli', 'damask'] 
  */
 export const LOOKS = ['classic', 'heritage', 'noir', 'royal', 'garden', 'celebration', 'modern'] as const;
 export type LookName = (typeof LOOKS)[number];
-/** Ambient particle effects drawn over a live invitation (off for reduced-motion users). */
-export const EFFECTS = ['none', 'petals', 'marigold', 'goldDust', 'fireflies', 'confetti', 'lanterns', 'snow'] as const;
-export type EffectName = (typeof EFFECTS)[number];
 /**
  * Illustrated scenes (template-engine art/scenes.tsx): website heroes use them
  * as layered 3D headers, videos as backdrops the camera moves through.
@@ -103,29 +74,6 @@ export const ThemeSchema = z.object({
   effect: z.enum(EFFECTS).default('none'),
 });
 export type Theme = z.infer<typeof ThemeSchema>;
-
-export const FONT_FAMILIES = [
-  'Playfair Display',
-  'Cormorant Garamond',
-  'Great Vibes',
-  'Poppins',
-  'Noto Sans',
-  'Noto Serif',
-  'Noto Sans Devanagari',
-  'Noto Serif Devanagari',
-  'Tiro Devanagari Hindi',
-  'Cinzel',
-  'Pinyon Script',
-  'Parisienne',
-  'Alex Brush',
-  'Marcellus',
-  'Montserrat',
-  'Italiana',
-  'Yeseva One',
-  'Rozha One',
-  'Yatra One',
-] as const;
-export type FontFamily = (typeof FONT_FAMILIES)[number];
 
 export const FontRefSchema = z.object({
   family: z.enum(FONT_FAMILIES),
@@ -191,24 +139,25 @@ export const SECTION_KEYS = [
   'menu',
   'quote',
   'footer',
+  /** A free-form artboard designed in the Canvas editor (see canvas.ts). */
+  'canvas',
 ] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
-export const ConditionSchema = z.object({
-  /** Render only when this binding resolves to a non-empty value. */
-  exists: z.string().max(120).optional(),
-  /** Render only for these event types. */
-  eventTypes: z.array(z.string()).optional(),
-});
-export type Condition = z.infer<typeof ConditionSchema>;
-
-export const SectionInstanceSchema = z.object({
-  id,
-  section: z.enum(SECTION_KEYS),
-  variant: z.string().regex(/^[a-z][a-zA-Z0-9-]*$/).max(40).default('default'),
-  props: z.record(z.string(), ValueSchema).default({}),
-  visibleWhen: ConditionSchema.optional(),
-});
+export const SectionInstanceSchema = z
+  .object({
+    id,
+    section: z.enum(SECTION_KEYS),
+    variant: z.string().regex(/^[a-z][a-zA-Z0-9-]*$/).max(40).default('default'),
+    props: z.record(z.string(), ValueSchema).default({}),
+    visibleWhen: ConditionSchema.optional(),
+    /** The artboards of a "canvas" section (and nothing else). */
+    canvas: z.lazy(() => CanvasSectionSchema).optional(),
+  })
+  .superRefine((s, ctx) => {
+    if (s.section === 'canvas' && !s.canvas) ctx.addIssue({ code: 'custom', path: ['canvas'], message: 'A canvas section needs its artboards' });
+    if (s.section !== 'canvas' && s.canvas) ctx.addIssue({ code: 'custom', path: ['canvas'], message: 'Only canvas sections carry artboards' });
+  });
 export type SectionInstance = z.infer<typeof SectionInstanceSchema>;
 
 export const WebsitePageSchema = z.object({

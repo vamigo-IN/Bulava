@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bulava/localization": "workspace:*",
     "@bulava/template-engine": "workspace:*",
     "@bulava/template-schema": "workspace:*",
     "@bulava/validation": "workspace:*",

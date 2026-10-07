@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { AudienceService } from '../audience/audience.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { openRegistrationByDefault } from '../registrations/registration-defaults';
+import { newPreviewToken } from './events.service';
 import { ShareLinkService } from './share-link.service';
 
 export const CloneEventSchema = z.object({
@@ -82,6 +83,7 @@ export class EventToolsService {
           typeKey: source.typeKey,
           title: input.title,
           slug: `${slugify(input.title) || 'event'}-${randomBytes(3).toString('hex')}`,
+          previewToken: newPreviewToken(),
           description: source.description,
           language: source.language,
           timezone: source.timezone,

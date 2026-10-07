@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Preview before paying: the new way to start
+
+- **Use this template, no sign-up wall.** On a template page, visitors enter their names, the date and a WhatsApp number and get a draft invitation with that design and a shareable preview link in under a minute. The account is made from the number alone; a password is not needed until they publish. The preview link also goes to their WhatsApp when the WhatsApp Business integration has a *preview link* template (Integrations → WhatsApp).
+- **Preview links for every event.** Every event has a preview link (`/preview/<token>`): the invitation exactly as guests will see it, with a “Preview” mark, before publishing and whatever the access settings. The event page and the overview show it with copy, open, share-on-WhatsApp and *New preview link*. Family members opening it see a share button and “Make your own invitation”; the host sees *Edit design* and *Publish*.
+- **Any design before paying.** A draft can use a Standard or Premium design and preview it with a watermark; the plan is checked when the event is published (and the design page says so), not when the design is saved.
+- **Securing an account.** An account made from a number alone can design, preview and edit functions, but publishing, paying, sending invitations and adding team members ask it to be secured first: a code on WhatsApp, an email and password (**Secure my account**), or Google. The dashboard shows a banner until then.
+- **Sign in with WhatsApp.** The sign-in page offers a one-time code on WhatsApp when the integration has an *authentication* template. Sign-up asks for an optional WhatsApp number and a separate, unticked box for updates on WhatsApp; the Account page edits both.
+- **Fixed on phones.** The dashboard no longer grows wider than the screen on the photo album, video and overview pages (long links wrap or truncate), and the notifications panel opens inside the screen.
+
+### Canvas templates: design freely in the Studio
+
+- **Canvas sections.** A template page can now carry free-form designs: fixed artboards (a phone one, and optionally a desktop one) with layers placed anywhere: text in theme or fixed fonts, library images or the host's photos in arch, circle, leaf and other masks, shapes, the engine's ornaments (torans, marigolds, diyas, mandalas, lanterns…), icons, and widgets for a countdown, buttons (get directions, add to calendar, RSVP) and date/time/venue rows. A section can repeat once per function, which gives the card-per-event invitations. Designs scale to any screen without scripts, keep text readable against their background (WCAG AA; the checks report layers that opt out), animate layer by layer, and stop moving for reduced motion.
+- **Canvas editor in Template Studio.** *Sections → Add section → canvas* opens a full-screen editor: drag, resize and rotate with snapping guides, a layer list with hide and lock, a properties panel for every layer kind, an image picker that also uploads new images with their licence, undo/redo and keyboard shortcuts. It edits the same draft as the Studio, so saving, checks and publishing are unchanged.
+- **Two canvas templates.** Rose Arch (weddings and engagements) and Confetti Pop (birthdays and family celebrations) ship as examples, each with phone and desktop heroes and a card for every function. They appear in the gallery after the next seed.
+- **Desktop previews at desktop width.** The template page's *Desktop* view and the Studio's desktop preview lay the page out at a laptop width and zoom it to the frame, so desktop layouts show as a visitor sees them instead of as a tablet.
+
 ### Reliability and CI
 
 - **CI on supported runtimes.** Every GitHub action is on its Node 24 release (Node 20 is deprecated on GitHub's runners). Runners are pinned to Ubuntu 24.04, so `ubuntu-latest` moving to Ubuntu 26 on 19 October 2026 can't change a build without a commit. pnpm's version now comes only from `packageManager`.

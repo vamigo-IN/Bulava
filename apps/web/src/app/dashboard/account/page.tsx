@@ -1,15 +1,16 @@
 'use client';
 
-import { ChevronRight, Download, ReceiptIndianRupee, ShieldAlert } from 'lucide-react';
+import { ChevronRight, Download, ReceiptIndianRupee, ShieldAlert, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Suspense, useState, type FormEvent } from 'react';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ACCOUNT_RESTORE_DAYS } from '@bulava/validation';
-import { api } from '@/lib/api';
+import { api, apiPatch } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
-import { useMe } from '@/lib/queries';
-import { Alert, Button, Card, Field, Input } from '@/components/ui/primitives';
+import { keys, useMe } from '@/lib/queries';
+import type { User } from '@/lib/types';
+import { Alert, Button, Card, Checkbox, Field, Input } from '@/components/ui/primitives';
 import { SignInMethods } from '@/components/account/sign-in-methods';
 import { TwoStepCard } from '@/components/account/two-step-card';
 
@@ -20,10 +21,19 @@ export default function AccountPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="font-display text-4xl">{t('account.title')}</h1>
-      <Card className="rounded-3xl">
-        <p className="font-display text-2xl">{me.data?.name}</p>
-        <p className="text-stone-600">{me.data?.email}</p>
-      </Card>
+      {me.data?.provisional ? (
+        <Link href="/dashboard/claim?next=%2Fdashboard%2Faccount" className="clay clay-lift group flex items-center gap-4 rounded-3xl border border-gold-300 p-5">
+          <span className="icon-3d size-11 shrink-0 rounded-xl">
+            <ShieldCheck aria-hidden className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-xl text-ink">{t('claim.title')}</span>
+            <span className="block text-sm text-stone-600">{t('claim.banner')}</span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-stone-400 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ) : null}
+      {me.data ? <ProfileCard me={me.data} /> : null}
       <Link href="/dashboard/payments" className="clay clay-lift group flex items-center gap-4 rounded-3xl p-5">
         <span className="icon-3d size-11 shrink-0 rounded-xl">
           <ReceiptIndianRupee aria-hidden className="size-5" />
@@ -52,6 +62,58 @@ export default function AccountPage() {
       </Card>
       <DeleteAccount hasPassword={me.data?.hasPassword ?? true} />
     </div>
+  );
+}
+
+/** Name, email, WhatsApp number and the optional WhatsApp-updates consent. */
+function ProfileCard({ me }: { me: User }) {
+  const t = useT();
+  const client = useQueryClient();
+  const [name, setName] = useState(me.name);
+  const [phone, setPhone] = useState(me.phone ?? '');
+  const [updates, setUpdates] = useState(me.whatsappUpdates);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+  useEffect(() => {
+    setName(me.name);
+    setPhone(me.phone ?? '');
+    setUpdates(me.whatsappUpdates);
+  }, [me]);
+  const dirty = name.trim() !== me.name || phone.trim() !== (me.phone ?? '') || updates !== me.whatsappUpdates;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setNotice(null);
+    try {
+      await apiPatch('/users/me', { name: name.trim(), phone: phone.trim(), whatsappUpdates: updates });
+      await client.invalidateQueries({ queryKey: keys.me });
+      setNotice({ tone: 'success', text: t('account.profileSaved') });
+    } catch (err) {
+      setNotice({ tone: 'danger', text: errorMessage(t, err) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="rounded-3xl">
+      <form onSubmit={submit} className="space-y-4">
+        {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t('auth.field.name')}>{(p) => <Input {...p} required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
+          <Field label={t('auth.field.email')}>{(p) => <Input {...p} type="email" value={me.email ?? ''} readOnly disabled />}</Field>
+          <Field label={t('account.phone')} hint={t('account.phone.hint')}>
+            {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" placeholder="98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} />}
+          </Field>
+        </div>
+        <Checkbox label={t('account.whatsappUpdates')} checked={updates} disabled={!phone.trim()} onChange={(e) => setUpdates(e.target.checked)} />
+        <p className="-mt-2 text-xs text-stone-500">{t('account.whatsappUpdates.hint')}</p>
+        <Button type="submit" className="rounded-2xl" disabled={!dirty || busy}>
+          {busy ? t('common.saving') : t('account.saveProfile')}
+        </Button>
+      </form>
+    </Card>
   );
 }
 

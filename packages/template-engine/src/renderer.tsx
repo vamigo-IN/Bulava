@@ -25,6 +25,7 @@ import { Countdown, Footer, Gallery, PhotoShare, Rsvp } from './sections/misc';
 import { EventTimeline, Venue } from './sections/schedule';
 import { Menu, Quote } from './sections/signature';
 import { initials } from './sections/shared';
+import { CanvasSection } from './canvas/section';
 import { themeStyle } from './theme';
 import { TemplateStyles } from './styles';
 import type { RenderMode, RenderSlots, SectionProps } from './types';
@@ -49,6 +50,7 @@ const REGISTRY: Record<SectionKey, ComponentType<SectionProps>> = {
   menu: Menu,
   quote: Quote,
   footer: Footer,
+  canvas: CanvasSection,
 };
 
 function isVisible(instance: SectionInstance, ctx: RenderContext): boolean {
@@ -99,6 +101,7 @@ export function TemplateRenderer({
   const opts = { t, language, timeZone };
   const sections = (definition.website?.pages[0]?.sections ?? []).filter((s) => isVisible(s, ctx) && !hidden.has(s.id));
   const shown = maxSections ? sections.slice(0, maxSections) : sections;
+  const rsvpSectionId = sections.find((s) => s.section === 'rsvp')?.id;
   const rootId = `bulava-t-${(introKey ?? definition.templateKey).replace(/[^A-Za-z0-9_-]/g, '')}`;
 
   return (
@@ -155,6 +158,8 @@ export function TemplateRenderer({
             slots={slots}
             mode={mode}
             artworks={definition.artworks}
+            fonts={fonts}
+            rsvpSectionId={rsvpSectionId}
           />
         );
       })}

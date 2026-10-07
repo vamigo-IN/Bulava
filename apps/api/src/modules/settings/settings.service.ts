@@ -71,6 +71,14 @@ export class PlatformSettingsService {
     };
   }
 
+  /** Platform messages to hosts on WhatsApp (the preview link, sign-in codes), each needing its approved template. */
+  async whatsappHost(): Promise<{ preview: boolean; otp: boolean }> {
+    const whatsapp = await this.store.get('whatsapp');
+    const w = whatsapp.value;
+    const live = w.enabled && !!w.phoneNumberId && !!whatsapp.secrets.accessToken;
+    return { preview: live && !!w.templates.preview, otp: live && !!w.templates.otp };
+  }
+
   private view(s: ResolvedSetting<SettingGroup>, editors: Map<string, string>) {
     const secrets = SETTING_SECRETS[s.group] as readonly string[];
     return {

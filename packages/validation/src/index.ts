@@ -97,8 +97,13 @@ export const SignupSchema = z.object({
   password: z.string().min(10, 'At least 10 characters').max(128),
   /** The Terms of Service and the Privacy Policy, recorded as consents with their versions. */
   acceptTerms: agreed('Please accept the Terms of Service and the Privacy Policy'),
+  /** WhatsApp number (E.164), for the preview link and, with `whatsappUpdates`, for updates. */
+  phone: optionalPhone,
+  /** Permission to send updates on WhatsApp (a separate, optional consent). */
+  whatsappUpdates: z.boolean().default(false),
 });
 export type SignupInput = z.infer<typeof SignupSchema>;
+
 
 /** Days a deleted account can still be restored by signing in, before it is erased for good. */
 export const ACCOUNT_RESTORE_DAYS = 30;
@@ -208,6 +213,64 @@ export const CreateEventSchema = z.object({
   applyDefaults: z.boolean().default(true),
 });
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
+
+// ───────────────────────────── Quick start (preview before paying) ─────────────────────────────
+
+/** A calendar day, YYYY-MM-DD. */
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date');
+
+/**
+ * The template page's quick start: the host's names, the date and a WhatsApp
+ * number make a draft event with the chosen design and a preview link, before
+ * any password or payment. `details` follows the event type's schema (couple
+ * names, an honoree, or nothing), as event creation does.
+ */
+export const QuickStartSchema = z.object({
+  templateKey: z.string().trim().min(1).max(80),
+  /** One of the template's event types; the template's first when omitted. */
+  typeKey: z.string().trim().min(1).max(40).optional(),
+  details: z.record(z.string(), z.string().trim().max(120)).default({}),
+  /** For types without couple or honoree details (a corporate event, a festival): the event's name. */
+  title: z.string().trim().max(160).optional(),
+  date: dateOnly.optional(),
+  phone: PhoneSchema,
+  language: LanguageCodeSchema.default('en'),
+  acceptTerms: agreed('Please accept the Terms of Service and the Privacy Policy'),
+  whatsappUpdates: z.boolean().default(false),
+});
+export type QuickStartInput = z.infer<typeof QuickStartSchema>;
+
+/** The six-digit code sent on WhatsApp. */
+export const OtpCodeSchema = z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code');
+
+/** Second step when the WhatsApp number already has an account: the code proves it is theirs. */
+export const QuickStartVerifySchema = QuickStartSchema.extend({ code: OtpCodeSchema });
+export type QuickStartVerifyInput = z.infer<typeof QuickStartVerifySchema>;
+
+export const PhoneOtpRequestSchema = z.object({ phone: PhoneSchema });
+export type PhoneOtpRequestInput = z.infer<typeof PhoneOtpRequestSchema>;
+
+export const PhoneOtpVerifySchema = z.object({ phone: PhoneSchema, code: OtpCodeSchema });
+export type PhoneOtpVerifyInput = z.infer<typeof PhoneOtpVerifySchema>;
+
+/**
+ * An account made from a WhatsApp number alone (the quick start) adds an email
+ * and a password, so it can sign in anywhere and receive receipts.
+ */
+export const ClaimAccountSchema = z.object({
+  email: z.email().max(254).transform((v) => v.toLowerCase()),
+  password: z.string().min(10, 'At least 10 characters').max(128),
+  name: trimmed(120).optional(),
+});
+export type ClaimAccountInput = z.infer<typeof ClaimAccountSchema>;
+
+/** PATCH /users/me: the profile fields a host may change. */
+export const UpdateProfileSchema = z.object({
+  name: trimmed(120).optional(),
+  phone: z.union([z.literal(''), z.null(), PhoneSchema]).transform((v) => (v ? v : null)).optional(),
+  whatsappUpdates: z.boolean().optional(),
+});
+export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 
 export const UpdateEventSchema = z.object({
   title: trimmed(160).optional(),

@@ -201,6 +201,25 @@ function WhatsAppForm({ view, webhookUrl }: { view: SettingGroupView; webhookUrl
         />
         <TextField label={t('int.whatsapp.language')} placeholder="en" spellCheck={false} className="[&_input]:font-mono" value={draft.templateLanguage} onChange={(v) => set('templateLanguage', v)} />
       </div>
+      <p className="text-xs text-stone-500">{t('int.whatsapp.hostTemplatesHint')}</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          label={t('int.whatsapp.previewTemplate')}
+          placeholder="host_preview_link"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.preview}
+          onChange={(v) => set('templates', { ...templates, preview: v })}
+        />
+        <TextField
+          label={t('int.whatsapp.otpTemplate')}
+          placeholder="host_sign_in_code"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.otp}
+          onChange={(v) => set('templates', { ...templates, otp: v })}
+        />
+      </div>
       <h3 className="pt-2 text-sm font-semibold text-stone-900">{t('int.whatsapp.webhookTitle')}</h3>
       <p className="-mt-2 text-xs text-stone-500">{t('int.whatsapp.webhookHint')}</p>
       <GroupSecret editor={editor} view={view} name="webhookVerifyToken" label={t('int.whatsapp.webhookVerifyToken')} />

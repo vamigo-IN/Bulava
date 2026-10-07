@@ -12,6 +12,11 @@ export const ErrorCode = {
   NOT_FOUND: HttpStatus.NOT_FOUND,
   CONFLICT: HttpStatus.CONFLICT,
   EMAIL_TAKEN: HttpStatus.CONFLICT,
+  PHONE_TAKEN: HttpStatus.CONFLICT,
+  /** An account made from a WhatsApp number alone must be secured (code, or email and password) before it publishes or pays. */
+  ACCOUNT_UNVERIFIED: HttpStatus.FORBIDDEN,
+  /** WhatsApp codes need the WhatsApp Business integration and an approved authentication template. */
+  PHONE_OTP_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   RATE_LIMITED: HttpStatus.TOO_MANY_REQUESTS,
   INVALID_EVENT_TYPE: HttpStatus.BAD_REQUEST,
   UNSUPPORTED_LANGUAGE: HttpStatus.BAD_REQUEST,

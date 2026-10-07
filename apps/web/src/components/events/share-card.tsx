@@ -59,7 +59,7 @@ export function ShareCard({ event, compact = false, linkOnly = false }: { event:
   if (info.kind === 'PERSONAL') {
     if (linkOnly) return null;
     return (
-      <Card className="rounded-3xl">
+      <Card className="min-w-0 rounded-3xl">
         <div className="flex items-start gap-4">
           <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700 ring-1 ring-brand-100">
             <Users className="size-5" />
@@ -89,7 +89,7 @@ export function ShareCard({ event, compact = false, linkOnly = false }: { event:
   const expiresLabel = info.expiresAt ? formatEventDate(info.expiresAt, { language: 'en', timeZone: event.timezone }) : null;
 
   return (
-    <Card className="rounded-3xl">
+    <Card className="min-w-0 rounded-3xl">
       <div className="flex items-start gap-4">
         <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-brand-900 text-gold-200 shadow-[0_10px_20px_-10px_rgba(91,14,27,0.8)]">
           <Link2 className="size-5" />

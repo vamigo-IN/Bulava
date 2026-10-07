@@ -8,6 +8,7 @@ import { TemplateDefinitionSchema, validateTemplateDefinition, type TemplateDefi
 import { ApiError, apiPost, apiPut, errorMessage } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import type { CheckReport, TemplateDetail } from '@/lib/types';
+import { CanvasEditor } from '../canvas-editor/editor';
 import { useInvalidate } from '../shell';
 import { Alert, Badge, Button, statusTone, Tabs } from '../ui';
 import { ArtworkTab } from './artwork-tab';
@@ -37,6 +38,8 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
   const [tab, setTab] = useState<TabKey>('theme');
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string; items?: string[] } | null>(null);
   const [report, setReport] = useState<CheckReport | null>(null);
+  /** The canvas section open in the full-screen editor. */
+  const [canvasId, setCanvasId] = useState<string | null>(null);
   /** Bumped on every local change so the preview retries after a render error. */
   const [revision, setRevision] = useState(0);
   const dirtyRef = useRef(dirty);
@@ -224,7 +227,7 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
           {!draft && tab !== 'json' && tab !== 'versions' ? <Alert>{t('studio.invalid', { count: 1 })}</Alert> : null}
           {draft && tab === 'details' ? <DetailsTab template={template} definition={draft} edit={edit} /> : null}
           {draft && tab === 'theme' ? <ThemeTab definition={draft} edit={edit} /> : null}
-          {draft && tab === 'layout' ? isWebsite ? <SectionsTab definition={draft} edit={edit} /> : <ScenesTab definition={draft} edit={edit} /> : null}
+          {draft && tab === 'layout' ? isWebsite ? <SectionsTab definition={draft} edit={edit} onOpenCanvas={setCanvasId} /> : <ScenesTab definition={draft} edit={edit} /> : null}
           {draft && tab === 'artwork' ? <ArtworkTab definition={draft} edit={edit} /> : null}
           {draft && tab === 'capabilities' ? <CapabilitiesTab definition={draft} edit={edit} /> : null}
           {tab === 'json' ? (
@@ -247,6 +250,8 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
           <div className="h-[80vh] xl:h-full">{draft ? <StudioPreview definition={draft} version={`${working.id}:${revision}`} /> : null}</div>
         </aside>
       </div>
+
+      {draft && canvasId ? <CanvasEditor definition={draft} sectionId={canvasId} edit={edit} onClose={() => setCanvasId(null)} onSave={() => save.mutate()} saving={save.isPending} dirty={dirty} /> : null}
     </div>
   );
 }

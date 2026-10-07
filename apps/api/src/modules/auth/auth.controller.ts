@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import {
+  ClaimAccountSchema,
   LoginMfaSchema,
   LoginSchema,
   MfaDisableSchema,
@@ -12,6 +13,7 @@ import {
   RestoreAccountSchema,
   SetPasswordSchema,
   SignupSchema,
+  type ClaimAccountInput,
   type LoginInput,
   type LoginMfaInput,
   type MfaDisableInput,
@@ -27,6 +29,7 @@ import { CurrentUser, Public, ReqMeta, type RequestMeta } from '../../common/dec
 import { ApiZodBody, ZodBody } from '../../common/decorators/zod.decorators';
 import { AppError } from '../../common/errors/app-error';
 import type { AuthUser } from '../../common/request-context';
+import { PhoneOtpService } from '../onboarding/phone-otp.service';
 import { AccountService } from '../users/account.service';
 import { AuthService, toPublicUser } from './auth.service';
 import { GOOGLE_STATE_COOKIE, GOOGLE_STATE_COOKIE_PATH, GoogleAuthService } from './google-auth.service';
@@ -45,14 +48,23 @@ export class AuthController {
     private readonly mfa: MfaService,
     private readonly google: GoogleAuthService,
     private readonly account: AccountService,
+    private readonly phoneOtp: PhoneOtpService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /** Which sign-in methods the apps should offer. */
   @Public()
   @Get('providers')
-  providers() {
-    return { google: this.google.enabled };
+  async providers() {
+    return { google: this.google.enabled, phoneOtp: await this.phoneOtp.available() };
+  }
+
+  /** A provisional (WhatsApp-only) account adds an email and a password. */
+  @Post('claim')
+  @HttpCode(200)
+  @ApiZodBody(ClaimAccountSchema)
+  claim(@CurrentUser() user: AuthUser, @ZodBody(ClaimAccountSchema) body: ClaimAccountInput, @ReqMeta() meta: RequestMeta) {
+    return this.auth.claim(user.id, body, meta);
   }
 
   private setGoogleState(res: Response, state: string) {

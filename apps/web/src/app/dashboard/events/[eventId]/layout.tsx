@@ -157,7 +157,17 @@ export default function EventLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {(event.data.accessMode === 'PUBLIC' || event.data.accessMode === 'PRIVATE_LINK') && can(event.data, 'invitation.read') ? (
+            {/* The watermarked preview: works before publishing, whatever the access mode. */}
+            <a
+              href={`/preview/${event.data.previewToken}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-medium text-ivory ring-1 ring-white/20 transition-[background-color,box-shadow] duration-300 hover:bg-white/5 hover:ring-gold-300/40"
+            >
+              {t('dash.nav.preview')}
+              <ExternalLink aria-hidden className="size-4" />
+            </a>
+            {(event.data.accessMode === 'PUBLIC' || event.data.accessMode === 'PRIVATE_LINK') && can(event.data, 'invitation.read') && event.data.status === 'ACTIVE' ? (
               <a
                 href={`/e/${event.data.slug}`}
                 target="_blank"

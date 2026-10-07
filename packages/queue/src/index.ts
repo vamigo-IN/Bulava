@@ -9,6 +9,8 @@ export const QueueName = {
   VIDEO_RENDER: 'video-render',
   NOTIFICATIONS: 'notifications',
   EMAIL: 'email',
+  /** Platform WhatsApp messages to hosts (preview links, sign-in codes); guest messages go through `notifications`. */
+  WHATSAPP: 'whatsapp',
   ANALYTICS: 'analytics',
   EXPORTS: 'exports',
   CLEANUP: 'cleanup',
@@ -22,6 +24,12 @@ export interface JobPayloads {
   notifications: { notificationId: string };
   /** `replyTo`: where a reply goes (a contact-form message's sender), instead of the settings' address. */
   email: { to: string; subject: string; html: string; text: string; notificationId?: string; replyTo?: string };
+  /**
+   * One approved WhatsApp template to a host's number: `template` names the kind
+   * (the admin's settings map it to the approved template name), `params` fill
+   * its body variables and `copyCode` an authentication template's copy button.
+   */
+  whatsapp: { to: string; template: 'preview' | 'otp'; params: string[]; copyCode?: string };
   analytics: {
     name: string;
     eventId?: string | null;
@@ -41,6 +49,8 @@ export const DEFAULT_JOB_OPTIONS: Record<QueueName, JobsOptions> = {
   'video-render': { attempts: 2, backoff: { type: 'exponential', delay: 30_000 }, removeOnComplete: 500, removeOnFail: 2000 },
   notifications: { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: 5000, removeOnFail: 5000 },
   email: { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: 5000, removeOnFail: 5000 },
+  // Codes expire in minutes, so a message that cannot go out soon is dropped rather than retried for hours.
+  whatsapp: { attempts: 3, backoff: { type: 'exponential', delay: 5_000 }, removeOnComplete: 2000, removeOnFail: 2000 },
   analytics: { attempts: 3, backoff: { type: 'exponential', delay: 5_000 }, removeOnComplete: 10_000, removeOnFail: 1000 },
   exports: { attempts: 2, backoff: { type: 'fixed', delay: 10_000 }, removeOnComplete: 200, removeOnFail: 500 },
   cleanup: { attempts: 1, removeOnComplete: 100, removeOnFail: 100 },

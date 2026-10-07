@@ -378,7 +378,8 @@ export function MotionPanel({ definition, custom, setCustom }: PanelProps) {
 
 export function SectionsPanel({ definition, custom, setCustom }: PanelProps) {
   const t = useT();
-  const sections = (definition.website?.pages[0]?.sections ?? []).filter((s) => s.section !== 'hero');
+  // The hero stays: a hero section, or a canvas design opening the page.
+  const sections = (definition.website?.pages[0]?.sections ?? []).filter((s, i) => s.section !== 'hero' && !(i === 0 && s.section === 'canvas'));
   const hidden = new Set(custom.hiddenSections ?? []);
   return (
     <div>

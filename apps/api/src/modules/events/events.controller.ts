@@ -50,6 +50,14 @@ export class EventsController {
     return this.events.update(access, body, meta);
   }
 
+  /** Replaces the host's preview link (the old one stops working). */
+  @Post(':eventId/preview-token')
+  @HttpCode(200)
+  @RequireEventPermission('event.update')
+  rotatePreview(@EventAccess() access: EventAccessContext, @ReqMeta() meta: RequestMeta) {
+    return this.events.rotatePreviewToken(access, meta);
+  }
+
   @Delete(':eventId')
   @HttpCode(200)
   @RequireEventPermission('event.delete')

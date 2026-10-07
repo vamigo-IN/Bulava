@@ -8,11 +8,17 @@ export interface User {
   id: string;
   name: string;
   email: string | null;
+  /** WhatsApp number, E.164. */
+  phone: string | null;
   locale: string;
   platformRole: string;
   hasPassword: boolean;
   googleLinked: boolean;
   mfaEnabled: boolean;
+  /** Made from a WhatsApp number alone (the quick start) and not yet secured: cannot publish, pay or invite. */
+  provisional: boolean;
+  /** Agreed to updates on WhatsApp. */
+  whatsappUpdates: boolean;
 }
 
 export interface EventType {
@@ -47,6 +53,10 @@ export interface EventSummary {
   endDate: string | null;
   details: Record<string, string>;
   counts: { functions: number; guests: number };
+  /** The host's shareable, watermarked preview link: /preview/<token>. */
+  previewToken: string;
+  /** "quick_start" when it began on the template page. */
+  source: string | null;
   role?: string;
   /** What the signed-in member may do in this event (the dashboard shows only that). */
   permissions?: string[];

@@ -205,6 +205,10 @@ export const WhatsAppSettingsSchema = z.object({
     .object({
       invitation: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
       reminder: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
+      /** The host's preview link after the quick start: {{1}} name, {{2}} design, {{3}} link. */
+      preview: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
+      /** An "authentication" template with a copy-code button: {{1}} the code. */
+      otp: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
     })
     .default({}),
   templateLanguage: z.string().trim().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, 'Like en or en_US').default('en'),

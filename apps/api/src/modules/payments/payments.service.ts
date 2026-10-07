@@ -10,6 +10,7 @@ import type { AuthUser, EventAccessContext } from '../../common/request-context'
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertVerifiedAccount } from '../users/account-gate';
 import { ConsentService } from '../users/consent.service';
 import { SETTINGS_STORE } from '../settings/settings.service';
 import { PAYMENT_PROVIDER, RazorpayProvider, type PaymentProvider } from './payment-provider';
@@ -67,6 +68,8 @@ export class PaymentsService {
 
   /** Per-event plans (ONE_TIME) attach to an event; yearly plans attach to the user. */
   async createOrder(user: AuthUser, access: EventAccessContext | null, input: CreateOrderInput, meta: RequestMeta) {
+    // Receipts and refunds need a reachable account, not a number alone.
+    await assertVerifiedAccount(this.prisma, user.id);
     const plan = await this.prisma.pricingPlan.findUnique({ where: { key: input.planKey } });
     if (!plan || !plan.active || plan.priceMinor <= 0) throw new AppError('NOT_FOUND', 'Plan not found.');
     if (access && plan.interval !== 'ONE_TIME') throw new AppError('BAD_REQUEST', 'This plan is not purchased per event.');

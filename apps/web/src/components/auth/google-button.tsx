@@ -2,27 +2,38 @@
 
 import { useEffect, useState } from 'react';
 
-let providers: Promise<{ google: boolean }> | null = null;
+export interface Providers {
+  google: boolean;
+  /** Sign-in codes on WhatsApp (needs the WhatsApp Business integration and its authentication template). */
+  phoneOtp: boolean;
+}
+
+const NONE: Providers = { google: false, phoneOtp: false };
+let providers: Promise<Providers> | null = null;
 
 /** Which sign-in methods the API offers (cached for the page). */
-export function loadProviders(): Promise<{ google: boolean }> {
+export function loadProviders(): Promise<Providers> {
   providers ??= fetch('/api/v1/auth/providers', { cache: 'no-store' })
-    .then((r) => r.json() as Promise<{ data?: { google: boolean } }>)
-    .then((b) => b.data ?? { google: false })
-    .catch(() => ({ google: false }));
+    .then((r) => r.json() as Promise<{ data?: Partial<Providers> }>)
+    .then((b) => ({ ...NONE, ...b.data }))
+    .catch(() => NONE);
   return providers;
 }
 
-export function useGoogleEnabled(): boolean {
-  const [enabled, setEnabled] = useState(false);
+export function useProviders(): Providers {
+  const [state, setState] = useState<Providers>(NONE);
   useEffect(() => {
     let alive = true;
-    void loadProviders().then((p) => alive && setEnabled(p.google));
+    void loadProviders().then((p) => alive && setState(p));
     return () => {
       alive = false;
     };
   }, []);
-  return enabled;
+  return state;
+}
+
+export function useGoogleEnabled(): boolean {
+  return useProviders().google;
 }
 
 /** Google's "G" mark, as Google's sign-in branding guidelines require. */

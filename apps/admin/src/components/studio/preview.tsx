@@ -3,9 +3,9 @@
 import { Player } from '@remotion/player';
 import { useQuery } from '@tanstack/react-query';
 import { Monitor, Play, Smartphone } from 'lucide-react';
-import { Component, useMemo, useState, type ReactNode } from 'react';
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TemplateRenderer } from '@bulava/template-engine';
-import { artworkAssetIds, sampleRenderContext, SAMPLE_PRESETS, videoDurationSec, type TemplateDefinition } from '@bulava/template-schema';
+import { sampleRenderContext, SAMPLE_PRESETS, templateAssetIds, videoDurationSec, type TemplateDefinition } from '@bulava/template-schema';
 import { apiPost } from '@/lib/api';
 import { TemplateVideo, templateVideoMetadata, type TemplateVideoProps } from '@bulava/video-engine';
 import { t } from '@/lib/i18n';
@@ -44,8 +44,8 @@ export function StudioPreview({ definition, version }: { definition: TemplateDef
 
   const effectiveType = typeOptions.includes(typeKey) ? typeKey : (typeOptions[0] ?? 'WEDDING');
   const effectiveLanguage = definition.languages.includes(language) ? language : (definition.languages[0] ?? 'en');
-  // Painted layers may not be approved or published yet: staff previews use signed URLs.
-  const artworkIds = artworkAssetIds(definition).sort();
+  // Painted layers and canvas images may not be approved or published yet: staff previews use signed URLs.
+  const artworkIds = templateAssetIds(definition).sort();
   const artworkUrls = useQuery({
     queryKey: ['admin', 'asset-urls', artworkIds],
     queryFn: () => apiPost<Record<string, string>>('/admin/assets/urls', { ids: artworkIds }),
@@ -102,15 +102,17 @@ export function StudioPreview({ definition, version }: { definition: TemplateDef
         <PreviewBoundary resetKey={`${version}:${effectiveLanguage}:${effectiveType}:${longNames}:${noPhotos}`}>
           {isWebsite ? (
             <div className={cn('mx-auto overflow-hidden bg-white shadow-xl', device === 'mobile' ? 'w-[min(390px,100%)] rounded-[1.75rem] border-[6px] border-stone-900' : 'w-full rounded-lg')}>
-              <TemplateRenderer
-                key={introRun ?? 'preview'}
-                definition={definition}
-                context={context}
-                language={effectiveLanguage}
-                mode={introRun ? 'live' : 'preview'}
-                introKey={introRun ? `studio-${introRun}` : undefined}
-                slots={{ watermark }}
-              />
+              <DesktopZoom enabled={device === 'desktop'}>
+                <TemplateRenderer
+                  key={introRun ?? 'preview'}
+                  definition={definition}
+                  context={context}
+                  language={effectiveLanguage}
+                  mode={introRun ? 'live' : 'preview'}
+                  introKey={introRun ? `studio-${introRun}` : undefined}
+                  slots={{ watermark }}
+                />
+              </DesktopZoom>
             </div>
           ) : (
             <VideoPreview definition={definition} context={context} language={effectiveLanguage} watermark={watermark} />
@@ -141,6 +143,27 @@ function VideoPreview({ definition, context, language, watermark }: { definition
         initiallyMuted
         acknowledgeRemotionLicense
       />
+    </div>
+  );
+}
+
+/** The desktop preview lays the page out at a laptop width and zooms it to the pane, so desktop layouts show as desktops. */
+function DesktopZoom({ enabled, width = 1280, children }: { enabled: boolean; width?: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled) return;
+    const fit = () => setZoom(Math.min(1, el.clientWidth / width));
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [enabled, width]);
+  if (!enabled) return <>{children}</>;
+  return (
+    <div ref={ref} className="w-full overflow-hidden">
+      <div style={{ width, zoom }}>{children}</div>
     </div>
   );
 }

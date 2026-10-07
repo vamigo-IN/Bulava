@@ -17,6 +17,12 @@ import { AuditModule } from './modules/audit/audit.service';
 import { AudienceModule } from './modules/audience/audience.service';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthService } from './modules/auth/auth.service';
+import { PhoneAuthController } from './modules/auth/phone-auth.controller';
+import { PhoneOtpService } from './modules/onboarding/phone-otp.service';
+import { PreviewController } from './modules/onboarding/preview.controller';
+import { PreviewService } from './modules/onboarding/preview.service';
+import { QuickStartController } from './modules/onboarding/quick-start.controller';
+import { QuickStartService } from './modules/onboarding/quick-start.service';
 import { GoogleAuthService } from './modules/auth/google-auth.service';
 import { MfaService } from './modules/auth/mfa.service';
 import { SessionService } from './modules/auth/session.service';
@@ -169,6 +175,9 @@ const bootConfig = loadConfig();
     HealthController,
     MetaController,
     AuthController,
+    PhoneAuthController,
+    QuickStartController,
+    PreviewController,
     UsersController,
     EventsController,
     ShareLinkController,
@@ -236,7 +245,10 @@ const bootConfig = loadConfig();
     SessionService,
     MfaService,
     GoogleAuthService,
+    PhoneOtpService,
     AuthService,
+    QuickStartService,
+    PreviewService,
     EventsService,
     ShareLinkService,
     FunctionsService,

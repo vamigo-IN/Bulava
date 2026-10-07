@@ -16,8 +16,12 @@ import type { EventAccessContext } from '../../common/request-context';
 import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { openRegistrationByDefault } from '../registrations/registration-defaults';
+import { assertVerifiedAccount } from '../users/account-gate';
 import { ShareLinkService } from './share-link.service';
 import { FEATURE_KEYS } from '@bulava/validation';
+
+/** An unguessable preview link (/preview/<token>): 144 bits, URL-safe. */
+export const newPreviewToken = () => randomBytes(18).toString('base64url');
 
 const eventInclude = {
   accessPolicy: { select: { mode: true, pinHash: true, requireOtp: true } },
@@ -43,6 +47,10 @@ export interface EventDto {
   endDate: Date | null;
   details: unknown;
   counts: { functions: number; guests: number };
+  /** The host's shareable, watermarked preview link token (members only see this DTO). */
+  previewToken: string;
+  /** "quick_start" when it began on the template page. */
+  source: string | null;
   role?: string;
   /** What the caller may do in this event; the dashboard shows only what they can use. */
   permissions?: EventPermission[];
@@ -68,6 +76,8 @@ function toDto(event: EventWithPolicy, role?: string): EventDto {
     endDate: event.endDate,
     details: event.details,
     counts: { functions: event._count.functions, guests: event._count.guests },
+    previewToken: event.previewToken,
+    source: event.source,
     ...(role ? { role, permissions: permissionsForEventRole(role as EventRole) } : {}),
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
@@ -118,7 +128,22 @@ export class EventsService {
     return toDto(event, access.role);
   }
 
-  async create(userId: string, input: CreateEventInput, meta: RequestMeta): Promise<EventDto> {
+  /** Free events count against events.max; events with a purchase do not. Throws PLAN_LIMIT_REACHED; returns the person's features. */
+  async assertEventAllowance(userId: string) {
+    const features = await this.entitlements.forUser(userId);
+    const freeEvents = await this.prisma.event.count({
+      where: { ownerId: userId, deletedAt: null, status: { notIn: ['ARCHIVED', 'CANCELLED'] } },
+    });
+    const paidEvents = await this.prisma.entitlement.findMany({
+      where: { userId, eventId: { not: null } },
+      select: { eventId: true },
+      distinct: ['eventId'],
+    });
+    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.EVENTS_MAX, Math.max(0, freeEvents - paidEvents.length));
+    return features;
+  }
+
+  async create(userId: string, input: CreateEventInput, meta: RequestMeta, options: { source?: 'quick_start' } = {}): Promise<EventDto> {
     const type = await this.prisma.eventType.findFirst({ where: { key: input.typeKey, enabled: true } });
     if (!type) throw new AppError('INVALID_EVENT_TYPE', 'Unknown event type.');
     if (!isSupportedLanguage(input.language)) throw new AppError('UNSUPPORTED_LANGUAGE', 'Unsupported language.');
@@ -132,17 +157,7 @@ export class EventsService {
       );
     }
 
-    // Free events count against events.max; events with a purchase do not.
-    const features = await this.entitlements.forUser(userId);
-    const freeEvents = await this.prisma.event.count({
-      where: { ownerId: userId, deletedAt: null, status: { notIn: ['ARCHIVED', 'CANCELLED'] } },
-    });
-    const paidEvents = await this.prisma.entitlement.findMany({
-      where: { userId, eventId: { not: null } },
-      select: { eventId: true },
-      distinct: ['eventId'],
-    });
-    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.EVENTS_MAX, Math.max(0, freeEvents - paidEvents.length));
+    const features = await this.assertEventAllowance(userId);
 
     const slug = `${slugify(input.title) || 'event'}-${randomBytes(4).toString('hex').slice(0, 6)}`;
 
@@ -160,6 +175,8 @@ export class EventsService {
           visibility: input.visibility,
           accessPolicyId: policy.id,
           details: details.data as Prisma.InputJsonValue,
+          previewToken: newPreviewToken(),
+          source: options.source ?? null,
           members: { create: { userId, role: 'OWNER' } },
         },
       });
@@ -216,6 +233,30 @@ export class EventsService {
     return toDto(event, 'OWNER');
   }
 
+  /**
+   * Publishing needs a secured account and a plan that covers the chosen design:
+   * drafts may preview any design with a watermark, but guests only see what the
+   * plan allows.
+   */
+  private async assertPublishable(userId: string, eventId: string): Promise<void> {
+    await assertVerifiedAccount(this.prisma, userId);
+    const selection = await this.prisma.eventTemplateSelection.findUnique({
+      where: { eventId_output: { eventId, output: 'WEBSITE' } },
+      include: { templateVersion: { include: { template: { select: { tier: true } } } } },
+    });
+    if (selection) EntitlementsService.assertTemplateTier(await this.entitlements.forEvent(eventId), selection.templateVersion.template.tier);
+  }
+
+  /** A new preview link; the old one stops working at once. */
+  async rotatePreviewToken(access: EventAccessContext, meta: RequestMeta): Promise<{ previewToken: string }> {
+    const previewToken = newPreviewToken();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.event.update({ where: { id: access.eventId }, data: { previewToken } });
+      await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'event.preview_link_replaced', targetType: 'Event', targetId: access.eventId, eventId: access.eventId, meta }, tx);
+    });
+    return { previewToken };
+  }
+
   async update(access: EventAccessContext, input: UpdateEventInput, meta: RequestMeta): Promise<EventDto> {
     const event = await this.prisma.event.findFirst({
       where: { id: access.eventId, deletedAt: null },
@@ -226,6 +267,7 @@ export class EventsService {
     if (input.status && input.status !== event.status && !access.permissions.includes('event.publish')) {
       throw AppError.forbidden('You cannot change the event status.');
     }
+    if (input.status === 'ACTIVE' && event.status !== 'ACTIVE') await this.assertPublishable(access.userId, event.id);
     if (input.language && !isSupportedLanguage(input.language)) {
       throw new AppError('UNSUPPORTED_LANGUAGE', 'Unsupported language.');
     }

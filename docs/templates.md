@@ -201,6 +201,25 @@ A layer that is not 3:2 still renders (stretched to the canvas); the Artwork tab
 
 Sections with nothing to show (no photos, empty text) hide themselves, and live pages reveal sections as they scroll into view (disabled for reduced motion). Every 3D control has a keyboard path: flip cards have a turn button per face and the hidden face is `inert`.
 
+### Canvas sections
+
+A `canvas` section is a free-form design: the Studio's Canvas editor ([template-studio.md](template-studio.md#canvas-editor)) lays out layers on fixed artboards instead of filling a prebuilt layout. The section carries `canvas.mobile` (an artboard, usually 390 × 844 design units) and optionally `canvas.desktop` (usually 1440 × 900); without a desktop artboard the phone design is shown centred at `desktopMaxWidth` on wide screens, on its own background. `repeatPerFunction` renders the artboard once per function the viewer may see, with `function.*` bound to each: the card-per-function invitations. The schema is `packages/template-schema/src/canvas.ts`; the renderer is `packages/template-engine/src/canvas/`.
+
+An artboard has a background fill (a colour, gradient, pattern or licensed image), an optional ambient effect and up to 120 layers, drawn bottom to top. Every layer has a frame `{x, y, w, h, rotate}` in design units, an opacity, `visibleWhen` (a binding that must have a value, event types) and an animation: an entrance played once when the section scrolls into view, and an ambient motion. Layer kinds:
+
+| Kind | What it draws |
+|---|---|
+| `text` | a `Value` (fixed text, a binding with a format and fallback, a translation, or a `{{template}}`) in a theme font role or a fixed family, with size, weight, colour, alignment, spacing, case and shadow. `overflow: shrink` fits long names into the box in the browser; `wrap` and `clip` keep the size. |
+| `image` | a licensed asset (listed in `assets`, loaded through `/api/v1/public/template-assets/:id`) or a host photo binding (`photo.cover`, `photos[0]`…), with fit, mask (rounded, circle, ellipse, arch, diamond, leaf), border, shadow, flips, brightness and saturation. A missing bound photo hides the layer, so designs put a shape or ornament behind it. |
+| `shape` | rect, ellipse, line, arch, diamond, triangle, star, heart, scallop, with a fill and an outline |
+| `ornament` | the engine's drawn motifs (mandala, paisley, floral, toran, marigold strand, diya, kalash, lantern, peacock feather, rose window, temple border…), tinted with a colour |
+| `icon` | a line icon (calendar, clock, pin, heart, rings, music…), optionally on a circle |
+| `widget` | `countdown` (boxes, flip or inline), `button` (get directions, add to Google Calendar, scroll to RSVP, open a link, back to top) and `details` (date, time, venue, address and city rows with icons) |
+
+Colours are palette roles (`primary`, `accent`, `text`…) or fixed hex values; roles follow the host's colour preset, so one design restyles itself. The renderer scales an artboard to its container with CSS alone: positions are percentages, sizes are container-width units (`cqw`) and the section is a container query, so a phone design keeps its proportions on every screen and the Studio's phone frame stays a phone. Text colours are nudged to WCAG AA against the artboard's fill unless the designer switches `contrast` off for a decorative layer; the test matrix lists such layers under `contrast`. Entrances and motions stop for reduced motion, and buttons only open `https:`, `mailto:`, `tel:` and same-page addresses.
+
+Two catalog templates are built this way (`templates/src/canvas.ts`): **Rose Arch** (weddings and engagements) and **Confetti Pop** (birthdays and family celebrations), each with phone and desktop hero artboards and a per-function card. They use only drawn ornaments and host photos; designers add painted or photographic layers from the asset library.
+
 ### Openings, effects and music
 
 Openings play once per browser session per invitation, are skipped for users who prefer reduced motion, and are keyboard accessible (the scratch card has a *Reveal* button). Opening an invitation dispatches `bulava:intro-open`; the music player listens for it, because browsers only allow audio after a user gesture. Music never autoplays on page load, pauses when the tab is hidden, and has a visible play/pause control.
@@ -293,7 +312,7 @@ The script photographs `/preview-frame/<key>` (a bare page that only exists with
 ## Quality gates
 
 - **Schema and semantics**: `validateTemplateDefinition` (structure, bindings, translation keys, unique ids).
-- **Test matrix**: `runTemplateChecks` resolves every prop and element for English, Hindi and Hinglish × short and long names × with and without photos × the template's event types, and reports empty required content and overflow risks. The catalog test runs it for every template; Template Studio runs it before publishing.
+- **Test matrix**: `runTemplateChecks` resolves every prop and element for English, Hindi and Hinglish × short and long names × with and without photos × the template's event types, and reports empty required content, overflow risks and canvas text set below AA contrast. The catalog test runs it for every template; Template Studio runs it before publishing.
 - **Licences**: publishing refuses assets that are unapproved, unlicensed for commercial on-demand use, or expired ([template-studio.md](template-studio.md)).
 - **Browser checks**: `ui-smoke.mjs` renders the catalog, template pages, openings, the dashboard design tab and live invitations in Chrome and fails on any console or hydration error.
 - **Accessibility**: `pnpm a11y` runs axe (WCAG 2.1 A + AA) on every template's full preview and every opening overlay; a new section or hero variant must pass it ([testing.md](testing.md#browser-smoke-tests)).

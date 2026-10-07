@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { TemplateRenderer } from '@bulava/template-engine';
 import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
-import { AuthAwareLink } from '@/components/marketing/account-links';
+import { UseTemplateButton } from '@/components/marketing/quick-start';
 import { createTranslator } from '@bulava/localization';
 
 const t = createTranslator('en');
 
 /** Full-page live demo of a website template with sample content and a floating action bar. */
-export function TemplateDemo({ definition, templateKey, name, eventType }: { definition: TemplateDefinition; templateKey: string; name: string; eventType: string }) {
+export function TemplateDemo({ definition, templateKey, name, eventType, eventTypes }: { definition: TemplateDefinition; templateKey: string; name: string; eventType: string; eventTypes: string[] }) {
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
   const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, language }), [eventType, language]);
   return (
@@ -31,14 +31,10 @@ export function TemplateDemo({ definition, templateKey, name, eventType }: { def
           >
             {language === 'en' ? 'हिन्दी' : 'English'}
           </button>
-          <AuthAwareLink
-            signedOutHref={`/signup?template=${templateKey}`}
-            signedInHref={`/dashboard/events/new?template=${templateKey}`}
-            className="btn-3d group/cta ml-auto min-h-11 flex-1 rounded-full px-5 text-sm"
-          >
+          <UseTemplateButton template={{ key: templateKey, name, eventTypes }} className="btn-3d group/cta ml-auto min-h-11 flex-1 rounded-full px-5 text-sm">
             {t('template.use')}
             <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-0.5" />
-          </AuthAwareLink>
+          </UseTemplateButton>
         </div>
       </div>
     </div>

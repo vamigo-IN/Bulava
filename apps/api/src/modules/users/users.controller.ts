@@ -1,8 +1,8 @@
-import { Controller, Delete, Get, HttpCode, Inject, Res } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Inject, Patch, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
-import { DeleteAccountSchema, type DeleteAccountInput } from '@bulava/validation';
+import { DeleteAccountSchema, UpdateProfileSchema, type DeleteAccountInput, type UpdateProfileInput } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { CurrentUser, ReqMeta, type RequestMeta } from '../../common/decorators/auth.decorators';
@@ -39,6 +39,13 @@ export class UsersController {
       mfaVerified: user.mfa,
       mfaRequired: this.config.staffMfaRequired && row.platformRole !== 'USER',
     };
+  }
+
+  /** Name, WhatsApp number and the WhatsApp-updates consent. */
+  @Patch('me')
+  @ApiZodBody(UpdateProfileSchema)
+  update(@CurrentUser() user: AuthUser, @ZodBody(UpdateProfileSchema) body: UpdateProfileInput, @ReqMeta() meta: RequestMeta) {
+    return this.account.updateProfile(user.id, body, meta);
   }
 
   /** Personal data export (privacy): profile, events owned, orders and consents. */

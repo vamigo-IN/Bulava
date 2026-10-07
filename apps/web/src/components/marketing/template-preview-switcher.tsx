@@ -2,7 +2,7 @@
 
 import { Monitor, Play, Smartphone } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { IntroOverlay, TemplateRenderer, themeStyle } from '@bulava/template-engine';
 import { createTranslator, formatEventDateWithWeekday } from '@bulava/localization';
 import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
@@ -83,7 +83,9 @@ export function TemplatePreviewSwitcher({
             <span className="size-2.5 rounded-full bg-green-400" />
           </div>
           <div className="h-[760px] overflow-y-auto overscroll-contain bg-white">
-            <TemplateRenderer definition={definition} context={ctx} mode="preview" language={language} />
+            <DesktopZoom>
+              <TemplateRenderer definition={definition} context={ctx} mode="preview" language={language} />
+            </DesktopZoom>
           </div>
         </div>
       )}
@@ -134,3 +136,26 @@ function PreviewOpening({
   );
 }
 
+/**
+ * A desktop preview lays the page out at a laptop width and zooms it to the
+ * frame, so desktop layouts (and canvas desktop artboards) show as a visitor
+ * sees them rather than as a tablet.
+ */
+function DesktopZoom({ width = 1280, children }: { width?: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => setZoom(Math.min(1, el.clientWidth / width));
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [width]);
+  return (
+    <div ref={ref} className="w-full overflow-hidden">
+      <div style={{ width, zoom }}>{children}</div>
+    </div>
+  );
+}

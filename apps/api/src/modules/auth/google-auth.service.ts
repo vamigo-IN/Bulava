@@ -155,7 +155,8 @@ export class GoogleAuthService {
       if (!flow.userId) return fail('GOOGLE_FAILED', 'link', 'link without user');
       const owner = await this.prisma.user.findUnique({ where: { googleSub: sub }, select: { id: true } });
       if (owner && owner.id !== flow.userId) return fail('GOOGLE_ALREADY_LINKED', 'link');
-      await this.prisma.user.update({ where: { id: flow.userId }, data: { googleSub: sub } });
+      // A linked Google account secures a provisional (WhatsApp-only) account too.
+      await this.prisma.user.update({ where: { id: flow.userId }, data: { googleSub: sub, provisional: false } });
       await this.audit.record({ actorType: 'USER', actorId: flow.userId, action: 'user.google_linked', targetType: 'User', targetId: flow.userId, meta });
       return { kind: 'linked', redirect: this.web(`${flow.next}${flow.next.includes('?') ? '&' : '?'}google=linked`) };
     }

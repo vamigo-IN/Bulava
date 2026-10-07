@@ -1,4 +1,5 @@
 export * from './definition';
+export * from './canvas';
 export * from './context';
 export * from './bindings';
 export * from './validate';

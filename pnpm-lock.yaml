@@ -52,6 +52,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@bulava/localization':
+        specifier: workspace:*
+        version: link:../../packages/localization
       '@bulava/template-engine':
         specifier: workspace:*
         version: link:../../packages/template-engine

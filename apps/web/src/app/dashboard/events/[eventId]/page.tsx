@@ -8,10 +8,11 @@ import { TemplateStyles, TemplateThumbnail } from '@bulava/template-engine';
 import { apiPatch } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { can } from '@/lib/permissions';
-import { useDesign, useEvent, useInvalidateEvent, useInvitations, useLanguages, useRsvpSummary, useShareLink } from '@/lib/queries';
+import { useDesign, useEvent, useInvalidateEvent, useInvitations, useLanguages, useMe, useRsvpSummary, useShareLink } from '@/lib/queries';
 import type { AccessMode, EventSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CountUp, ProgressRing } from '@/components/dashboard/count-up';
+import { PreviewLinkCard } from '@/components/events/preview-link-card';
 import { ShareCard } from '@/components/events/share-card';
 import { Alert, Button, Card, Field, Input, Select } from '@/components/ui/primitives';
 
@@ -39,6 +40,7 @@ export default function EventOverviewPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const base = `/dashboard/events/${eventId}`;
   const event = useEvent(eventId);
+  const me = useMe();
   // Each block loads only for members whose role includes it.
   const canInvites = can(event.data, 'invitation.read');
   const canRsvps = can(event.data, 'rsvp.read');
@@ -107,7 +109,8 @@ export default function EventOverviewPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
+          {canEdit ? <PreviewLinkCard event={event.data} /> : null}
           {canInvites ? <ShareCard event={event.data} /> : null}
 
           {canEdit ? (
@@ -142,9 +145,19 @@ export default function EventOverviewPage() {
               ))}
             </ol>
             {event.data.status === 'DRAFT' ? (
-              <Button className="mt-5 w-full sm:w-auto" disabled={saving} onClick={() => save({ status: 'ACTIVE' })}>
-                {t('event.publish')}
-              </Button>
+              me.data?.provisional ? (
+                // A WhatsApp-only account secures itself first; the API refuses to publish otherwise.
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <Link href={`/dashboard/claim?next=${encodeURIComponent(base)}`} className="btn-3d min-h-11 rounded-xl px-5 text-sm">
+                    {t('claim.banner.cta')}
+                  </Link>
+                  <p className="text-sm text-stone-600">{t('claim.publishFirst')}</p>
+                </div>
+              ) : (
+                <Button className="mt-5 w-full sm:w-auto" disabled={saving} onClick={() => save({ status: 'ACTIVE' })}>
+                  {t('event.publish')}
+                </Button>
+              )
             ) : null}
           </Card>
           ) : null}

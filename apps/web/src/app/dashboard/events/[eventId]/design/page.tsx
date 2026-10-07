@@ -180,15 +180,18 @@ export default function DesignPage() {
           ) : null}
           {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
           {locked ? (
-            <Link href={`/dashboard/events/${eventId}/upgrade`} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-gold-600 font-semibold text-white hover:bg-gold-700">
-              <Lock aria-hidden className="size-4" />
-              {t('design.locked')}
-            </Link>
-          ) : (
-            <Button size="lg" className="w-full rounded-full" disabled={saving || !selectedKey} onClick={save}>
-              {saving ? t('common.saving') : t('common.save')}
-            </Button>
-          )}
+            // Beyond the plan: the design still saves and previews (with a watermark); publishing without it needs the upgrade.
+            <div className="space-y-3">
+              <Alert tone="info">{t('design.watermarked')}</Alert>
+              <Link href={`/dashboard/events/${eventId}/upgrade?template=${encodeURIComponent(selected?.key ?? '')}`} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-gold-300 text-sm font-semibold text-brand-700 hover:bg-gold-100/60">
+                <Lock aria-hidden className="size-4" />
+                {t('design.watermarked.cta')}
+              </Link>
+            </div>
+          ) : null}
+          <Button size="lg" className="w-full rounded-full" disabled={saving || !selectedKey} onClick={save}>
+            {saving ? t('common.saving') : t('common.save')}
+          </Button>
         </div>
       </aside>
     </div>

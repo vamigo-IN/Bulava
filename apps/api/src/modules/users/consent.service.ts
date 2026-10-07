@@ -23,9 +23,14 @@ export class ConsentService {
   }
 
   /** The Terms and the Privacy Policy, accepted when an account is created. */
-  async recordSignup(tx: Tx, userId: string, versions: Record<string, string>, source: 'signup' | 'signup_google'): Promise<void> {
+  async recordSignup(tx: Tx, userId: string, versions: Record<string, string>, source: 'signup' | 'signup_google' | 'quick_start'): Promise<void> {
     await tx.consent.createMany({
       data: SIGNUP_CONSENTS.map(({ kind, slug }) => ({ userId, kind, granted: true, version: versions[slug] ?? `${slug}@unknown`, source })),
     });
+  }
+
+  /** Updates on WhatsApp: an optional consent of its own, given or withdrawn, never bundled with the Terms. */
+  async recordWhatsAppUpdates(tx: Tx, userId: string, granted: boolean, source: 'signup' | 'quick_start' | 'account'): Promise<void> {
+    await tx.consent.create({ data: { userId, kind: 'whatsapp_updates', granted, version: 'whatsapp_updates@1', source } });
   }
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { en } from '@bulava/localization';
-import { bindingsIn, isKnownBinding, translationKeysIn } from './bindings';
+import { BINDINGS, bindingsIn, isKnownBinding, translationKeysIn } from './bindings';
+import { canvasAssetIds, type Artboard } from './canvas';
 import {
   EFFECTS,
   INTROS,
@@ -54,6 +55,8 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
     }
   };
 
+  const listed = new Set(d.assets.map((a) => a.assetId));
+
   d.website?.pages.forEach((page, pi) => {
     const ids = new Set<string>();
     page.sections.forEach((s, si) => {
@@ -68,6 +71,42 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
       }
       if (s.visibleWhen?.exists && !isKnownBinding(s.visibleWhen.exists, slots)) {
         issues.push({ path: `${base}.visibleWhen.exists`, message: `Unknown binding "${s.visibleWhen.exists}"` });
+      }
+      if (s.section === 'canvas' && s.canvas) {
+        const boards: Array<[string, Artboard | undefined]> = [
+          ['mobile', s.canvas.mobile],
+          ['desktop', s.canvas.desktop],
+        ];
+        for (const [name, board] of boards) {
+          if (!board) continue;
+          const layerIds = new Set<string>();
+          board.layers.forEach((layer, li) => {
+            const path = `${base}.canvas.${name}.layers.${li}`;
+            if (layerIds.has(layer.id)) issues.push({ path: `${path}.id`, message: `Duplicate layer id "${layer.id}"` });
+            layerIds.add(layer.id);
+            if (layer.kind === 'text') checkValue(layer.content, `${path}.content`);
+            if (layer.kind === 'image' && layer.source.type === 'binding') {
+              const b = layer.source.binding;
+              if (!isKnownBinding(b, slots)) issues.push({ path: `${path}.source.binding`, message: `Unknown binding "${b}"` });
+              else if (BINDINGS[b] && BINDINGS[b].type !== 'image') issues.push({ path: `${path}.source.binding`, message: `"${b}" is not an image` });
+            }
+            if (layer.kind === 'widget' && layer.widget.type === 'button') {
+              checkValue(layer.widget.label, `${path}.widget.label`);
+              checkValue(layer.widget.url, `${path}.widget.url`);
+              if (layer.widget.action === 'link' && !layer.widget.url) issues.push({ path: `${path}.widget.url`, message: 'A link button needs an address' });
+            }
+            if (layer.visibleWhen?.exists && !isKnownBinding(layer.visibleWhen.exists, slots)) {
+              issues.push({ path: `${path}.visibleWhen.exists`, message: `Unknown binding "${layer.visibleWhen.exists}"` });
+            }
+            // Far outside the artboard: probably a lost layer.
+            if (layer.frame.x > board.width * 1.5 || layer.frame.y > board.height * 1.5 || layer.frame.x + layer.frame.w < -board.width * 0.5 || layer.frame.y + layer.frame.h < -board.height * 0.5) {
+              issues.push({ path: `${path}.frame`, message: 'Layer is far outside the artboard' });
+            }
+          });
+        }
+        for (const assetId of canvasAssetIds(s.canvas)) {
+          if (!listed.has(assetId)) issues.push({ path: `${base}.canvas`, message: `List asset ${assetId} in assets so its licence is checked` });
+        }
       }
     });
   });
@@ -91,7 +130,6 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
     });
   });
 
-  const listed = new Set(d.assets.map((a) => a.assetId));
   for (const [key, artwork] of Object.entries(d.artworks ?? {})) {
     artwork.layers.forEach((layer, li) => {
       if (!listed.has(layer.assetId)) issues.push({ path: `artworks.${key}.layers.${li}.assetId`, message: 'List this asset in assets so its licence is checked' });
@@ -104,6 +142,12 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
 /** Every asset the template's painted artwork uses (for licence checks, signing and preloading). */
 export function artworkAssetIds(definition: Pick<TemplateDefinition, 'artworks'>): string[] {
   return [...new Set(Object.values(definition.artworks ?? {}).flatMap((a) => a.layers.map((l) => l.assetId)))];
+}
+
+/** Every image asset the template shows: painted artwork layers and canvas images (for signing in previews). */
+export function templateAssetIds(definition: Pick<TemplateDefinition, 'artworks' | 'website'>): string[] {
+  const canvas = (definition.website?.pages ?? []).flatMap((p) => p.sections.flatMap((s) => (s.section === 'canvas' && s.canvas ? canvasAssetIds(s.canvas) : [])));
+  return [...new Set([...artworkAssetIds(definition), ...canvas])];
 }
 
 /** Total video duration in seconds for a context with `functionCount` functions. */
