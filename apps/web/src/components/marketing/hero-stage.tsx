@@ -191,8 +191,11 @@ export function HeroStage({
                     ref={screen}
                     data-lenis-prevent
                     className="relative h-full w-full overflow-y-auto overscroll-contain bg-white [scrollbar-width:none]"
+                    // A scrollable area keyboard users can focus. ARIA allows a label on a group, not on a plain
+                    // div; a group (not a region landmark) so its name cannot clash with the page's sections.
+                    role="group"
                     tabIndex={0}
-                    aria-label={name}
+                    aria-label={`${liveLabel}: ${name}`}
                   >
                     {image ? (
                       <img

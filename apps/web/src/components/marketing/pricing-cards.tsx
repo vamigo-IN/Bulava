@@ -34,10 +34,12 @@ export function planFeatureLines(plan: Plan, t: Translator): string[] {
 /**
  * Plan cards. The popular plan sits in a gold-edged maroon card; the others are
  * glass on dark sections and white on light ones. A soft light follows the
- * pointer across the row.
+ * pointer across the row. `headingLevel` follows the page outline: 2 directly
+ * under a page's h1, 3 inside a section.
  */
-export function PricingCards({ plans, t, dark = false }: { plans: Plan[]; t: Translator; dark?: boolean }) {
+export function PricingCards({ plans, t, dark = false, headingLevel = 3 }: { plans: Plan[]; t: Translator; dark?: boolean; headingLevel?: 2 | 3 }) {
   if (!plans.length) return null;
+  const Heading = headingLevel === 2 ? 'h2' : 'h3';
   return (
     <SpotlightGrid className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
       {plans.map((plan) => {
@@ -62,7 +64,7 @@ export function PricingCards({ plans, t, dark = false }: { plans: Plan[]; t: Tra
                 popular ? 'bg-gradient-to-b from-brand-700 to-brand-900 text-ivory' : dark ? 'bg-night-800 text-ivory' : 'bg-white text-ink',
               )}
             >
-              <h3 className="font-display text-2xl">{plan.name}</h3>
+              <Heading className="font-display text-2xl">{plan.name}</Heading>
               {plan.description ? <p className={cn('mt-2 min-h-12 text-sm leading-relaxed', onDark ? 'text-ivory/75' : 'text-stone-600')}>{plan.description}</p> : null}
               <p className="mt-6 flex items-baseline gap-1">
                 <span className="font-display text-5xl tracking-tight">{plan.priceMinor === 0 ? '₹0' : formatInr(plan.priceMinor)}</span>

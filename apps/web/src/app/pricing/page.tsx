@@ -25,9 +25,9 @@ export default async function PricingPage() {
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(ellipse_60%_70%_at_50%_0%,rgba(227,197,133,0.35),transparent_70%)]" />
         <Mandala className="pointer-events-none absolute -top-72 left-1/2 -z-10 w-[760px] -translate-x-1/2 animate-spin-slow text-gold-300 opacity-[0.12]" />
         <section className="mx-auto max-w-7xl px-4 pt-14 pb-28 sm:px-6 sm:pt-20">
-          <SectionHeading eyebrow={t('home.pricing.eyebrow')} title={t('pricing.title')} subtitle={t('home.pricing.subtitle')} />
+          <SectionHeading level={1} eyebrow={t('home.pricing.eyebrow')} title={t('pricing.title')} subtitle={t('home.pricing.subtitle')} />
           <div className="mt-16">
-            <PricingCards plans={plans} t={t} />
+            <PricingCards plans={plans} t={t} headingLevel={2} />
           </div>
           <div className="mx-auto mt-24 max-w-3xl">
             <h2 className="text-center font-display text-4xl tracking-tight">{t('home.faq.title')}</h2>

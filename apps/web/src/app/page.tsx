@@ -505,11 +505,14 @@ export default async function HomePage() {
               <SectionHeading id="compare-title" eyebrow={t('home.compare.eyebrow')} title={t('home.compare.title')} />
             </Reveal>
             <Reveal className="mt-12" delay={0.1}>
-              <div className="overflow-x-auto rounded-[2rem] border border-gold-200/80 bg-white shadow-soft">
+              {/* `relative`: the cells' sr-only labels are absolutely positioned; without a positioned
+                  scroll box they escape it and widen the whole page on phones. Focusable and named,
+                  so keyboard users can scroll it sideways. */}
+              <div role="group" aria-labelledby="compare-title" tabIndex={0} className="relative overflow-x-auto rounded-[2rem] border border-gold-200/80 bg-white shadow-soft">
                 <table className="w-full min-w-[600px] text-left text-sm">
                   <thead>
                     <tr>
-                      <th scope="col" className="p-5" />
+                      <td className="p-5" />
                       <th scope="col" className="bg-gradient-to-b from-brand-700 to-brand-800 p-5 text-center font-display text-xl font-medium text-ivory">
                         {t('home.compare.bulava')}
                       </th>

@@ -12,11 +12,14 @@ const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)'
 
 type Variant = 'up' | 'scale' | 'left' | 'right';
 
+// Opacity only, never `visibility` (GSAP's autoAlpha): content waiting for its reveal stays in the
+// accessibility tree, so screen readers and AI agents read the whole page, and Tab can reach it
+// (focus scrolls it into view, which reveals it).
 const FROM: Record<Variant, gsap.TweenVars> = {
-  up: { y: 40, autoAlpha: 0 },
-  scale: { y: 30, scale: 0.95, autoAlpha: 0 },
-  left: { x: -48, autoAlpha: 0 },
-  right: { x: 48, autoAlpha: 0 },
+  up: { y: 40, opacity: 0 },
+  scale: { y: 30, scale: 0.95, opacity: 0 },
+  left: { x: -48, opacity: 0 },
+  right: { x: 48, opacity: 0 },
 };
 
 /**
@@ -79,7 +82,7 @@ export function StepsProgress({ children, className }: { children: ReactNode; cl
           onLeaveBack: () => step.removeAttribute('data-active'),
         });
       }
-      gsap.from(gsap.utils.toArray('[data-step]', el), { y: 40, autoAlpha: 0, duration: 0.9, stagger: 0.12, ease: 'power3.out', clearProps: 'transform,opacity,visibility', scrollTrigger: { trigger: el, start: 'top 82%', once: true } });
+      gsap.from(gsap.utils.toArray('[data-step]', el), { y: 40, opacity: 0, duration: 0.9, stagger: 0.12, ease: 'power3.out', clearProps: 'transform,opacity,visibility', scrollTrigger: { trigger: el, start: 'top 82%', once: true } });
     },
     { scope: ref },
   );

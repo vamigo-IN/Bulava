@@ -28,8 +28,9 @@ function AnnouncementBar({ announcement }: { announcement: PublicSiteConfig['sit
   if (!announcement.enabled || !announcement.text) return null;
   const external = announcement.link?.startsWith('https://');
   const linkClass = 'font-semibold text-gold-200 underline underline-offset-4 transition-colors hover:text-gold-100';
+  // A named landmark, so assistive technology (and AI agents) find it outside the header and main.
   return (
-    <div className="relative z-50 bg-night-950 px-4 py-2 text-center text-sm text-ivory/90">
+    <aside aria-label={t('nav.announcement')} className="relative z-50 bg-night-950 px-4 py-2 text-center text-sm text-ivory/90">
       <span>{announcement.text}</span>
       {announcement.link ? (
         <>
@@ -45,7 +46,7 @@ function AnnouncementBar({ announcement }: { announcement: PublicSiteConfig['sit
           )}
         </>
       ) : null}
-    </div>
+    </aside>
   );
 }
 
@@ -216,14 +217,34 @@ function WhatsAppChatButton({ number, message }: { number: string; message: stri
   );
 }
 
-/** Section heading used across marketing pages: an eyebrow chip, a serif title and an optional lead. */
-export function SectionHeading({ id, eyebrow, title, subtitle, light = false, align = 'center' }: { id?: string; eyebrow?: string; title: string; subtitle?: string; light?: boolean; align?: 'center' | 'left' }) {
+/**
+ * Section heading used across marketing pages: an eyebrow chip, a serif title and an optional lead.
+ * `level={1}` for a page's own title (every page needs exactly one h1).
+ */
+export function SectionHeading({
+  id,
+  eyebrow,
+  title,
+  subtitle,
+  light = false,
+  align = 'center',
+  level = 2,
+}: {
+  id?: string;
+  eyebrow?: string;
+  title: string;
+  subtitle?: string;
+  light?: boolean;
+  align?: 'center' | 'left';
+  level?: 1 | 2;
+}) {
+  const Heading = level === 1 ? 'h1' : 'h2';
   return (
     <div className={align === 'center' ? 'mx-auto max-w-3xl text-center' : 'max-w-2xl'}>
       {eyebrow ? <p className={cn('eyebrow', light ? 'bg-white/5 text-gold-200 ring-1 ring-white/10' : 'bg-gold-100 text-gold-700 ring-1 ring-gold-200')}>{eyebrow}</p> : null}
-      <h2 id={id} className={cn('mt-5 font-display text-4xl leading-[1.05] tracking-tight text-balance sm:text-5xl lg:text-[3.5rem]', light ? 'text-ivory' : 'text-ink')}>
+      <Heading id={id} className={cn('mt-5 font-display text-4xl leading-[1.05] tracking-tight text-balance sm:text-5xl lg:text-[3.5rem]', light ? 'text-ivory' : 'text-ink')}>
         {title}
-      </h2>
+      </Heading>
       {subtitle ? <p className={cn('mt-5 text-lg leading-relaxed text-pretty', light ? 'text-ivory/70' : 'text-stone-600')}>{subtitle}</p> : null}
     </div>
   );

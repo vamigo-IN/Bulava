@@ -11,6 +11,7 @@ export const enMarketing = {
   'nav.signedInAs': 'Signed in as {name}',
   'nav.dashboard': 'Dashboard',
   'nav.menu': 'Menu',
+  'nav.announcement': 'Site announcement',
 
   'home.hero.eyebrow': 'Digital invitations for every Indian celebration',
   'home.hero.title': 'Invitations that feel like the occasion itself',

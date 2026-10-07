@@ -36,7 +36,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
       tags: tpl.tags,
       eventTypes: tpl.eventTypes,
       outputs: tpl.outputs,
-      node: <TemplateCard template={tpl} t={t} priceLabel={tierPrice(tpl.tier, plans)} />,
+      node: <TemplateCard template={tpl} t={t} priceLabel={tierPrice(tpl.tier, plans)} headingLevel={2} />,
     }));
   const all = { value: '', label: t('filter.all') };
   const current = { tag: one(params.tag), tier: one(params.tier), event: one(params.event), format: one(params.format) };
@@ -54,7 +54,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-[radial-gradient(ellipse_60%_70%_at_50%_0%,rgba(227,197,133,0.35),transparent_70%)]" />
           <Mandala className="pointer-events-none absolute -top-64 left-1/2 -z-10 w-[720px] -translate-x-1/2 animate-spin-slow text-gold-300 opacity-[0.12]" />
           <div className="mx-auto max-w-7xl px-4 pt-14 pb-24 sm:px-6 sm:pt-20">
-            <SectionHeading eyebrow={t('templates.count', { count: items.length })} title={t('templates.title')} subtitle={t('templates.subtitle')} />
+            <SectionHeading level={1} eyebrow={t('templates.count', { count: items.length })} title={t('templates.title')} subtitle={t('templates.subtitle')} />
             <div className="mt-12">
               <TemplateExplorer
                 items={matching}

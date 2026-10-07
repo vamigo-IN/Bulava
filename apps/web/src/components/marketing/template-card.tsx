@@ -141,10 +141,24 @@ function VideoPoster({ template, width, height, priority }: { template: Template
 /**
  * A gallery card: the live phone preview leans toward the pointer in 3D (the
  * cursor reads "View" over it) and lifts off its floor shadow; name, plan and
- * a live-demo link sit underneath.
+ * a live-demo link sit underneath. `headingLevel` follows the page outline:
+ * 2 directly under a page's h1, 3 inside a section.
  */
-export function TemplateCard({ template, t, priceLabel, href }: { template: TemplateSummary; t: Translator; priceLabel: string | null; href?: string }) {
+export function TemplateCard({
+  template,
+  t,
+  priceLabel,
+  href,
+  headingLevel = 3,
+}: {
+  template: TemplateSummary;
+  t: Translator;
+  priceLabel: string | null;
+  href?: string;
+  headingLevel?: 2 | 3;
+}) {
   const link = href ?? `/templates/${template.key}`;
+  const Heading = headingLevel === 2 ? 'h2' : 'h3';
   return (
     <article className="group flex flex-col items-center">
       <div className="relative">
@@ -164,11 +178,11 @@ export function TemplateCard({ template, t, priceLabel, href }: { template: Temp
       </div>
       <div className="mt-6 w-full max-w-[234px] text-center">
         <p className="text-[11px] font-semibold tracking-[0.22em] text-gold-600 uppercase">{template.category}</p>
-        <h3 className="mt-1.5 font-display text-[1.4rem] leading-snug">
+        <Heading className="mt-1.5 font-display text-[1.4rem] leading-snug">
           <Link href={link} className="transition-colors duration-300 hover:text-brand-700">
             {template.name}
           </Link>
-        </h3>
+        </Heading>
         <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm">
           {priceLabel ? (
             <span className="text-stone-600">
