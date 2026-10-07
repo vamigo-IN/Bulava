@@ -1,5 +1,5 @@
 import { getSiteConfig } from '@/lib/site-config';
-import { getTemplates } from '@/lib/server-api';
+import { getSitePages, getTemplates } from '@/lib/server-api';
 
 export const revalidate = 300;
 
@@ -16,7 +16,8 @@ export async function GET(): Promise<Response> {
 
   let body = seo.llmsTxt.trim();
   if (!body) {
-    const templates = (await getTemplates()).slice(0, 40);
+    const [allTemplates, pages] = await Promise.all([getTemplates(), getSitePages()]);
+    const templates = allTemplates.slice(0, 40);
     const line = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
     const contact = [
       site.supportEmail ? `- Email: ${site.supportEmail}` : null,
@@ -35,10 +36,7 @@ export async function GET(): Promise<Response> {
       `- [Home](${origin}/): what ${site.name} does and how it works`,
       `- [Templates](${origin}/templates): invitation website and video templates by occasion, community and style`,
       `- [Pricing](${origin}/pricing): plans and what each includes`,
-      `- [About](${origin}/about)`,
-      `- [Privacy policy](${origin}/privacy)`,
-      `- [Terms](${origin}/terms)`,
-      `- [Refunds](${origin}/refund)`,
+      ...pages.map((p) => `- [${line(p.title)}](${origin}/${p.slug})`),
       '',
       ...(templates.length
         ? ['## Templates', ...templates.map((t) => `- [${line(t.name)}](${origin}/templates/${t.key}): ${line(t.description) || `${t.category} invitation template`}`), '']

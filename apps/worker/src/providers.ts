@@ -8,6 +8,8 @@ export interface EmailMessage {
   subject: string;
   html: string;
   text: string;
+  /** Where replies go, when not the settings' reply-to address. */
+  replyTo?: string;
 }
 
 /** Channel providers (spec §50): swap implementations without touching callers. */
@@ -61,7 +63,9 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 
   async send(message: EmailMessage): Promise<{ messageId: string }> {
-    const info = await this.transport.sendMail({ from: this.from, ...(this.options.replyTo ? { replyTo: this.options.replyTo } : {}), ...message });
+    // A message's own reply-to (a contact-form sender) wins over the settings' default.
+    const replyTo = message.replyTo ?? this.options.replyTo;
+    const info = await this.transport.sendMail({ from: this.from, to: message.to, subject: message.subject, html: message.html, text: message.text, ...(replyTo ? { replyTo } : {}) });
     return { messageId: info.messageId };
   }
 

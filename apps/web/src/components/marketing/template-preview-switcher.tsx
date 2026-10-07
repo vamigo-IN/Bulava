@@ -8,12 +8,10 @@ import { createTranslator, formatEventDateWithWeekday } from '@bulava/localizati
 import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
 import { cn } from '@/lib/utils';
 
-const SEGMENTS = 'inline-flex rounded-full border border-gold-200 bg-white/80 p-1 shadow-soft';
+/** A segmented control: a pressed-in track with the chosen segment raised as a 3D button. */
+const SEGMENTS = 'clay-inset inline-flex gap-1 rounded-full p-1.5';
 const segment = (on: boolean) =>
-  cn(
-    'inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors duration-300',
-    on ? 'bg-night-900 text-ivory shadow-[0_6px_16px_-8px_rgba(19,7,11,0.8)]' : 'text-stone-600 hover:text-ink',
-  );
+  cn('inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-sm font-medium', on ? 'btn-3d' : 'text-stone-600 transition-colors duration-300 hover:text-ink');
 
 const VideoPlayer = dynamic(() => import('./video-player').then((m) => m.VideoPlayer), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
 
@@ -59,7 +57,7 @@ export function TemplatePreviewSwitcher({
           <button
             type="button"
             onClick={() => setOpening(Date.now())}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-gradient-to-b from-gold-200 to-gold-300 px-5 text-sm font-semibold text-night-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_10px_24px_-12px_rgba(184,137,43,0.8)] transition-colors duration-300 hover:from-gold-100 hover:to-gold-200"
+            className="btn-3d btn-3d-gold min-h-11 rounded-full px-5 text-sm"
           >
             <Play aria-hidden className="size-3.5 fill-current" />
             {labels.playOpening}

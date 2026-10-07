@@ -37,6 +37,13 @@ const token = z.string().trim().max(120).regex(/^[A-Za-z0-9_\-=.:]+$/, 'Letters,
 export const SITE_ASSET_KINDS = ['logo', 'favicon', 'ogImage'] as const;
 export type SiteAssetKind = (typeof SITE_ASSET_KINDS)[number];
 
+const FOOTER_DEFAULTS = {
+  eyebrow: 'Made in India',
+  about: 'Digital invitations, RSVPs and memories for every Indian celebration.',
+  copyright: '© {year} {name}. All rights reserved.',
+  note: '',
+};
+
 export const SiteSettingsSchema = z.object({
   name: z.string().trim().min(1).max(60).default('Bulava'),
   tagline: z.string().trim().max(120).default('Digital invitations for every Indian celebration'),
@@ -45,7 +52,8 @@ export const SiteSettingsSchema = z.object({
   faviconKey: z.string().max(200).optional(),
   ogImageKey: z.string().max(200).optional(),
   themeColor: hex.default('#5b0e1b'),
-  supportEmail: opt(z.email().max(200)),
+  /** The one support address: the contact page, the policies, the footer and new contact-form messages. */
+  supportEmail: z.preprocess(blank, z.email().max(200).default('support@bulava.in')),
   supportPhone: opt(e164),
   /** Click-to-chat button on public pages. */
   whatsappNumber: opt(e164),
@@ -68,6 +76,19 @@ export const SiteSettingsSchema = z.object({
       pinterest: opt(httpsUrl),
     })
     .default({}),
+  /** Footer text on every public page. An empty field hides its line. */
+  footer: z
+    .object({
+      /** The small line under the logo. */
+      eyebrow: z.string().trim().max(60).default(FOOTER_DEFAULTS.eyebrow),
+      /** The short description under it. */
+      about: z.string().trim().max(300).default(FOOTER_DEFAULTS.about),
+      /** The bottom line; {year} and {name} are filled in. */
+      copyright: z.string().trim().max(200).default(FOOTER_DEFAULTS.copyright),
+      /** An extra line at the bottom, for example the registered company name and GSTIN. */
+      note: z.string().trim().max(300).default(FOOTER_DEFAULTS.note),
+    })
+    .default(FOOTER_DEFAULTS),
 });
 
 // ───────────────────────────── SEO & AI ─────────────────────────────
@@ -114,6 +135,8 @@ export const SeoSettingsSchema = z.object({
       email: opt(z.email().max(200)),
       phone: opt(e164),
       address: opt(z.string().trim().max(300)),
+      /** Named in the privacy policy and terms, as Indian law requires; the policies leave the line out until it is set. */
+      grievanceOfficer: opt(z.string().trim().max(120)),
       foundingYear: z.preprocess((v) => (v === '' || v === null ? undefined : v), z.coerce.number().int().min(1900).max(2100).optional()),
     })
     .default({}),

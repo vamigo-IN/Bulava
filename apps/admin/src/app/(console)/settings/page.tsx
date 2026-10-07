@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { ImageUp, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { SettingValues } from '@bulava/validation';
-import { SettingsCard, SettingsPage, TextField, useGroupEditor } from '@/components/settings';
+import { SettingsCard, SettingsPage, TextAreaField, TextField, useGroupEditor } from '@/components/settings';
 import { useInvalidate } from '@/components/shell';
 import { Alert, Badge, Button, Card, Checkbox, Field, Input } from '@/components/ui';
 import { ApiError, apiDelete, apiPost, errorMessage } from '@/lib/api';
@@ -42,6 +42,7 @@ function SiteForm({ view }: { view: SettingGroupView }) {
   const { draft, set } = editor;
   const announcement = draft.announcement ?? { enabled: false, text: '', linkText: '' };
   const social = draft.social ?? {};
+  const footer = draft.footer ?? { eyebrow: '', about: '', copyright: '', note: '' };
   return (
     <SettingsCard title={t('site.brand')} view={view} editor={editor}>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -79,6 +80,15 @@ function SiteForm({ view }: { view: SettingGroupView }) {
         {SOCIAL.map((key) => (
           <TextField key={key} label={SOCIAL_LABEL[key]} type="url" placeholder="https://" value={social[key]} onChange={(v) => set('social', { ...social, [key]: v })} />
         ))}
+      </div>
+
+      <h3 className="pt-2 text-sm font-semibold text-stone-900">{t('site.footer')}</h3>
+      <p className="-mt-2 text-xs text-stone-500">{t('site.footerHint')}</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField label={t('site.footerEyebrow')} maxLength={60} value={footer.eyebrow} onChange={(v) => set('footer', { ...footer, eyebrow: v })} />
+        <TextField label={t('site.footerCopyright')} hint={t('site.footerCopyrightHint')} maxLength={200} value={footer.copyright} onChange={(v) => set('footer', { ...footer, copyright: v })} />
+        <TextAreaField className="sm:col-span-2" label={t('site.footerAbout')} rows={2} maxLength={300} value={footer.about} onChange={(v) => set('footer', { ...footer, about: v })} />
+        <TextField className="sm:col-span-2" label={t('site.footerNote')} hint={t('site.footerNoteHint')} maxLength={300} value={footer.note} onChange={(v) => set('footer', { ...footer, note: v })} />
       </div>
     </SettingsCard>
   );

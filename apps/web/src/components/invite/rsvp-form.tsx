@@ -265,7 +265,7 @@ export function RsvpForm({
         </label>
         {error ? <Alert>{error}</Alert> : null}
         {saved ? <Alert tone="success">{t('rsvp.thanks')}</Alert> : null}
-        <Button type="submit" size="lg" className="w-full rounded-full bg-[var(--t-primary,#5b0e1b)] text-[var(--t-bg,#fff)] hover:opacity-90" disabled={submitting}>
+        <Button type="submit" size="lg" className="btn-3d-template w-full rounded-full" disabled={submitting}>
           {submitting ? t('common.saving') : hasPrevious ? t('rsvp.update') : t('rsvp.submit')}
         </Button>
       </form>

@@ -18,18 +18,15 @@ export function TemplateDemo({ definition, templateKey, name, eventType }: { def
     <div className="pb-28" style={{ background: definition.theme.colors.background }}>
       <TemplateRenderer key={language} definition={definition} context={ctx} mode="live" language={language} introKey={`demo-${templateKey}`} />
       <div className="fixed inset-x-0 bottom-4 z-[60] flex justify-center px-4">
-        <div className="flex w-full max-w-md items-center gap-2 rounded-full border border-white/10 bg-night-900/85 p-2 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-          <Link
-            href={`/templates/${templateKey}`}
-            className="grid size-11 shrink-0 place-items-center rounded-full text-ivory transition-colors duration-300 hover:bg-white/10"
-            aria-label={t('templates.demo.back', { name })}
-          >
+        {/* A floating clay bar over the template: back, language, and the main action. */}
+        <div className="clay flex w-full max-w-md items-center gap-2 rounded-full p-2">
+          <Link href={`/templates/${templateKey}`} className="btn-3d btn-3d-light size-11 shrink-0 rounded-full" aria-label={t('templates.demo.back', { name })}>
             <ArrowLeft aria-hidden className="size-5" />
           </Link>
           <button
             type="button"
             onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
-            className="min-h-11 rounded-full px-4 text-sm text-ivory ring-1 ring-white/20 transition-colors duration-300 hover:bg-white/10"
+            className="btn-3d btn-3d-light min-h-11 rounded-full px-4 text-sm font-medium"
             aria-label={t('templates.demo.language')}
           >
             {language === 'en' ? 'हिन्दी' : 'English'}
@@ -37,7 +34,7 @@ export function TemplateDemo({ definition, templateKey, name, eventType }: { def
           <AuthAwareLink
             signedOutHref={`/signup?template=${templateKey}`}
             signedInHref={`/dashboard/events/new?template=${templateKey}`}
-            className="group/cta ml-auto inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-200 to-gold-300 px-5 text-sm font-semibold text-night-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] transition-colors duration-300 hover:from-gold-100 hover:to-gold-200"
+            className="btn-3d group/cta ml-auto min-h-11 flex-1 rounded-full px-5 text-sm"
           >
             {t('template.use')}
             <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-0.5" />

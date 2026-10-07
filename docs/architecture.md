@@ -25,6 +25,7 @@ Bulava is an event platform with a template engine, invitation engine, media pla
 | Production compose, Nginx, CI/CD, backups, health checks, metrics, Sentry | Done |
 | Super Admin console: branding, SEO and AI crawlers, trackers and custom code, integrations (Razorpay, SMTP, WhatsApp, Google Maps, custom domains, storage test), staff roles, user profiles, payment states, complimentary upgrades | Done |
 | WhatsApp Business delivery (Meta Cloud API) with per-plan allowances; Google Maps on invitations | Done |
+| Site pages edited in the console (About, Contact, policies, new pages), contact form with a staff inbox, payment status page | Done |
 | SMS delivery, AI assistant | Not started (see Roadmap) |
 
 ## Core domain
@@ -103,7 +104,9 @@ All routes live under `/api/v1`, except health (`/health`, `/health/db`, `/healt
 | check-in | `/events/:id/check-ins/*`, `/public/check-in/:code/qr.svg` | event permissions |
 | domains | `/events/:id/domain` (+ `/check`), `/public/domains/resolve` | `event.read` / `event.update` / public (used by the web middleware) |
 | announcements, notifications | `/events/:id/announcements`, `/notifications` | event permissions / signed in |
-| payments | `/events/:id/orders`, `/orders/:id/verify`, `/payments/razorpay/webhook` | signed in / HMAC |
+| payments | `/events/:id/orders`, `/orders/:id` (+ `/verify`, `/checkout`), `/payments/razorpay/webhook` | signed in (the buyer's own orders) / HMAC |
+| site pages | `/public/pages` (+ `/:slug`), `/admin/pages` | public / `page.manage` |
+| contact | `/public/contact`, `/admin/contact-messages` | public (rate limited) / `contact.manage` |
 | admin | `/admin/*` (templates, assets, music, licences, plans, coupons, users and profiles, staff, orders, complimentary upgrades, moderation, renders, audit) | platform permissions ([authorization.md](authorization.md#platform-roles)) |
 | settings | `/admin/settings` (+ `/:group`, `/checks/:target`, `/site-assets`), `/public/site-config`, `/public/site-assets/:kind` | `settings.manage` (Super Admin) / public |
 

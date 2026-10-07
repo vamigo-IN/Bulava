@@ -22,7 +22,12 @@ export const DEFAULT_SITE_CONFIG: PublicSiteConfig = defaults();
  * site within about a minute; falls back to the defaults if the API is down.
  */
 export async function getSiteConfig(): Promise<PublicSiteConfig> {
-  return (await serverApi<PublicSiteConfig>('/public/site-config', { revalidate: 60 })) ?? DEFAULT_SITE_CONFIG;
+  const config = await serverApi<PublicSiteConfig>('/public/site-config', { revalidate: 60 });
+  if (!config) return DEFAULT_SITE_CONFIG;
+  // Fields added later (say, the footer text) fall back to their defaults if the API predates them.
+  const site = { ...DEFAULT_SITE_CONFIG.site, ...config.site, footer: { ...DEFAULT_SITE_CONFIG.site.footer, ...config.site.footer } };
+  const seo = { ...DEFAULT_SITE_CONFIG.seo, ...config.seo, organization: { ...DEFAULT_SITE_CONFIG.seo.organization, ...config.seo.organization } };
+  return { ...config, site, seo };
 }
 
 /** Generated share image, used until the Super Admin uploads one. */

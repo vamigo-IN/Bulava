@@ -44,7 +44,7 @@ function Users() {
     onSuccess: () => invalidate(['admin', 'users'], ['admin', 'staff']),
   });
   // Suspending customers is user.manage; anything about staff is the Super Admin's (staff.manage).
-  const canSuspend = (u: AdminUser) => u.id !== me.id && u.platformRole !== 'SUPER_ADMIN' && u.status !== 'DELETED' && (u.platformRole === 'USER' ? canManageUsers : canManageStaff);
+  const canSuspend = (u: AdminUser) => u.id !== me.id && u.platformRole !== 'SUPER_ADMIN' && u.status !== 'DELETED' && u.status !== 'PENDING_DELETION' && (u.platformRole === 'USER' ? canManageUsers : canManageStaff);
   const canChangeRole = (u: AdminUser) => canManageStaff && u.id !== me.id && u.platformRole !== 'SUPER_ADMIN' && u.status !== 'DELETED';
 
   return (

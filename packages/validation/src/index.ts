@@ -85,12 +85,34 @@ export const RSVPResponseStatusSchema = z.enum(['ATTENDING', 'DECLINED', 'MAYBE'
 
 // ───────────────────────────── Auth ─────────────────────────────
 
+/**
+ * An explicit tick of an unticked box (DPDP Act consent; the Consumer Protection
+ * (E-Commerce) Rules forbid recording consent from pre-ticked boxes).
+ */
+const agreed = (message: string) => z.boolean({ error: message }).refine((v) => v === true, message);
+
 export const SignupSchema = z.object({
   name: trimmed(120),
   email: z.email().max(254).transform((v) => v.toLowerCase()),
   password: z.string().min(10, 'At least 10 characters').max(128),
+  /** The Terms of Service and the Privacy Policy, recorded as consents with their versions. */
+  acceptTerms: agreed('Please accept the Terms of Service and the Privacy Policy'),
 });
 export type SignupInput = z.infer<typeof SignupSchema>;
+
+/** Days a deleted account can still be restored by signing in, before it is erased for good. */
+export const ACCOUNT_RESTORE_DAYS = 30;
+
+/** DELETE /users/me: the password, or for accounts without one (Google only), the word DELETE. */
+export const DeleteAccountSchema = z.object({
+  password: z.string().max(128).optional(),
+  confirm: z.string().trim().max(20).optional(),
+});
+export type DeleteAccountInput = z.infer<typeof DeleteAccountSchema>;
+
+/** POST /auth/restore: the one-use token from signing in to an account that is waiting to be deleted. */
+export const RestoreAccountSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{20,128}$/) });
+export type RestoreAccountInput = z.infer<typeof RestoreAccountSchema>;
 
 export const LoginSchema = z.object({
   email: z.email().max(254).transform((v) => v.toLowerCase()),
@@ -538,6 +560,8 @@ export const TEMPLATE_TIER_RANK = { FREE: 0, STANDARD: 1, PREMIUM: 2 } as const;
 export const CreateOrderSchema = z.object({
   planKey: z.string().trim().min(1).max(40),
   couponCode: z.string().trim().toUpperCase().max(40).optional(),
+  /** The Terms of Service and the Refund and Cancellation Policy, ticked for this purchase. */
+  acceptTerms: agreed('Please accept the Terms of Service and the Refund and Cancellation Policy'),
 });
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 
@@ -744,6 +768,45 @@ export type MediaUploadRequestInput = z.infer<typeof MediaUploadRequestSchema>;
 /** Team members (photographers) always choose the sub-album. */
 export const TeamUploadRequestSchema = MediaUploadRequestSchema.omit({ uploaderName: true }).extend({ albumId: IdSchema });
 export type TeamUploadRequestInput = z.infer<typeof TeamUploadRequestSchema>;
+
+// ───────────────────────────── Contact form ─────────────────────────────
+
+export const CONTACT_TOPICS = ['GENERAL', 'EVENT_HELP', 'BILLING', 'PARTNERSHIP', 'PRIVACY', 'FEEDBACK'] as const;
+export type ContactTopic = (typeof CONTACT_TOPICS)[number];
+export const CONTACT_STATUSES = ['NEW', 'OPEN', 'RESOLVED', 'SPAM'] as const;
+export type ContactStatus = (typeof CONTACT_STATUSES)[number];
+
+/** A message from the public contact form (POST /public/contact). */
+export const ContactMessageSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  email: z.email().max(254).transform((v) => v.trim().toLowerCase()),
+  phone: optionalPhone,
+  topic: z.enum(CONTACT_TOPICS),
+  message: z.string().trim().min(20, 'Please tell us a little more (at least 20 characters)').max(4000),
+  /** Hidden from people; a form that fills it in is a bot, and its message is dropped. */
+  website: z.string().max(200).optional(),
+});
+export type ContactMessageInput = z.infer<typeof ContactMessageSchema>;
+
+/** Staff triage: status and an internal note (never shown to the sender). */
+export const ContactMessageUpdateSchema = z
+  .object({
+    status: z.enum(CONTACT_STATUSES).optional(),
+    note: z.string().trim().max(4000).optional(),
+  })
+  .refine((v) => v.status !== undefined || v.note !== undefined, 'Nothing to change');
+export type ContactMessageUpdateInput = z.infer<typeof ContactMessageUpdateSchema>;
+
+/** A reply emailed to the sender from the console. */
+export const ContactReplySchema = z.object({
+  body: z.string().trim().min(2).max(8000),
+  /** Mark the message resolved once the reply is sent. */
+  resolve: z.boolean(),
+});
+export type ContactReplyInput = z.infer<typeof ContactReplySchema>;
+
+// Site pages (About, Contact, policies and pages staff create).
+export * from './pages';
 
 // Platform settings (admin console).
 export * from './settings';

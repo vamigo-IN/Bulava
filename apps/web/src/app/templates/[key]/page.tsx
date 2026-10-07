@@ -30,13 +30,13 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
   if (!tpl?.definition) notFound();
   const price = tierPrice(tpl.tier, plans);
   const related = all.filter((x) => x.key !== tpl.key && x.definition && x.outputs.some((o) => tpl.outputs.includes(o)) && x.tags.some((g) => tpl.tags.includes(g))).slice(0, 4);
-  const chip = 'inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-3 py-1 text-gold-700 ring-1 ring-gold-200';
+  const chip = 'inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 font-medium text-brand-700 shadow-clay-sm';
 
   return (
     <>
       <SiteHeader />
-      <main className="relative isolate bg-ivory">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(ellipse_55%_60%_at_30%_0%,rgba(227,197,133,0.3),transparent_70%)]" />
+      <main className="relative isolate">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] bg-[radial-gradient(ellipse_55%_60%_at_30%_0%,rgba(233,200,127,0.38),transparent_70%)]" />
         <div className="mx-auto max-w-7xl px-4 pt-10 pb-28 sm:px-6">
           <Link href="/templates" className="group/back inline-flex items-center gap-2 text-sm font-medium text-brand-700">
             <ArrowLeft aria-hidden className="size-4 transition-transform duration-300 group-hover/back:-translate-x-1" />
@@ -49,9 +49,9 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
               labels={{ mobile: t('templates.detail.mobile'), desktop: t('templates.detail.desktop'), note: t('templates.detail.previewNote'), playOpening: t('signature.play') }}
             />
             <aside className="lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-[2rem] border border-gold-200/80 bg-white p-7 shadow-lift sm:p-8">
-                <p className="text-[11px] font-semibold tracking-[0.25em] text-gold-600 uppercase">{tpl.category}</p>
-                <h1 className="mt-2 font-display text-5xl leading-[1.02] tracking-tight">{tpl.name}</h1>
+              <div className="clay rounded-[2rem] p-7 sm:p-8">
+                <p className="eyebrow text-brand-700">{tpl.category}</p>
+                <h1 className="mt-3 font-display text-5xl leading-[1.04] tracking-[-0.015em]">{tpl.name}</h1>
                 {tpl.description ? <p className="mt-4 text-lg leading-relaxed text-stone-600">{tpl.description}</p> : null}
                 {tpl.definition.website && tpl.definition.website.intro !== 'none' ? (
                   <ul className="mt-5 flex flex-wrap gap-2 text-sm">
@@ -80,28 +80,25 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
                 <AuthAwareLink
                   signedOutHref={`/signup?template=${tpl.key}`}
                   signedInHref={`/dashboard/events/new?template=${tpl.key}`}
-                  className="group/cta mt-6 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-night-900 font-semibold text-ivory shadow-[0_16px_34px_-16px_rgba(19,7,11,0.85)] transition-colors duration-300 hover:bg-brand-700"
+                  className="btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base"
                 >
                   {t('template.use')}
                   <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                 </AuthAwareLink>
                 {tpl.definition.type === 'WEBSITE' ? (
-                  <Link
-                    href={`/templates/${tpl.key}/demo`}
-                    className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-gold-300 font-semibold text-brand-700 transition-colors duration-300 hover:border-gold-500 hover:bg-gold-100/60"
-                  >
+                  <Link href={`/templates/${tpl.key}/demo`} className="btn-3d btn-3d-light mt-3 min-h-12 w-full rounded-2xl text-brand-700">
                     <Play aria-hidden className="size-3.5 fill-current" />
                     {t('templates.detail.demo')}
                   </Link>
                 ) : null}
               </div>
-              <dl className="mt-5 space-y-5 rounded-[2rem] border border-gold-200/80 bg-white/70 p-7 text-sm">
+              <dl className="clay-inset mt-5 space-y-5 rounded-[2rem] p-7 text-sm">
                 {tpl.tags.length ? (
                   <div>
                     <dt className="font-semibold text-ink">{t('templates.detail.for')}</dt>
-                    <dd className="mt-2 flex flex-wrap gap-2">
+                    <dd className="mt-3 flex flex-wrap gap-2">
                       {tpl.tags.map((g) => (
-                        <Link key={g} href={`/templates?tag=${g}`} className="rounded-full bg-sand px-3 py-1 capitalize transition-colors duration-300 hover:bg-gold-200">
+                        <Link key={g} href={`/templates?tag=${g}`} className="btn-3d btn-3d-light min-h-9 rounded-full px-3.5 text-xs font-medium capitalize">
                           {g.replace(/-/g, ' ')}
                         </Link>
                       ))}
@@ -132,10 +129,10 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
           </div>
           {related.length ? (
             <section className="mt-28" aria-labelledby="related-title">
-              <h2 id="related-title" className="text-center font-display text-4xl tracking-tight">
+              <h2 id="related-title" className="text-center font-display text-4xl tracking-[-0.015em]">
                 {t('home.grid.title')}
               </h2>
-              <ul className="mt-12 grid grid-cols-1 gap-x-6 gap-y-16 min-[520px]:grid-cols-2 lg:grid-cols-4">
+              <ul className="mt-12 grid grid-cols-[repeat(auto-fill,minmax(min(100%,17.5rem),1fr))] gap-6">
                 {related.map((r) => (
                   <li key={r.key}>
                     <TemplateCard template={r} t={t} priceLabel={tierPrice(r.tier, plans)} />

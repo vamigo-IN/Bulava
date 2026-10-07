@@ -55,12 +55,12 @@ export function SceneCoverflow({ items, labels }: { items: CoverflowItem[]; labe
     if (el && card) el.scrollBy({ left: dir * (card.offsetWidth + 24), behavior: 'smooth' });
   };
 
-  const navButton = 'grid size-12 place-items-center rounded-full border border-white/15 bg-white/5 text-gold-100 backdrop-blur transition-[background-color,border-color,color] duration-300 hover:border-gold-300/60 hover:bg-gold-300 hover:text-night-900';
+  const navButton = 'btn-3d btn-3d-light size-12 rounded-full';
 
   return (
     <div className="relative">
       {/* A pool of light where the centred card stands. */}
-      <div className="pointer-events-none absolute top-6 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,197,133,0.2),transparent)]" aria-hidden="true" />
+      <div className="pointer-events-none absolute top-6 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.8),rgba(233,200,127,0.28)_50%,transparent)]" aria-hidden="true" />
 
       <ul ref={track} data-lenis-prevent className="relative flex snap-x snap-mandatory gap-6 overflow-x-auto px-[calc(50%-150px)] pt-6 pb-12 [perspective:1400px] [scrollbar-width:none]" aria-label={labels.details}>
         {items.map((item, i) => {
@@ -79,19 +79,14 @@ export function SceneCoverflow({ items, labels }: { items: CoverflowItem[]; labe
                 <Link
                   href={`/templates/${item.key}`}
                   data-cursor="view"
-                  className={`block rounded-[2.2rem] transition-shadow duration-500 ${centred ? 'shadow-[0_0_0_1px_rgba(227,197,133,0.35),0_30px_80px_-20px_rgba(227,197,133,0.45)]' : 'shadow-[0_24px_50px_-20px_rgba(0,0,0,0.8)]'}`}
+                  className={`block rounded-[2.2rem] transition-shadow duration-500 ${centred ? 'shadow-[0_34px_70px_-26px_rgba(122,29,39,0.5)]' : 'shadow-[0_24px_50px_-26px_rgba(70,40,26,0.5)]'}`}
                   aria-label={`${item.name}: ${labels.details}`}
                 >
                   {item.node}
                 </Link>
-                <p className="mt-6 font-display text-2xl text-ivory">{item.name}</p>
-                <p className="mt-1 line-clamp-2 max-w-[260px] text-center text-sm text-ivory/65">{item.blurb}</p>
-                <Link
-                  href={`/templates/${item.key}/demo`}
-                  className={`mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-semibold transition-[background-color,border-color,color] duration-300 ${
-                    centred ? 'border-transparent bg-gradient-to-b from-gold-200 to-gold-300 text-night-900' : 'border-white/15 text-gold-100 hover:border-gold-300/60'
-                  }`}
-                >
+                <p className="mt-6 font-display text-2xl text-ink">{item.name}</p>
+                <p className="mt-1 line-clamp-2 max-w-[260px] text-center text-sm text-stone-600">{item.blurb}</p>
+                <Link href={`/templates/${item.key}/demo`} className={`mt-5 min-h-11 rounded-xl px-5 text-sm ${centred ? 'btn-3d' : 'btn-3d btn-3d-light'}`}>
                   <Play aria-hidden className="size-3.5 fill-current" />
                   {labels.demo}
                 </Link>

@@ -29,10 +29,10 @@ function Chip({ icon, text, className, depth, delay }: { icon: ReactNode; text: 
       <div data-chip data-depth={depth}>
         <div className="animate-pop-in" style={{ animationDelay: `${delay}s` }}>
           <div
-            className="flex animate-float-slow items-center gap-3 rounded-2xl border border-white/10 bg-night-800/90 py-2.5 pr-4 pl-2.5 text-[13px] font-medium whitespace-nowrap text-ivory shadow-[0_24px_48px_-16px_rgba(0,0,0,0.9)] backdrop-blur-md"
+            className="clay flex animate-float-slow items-center gap-3 rounded-2xl py-2.5 pr-4 pl-2.5 text-[13px] font-medium whitespace-nowrap text-ink"
             style={{ animationDelay: `-${(depth / 45).toFixed(1)}s` }}
           >
-            <span className="grid size-8 place-items-center rounded-xl bg-gradient-to-b from-gold-200 to-gold-300 text-night-900">{icon}</span>
+            <span className="icon-3d size-8 rounded-xl">{icon}</span>
             {text}
           </div>
         </div>
@@ -150,8 +150,8 @@ export function HeroStage({
       className="relative mx-auto h-[calc(660px*var(--s))] w-full max-w-[620px] [--s:0.6] min-[420px]:[--s:0.66] sm:[--s:0.84] lg:[--s:0.74] xl:[--s:0.92] 2xl:[--s:1]"
     >
       {/* Light, not a box: a warm glow behind the phones and their shadow on the floor. */}
-      <div aria-hidden="true" className="pointer-events-none absolute top-[46%] left-1/2 aspect-square w-[118%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,197,133,0.24),rgba(155,44,53,0.16)_45%,transparent_72%)]" />
-      <div aria-hidden="true" className="pointer-events-none absolute bottom-[2%] left-1/2 h-10 w-[58%] -translate-x-1/2 rounded-[50%] bg-black/70 blur-2xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute top-[46%] left-1/2 aspect-square w-[118%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.85),rgba(233,200,127,0.32)_45%,transparent_72%)]" />
+      <div aria-hidden="true" className="pointer-events-none absolute bottom-[2%] left-1/2 h-10 w-[58%] -translate-x-1/2 rounded-[50%] bg-[rgba(70,40,26,0.45)] blur-2xl" />
 
       <div className="absolute top-0 left-1/2 h-[660px] w-[620px] origin-top -translate-x-1/2 scale-[var(--s)] [perspective:1800px]">
         <div data-rig-scroll className="h-full w-full [transform-style:preserve-3d]">
@@ -162,12 +162,12 @@ export function HeroStage({
           >
             {/* Two more designs fanned out behind. */}
             <div aria-hidden="true" className="absolute top-20 left-2 [transform:translateZ(-190px)_rotateY(24deg)_rotate(-5deg)]">
-              <div className="animate-slide-in-left brightness-[0.8]" style={{ animationDelay: '0.35s' }}>
+              <div className="animate-slide-in-left brightness-[0.97] saturate-[0.9]" style={{ animationDelay: '0.35s' }}>
                 {back[0]}
               </div>
             </div>
             <div aria-hidden="true" className="absolute top-20 right-2 [transform:translateZ(-190px)_rotateY(-24deg)_rotate(5deg)]">
-              <div className="animate-slide-in-right brightness-[0.8]" style={{ animationDelay: '0.4s', animationDuration: '1.1s' }}>
+              <div className="animate-slide-in-right brightness-[0.97] saturate-[0.9]" style={{ animationDelay: '0.4s', animationDuration: '1.1s' }}>
                 {back[1]}
               </div>
             </div>
@@ -176,7 +176,7 @@ export function HeroStage({
             <div className="absolute top-6 left-1/2 z-10 -translate-x-1/2 [transform:translateZ(70px)]">
               <div className="animate-rise-in" style={{ animationDelay: '0.1s' }}>
                 <div
-                  className="absolute -top-11 left-1/2 flex -translate-x-1/2 animate-fade-in-up items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] whitespace-nowrap text-gold-200 uppercase backdrop-blur-md"
+                  className="absolute -top-12 left-1/2 flex -translate-x-1/2 animate-fade-in-up items-center gap-2 rounded-full bg-surface px-3.5 py-1.5 text-[11px] font-semibold tracking-[0.2em] whitespace-nowrap text-brand-700 uppercase shadow-clay-sm"
                   style={{ animationDelay: '0.9s' }}
                 >
                   <span className="relative flex size-2">
@@ -185,7 +185,7 @@ export function HeroStage({
                   </span>
                   {liveLabel}
                 </div>
-                <div className="phone-frame shadow-[0_60px_90px_-30px_rgba(0,0,0,0.85),0_0_0_1px_rgba(227,197,133,0.25),0_0_70px_-12px_rgba(227,197,133,0.35)]" style={{ width: 284, height: 580 }}>
+                <div className="phone-frame shadow-[0_60px_90px_-34px_rgba(70,40,26,0.6),0_20px_40px_-20px_rgba(70,40,26,0.35)]" style={{ width: 284, height: 580 }}>
                   <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-br from-white/15 via-transparent to-transparent" aria-hidden="true" />
                   <div
                     ref={screen}

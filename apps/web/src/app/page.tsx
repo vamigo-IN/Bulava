@@ -22,7 +22,6 @@ import {
   Palette,
   PartyPopper,
   Play,
-  Plus,
   QrCode,
   Quote,
   Send,
@@ -42,6 +41,7 @@ import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { SpotlightGrid } from '@/components/effects/spotlight-grid';
 import { TiltCard } from '@/components/effects/tilt-card';
 import { AuthAwareLink } from '@/components/marketing/account-links';
+import { FaqList } from '@/components/marketing/faq-list';
 import { HeroStage } from '@/components/marketing/hero-stage';
 import { PricingCards } from '@/components/marketing/pricing-cards';
 import { SceneCoverflow, type CoverflowItem } from '@/components/marketing/scene-coverflow';
@@ -107,17 +107,16 @@ const COMPARE_ROWS: Array<{ key: MessageKey; values: [Mark | string, Mark | stri
   { key: 'home.compare.languages', values: ['yes', 'partly', 'partly'] },
 ];
 
-/** The gold call to action used on dark sections. */
-const GOLD_CTA =
-  'group/cta inline-flex min-h-13 items-center gap-2 rounded-full bg-gradient-to-b from-gold-200 to-gold-300 px-7 text-base font-semibold text-night-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_18px_40px_-16px_rgba(227,197,133,0.75)] transition-[background-color,box-shadow] duration-300 hover:from-gold-100 hover:to-gold-200';
-const GHOST_CTA =
-  'group/ghost inline-flex min-h-13 items-center gap-3 rounded-full py-2 pr-6 pl-2 text-base font-medium text-ivory ring-1 ring-white/15 transition-[background-color,box-shadow] duration-300 hover:bg-white/5 hover:ring-gold-300/40';
+/** The main call to action: a maroon 3D button. */
+const PRIMARY_CTA = 'btn-3d group/cta min-h-14 rounded-2xl px-7 text-base';
+/** The second action beside it: a light 3D button with a maroon icon tile. */
+const SECONDARY_CTA = 'btn-3d btn-3d-light group/ghost min-h-14 gap-3 rounded-2xl py-2 pr-6 pl-2.5 text-base';
 
 function CompareMark({ value, lead }: { value: string; lead: boolean }) {
   if (value === 'yes')
     return (
       <>
-        <span aria-hidden className={cn('mx-auto grid size-7 place-items-center rounded-full', lead ? 'bg-gold-300 text-brand-900' : 'bg-emerald-50 text-emerald-700')}>
+        <span aria-hidden className={cn('mx-auto size-7 rounded-full', lead ? 'icon-3d' : 'grid place-items-center bg-emerald-50 text-emerald-700')}>
           <Check className="size-4" strokeWidth={3} />
         </span>
         <span className="sr-only">{t('home.compare.yes')}</span>
@@ -150,10 +149,10 @@ function Proof({ stats }: { stats: Awaited<ReturnType<typeof getStats>> }) {
     ...(stats.rsvps >= 1000 ? [t('home.proof.rsvps', { count: stats.rsvps.toLocaleString('en-IN') })] : []),
   ];
   return (
-    <ul className="mt-10 flex animate-fade-in-up flex-wrap items-center gap-x-6 gap-y-3 border-t border-white/10 pt-7 text-sm text-ivory/70" style={{ animationDelay: '0.9s' }}>
+    <ul className="mt-10 flex animate-fade-in-up flex-wrap items-center gap-3" style={{ animationDelay: '0.9s' }}>
       {items.map((i) => (
-        <li key={i} className="flex items-center gap-2">
-          <Sparkle aria-hidden className="size-3.5 fill-gold-300 text-gold-300" />
+        <li key={i} className="flex items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-medium text-stone-700 shadow-clay-sm">
+          <Sparkle aria-hidden className="size-3.5 fill-gold-500 text-gold-500" />
           {i}
         </li>
       ))}
@@ -161,13 +160,16 @@ function Proof({ stats }: { stats: Awaited<ReturnType<typeof getStats>> }) {
   );
 }
 
-/** The hero title rises word by word from behind a mask, in CSS so it plays from the first paint. */
-function RisingWords({ text, start = 0.15 }: { text: string; start?: number }) {
+/**
+ * The hero title rises word by word from behind a mask, in CSS so it plays from the first paint.
+ * The last `accent` words are set in maroon.
+ */
+function RisingWords({ text, start = 0.15, accent = 0 }: { text: string; start?: number; accent?: number }) {
   const words = text.split(' ');
   return words.map((word, i) => (
     <Fragment key={i}>
       <span aria-hidden="true" className="-mb-[0.14em] inline-block overflow-hidden pb-[0.14em] align-bottom">
-        <span className="inline-block animate-word-rise" style={{ animationDelay: `${(start + i * 0.07).toFixed(2)}s` }}>
+        <span className={cn('inline-block animate-word-rise', i >= words.length - accent && 'text-brand-700')} style={{ animationDelay: `${(start + i * 0.07).toFixed(2)}s` }}>
           {word}
         </span>
       </span>
@@ -206,44 +208,43 @@ export default async function HomePage() {
   return (
     <>
       <SiteStructuredData config={siteConfig} origin={process.env.WEB_ORIGIN || 'http://localhost:3000'} />
-      <SiteHeader tone="dark" />
+      <SiteHeader />
       <main>
-        {/* ───── Act one (dark): hero, traditions, illustrated scenes ───── */}
-        <div data-header-tone="dark" className="grain relative isolate -mt-16 overflow-hidden bg-night-950 text-ivory lg:-mt-[72px]">
-          {/* Ambient light: soft pools of maroon and gold, never a panel with edges. */}
+        {/* ───── Act one: hero, traditions, illustrated scenes ───── */}
+        <div data-header-tone="light" className="relative isolate overflow-hidden">
+          {/* Ambient light: soft pools of gold and rose on the cream, never a panel with edges. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute -top-[18%] right-[-12%] h-[860px] w-[860px] animate-drift rounded-full bg-[radial-gradient(closest-side,rgba(122,29,39,0.62),rgba(91,14,27,0.22)_55%,transparent)]" />
-            <div className="absolute top-[30%] -left-[18%] h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(184,137,43,0.16),transparent)]" />
-            <div className="absolute inset-x-0 top-0 h-[1100px] [background-image:radial-gradient(rgba(227,197,133,0.12)_1px,transparent_1px)] [background-size:30px_30px] [mask-image:radial-gradient(ellipse_70%_55%_at_60%_35%,#000_20%,transparent_75%)]" />
+            <div className="absolute -top-[22%] right-[-14%] h-[860px] w-[860px] animate-drift rounded-full bg-[radial-gradient(closest-side,rgba(233,200,127,0.42),rgba(240,212,196,0.3)_55%,transparent)]" />
+            <div className="absolute top-[32%] -left-[20%] h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(168,58,71,0.09),transparent)]" />
           </div>
-          <Parallax speed={0.35} className="absolute -top-44 -left-52 -z-10 w-[620px] text-gold-300 opacity-[0.06]">
+          <Parallax speed={0.35} className="absolute -top-44 -left-52 -z-10 w-[620px] text-gold-500 opacity-[0.08]">
             <Mandala className="w-full animate-spin-slow" />
           </Parallax>
 
           {/* Hero */}
-          <section aria-labelledby="hero-title" className="relative mx-auto grid max-w-7xl items-center gap-x-10 gap-y-16 px-4 pt-28 pb-16 sm:px-6 lg:grid-cols-12 lg:pt-36 lg:pb-24">
+          <section aria-labelledby="hero-title" className="relative mx-auto grid max-w-7xl items-center gap-x-10 gap-y-16 px-4 pt-14 pb-16 sm:px-6 lg:grid-cols-12 lg:pt-20 lg:pb-24">
             <div className="lg:col-span-6">
-              <p className="eyebrow animate-fade-in-up bg-white/5 text-gold-200 ring-1 ring-white/10">{t('home.hero.eyebrow')}</p>
+              <p className="eyebrow animate-fade-in-up text-brand-700">{t('home.hero.eyebrow')}</p>
               {/* Labelled once, so screen readers read the sentence rather than one masked word at a time. */}
-              <h1 id="hero-title" aria-label={t('home.hero.title')} className="mt-6 font-display text-[2.9rem] leading-[1.02] font-medium tracking-tight text-balance sm:text-6xl xl:text-[4.6rem]">
-                <RisingWords text={t('home.hero.title')} />
+              <h1 id="hero-title" aria-label={t('home.hero.title')} className="mt-6 font-display text-[2.9rem] leading-[1.04] tracking-[-0.02em] text-balance text-ink sm:text-6xl xl:text-[4.5rem]">
+                <RisingWords text={t('home.hero.title')} accent={3} />
               </h1>
-              <p className="mt-7 max-w-xl animate-settle-up text-lg leading-relaxed text-pretty text-ivory/75" style={{ animationDelay: '0.2s' }}>
+              <p className="mt-7 max-w-xl animate-settle-up text-lg leading-relaxed text-pretty text-stone-600" style={{ animationDelay: '0.2s' }}>
                 {t('home.hero.subtitle')}
               </p>
-              <p className="mt-3 max-w-xl animate-fade-in-up text-base text-ivory/60" style={{ animationDelay: '0.65s' }}>
+              <p className="mt-3 max-w-xl animate-fade-in-up text-base text-stone-500" style={{ animationDelay: '0.65s' }}>
                 {t('home.hero.support')}
               </p>
-              <div className="mt-9 flex animate-fade-in-up flex-wrap items-center gap-3" style={{ animationDelay: '0.75s' }}>
+              <div className="mt-9 flex animate-fade-in-up flex-wrap items-center gap-4" style={{ animationDelay: '0.75s' }}>
                 <MagneticButton strength={0.25}>
-                  <Link href="/templates" className={GOLD_CTA}>
+                  <Link href="/templates" className={PRIMARY_CTA}>
                     {t('home.hero.browse')}
                     <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                   </Link>
                 </MagneticButton>
                 {heroLive ? (
-                  <Link href={`/templates/${heroLive.key}/demo`} className={GHOST_CTA}>
-                    <span className="grid size-9 place-items-center rounded-full bg-white/10 transition-colors duration-300 group-hover/ghost:bg-gold-300 group-hover/ghost:text-night-900">
+                  <Link href={`/templates/${heroLive.key}/demo`} className={SECONDARY_CTA}>
+                    <span className="icon-3d size-9 rounded-xl">
                       <Play aria-hidden className="size-3.5 translate-x-px fill-current" />
                     </span>
                     {t('home.hero.demo')}
@@ -269,26 +270,26 @@ export default async function HomePage() {
                 />
               ) : null}
             </div>
-            <div aria-hidden="true" className="pointer-events-none absolute bottom-4 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-3 text-[10px] font-semibold tracking-[0.3em] text-ivory/45 uppercase lg:flex">
+            <div aria-hidden="true" className="pointer-events-none absolute bottom-2 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-3 text-[10px] font-semibold tracking-[0.3em] text-stone-500 uppercase lg:flex">
               {t('home.hero.scroll')}
-              <span className="relative h-10 w-px overflow-hidden bg-white/10">
-                <span className="absolute inset-0 animate-scroll-cue bg-gradient-to-b from-transparent via-gold-300 to-transparent" />
+              <span className="relative h-10 w-px overflow-hidden bg-stone-300/70">
+                <span className="absolute inset-0 animate-scroll-cue bg-gradient-to-b from-transparent via-brand-600 to-transparent" />
               </span>
             </div>
           </section>
 
           {/* Traditions marquee */}
-          <section aria-label={t('home.marquee.label')} className="relative border-y border-white/[0.07] bg-white/[0.02]">
+          <section aria-label={t('home.marquee.label')} className="relative border-y border-gold-200/60 bg-surface/60">
             <div className="mx-auto flex max-w-7xl items-center gap-8 px-4 py-6 sm:px-6">
-              <p className="hidden shrink-0 text-[11px] font-semibold tracking-[0.25em] text-gold-300 uppercase md:block">{t('home.marquee.label')}</p>
+              <p className="eyebrow hidden shrink-0 text-brand-700 md:inline-flex">{t('home.marquee.label')}</p>
               <div className="marquee min-w-0 flex-1 overflow-hidden">
                 <div className="marquee-track">
                   {[0, 1].map((copy) => (
                     <ul key={copy} aria-hidden={copy === 1 ? true : undefined} className="flex shrink-0 items-center">
                       {marquee.map((label) => (
-                        <li key={label} className="flex items-center gap-8 pr-8 font-display text-2xl whitespace-nowrap text-ivory/80 sm:text-3xl">
+                        <li key={label} className="flex items-center gap-8 pr-8 font-display text-2xl whitespace-nowrap text-ink/75 sm:text-3xl">
                           {label}
-                          <Sparkle aria-hidden className="size-3.5 fill-gold-300/70 text-gold-300/70" />
+                          <Sparkle aria-hidden className="size-3.5 fill-gold-500/80 text-gold-500/80" />
                         </li>
                       ))}
                     </ul>
@@ -300,21 +301,15 @@ export default async function HomePage() {
 
           {/* Illustrated 3D scenes */}
           {scenes.length ? (
-            <section className="relative pt-28 pb-36" aria-labelledby="scenes-title">
+            <section className="relative pt-28 pb-32" aria-labelledby="scenes-title">
               <Reveal className="px-4">
-                <div className="mx-auto max-w-3xl text-center">
-                  <p className="eyebrow bg-white/5 text-gold-200 ring-1 ring-white/10">{t('home.scenes.eyebrow')}</p>
-                  <h2 id="scenes-title" className="mt-5 font-display text-4xl leading-[1.05] tracking-tight text-balance sm:text-5xl lg:text-[3.5rem]">
-                    {t('home.scenes.title')}
-                  </h2>
-                  <p className="mt-5 text-lg leading-relaxed text-pretty text-ivory/70">{t('home.scenes.subtitle')}</p>
-                </div>
+                <SectionHeading id="scenes-title" eyebrow={t('home.scenes.eyebrow')} title={t('home.scenes.title')} subtitle={t('home.scenes.subtitle')} />
               </Reveal>
               <Reveal variant="scale" className="mt-12">
                 <SceneCoverflow items={scenes} labels={{ demo: t('home.scenes.demo'), details: t('home.scenes.details'), previous: t('home.scenes.previous'), next: t('home.scenes.next') }} />
               </Reveal>
               <div className="mt-10 text-center">
-                <Link href="/templates?tag=signature" className={GOLD_CTA}>
+                <Link href="/templates?tag=signature" className={PRIMARY_CTA}>
                   {t('home.signature.cta')}
                   <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                 </Link>
@@ -325,9 +320,9 @@ export default async function HomePage() {
           )}
         </div>
 
-        {/* ───── Act two (light): occasions, the collection, a spotlight ───── */}
-        <div data-header-tone="light" className="relative z-10 -mt-10 rounded-t-[2.5rem] bg-ivory">
-          <section className="mx-auto max-w-7xl px-4 pt-24 pb-24 sm:px-6" aria-labelledby="categories-title">
+        {/* ───── Act two: occasions, the collection, a spotlight ───── */}
+        <div data-header-tone="light" className="relative">
+          <section className="mx-auto max-w-7xl px-4 pt-8 pb-24 sm:px-6" aria-labelledby="categories-title">
             <Reveal>
               <SectionHeading id="categories-title" eyebrow={t('home.categories.eyebrow')} title={t('home.categories.title')} />
             </Reveal>
@@ -336,12 +331,9 @@ export default async function HomePage() {
                 <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
                   {CATEGORIES.map(({ key, href, icon: Icon }) => (
                     <li key={key}>
-                      <Link
-                        href={href}
-                        className="spotlight group relative flex h-full flex-col rounded-3xl border border-gold-200/80 bg-white p-5 shadow-soft transition-[translate,box-shadow,border-color] duration-500 hover:-translate-y-1 hover:border-gold-300 hover:shadow-lift sm:p-6"
-                      >
+                      <Link href={href} className="clay clay-lift spotlight group relative flex h-full flex-col rounded-3xl p-5 sm:p-6">
                         <ArrowUpRight aria-hidden className="absolute top-5 right-5 size-4 text-stone-400 transition-[translate,color] duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-brand-700" />
-                        <span className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-brand-900 text-gold-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_10px_20px_-10px_rgba(91,14,27,0.8)] transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
+                        <span className="icon-3d size-12 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6">
                           <Icon aria-hidden className="size-5" />
                         </span>
                         <span className="mt-5 font-display text-xl leading-tight text-ink sm:text-[1.35rem]">{t(`home.cat.${key}` as MessageKey)}</span>
@@ -354,7 +346,7 @@ export default async function HomePage() {
             </SpotlightGrid>
           </section>
 
-          <section id="templates" className="scroll-mt-24 border-t border-gold-200/60 bg-gradient-to-b from-sand/50 to-ivory py-24" aria-labelledby="grid-title">
+          <section id="templates" className="scroll-mt-24 border-y border-gold-200/50 bg-[linear-gradient(180deg,rgba(239,226,210,0.55),rgba(246,238,229,0))] py-24" aria-labelledby="grid-title">
             <div className="mx-auto max-w-7xl px-4 sm:px-6">
               <Reveal>
                 <SectionHeading id="grid-title" eyebrow={t('home.grid.eyebrow')} title={t('home.grid.title')} subtitle={t('home.grid.subtitle')} />
@@ -375,28 +367,28 @@ export default async function HomePage() {
           </section>
 
           {spotlight ? (
-            <section className="mx-auto max-w-7xl px-4 pt-8 pb-28 sm:px-6" aria-labelledby="spotlight-title">
+            <section className="mx-auto max-w-7xl px-4 pt-24 pb-28 sm:px-6" aria-labelledby="spotlight-title">
               <Reveal variant="scale">
-                <div className="grid overflow-hidden rounded-[2.5rem] border border-gold-200/80 bg-white shadow-lift lg:grid-cols-2">
-                  <div className="grain relative isolate flex items-center justify-center overflow-hidden bg-night-900 px-6 py-16">
-                    <div aria-hidden="true" className="absolute top-1/2 left-1/2 -z-10 aspect-square w-[130%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,197,133,0.26),rgba(122,29,39,0.35)_50%,transparent_75%)]" />
-                    <Mandala className="pointer-events-none absolute top-1/2 left-1/2 -z-10 w-[560px] -translate-x-1/2 -translate-y-1/2 animate-spin-slow text-gold-300 opacity-[0.08]" />
+                <div className="clay grid overflow-hidden rounded-[2.5rem] lg:grid-cols-2">
+                  <div className="relative isolate m-3 flex items-center justify-center overflow-hidden rounded-[2rem] bg-[radial-gradient(ellipse_at_50%_35%,#fdf0d6,#f4e2c8_50%,#ead3b6)] px-6 py-16 shadow-clay-inset">
+                    <div aria-hidden="true" className="absolute top-1/2 left-1/2 -z-10 aspect-square w-[120%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.75),transparent_70%)]" />
+                    <Mandala className="pointer-events-none absolute top-1/2 left-1/2 -z-10 w-[560px] -translate-x-1/2 -translate-y-1/2 animate-spin-slow text-gold-500 opacity-[0.14]" />
                     <TiltCard className="rounded-[2.2rem]" max={8}>
                       <Link href={`/templates/${spotlight.key}`} data-cursor="view" className="block rounded-[2.2rem]" aria-label={spotlight.name}>
                         <TemplatePhone template={spotlight} width={280} height={540} sections={4} />
                       </Link>
                     </TiltCard>
                   </div>
-                  <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-16">
-                    <p className="eyebrow self-start bg-gold-100 text-gold-700 ring-1 ring-gold-200">{t('home.spotlight.eyebrow')}</p>
-                    <h2 id="spotlight-title" className="mt-5 font-display text-5xl leading-[1.02] tracking-tight">
+                  <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-14">
+                    <p className="eyebrow self-start text-brand-700">{t('home.spotlight.eyebrow')}</p>
+                    <h2 id="spotlight-title" className="mt-4 font-display text-5xl leading-[1.04] tracking-[-0.015em]">
                       {spotlight.name}
                     </h2>
                     {spotlight.description ? <p className="mt-4 text-lg leading-relaxed text-stone-600">{spotlight.description}</p> : null}
                     <ul className="mt-8 space-y-4">
                       {(['home.spotlight.point1', 'home.spotlight.point2', 'home.spotlight.point3', 'home.spotlight.point4'] as const).map((k) => (
                         <li key={k} className="flex gap-3 text-stone-700">
-                          <span aria-hidden className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-brand-700 text-gold-200">
+                          <span aria-hidden className="icon-3d mt-0.5 size-6 shrink-0 rounded-full">
                             <Check className="size-3.5" strokeWidth={3} />
                           </span>
                           {t(k)}
@@ -404,10 +396,7 @@ export default async function HomePage() {
                       ))}
                     </ul>
                     <div className="mt-10 flex flex-wrap items-center gap-4">
-                      <Link
-                        href={`/templates/${spotlight.key}`}
-                        className="group/cta inline-flex min-h-12 items-center gap-2 rounded-full bg-night-900 px-7 font-semibold text-ivory shadow-[0_14px_30px_-14px_rgba(19,7,11,0.8)] transition-colors duration-300 hover:bg-brand-700"
-                      >
+                      <Link href={`/templates/${spotlight.key}`} className="btn-3d group/cta min-h-13 rounded-2xl px-7">
                         {t('template.view')}
                         <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                       </Link>
@@ -420,20 +409,20 @@ export default async function HomePage() {
           ) : null}
         </div>
 
-        {/* ───── Act three (dark): video invitations and features ───── */}
-        <div data-header-tone="dark" className="grain relative isolate overflow-hidden bg-night-950 text-ivory">
+        {/* ───── Act three: video invitations and features ───── */}
+        <div data-header-tone="light" className="relative isolate overflow-hidden">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute -top-40 left-1/2 h-[700px] w-[1100px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(122,29,39,0.45),transparent)]" />
-            <div className="absolute right-[-15%] bottom-[10%] h-[620px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(184,137,43,0.12),transparent)]" />
+            <div className="absolute -top-40 left-1/2 h-[700px] w-[1100px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(233,200,127,0.3),transparent)]" />
+            <div className="absolute right-[-15%] bottom-[10%] h-[620px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(168,58,71,0.07),transparent)]" />
           </div>
-          <Parallax speed={0.3} className="absolute top-[38%] -right-56 -z-10 w-[640px] text-gold-300 opacity-[0.05]">
+          <Parallax speed={0.3} className="absolute top-[38%] -right-56 -z-10 w-[640px] text-gold-500 opacity-[0.07]">
             <Mandala className="w-full animate-spin-slow" />
           </Parallax>
 
           {videos.length ? (
             <section className="mx-auto max-w-7xl px-4 pt-28 pb-24 sm:px-6" aria-labelledby="video-title">
               <Reveal>
-                <SectionHeading id="video-title" light eyebrow={t('home.video.eyebrow')} title={t('home.video.title')} subtitle={t('home.video.subtitle')} />
+                <SectionHeading id="video-title" eyebrow={t('home.video.eyebrow')} title={t('home.video.title')} subtitle={t('home.video.subtitle')} />
               </Reveal>
               <div className="mt-16">
                 <VideoShowcase
@@ -446,27 +435,21 @@ export default async function HomePage() {
 
           <section id="features" className={cn('mx-auto max-w-7xl scroll-mt-24 px-4 pb-28 sm:px-6', videos.length ? 'pt-8' : 'pt-28')} aria-labelledby="features-title">
             <Reveal>
-              <SectionHeading id="features-title" light eyebrow={t('home.features.eyebrow')} title={t('home.features.title')} subtitle={t('home.features.subtitle')} />
+              <SectionHeading id="features-title" eyebrow={t('home.features.eyebrow')} title={t('home.features.title')} subtitle={t('home.features.subtitle')} />
             </Reveal>
             <SpotlightGrid className="mt-14">
               <Reveal stagger="li">
-                <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                   {FEATURES.map(({ key, icon: Icon, wide }) => (
-                    <li
-                      key={key}
-                      className={cn(
-                        'spotlight group relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.03] p-7 transition-[border-color,background-color] duration-500 hover:border-gold-300/25 hover:bg-white/[0.05]',
-                        wide && 'sm:col-span-2',
-                      )}
-                    >
+                    <li key={key} className={cn('clay clay-lift spotlight group relative overflow-hidden rounded-3xl p-7', wide && 'sm:col-span-2')}>
                       {wide ? (
-                        <Icon aria-hidden strokeWidth={0.75} className="pointer-events-none absolute -right-8 -bottom-10 size-52 text-gold-300/[0.07] transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6" />
+                        <Icon aria-hidden strokeWidth={0.75} className="pointer-events-none absolute -right-8 -bottom-10 size-52 text-brand-700/[0.06] transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6" />
                       ) : null}
-                      <span className="grid size-12 place-items-center rounded-2xl bg-gold-300/10 text-gold-200 ring-1 ring-gold-300/20 transition-transform duration-500 group-hover:-translate-y-0.5">
+                      <span className="icon-3d size-12 transition-transform duration-500 group-hover:-rotate-6">
                         <Icon aria-hidden className="size-5" />
                       </span>
-                      <h3 className={cn('mt-6 font-display text-2xl text-ivory', wide && 'sm:text-3xl')}>{t(`home.feature.${key}.title`)}</h3>
-                      <p className={cn('mt-2 text-sm leading-relaxed text-ivory/65', wide && 'max-w-md sm:text-base')}>{t(`home.feature.${key}.body`)}</p>
+                      <h3 className={cn('mt-6 font-display text-2xl text-ink', wide && 'sm:text-3xl')}>{t(`home.feature.${key}.title`)}</h3>
+                      <p className={cn('mt-2 text-sm leading-relaxed text-stone-600', wide && 'max-w-md sm:text-base')}>{t(`home.feature.${key}.body`)}</p>
                     </li>
                   ))}
                 </ul>
@@ -475,25 +458,24 @@ export default async function HomePage() {
           </section>
         </div>
 
-        {/* ───── Act four (light): how it works, comparison ───── */}
-        <div data-header-tone="light" className="bg-ivory">
+        {/* ───── Act four: how it works, comparison ───── */}
+        <div data-header-tone="light">
           <section id="how-it-works" className="mx-auto max-w-7xl scroll-mt-24 px-4 pt-28 pb-24 sm:px-6" aria-labelledby="how-title">
             <Reveal>
               <SectionHeading id="how-title" eyebrow={t('home.how.eyebrow')} title={t('home.how.title')} subtitle={t('home.how.subtitle')} />
             </Reveal>
             <StepsProgress className="mt-16">
-              <div aria-hidden="true" className="absolute top-7 right-[12.5%] left-[12.5%] hidden h-px bg-gold-200 lg:block">
-                <div data-progress className="h-full origin-left bg-gradient-to-r from-gold-500 via-brand-600 to-brand-700" />
-              </div>
-              <ol className="relative grid gap-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+              <ol className="relative grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {STEPS.map(({ n, icon: Icon }) => (
-                  <li key={n} data-step className="group text-center">
-                    <span className="relative mx-auto grid size-14 place-items-center rounded-full border border-gold-300 bg-ivory text-gold-600 shadow-soft transition-[background-color,color,border-color,box-shadow] duration-500 group-data-[active]:border-transparent group-data-[active]:bg-brand-700 group-data-[active]:text-gold-200 group-data-[active]:shadow-[0_0_0_6px_rgba(227,197,133,0.18)]">
-                      <Icon aria-hidden className="size-6" />
-                    </span>
-                    <span className="mt-6 block text-xs font-semibold tracking-[0.3em] text-gold-600">{String(n).padStart(2, '0')}</span>
-                    <h3 className="mt-2 font-display text-2xl">{t(`home.how.${n}.title`)}</h3>
-                    <p className="mx-auto mt-2 max-w-xs leading-relaxed text-stone-600">{t(`home.how.${n}.body`)}</p>
+                  <li key={n} data-step className="clay clay-lift group flex flex-col rounded-3xl p-7">
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="font-display text-5xl leading-none text-gold-500 transition-colors duration-500 group-data-[active]:text-brand-700">{String(n).padStart(2, '0')}</span>
+                      <span className="icon-3d size-12 transition-transform duration-500 group-data-[active]:-rotate-6">
+                        <Icon aria-hidden className="size-5" />
+                      </span>
+                    </div>
+                    <h3 className="mt-6 font-display text-2xl">{t(`home.how.${n}.title`)}</h3>
+                    <p className="mt-2 leading-relaxed text-stone-600">{t(`home.how.${n}.body`)}</p>
                   </li>
                 ))}
               </ol>
@@ -508,12 +490,12 @@ export default async function HomePage() {
               {/* `relative`: the cells' sr-only labels are absolutely positioned; without a positioned
                   scroll box they escape it and widen the whole page on phones. Focusable and named,
                   so keyboard users can scroll it sideways. */}
-              <div role="group" aria-labelledby="compare-title" tabIndex={0} className="relative overflow-x-auto rounded-[2rem] border border-gold-200/80 bg-white shadow-soft">
+              <div role="group" aria-labelledby="compare-title" tabIndex={0} className="clay relative overflow-x-auto rounded-[2rem]">
                 <table className="w-full min-w-[600px] text-left text-sm">
                   <thead>
                     <tr>
                       <td className="p-5" />
-                      <th scope="col" className="bg-gradient-to-b from-brand-700 to-brand-800 p-5 text-center font-display text-xl font-medium text-ivory">
+                      <th scope="col" className="bg-gradient-to-b from-[#a83a47] via-brand-600 to-brand-700 p-5 text-center font-display text-xl font-normal text-ivory">
                         {t('home.compare.bulava')}
                       </th>
                       <th scope="col" className="p-5 text-center font-medium text-stone-600">
@@ -531,7 +513,7 @@ export default async function HomePage() {
                           {t(row.key)}
                         </th>
                         {row.values.map((v, i) => (
-                          <td key={i} className={cn('p-5 text-center', i === 0 ? 'bg-brand-50 font-semibold text-brand-700' : 'text-stone-600')}>
+                          <td key={i} className={cn('p-5 text-center', i === 0 ? 'bg-brand-50/70 font-semibold text-brand-700' : 'text-stone-600')}>
                             <CompareMark value={v} lead={i === 0} />
                           </td>
                         ))}
@@ -544,10 +526,11 @@ export default async function HomePage() {
           </section>
         </div>
 
-        {/* ───── Act five (dark): pricing ───── */}
-        <section id="pricing" data-header-tone="dark" className="grain relative isolate scroll-mt-24 overflow-hidden bg-night-900 py-28 text-ivory" aria-labelledby="pricing-title">
+        {/* ───── Act five (the one dark band): pricing ───── */}
+        <section id="pricing" data-header-tone="dark" className="relative isolate scroll-mt-24 overflow-hidden bg-night-900 py-28 text-ivory" aria-labelledby="pricing-title">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute -top-60 left-1/2 h-[640px] w-[980px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,197,133,0.14),transparent)]" />
+            <div className="absolute -top-60 left-1/2 h-[640px] w-[980px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,197,133,0.16),transparent)]" />
+            <div className="absolute -bottom-72 left-[10%] h-[560px] w-[760px] rounded-full bg-[radial-gradient(closest-side,rgba(122,29,39,0.4),transparent)]" />
           </div>
           <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
             <Reveal>
@@ -559,8 +542,8 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* ───── Act six (light): voices, questions, the invitation to start ───── */}
-        <div data-header-tone="light" className="bg-ivory">
+        {/* ───── Act six: voices, questions, the invitation to start ───── */}
+        <div data-header-tone="light">
           {/* Testimonials: only real, consented quotes; hidden when there are none. */}
           {testimonials.length ? (
             <section className="mx-auto max-w-7xl px-4 pt-28 sm:px-6" aria-labelledby="testimonials-title">
@@ -570,7 +553,7 @@ export default async function HomePage() {
               <Reveal stagger="li" className="mt-14">
                 <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
                   {testimonials.map((q) => (
-                    <li key={q.id} className="flex flex-col rounded-3xl border border-gold-200/80 bg-white p-7 shadow-soft transition-shadow duration-500 hover:shadow-lift">
+                    <li key={q.id} className="clay clay-lift flex flex-col rounded-3xl p-7">
                       <Quote aria-hidden className="size-8 fill-gold-100 text-gold-300" />
                       <p className="mt-4 flex gap-0.5 text-gold-500">
                         <span className="sr-only">{t('home.testimonials.rating', { rating: q.rating })}</span>
@@ -592,50 +575,35 @@ export default async function HomePage() {
             <Reveal className="lg:col-span-5">
               <div className="lg:sticky lg:top-28">
                 <SectionHeading id="faq-title" align="left" eyebrow={t('home.faq.eyebrow')} title={t('home.faq.title')} subtitle={t('home.faq.subtitle')} />
-                <Link href="/contact" className="group/cta mt-8 inline-flex items-center gap-2 font-semibold text-brand-700">
-                  <span className="link-grow">{t('home.faq.more')}</span>
+                <Link href="/contact" className="btn-3d btn-3d-light group/cta mt-8 min-h-12 rounded-2xl px-6 text-brand-700">
+                  {t('home.faq.more')}
                   <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                 </Link>
               </div>
             </Reveal>
             <Reveal className="lg:col-span-7" delay={0.1}>
-              <div className="divide-y divide-gold-200/80 overflow-hidden rounded-[2rem] border border-gold-200/80 bg-white shadow-soft">
-                {([1, 2, 3, 4, 5, 6] as const).map((n) => (
-                  <details key={n} className="group px-6 py-5 transition-colors duration-300 open:bg-gold-100/25 sm:px-8 [&_summary::-webkit-details-marker]:hidden">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-1 font-display text-xl">
-                      {t(`home.faq.${n}.q`)}
-                      <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full border border-gold-200 text-gold-600 transition-[rotate,background-color,color,border-color] duration-500 group-open:rotate-45 group-open:border-transparent group-open:bg-brand-700 group-open:text-gold-200">
-                        <Plus className="size-4" />
-                      </span>
-                    </summary>
-                    <p className="mt-3 pr-12 leading-relaxed text-stone-600">{t(`home.faq.${n}.a`)}</p>
-                  </details>
-                ))}
-              </div>
+              <FaqList questions={[1, 2, 3, 4, 5, 6]} t={t} />
             </Reveal>
           </section>
 
           <section className="px-4 pb-28 sm:px-6" aria-labelledby="final-title">
             <Reveal variant="scale">
-              <div className="grain relative isolate mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] bg-night-900 px-6 py-20 text-center text-ivory sm:px-12 sm:py-24">
-                <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-                  <div className="absolute -top-32 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(122,29,39,0.7),transparent)]" />
-                  <div className="absolute -bottom-40 left-1/2 h-[380px] w-[700px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,197,133,0.18),transparent)]" />
-                </div>
-                <Mandala className="pointer-events-none absolute -top-40 -right-32 -z-10 w-[480px] animate-spin-slow text-gold-300 opacity-[0.1]" />
-                <Mandala className="pointer-events-none absolute -bottom-48 -left-40 -z-10 w-[420px] animate-spin-slow text-gold-300 opacity-[0.06]" />
-                <h2 id="final-title" className="mx-auto max-w-3xl font-display text-4xl leading-[1.05] tracking-tight text-balance sm:text-6xl">
+              {/* The closing invitation: a maroon clay slab, lit from the top left like the buttons. */}
+              <div className="relative isolate mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] bg-[linear-gradient(160deg,#a33441,#7a1d27_48%,#4a0b16)] px-6 py-20 text-center text-ivory shadow-[inset_0_3px_2px_rgba(255,255,255,0.22),inset_5px_0_4px_rgba(255,255,255,0.08),inset_0_-8px_14px_rgba(30,2,8,0.45),inset_-6px_0_10px_rgba(30,2,8,0.3),8px_30px_60px_-22px_rgba(74,11,22,0.6)] sm:px-12 sm:py-24">
+                <Mandala className="pointer-events-none absolute -top-40 -right-32 -z-10 w-[480px] animate-spin-slow text-gold-200 opacity-[0.12]" />
+                <Mandala className="pointer-events-none absolute -bottom-48 -left-40 -z-10 w-[420px] animate-spin-slow text-gold-200 opacity-[0.08]" />
+                <h2 id="final-title" className="mx-auto max-w-3xl font-display text-4xl leading-[1.08] tracking-[-0.015em] text-balance sm:text-6xl">
                   {t('home.final.title')}
                 </h2>
-                <p className="mx-auto mt-5 max-w-xl text-lg text-ivory/75">{t('home.final.subtitle')}</p>
-                <div className="mt-10 flex flex-wrap justify-center gap-3">
+                <p className="mx-auto mt-5 max-w-xl text-lg text-ivory/85">{t('home.final.subtitle')}</p>
+                <div className="mt-10 flex flex-wrap justify-center gap-4">
                   <MagneticButton strength={0.25}>
-                    <AuthAwareLink signedOutHref="/signup" signedInHref="/dashboard" className={GOLD_CTA}>
+                    <AuthAwareLink signedOutHref="/signup" signedInHref="/dashboard" className="btn-3d btn-3d-gold group/cta min-h-14 rounded-2xl px-8 text-base">
                       {t('nav.getStarted')}
                       <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                     </AuthAwareLink>
                   </MagneticButton>
-                  <Link href="/templates" className="inline-flex min-h-13 items-center rounded-full px-7 font-medium text-ivory ring-1 ring-white/20 transition-[background-color,box-shadow] duration-300 hover:bg-white/5 hover:ring-gold-300/40">
+                  <Link href="/templates" className="btn-3d btn-3d-light min-h-14 rounded-2xl px-8 text-base">
                     {t('home.hero.browse')}
                   </Link>
                 </div>

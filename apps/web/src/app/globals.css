@@ -22,8 +22,8 @@
 }
 
 @theme {
-  --font-sans: 'Bulava Rupee', 'Bulava Devanagari', var(--font-noto-sans), var(--font-noto-devanagari), system-ui, sans-serif;
-  --font-display: 'Bulava Rupee Serif', var(--font-cormorant), var(--font-playfair), var(--font-noto-serif-devanagari), Georgia, serif;
+  --font-sans: 'Bulava Rupee', 'Bulava Devanagari', var(--font-dm-sans), var(--font-noto-sans), var(--font-noto-devanagari), system-ui, sans-serif;
+  --font-display: 'Bulava Rupee Serif', var(--font-fraunces), var(--font-cormorant), var(--font-noto-serif-devanagari), Georgia, serif;
   --font-script: var(--font-great-vibes), var(--font-tiro-devanagari), cursive;
 
   /* Deep maroon (brand) */
@@ -48,6 +48,9 @@
   --color-ivory: #fbf7f0;
   --color-sand: #f3eadb;
   --color-cream: #fffaf0;
+  /* Clay (design system v3): the page canvas, and the face of raised cards and buttons on it */
+  --color-canvas: #f6eee5;
+  --color-surface: #fffaf5;
   --color-ink: #1c1917;
   /* Tailwind's stone-500 is 4.48:1 on ivory; secondary text needs 4.5:1 (WCAG AA). */
   --color-stone-500: #6f6862;
@@ -62,6 +65,13 @@
   --shadow-soft: 0 1px 2px rgba(28, 25, 23, 0.04), 0 8px 24px -10px rgba(28, 25, 23, 0.1);
   --shadow-lift: 0 2px 6px rgba(28, 25, 23, 0.05), 0 28px 56px -18px rgba(47, 7, 16, 0.22);
   --shadow-glow: 0 0 0 1px rgba(227, 197, 133, 0.35), 0 24px 70px -24px rgba(227, 197, 133, 0.55);
+  /* Clay: soft 3D lit from the top left. A light rim on the top and left edges, a shaded rim on
+     the bottom and right, and a drop shadow falling to the bottom right. */
+  --shadow-clay: inset 0 3px 2px rgba(255, 255, 255, 0.95), inset 4px 0 3px rgba(255, 255, 255, 0.85), inset 0 -3px 3px rgba(122, 90, 62, 0.18), inset -3px 0 3px rgba(122, 90, 62, 0.14), 3px 8px 16px -4px rgba(56, 32, 22, 0.12), 8px 26px 46px -12px rgba(56, 32, 22, 0.24);
+  --shadow-clay-raised: inset 0 3px 2px rgba(255, 255, 255, 0.95), inset 4px 0 3px rgba(255, 255, 255, 0.85), inset 0 -3px 3px rgba(122, 90, 62, 0.18), inset -3px 0 3px rgba(122, 90, 62, 0.14), 4px 12px 22px -4px rgba(56, 32, 22, 0.15), 12px 38px 62px -14px rgba(56, 32, 22, 0.32);
+  --shadow-clay-sm: inset 0 2px 1px rgba(255, 255, 255, 0.95), inset 2px 0 2px rgba(255, 255, 255, 0.8), inset 0 -2px 2px rgba(122, 90, 62, 0.16), inset -2px 0 2px rgba(122, 90, 62, 0.12), 2px 5px 10px -3px rgba(56, 32, 22, 0.16);
+  /* Pressed in: inputs, toggle tracks, wells. */
+  --shadow-clay-inset: inset 0 2px 4px rgba(122, 90, 62, 0.22), inset 2px 0 3px rgba(122, 90, 62, 0.12), inset 0 -2px 2px rgba(255, 255, 255, 0.9), inset -2px 0 2px rgba(255, 255, 255, 0.6);
 
   --animate-drift: drift 22s ease-in-out infinite alternate;
   --animate-float-slow: float 9s ease-in-out infinite;
@@ -163,13 +173,13 @@
     overflow: hidden;
   }
   body {
-    @apply bg-ivory text-ink antialiased;
+    @apply bg-canvas text-ink antialiased;
     overflow-x: hidden;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-600;
   }
-  /* Cormorant's default old-style figures make 1 and 0 read as "I" and "O" in counts and dates. */
+  /* Lining figures in headings: old-style 1 and 0 read as "I" and "O" in counts and dates. */
   .font-display {
     font-variant-numeric: lining-nums;
   }
@@ -257,13 +267,141 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
-  /* Eyebrow chip used above section titles. */
+  /* Eyebrow above section titles: small spaced capitals after a four-point star. */
   .eyebrow {
-    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.22em] uppercase;
+    @apply inline-flex items-center gap-2.5 text-xs font-semibold tracking-[0.26em] uppercase;
   }
   .eyebrow::before {
     content: '';
-    @apply size-1.5 rounded-full bg-current;
+    @apply size-2.5 shrink-0 bg-current;
+    clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  }
+
+  /* ───────────── Design system v3: clay ─────────────
+     Tactile 3D lit from the top left: light rims on top and left, shaded rims on bottom and
+     right, drop shadows to the bottom right. Lifts use `translate`, never `transform`, so they
+     never fight GSAP reveals or the 3D tilt. */
+  .clay {
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-clay);
+  }
+  .clay-lift {
+    transition: translate 0.4s var(--ease-out-expo), box-shadow 0.4s var(--ease-out-expo);
+  }
+  .clay-lift:hover,
+  .clay-lift:focus-within {
+    translate: 0 -5px;
+    box-shadow: var(--shadow-clay-raised);
+  }
+  /* Pressed in: inputs, toggle tracks, wells. */
+  .clay-inset {
+    background: linear-gradient(180deg, #f2e8dc, #fbf6ef);
+    box-shadow: var(--shadow-clay-inset);
+  }
+
+  /* 3D buttons. A glossy gradient lit from above, rims that make it bulge, and a drop shadow;
+     it rises a pixel on hover and presses down when clicked. Maroon by default; `-gold` for dark
+     sections, `-light` for secondary actions and chips, `-green` for WhatsApp. Size and shape
+     come from utilities (min-h, px, text, rounded). */
+  .btn-3d {
+    --btn-top: #a83a47;
+    --btn-mid: #7a1d27;
+    --btn-bottom: #611420;
+    --btn-rim: rgba(255, 255, 255, 0.34);
+    --btn-rim-side: rgba(255, 255, 255, 0.14);
+    --btn-shade: rgba(40, 4, 12, 0.58);
+    --btn-shade-side: rgba(40, 4, 12, 0.4);
+    --btn-drop: rgba(60, 10, 20, 0.3);
+    --btn-drop-far: rgba(60, 10, 20, 0.22);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #fff8f1;
+    background: linear-gradient(180deg, var(--btn-top), var(--btn-mid) 58%, var(--btn-bottom));
+    box-shadow:
+      inset 0 2px 2px var(--btn-rim),
+      inset 4px 0 3px var(--btn-rim-side),
+      inset 0 -9px 12px -4px var(--btn-shade),
+      inset -6px 0 9px -3px var(--btn-shade-side),
+      3px 9px 18px -4px var(--btn-drop),
+      6px 16px 26px -8px var(--btn-drop-far);
+    transition: translate 0.15s ease-out, box-shadow 0.15s ease-out, filter 0.25s;
+  }
+  .btn-3d:hover {
+    translate: 0 -1px;
+    filter: brightness(1.06) saturate(1.04);
+  }
+  .btn-3d:active {
+    translate: 0 2px;
+    box-shadow:
+      inset 0 2px 2px var(--btn-rim),
+      inset 4px 0 3px var(--btn-rim-side),
+      inset 0 -7px 10px -4px var(--btn-shade),
+      inset -5px 0 8px -3px var(--btn-shade-side),
+      1px 3px 6px -2px var(--btn-drop);
+  }
+  .btn-3d:disabled,
+  .btn-3d[aria-disabled='true'] {
+    filter: saturate(0.6) opacity(0.6);
+    translate: none;
+  }
+  .btn-3d-gold {
+    --btn-top: #fbecca;
+    --btn-mid: #e9c87f;
+    --btn-bottom: #d2a955;
+    --btn-rim: rgba(255, 255, 255, 0.75);
+    --btn-rim-side: rgba(255, 255, 255, 0.4);
+    --btn-shade: rgba(120, 80, 16, 0.42);
+    --btn-shade-side: rgba(120, 80, 16, 0.3);
+    --btn-drop: rgba(20, 10, 4, 0.4);
+    --btn-drop-far: rgba(20, 10, 4, 0.3);
+    color: #2b1606;
+  }
+  .btn-3d-light {
+    --btn-top: #ffffff;
+    --btn-mid: #fbf5ee;
+    --btn-bottom: #efe3d5;
+    --btn-rim: rgba(255, 255, 255, 0.95);
+    --btn-rim-side: rgba(255, 255, 255, 0.75);
+    --btn-shade: rgba(150, 118, 90, 0.34);
+    --btn-shade-side: rgba(150, 118, 90, 0.26);
+    --btn-drop: rgba(56, 32, 22, 0.14);
+    --btn-drop-far: rgba(56, 32, 22, 0.12);
+    color: var(--color-ink);
+  }
+  .btn-3d-green {
+    --btn-top: #22a08f;
+    --btn-mid: #0f7a6e;
+    --btn-bottom: #0a6158;
+    --btn-shade: rgba(2, 40, 34, 0.55);
+    --btn-shade-side: rgba(2, 40, 34, 0.38);
+    --btn-drop: rgba(4, 50, 44, 0.32);
+    --btn-drop-far: rgba(4, 50, 44, 0.22);
+    color: #fff;
+  }
+  /* Guest forms inside an invitation: the same 3D shape in the template's own button colour
+     (theme.ts sets --t-button and the contrast-checked --t-on-button), with neutral shading. */
+  .btn-3d-template {
+    --btn-shade: rgba(0, 0, 0, 0.32);
+    --btn-shade-side: rgba(0, 0, 0, 0.22);
+    --btn-drop: rgba(0, 0, 0, 0.22);
+    --btn-drop-far: rgba(0, 0, 0, 0.16);
+    color: var(--t-on-button, #fff8f1);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 58%, rgba(0, 0, 0, 0.12)) var(--t-button, #7a1d27);
+  }
+  /* A static 3D tile for icons (feature, category and step cards). */
+  .icon-3d {
+    display: grid;
+    place-items: center;
+    border-radius: 1rem;
+    color: #f7e3b5;
+    background: linear-gradient(160deg, #a83a47, #7a1d27 55%, #5b0e1b);
+    box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.3), inset 3px 0 3px rgba(255, 255, 255, 0.12), inset 0 -6px 8px -3px rgba(40, 4, 12, 0.55), 3px 8px 14px -4px rgba(60, 10, 20, 0.35);
   }
 
   /* Text that underlines itself on hover (links in prose and footers). */
@@ -404,7 +542,7 @@
     --logo-mark: #9c7222;
   }
   .site-header[data-tone='light'] {
-    --hdr-bg: rgba(251, 247, 240, 0.82);
+    --hdr-bg: rgba(255, 250, 245, 0.9);
     --hdr-border: rgba(184, 137, 43, 0.2);
     --hdr-pill: rgba(255, 255, 255, 0.6);
     --hdr-hover: rgba(91, 14, 27, 0.06);
@@ -413,8 +551,11 @@
     --logo-disc: #5b0e1b;
     --logo-mark: #e3c585;
   }
-  /* At the very top the header melts into the page; the glass appears once it scrolls. */
-  .site-header:not([data-scrolled]) {
-    --hdr-bg: transparent;
+  /* A clay bar: light rim on top, shaded rim and a soft shadow underneath. */
+  .site-header {
+    box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.9), inset 0 -2px 2px rgba(122, 90, 62, 0.14), 0 14px 30px -20px rgba(56, 32, 22, 0.32);
+  }
+  .site-header[data-tone='dark'] {
+    box-shadow: inset 0 -1px 0 rgba(227, 197, 133, 0.12), 0 14px 30px -20px rgba(0, 0, 0, 0.6);
   }
 }

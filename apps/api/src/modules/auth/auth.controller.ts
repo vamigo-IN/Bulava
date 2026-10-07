@@ -9,6 +9,7 @@ import {
   MfaEnableSchema,
   MfaRegenerateSchema,
   MfaSetupSchema,
+  RestoreAccountSchema,
   SetPasswordSchema,
   SignupSchema,
   type LoginInput,
@@ -17,6 +18,7 @@ import {
   type MfaEnableInput,
   type MfaRegenerateInput,
   type MfaSetupInput,
+  type RestoreAccountInput,
   type SetPasswordInput,
   type SignupInput,
 } from '@bulava/validation';
@@ -25,6 +27,7 @@ import { CurrentUser, Public, ReqMeta, type RequestMeta } from '../../common/dec
 import { ApiZodBody, ZodBody } from '../../common/decorators/zod.decorators';
 import { AppError } from '../../common/errors/app-error';
 import type { AuthUser } from '../../common/request-context';
+import { AccountService } from '../users/account.service';
 import { AuthService, toPublicUser } from './auth.service';
 import { GOOGLE_STATE_COOKIE, GOOGLE_STATE_COOKIE_PATH, GoogleAuthService } from './google-auth.service';
 import { MfaService } from './mfa.service';
@@ -41,6 +44,7 @@ export class AuthController {
     private readonly sessions: SessionService,
     private readonly mfa: MfaService,
     private readonly google: GoogleAuthService,
+    private readonly account: AccountService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -65,9 +69,10 @@ export class AuthController {
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Get('google/start')
-  async googleStart(@Query('next') next: string | undefined, @Res() res: Response) {
+  async googleStart(@Query('next') next: string | undefined, @Query('consent') consent: string | undefined, @Res() res: Response) {
     if (!this.google.enabled) return res.redirect(302, `${this.config.WEB_ORIGIN.replace(/\/$/, '')}/login?error=GOOGLE_UNAVAILABLE`);
-    const { url, state } = await this.google.start({ next, mode: 'signin' });
+    // consent=1: the sign-up page's box was ticked, so a new account may be created (and its consent recorded).
+    const { url, state } = await this.google.start({ next, mode: 'signin', consented: consent === '1' });
     this.setGoogleState(res, state);
     res.setHeader('Cache-Control', 'no-store');
     return res.redirect(302, url);
@@ -147,11 +152,25 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.login(body, meta);
-    // Two-step accounts: no session yet, only a challenge for the code step.
-    if ('mfaRequired' in result) return result;
+    // Two-step accounts: no session yet, only a challenge for the code step. Accounts waiting
+    // to be deleted: no session either, only the offer to restore.
+    if ('mfaRequired' in result || 'restoreRequired' in result) return result;
     const { user, session } = result;
     setSessionCookies(res, session, this.config);
     return { user, accessToken: session.accessToken, accessExpiresAt: session.accessExpiresAt };
+  }
+
+  /** Restores an account waiting to be deleted, with the token from signing in (password or Google). */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('restore')
+  @HttpCode(200)
+  @ApiZodBody(RestoreAccountSchema)
+  async restore(@ZodBody(RestoreAccountSchema) body: RestoreAccountInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    const result = await this.account.restore(body.token, meta);
+    if ('mfaRequired' in result) return result;
+    setSessionCookies(res, result.session, this.config);
+    return { user: result.user, accessToken: result.session.accessToken, accessExpiresAt: result.session.accessExpiresAt };
   }
 
   /** Second step of sign-in: an authenticator code or a recovery code. */

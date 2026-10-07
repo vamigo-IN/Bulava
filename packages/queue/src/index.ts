@@ -20,7 +20,8 @@ export interface JobPayloads {
   'media-processing': { mediaItemId: string } | { assetId: string };
   'video-render': { videoJobId: string };
   notifications: { notificationId: string };
-  email: { to: string; subject: string; html: string; text: string; notificationId?: string };
+  /** `replyTo`: where a reply goes (a contact-form message's sender), instead of the settings' address. */
+  email: { to: string; subject: string; html: string; text: string; notificationId?: string; replyTo?: string };
   analytics: {
     name: string;
     eventId?: string | null;

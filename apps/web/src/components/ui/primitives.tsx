@@ -2,28 +2,26 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { forwardRef, useId, type ComponentProps, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-// Touch targets are at least 44px tall for thumb-friendly mobile use.
+// Touch targets are at least 44px tall for thumb-friendly mobile use. Buttons are the clay 3D
+// buttons of globals.css (btn-3d), the same as on the marketing site.
 
-export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[color,background-color,border-color,box-shadow,scale] duration-300 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
-  {
-    variants: {
-      variant: {
-        primary: 'bg-brand-700 text-ivory shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_8px_20px_-10px_rgba(91,14,27,0.75)] hover:bg-brand-800',
-        secondary: 'border border-gold-200 bg-white text-ink shadow-soft hover:border-gold-300 hover:bg-gold-100/40',
-        ghost: 'text-stone-700 hover:bg-sand/80 hover:text-ink',
-        danger: 'border border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50',
-        whatsapp: 'bg-[#0f7a6e] text-white shadow-[0_8px_20px_-10px_rgba(15,122,110,0.8)] hover:bg-[#0d6559]',
-      },
-      size: {
-        md: 'min-h-11 px-5 text-sm',
-        sm: 'min-h-9 px-3.5 text-sm',
-        lg: 'min-h-12 px-6 text-base',
-      },
+export const buttonVariants = cva('rounded-xl font-semibold disabled:pointer-events-none', {
+  variants: {
+    variant: {
+      primary: 'btn-3d',
+      secondary: 'btn-3d btn-3d-light',
+      ghost: 'inline-flex items-center justify-center gap-2 font-medium text-stone-700 transition-colors duration-300 hover:bg-sand/80 hover:text-ink disabled:opacity-50',
+      danger: 'btn-3d btn-3d-light !text-red-700',
+      whatsapp: 'btn-3d btn-3d-green',
     },
-    defaultVariants: { variant: 'primary', size: 'md' },
+    size: {
+      md: 'min-h-11 px-5 text-sm',
+      sm: 'min-h-9 px-3.5 text-sm',
+      lg: 'min-h-12 px-6 text-base',
+    },
   },
-);
+  defaultVariants: { variant: 'primary', size: 'md' },
+});
 
 export const Button = forwardRef<HTMLButtonElement, ComponentProps<'button'> & VariantProps<typeof buttonVariants>>(
   ({ className, variant, size, type = 'button', ...props }, ref) => (
@@ -32,8 +30,9 @@ export const Button = forwardRef<HTMLButtonElement, ComponentProps<'button'> & V
 );
 Button.displayName = 'Button';
 
+// Fields are pressed into the clay (shadow-clay-inset) and lift to white while focused.
 const fieldClass =
-  'block w-full rounded-xl border border-stone-300 bg-white px-3.5 text-base text-stone-900 shadow-[inset_0_1px_2px_rgba(28,25,23,0.04)] placeholder:text-stone-400 transition-[border-color,box-shadow] duration-200 hover:border-stone-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 focus:outline-none aria-invalid:border-red-500 aria-invalid:focus:ring-red-100';
+  'block w-full rounded-xl border border-[#e2d2c0] bg-[#f8f2ea] px-3.5 text-base text-stone-900 shadow-clay-inset placeholder:text-stone-500 transition-[border-color,box-shadow,background-color] duration-200 hover:border-[#d3bda5] focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-100 focus:outline-none aria-invalid:border-red-500 aria-invalid:focus:ring-red-100';
 
 export const Input = forwardRef<HTMLInputElement, ComponentProps<'input'>>(({ className, ...props }, ref) => (
   <input ref={ref} className={cn(fieldClass, 'min-h-11', className)} {...props} />
@@ -95,7 +94,7 @@ export function Checkbox({ label, className, ...props }: ComponentProps<'input'>
 }
 
 export function Card({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('rounded-2xl border border-gold-200/70 bg-white p-4 shadow-soft sm:p-6', className)} {...props} />;
+  return <div className={cn('clay rounded-2xl p-4 sm:p-6', className)} {...props} />;
 }
 
 const badgeVariants = cva('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset', {

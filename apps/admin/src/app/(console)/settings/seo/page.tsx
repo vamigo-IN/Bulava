@@ -96,7 +96,8 @@ function SeoForm({ view, origin }: { view: SettingGroupView; origin: string }) {
           <TextField label={t('seo.foundingYear')} type="number" min={1900} max={2100} value={org.foundingYear ?? ''} onChange={(v) => set('organization', { ...org, foundingYear: v === '' ? undefined : Number(v) })} />
           <TextField label={t('seo.orgEmail')} type="email" value={org.email} onChange={(v) => set('organization', { ...org, email: v })} />
           <TextField label={t('seo.orgPhone')} type="tel" placeholder="+91…" value={org.phone} onChange={(v) => set('organization', { ...org, phone: v })} />
-          <TextField className="sm:col-span-2" label={t('seo.address')} value={org.address} onChange={(v) => set('organization', { ...org, address: v })} />
+          <TextField className="sm:col-span-2" label={t('seo.address')} hint={t('seo.addressHint')} value={org.address} onChange={(v) => set('organization', { ...org, address: v })} />
+          <TextField className="sm:col-span-2" label={t('seo.grievanceOfficer')} hint={t('seo.grievanceOfficerHint')} maxLength={120} value={org.grievanceOfficer} onChange={(v) => set('organization', { ...org, grievanceOfficer: v })} />
         </div>
 
         <h3 className="pt-2 text-sm font-semibold text-stone-900">{t('seo.ai')}</h3>

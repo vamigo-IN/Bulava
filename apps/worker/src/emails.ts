@@ -113,3 +113,17 @@ export function functionReminderEmail(input: {
     text: `${dear}\n\n${body}\n\n${t('invitation.when')}: ${when}${where ? `\n${t('invitation.venue')}: ${where}` : ''}${input.venue?.mapUrl ? `\n${input.venue.mapUrl}` : ''}\n\n${input.inviteUrl}`,
   };
 }
+
+/** The last email to an account: it has now been erased, after the restore window (sent just before the address is removed). */
+export function accountDeletedEmail(input: { site: string; name: string }) {
+  const body = [
+    `Hello ${input.name},`,
+    `As you asked, your ${input.site} account has now been deleted for good, together with your events, guest lists and photos.`,
+    'We keep only the payment records that tax law requires, without your contact details. You are always welcome to create a new account.',
+  ];
+  return {
+    subject: `Your ${input.site} account has been deleted`,
+    html: layout(input.site, 'Your account has been deleted', body.map((p) => `<p style="line-height:1.5;margin:0 0 12px">${escapeHtml(p)}</p>`).join('')),
+    text: body.join('\n\n'),
+  };
+}

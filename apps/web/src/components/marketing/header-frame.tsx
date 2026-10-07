@@ -6,10 +6,10 @@ import { cn } from '@/lib/utils';
 type Tone = 'dark' | 'light';
 
 /**
- * The sticky marketing header. It reads the section just below it
- * (`data-header-tone="dark"` or `"light"`) and switches its glass and text
- * colours to match, and turns more solid once the page has scrolled. Pages that
- * open on a dark hero pass `initialTone="dark"` so the first paint matches.
+ * The sticky marketing header: a clay bar over the cream canvas. It reads the
+ * section just below it (`data-header-tone="dark"` or `"light"`) and switches
+ * to dark glass over the dark bands (pricing, footer). Pages that open on a
+ * dark section pass `initialTone="dark"` so the first paint matches.
  */
 export function HeaderFrame({ children, initialTone = 'light' }: { children: ReactNode; initialTone?: Tone }) {
   const ref = useRef<HTMLElement>(null);
@@ -49,10 +49,8 @@ export function HeaderFrame({ children, initialTone = 'light' }: { children: Rea
       data-tone={tone}
       data-scrolled={scrolled ? '' : undefined}
       className={cn(
-        // No border: the header is exactly as tall as the space heroes pull up under it.
         'site-header group/header sticky top-0 z-40 text-[var(--hdr-text)] transition-[background-color,box-shadow] duration-500',
         'bg-[var(--hdr-bg)] backdrop-blur-xl backdrop-saturate-150',
-        'data-[scrolled]:shadow-[0_1px_0_var(--hdr-border),0_12px_32px_-20px_rgba(0,0,0,0.4)]',
       )}
     >
       {children}

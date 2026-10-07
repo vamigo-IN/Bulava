@@ -94,6 +94,12 @@ import { SettingsChecksService } from './modules/settings/settings-checks.servic
 import { PlatformSettingsService, SETTINGS_STORE } from './modules/settings/settings.service';
 import { WhatsAppWebhookController } from './modules/whatsapp/whatsapp-webhook.controller';
 import { WhatsAppWebhookService } from './modules/whatsapp/whatsapp-webhook.service';
+import { AdminSitePagesController, PublicSitePagesController } from './modules/site-pages/site-pages.controller';
+import { SitePagesService } from './modules/site-pages/site-pages.service';
+import { AdminContactController, PublicContactController } from './modules/contact/contact.controller';
+import { ContactService } from './modules/contact/contact.service';
+import { AccountService } from './modules/users/account.service';
+import { ConsentService } from './modules/users/consent.service';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 import { PlatformPermissionGuard } from './common/guards/platform-permission.guard';
 
@@ -199,6 +205,10 @@ const bootConfig = loadConfig();
     PublicDomainsController,
     AdminSettingsController,
     PublicSiteController,
+    AdminSitePagesController,
+    PublicSitePagesController,
+    AdminContactController,
+    PublicContactController,
   ],
   providers: [
     // Guards run in this order: rate limit -> authenticate -> CSRF -> event permission.
@@ -260,6 +270,10 @@ const bootConfig = loadConfig();
     LogisticsService,
     RemindersService,
     DomainsService,
+    SitePagesService,
+    ContactService,
+    ConsentService,
+    AccountService,
     { provide: DNS_RESOLVER, useValue: systemResolver },
     {
       // Customer-domain certificates come from the Super Admin's settings (Cloudflare for SaaS,

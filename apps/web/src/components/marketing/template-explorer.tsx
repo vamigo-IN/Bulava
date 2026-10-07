@@ -25,7 +25,7 @@ export interface ExplorerFilters {
   format?: string;
 }
 
-type FilterKey = keyof ExplorerFilters;
+export type FilterKey = keyof ExplorerFilters;
 
 /** Keeps only the templates matching every chosen filter. */
 export function filterItems<T extends Omit<ExplorerItem, 'node'>>(items: T[], f: ExplorerFilters): T[] {
@@ -38,7 +38,8 @@ export function filterItems<T extends Omit<ExplorerItem, 'node'>>(items: T[], f:
   );
 }
 
-function hrefFor(basePath: string, current: ExplorerFilters, key: FilterKey, value: string): string {
+/** A gallery link with one filter changed (an empty value removes it). */
+export function hrefFor(basePath: string, current: ExplorerFilters, key: FilterKey, value: string): string {
   const next = new URLSearchParams();
   for (const [k, v] of Object.entries({ ...current, [key]: value })) if (v) next.set(k, v);
   const query = next.toString();
@@ -48,7 +49,9 @@ function hrefFor(basePath: string, current: ExplorerFilters, key: FilterKey, val
 function Chips({ label, options, filter, current, basePath }: { label: string; options: FilterOption[]; filter: FilterKey; current: ExplorerFilters; basePath: string }) {
   const value = current[filter] ?? '';
   return (
-    <nav aria-label={label} className="flex flex-wrap justify-center gap-2">
+    // On phones each group is one row that scrolls sideways (room below for the chips' shadows);
+    // wider screens wrap and centre it.
+    <nav aria-label={label} data-lenis-prevent className="-mx-4 flex gap-2 overflow-x-auto px-4 pt-1 pb-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:p-0">
       {options.map((o) => (
         <TrackedLink
           key={o.value}
@@ -57,12 +60,7 @@ function Chips({ label, options, filter, current, basePath }: { label: string; o
           event="template_filter"
           properties={{ kind: filter, value: o.value }}
           aria-current={value === o.value ? 'true' : undefined}
-          className={cn(
-            'inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-medium transition-[color,background-color,border-color,box-shadow,translate] duration-300',
-            value === o.value
-              ? 'border-transparent bg-night-900 text-ivory shadow-[0_8px_20px_-10px_rgba(19,7,11,0.7)]'
-              : 'border-gold-200 bg-white/80 text-stone-700 hover:-translate-y-0.5 hover:border-gold-300 hover:text-ink hover:shadow-soft',
-          )}
+          className={cn('btn-3d min-h-10 shrink-0 rounded-full px-4 text-sm font-medium', value === o.value ? null : 'btn-3d-light')}
         >
           {o.label}
         </TrackedLink>
@@ -73,8 +71,8 @@ function Chips({ label, options, filter, current, basePath }: { label: string; o
 
 /**
  * Template gallery with filters. Filtering happens on the server from the URL
- * (chips are links), so a page only renders and ships the cards it shows.
- * Each card is a live preview, which makes shipping every card expensive.
+ * (chips are links), so a page only renders and ships the cards it shows. The
+ * grid fits as many 280px card columns as there is room for.
  */
 export function TemplateExplorer({
   items,
@@ -112,32 +110,29 @@ export function TemplateExplorer({
   const shown = limit ? items.slice(0, limit) : items;
   return (
     <div>
-      <div className="space-y-3">
+      <div className="space-y-1 sm:space-y-3">
         {occasions ? <Chips label="Occasion" options={occasions} filter="event" current={current} basePath={basePath} /> : null}
         <Chips label="Tradition" options={traditions} filter="tag" current={current} basePath={basePath} />
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-center sm:gap-3">
           <Chips label="Plan" options={tiers} filter="tier" current={current} basePath={basePath} />
           {formats ? <Chips label="Format" options={formats} filter="format" current={current} basePath={basePath} /> : null}
         </div>
       </div>
       {shown.length ? (
-        <ul className="mt-14 grid grid-cols-1 gap-x-6 gap-y-16 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className="mt-12 grid grid-cols-[repeat(auto-fill,minmax(min(100%,17.5rem),1fr))] gap-6">
           {shown.map((i, n) => (
-            <li key={i.key} className={cn(phoneLimit !== undefined && n >= phoneLimit && 'max-[519px]:hidden')}>
+            // One card per row below the `sm` width: the homepage teaser stays short there.
+            <li key={i.key} className={cn(phoneLimit !== undefined && n >= phoneLimit && 'max-sm:hidden')}>
               {i.node}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-12 rounded-3xl border border-dashed border-gold-300 bg-white/60 px-6 py-14 text-center text-stone-600">{emptyLabel}</p>
+        <p className="clay-inset mt-12 rounded-3xl px-6 py-14 text-center text-stone-600">{emptyLabel}</p>
       )}
       {moreHref && limit && items.length > Math.min(limit, phoneLimit ?? limit) ? (
         <div className="mt-14 text-center">
-          <Link
-            href={moreHref}
-            scroll={!moreKeepsScroll}
-            className="group/more inline-flex min-h-12 items-center gap-2 rounded-full bg-night-900 px-7 font-semibold text-ivory shadow-[0_14px_30px_-14px_rgba(19,7,11,0.8)] transition-[background-color,translate] duration-300 hover:-translate-y-0.5 hover:bg-brand-700"
-          >
+          <Link href={moreHref} scroll={!moreKeepsScroll} className="btn-3d group/more min-h-13 rounded-2xl px-7">
             {moreLabel}
             <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/more:translate-x-1" />
           </Link>

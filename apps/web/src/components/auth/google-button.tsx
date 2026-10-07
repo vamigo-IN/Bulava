@@ -37,14 +37,26 @@ export function GoogleMark({ className = 'size-5' }: { className?: string }) {
   );
 }
 
-/** "Continue with Google": a plain navigation to the API, which redirects to Google. */
-export function GoogleButton({ next, label }: { next: string; label: string }) {
+/**
+ * "Continue with Google": a plain navigation to the API, which redirects to Google.
+ * On the sign-up page `consent` says whether the Terms and Privacy box is ticked:
+ * until it is, the button asks for it (`onBlocked`) instead of leaving the page,
+ * and with it the API may create the account. Without `consent` (sign-in page) a
+ * new account is sent back to sign up first.
+ */
+export function GoogleButton({ next, label, consent, onBlocked }: { next: string; label: string; consent?: boolean; onBlocked?: () => void }) {
+  const className = 'btn-3d btn-3d-light min-h-12 w-full gap-3 rounded-2xl px-5 font-medium';
+  if (consent === false) {
+    return (
+      <button type="button" className={className} onClick={onBlocked}>
+        <GoogleMark />
+        {label}
+      </button>
+    );
+  }
   return (
     // A redirect endpoint on the API, not a page: a plain link is correct.
-    <a
-      href={`/api/v1/auth/google/start?next=${encodeURIComponent(next)}`}
-      className="flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-stone-300 bg-white px-5 font-medium text-stone-800 shadow-sm transition-colors hover:bg-stone-50"
-    >
+    <a href={`/api/v1/auth/google/start?next=${encodeURIComponent(next)}${consent ? '&consent=1' : ''}`} className={className}>
       <GoogleMark />
       {label}
     </a>

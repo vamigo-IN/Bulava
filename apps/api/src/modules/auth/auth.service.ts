@@ -6,18 +6,22 @@ import { RedisService } from '../../infrastructure/redis/redis.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import { AuditService } from '../audit/audit.service';
+import { AccountService } from '../users/account.service';
+import { ConsentService } from '../users/consent.service';
 import { MfaService } from './mfa.service';
+import { toPublicUser, type PublicUser } from './public-user';
 import { SessionService, type IssuedSession } from './session.service';
+
+export { toPublicUser, type PublicUser } from './public-user';
 
 const MAX_FAILED_LOGINS = 10;
 const LOCKOUT_SECONDS = 15 * 60;
 
-export interface PublicUser {
-  id: string;
-  name: string;
-  email: string | null;
-  locale: string;
-  platformRole: string;
+/** Signing in to an account waiting to be deleted: no session yet, only the offer to restore it. */
+export interface RestoreOffer {
+  restoreRequired: true;
+  restoreToken: string;
+  deleteAt: Date;
 }
 
 @Injectable()
@@ -31,22 +35,21 @@ export class AuthService {
     private readonly redis: RedisService,
     private readonly audit: AuditService,
     private readonly mfa: MfaService,
+    private readonly consents: ConsentService,
+    private readonly account: AccountService,
   ) {}
 
   async signup(input: SignupInput, meta: RequestMeta): Promise<{ user: PublicUser; session: IssuedSession }> {
     const existing = await this.prisma.user.findUnique({ where: { email: input.email }, select: { id: true } });
     if (existing) throw new AppError('EMAIL_TAKEN', 'An account with this email already exists.');
 
-    const user = await this.prisma.user.create({
-      data: { name: input.name, email: input.email, passwordHash: await hashPassword(input.password) },
-    });
-    await this.audit.record({
-      actorType: 'USER',
-      actorId: user.id,
-      action: 'user.signup',
-      targetType: 'User',
-      targetId: user.id,
-      meta,
+    const [passwordHash, versions] = await Promise.all([hashPassword(input.password), this.consents.versions(['terms', 'privacy'])]);
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({ data: { name: input.name, email: input.email, passwordHash } });
+      // The ticked box on the sign-up form: the Terms and the Privacy Policy, with the versions shown.
+      await this.consents.recordSignup(tx, created.id, versions, 'signup');
+      await this.audit.record({ actorType: 'USER', actorId: created.id, action: 'user.signup', targetType: 'User', targetId: created.id, meta }, tx);
+      return created;
     });
     const session = await this.sessions.issue(user, meta);
     return { user: toPublicUser(user), session };
@@ -54,12 +57,13 @@ export class AuthService {
 
   /**
    * Password step. Accounts with two-step sign-in get a short-lived challenge
-   * instead of a session; `MfaService.completeLogin` finishes the sign-in.
+   * instead of a session; `MfaService.completeLogin` finishes the sign-in. An
+   * account waiting to be deleted gets the offer to restore it instead.
    */
   async login(
     input: LoginInput,
     meta: RequestMeta,
-  ): Promise<{ user: PublicUser; session: IssuedSession } | { mfaRequired: true; challengeToken: string; challengeExpiresAt: Date }> {
+  ): Promise<{ user: PublicUser; session: IssuedSession } | { mfaRequired: true; challengeToken: string; challengeExpiresAt: Date } | RestoreOffer> {
     const lockKey = `login-fail:${input.email}`;
     const failures = Number((await this.redis.client.get(lockKey)) ?? 0);
     if (failures >= MAX_FAILED_LOGINS) {
@@ -70,6 +74,13 @@ export class AuthService {
     const valid = user?.passwordHash
       ? await verifyPassword(input.password, user.passwordHash)
       : await this.burnPasswordCheck(input.password);
+
+    // The right password for an account in its restore window: offer to restore it, nothing else.
+    if (user && valid && AccountService.restorable(user)) {
+      await this.redis.client.del(lockKey);
+      await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'user.restore_offered', targetType: 'User', targetId: user.id, meta });
+      return { restoreRequired: true, restoreToken: await this.account.restoreToken(user.id), deleteAt: user.deletionScheduledAt! };
+    }
 
     if (!user || !valid || user.status !== 'ACTIVE' || user.deletedAt) {
       await this.redis.client.multi().incr(lockKey).expire(lockKey, LOCKOUT_SECONDS).exec();
@@ -120,14 +131,4 @@ export class AuthService {
     await verifyPassword(password, await this.dummyHash);
     return false;
   }
-}
-
-export function toPublicUser(user: {
-  id: string;
-  name: string;
-  email: string | null;
-  locale: string;
-  platformRole: string;
-}): PublicUser {
-  return { id: user.id, name: user.name, email: user.email, locale: user.locale, platformRole: user.platformRole };
 }

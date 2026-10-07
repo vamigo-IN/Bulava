@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CalendarHeart, CheckCircle2, ChevronDown, Clapperboard, LayoutGrid, LogOut, UserCheck, UserRound, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { Bell, CalendarHeart, CheckCircle2, ChevronDown, Clapperboard, LayoutGrid, LogOut, ReceiptIndianRupee, UserCheck, UserRound, Users, Wallet, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -103,9 +103,13 @@ function Notifications() {
                           <Icon className="size-4" />
                         </span>
                         <div className="min-w-0">
-                          {n.eventId ? (
+                          {n.eventId || (n.type === 'PAYMENT' && typeof n.payload.orderId === 'string') ? (
                             <Link
-                              href={`/dashboard/events/${n.eventId}${n.type === 'RSVP_RECEIVED' ? '/rsvps' : n.type === 'RENDER_COMPLETE' ? '/video' : ''}`}
+                              href={
+                                n.type === 'PAYMENT' && typeof n.payload.orderId === 'string'
+                                  ? `/dashboard/payments/${n.payload.orderId}`
+                                  : `/dashboard/events/${n.eventId}${n.type === 'RSVP_RECEIVED' ? '/rsvps' : n.type === 'RENDER_COMPLETE' ? '/video' : ''}`
+                              }
                               onClick={() => setOpen(false)}
                               className="font-medium text-ink transition-colors hover:text-brand-700"
                             >
@@ -167,6 +171,10 @@ function AccountMenu({ name, onLogout }: { name?: string; onLogout: () => void }
             <Link role="menuitem" href="/dashboard/account" onClick={() => setOpen(false)} className={item}>
               <UserRound aria-hidden className="size-4 text-gold-600" />
               {t('dash.nav.account')}
+            </Link>
+            <Link role="menuitem" href="/dashboard/payments" onClick={() => setOpen(false)} className={item}>
+              <ReceiptIndianRupee aria-hidden className="size-4 text-gold-600" />
+              {t('dash.nav.payments')}
             </Link>
             <div className="my-1.5 h-px bg-gold-100" />
             <button role="menuitem" type="button" onClick={onLogout} className={item}>

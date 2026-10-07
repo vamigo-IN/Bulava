@@ -1,8 +1,8 @@
 import { decryptSecret } from '@bulava/auth';
 import type { PrismaClient } from '@bulava/database';
 import type { JobPayloads } from '@bulava/queue';
-import { advanceEventLifecycle, lifecycleOptionsFromEnv, purgeDeletedEvents } from './lifecycle';
-import { announcementEmail, functionReminderEmail, invitationEmail, registrationUpdateEmail, rsvpReceivedEmail, rsvpReminderEmail } from './emails';
+import { advanceEventLifecycle, lifecycleOptionsFromEnv, purgeDeletedAccounts, purgeDeletedEvents } from './lifecycle';
+import { accountDeletedEmail, announcementEmail, functionReminderEmail, invitationEmail, registrationUpdateEmail, rsvpReceivedEmail, rsvpReminderEmail } from './emails';
 import { dispatchReminders } from './reminders';
 import { checkDueDomains, type DnsResolver, type HostnameProvider, type RoutingTarget } from '@bulava/domains';
 import { WhatsAppSendError, type EmailMessage, type EmailProvider, type WhatsAppChannel } from './providers';
@@ -207,7 +207,7 @@ export async function processEmail(deps: WorkerDeps, job: JobPayloads['email']):
     deps.log.warn({ to: '[redacted]' }, 'Email provider not configured; dropping email');
     return 'skipped';
   }
-  await email.send({ to: job.to, subject: job.subject, html: job.html, text: job.text });
+  await email.send({ to: job.to, subject: job.subject, html: job.html, text: job.text, ...(job.replyTo ? { replyTo: job.replyTo } : {}) });
   return 'sent';
 }
 
@@ -247,18 +247,29 @@ export async function processCleanup(deps: WorkerDeps & { deleteObject: (key: st
   if (job.task === 'expired-sessions') {
     const r = await deps.prisma.session.deleteMany({ where: { OR: [{ expiresAt: { lt: new Date(now) } }, { revokedAt: { lt: new Date(now - 30 * 86_400_000) } }] } });
     await deps.prisma.otpChallenge.deleteMany({ where: { expiresAt: { lt: new Date(now - 86_400_000) } } });
-    return `sessions:${r.count}`;
+    // Contact-form messages (the privacy policy's promise): spam after 30 days, every other
+    // conversation two years after it was last touched.
+    const contact = await deps.prisma.contactMessage.deleteMany({
+      where: { OR: [{ status: 'SPAM', updatedAt: { lt: new Date(now - 30 * 86_400_000) } }, { updatedAt: { lt: new Date(now - 730 * 86_400_000) } }] },
+    });
+    return `sessions:${r.count} contact:${contact.count}`;
   }
   if (job.task === 'stale-uploads') {
     const stale = await deps.prisma.mediaItem.findMany({ where: { status: 'UPLOADING', createdAt: { lt: new Date(now - 24 * 3_600_000) } }, take: 500 });
     for (const item of stale) {
-      await deps.deleteObject(item.originalKey).catch(() => undefined);
-      await deps.prisma.mediaItem.update({ where: { id: item.id }, data: { status: 'DELETED', deletedAt: new Date() } });
+      try {
+        await deps.deleteObject(item.originalKey).catch(() => undefined);
+        await deps.prisma.mediaItem.update({ where: { id: item.id }, data: { status: 'DELETED', deletedAt: new Date() } });
+      } catch (err) {
+        deps.log.warn({ err, mediaItemId: item.id }, 'Could not clear a stale upload; trying again next hour');
+      }
     }
     return `uploads:${stale.length}`;
   }
   if (job.task === 'event-lifecycle') {
-    const r = await advanceEventLifecycle(deps.prisma, lifecycleOptionsFromEnv());
+    const r = await advanceEventLifecycle(deps.prisma, lifecycleOptionsFromEnv(), Date.now(), undefined, (eventId, err) =>
+      deps.log.warn({ err, eventId }, 'Could not advance an event; the others carried on'),
+    );
     return `completed:${r.completed} archived:${r.archived}`;
   }
   if (job.task === 'reminders') {
@@ -273,11 +284,22 @@ export async function processCleanup(deps: WorkerDeps & { deleteObject: (key: st
     return `rsvp:${r.rsvpEvents} functions:${r.functionReminders} notifications:${r.notifications} requeued:${r.requeued}`;
   }
   if (job.task === 'deleted-events') {
+    // Accounts past their restore window first, so their events are purged in the same run.
+    const sendFinalEmail = async (to: string, name: string) => {
+      const email = await deps.email();
+      if (email) await email.send({ to, ...accountDeletedEmail({ site: await deps.siteName(), name }) });
+    };
+    const accounts = await purgeDeletedAccounts(deps.prisma, sendFinalEmail, Date.now(), (userId, err) =>
+      deps.log.warn({ err, userId }, 'Could not erase a deleted account; trying again tomorrow'),
+    );
     const removeHostname = async (id: string) => {
       const routing = await deps.domains?.();
       await routing?.provider.remove(id);
     };
-    return `purged:${await purgeDeletedEvents(deps.prisma, deps.deleteObject, lifecycleOptionsFromEnv(), Date.now(), removeHostname)}`;
+    const events = await purgeDeletedEvents(deps.prisma, deps.deleteObject, lifecycleOptionsFromEnv(), Date.now(), removeHostname, (eventId, err) =>
+      deps.log.warn({ err, eventId }, 'Could not purge a deleted event; trying again tomorrow'),
+    );
+    return `accounts:${accounts} purged:${events}`;
   }
   if (job.task === 'domains') {
     const routing = await deps.domains?.();

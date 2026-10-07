@@ -52,6 +52,11 @@ Validation errors add `error.details: [{ "path": "phone", "message": "Enter a va
 | DOMAIN_UNAVAILABLE | 503 | no certificate source for customer domains is configured |
 | SUPER_ADMIN_PROTECTED | 409 | the Super Admin cannot be suspended or re-roled; the role is only handed over ([authorization.md](authorization.md#platform-roles)) |
 | WHATSAPP_UNAVAILABLE | 503 | WhatsApp sending is not set up (Integrations) |
+| PAGE_SLUG_TAKEN / PAGE_PROTECTED | 409 | another site page has this address; built-in pages keep their address and layout, stay published and can't be deleted |
+| ORDER_NOT_PAYABLE | 409 | the order was refunded, cancelled or granted, its plan was retired, or its event deleted |
+| CONSENT_REQUIRED | 400 | a new account through Google without the sign-up page's ticked box |
+| RESTORE_EXPIRED | 410 | the one-use restore token was used or expired; sign in again |
+| EMAIL_UNAVAILABLE | 503 | a console reply needs email to be set up (Integrations) |
 | RATE_LIMITED | 429 | |
 | PAYMENTS_UNAVAILABLE / SERVICE_UNAVAILABLE | 503 | |
 | INTERNAL_ERROR | 500 | |
@@ -101,7 +106,9 @@ The GET returns the event shell, the guest's name, and only the functions the gu
 | Event team | `GET`/`POST /events/:id/members`, `PATCH`/`DELETE /events/:id/members/:memberId`, `POST /events/:id/members/invites/:inviteId/resend`, `DELETE /events/:id/members/invites/:inviteId`; the invited person: `GET /team-invites/:token`, `POST /team-invites/:token/{verify,accept,join}` (10 per minute) | [authorization.md](authorization.md#event-team) |
 | Videos and cards | `GET/POST /events/:id/videos`, `…/:jobId/cancel`, `…/:jobId/download`, `GET /music` | [video-rendering.md](video-rendering.md) |
 | Check-in | `/events/:id/check-ins/{lookup/:code,summary}`, `POST /events/:id/check-ins` | [qr-system.md](qr-system.md) |
-| Payments | `POST /events/:id/orders`, `POST /orders/:id/verify`, `POST /payments/razorpay/webhook` | [payments.md](payments.md) |
+| Payments | `POST /events/:id/orders` `{ planKey, couponCode?, acceptTerms: true }`, `POST /orders/:id/verify`, `GET /orders` (payment history), `GET /orders/:id` (status, the buyer's own orders), `POST /orders/:id/checkout` (retry or finish paying the same order), `POST /payments/razorpay/webhook` | [payments.md](payments.md#payment-status-page) |
+| Account | `POST /auth/signup` `{ name, email, password, acceptTerms: true }`; `DELETE /users/me` `{ password }` or `{ confirm: "DELETE" }` (schedules erasure in 30 days); `POST /auth/login` may answer `{ restoreRequired, restoreToken, deleteAt }`; `POST /auth/restore` `{ token }` | [authentication.md](authentication.md#hosts-users) |
+| Site pages and contact | public `GET /public/pages`, `GET /public/pages/:slug`, `POST /public/contact` (4 per 10 minutes per IP); staff `/admin/pages` (`page.manage`), `/admin/contact-messages` (`contact.manage`) | [below](#site-pages-and-the-contact-inbox) |
 | Admin | `/admin/*` (see below for staff, settings and orders) | [template-studio.md](template-studio.md), [authorization.md](authorization.md#platform-roles) |
 | Privacy | `GET /users/me/export`, `DELETE /users/me` | [security.md](security.md) |
 
@@ -143,6 +150,22 @@ Staff routes answer 404 to anyone whose role lacks the permission, so the admin 
 | `POST /admin/settings/site-assets` `{ kind, contentType, sizeBytes }`, `POST …/site-assets/complete` `{ kind, storageKey }`, `DELETE …/site-assets/:kind` | `settings.manage` | logo, favicon and share image: a signed upload, then the stored object's type and size are checked before it is used |
 | public `GET /public/site-config` | none | branding, SEO, trackers, header and footer code, and the extra CSP sources public pages need; never secrets. `Cache-Control: public, max-age=60` |
 | public `GET /public/site-assets/:kind` | none | 302 to a signed URL of the logo, favicon or share image (signed per hour, so browsers can cache it) |
+
+### Site pages and the contact inbox
+
+| Routes | Permission | Notes |
+|---|---|---|
+| public `GET /public/pages` | none | published pages for the footer and sitemap: `slug`, `title`, `footerGroup` (`COMPANY`, `LEGAL` or null), `sortOrder`, `updatedAt` |
+| public `GET /public/pages/:slug` | none | a published page: `title`, `description`, `layout` (`DOCUMENT`, `CARDS`, `CONTACT`) and `sections` `[{ heading, body }]`; 404 for drafts. The body markup and `{placeholders}` are parsed by `parsePageBody` in `@bulava/validation` |
+| `GET /admin/pages`, `GET /admin/pages/:id` | `page.manage` | every page with its public `url` |
+| `POST /admin/pages`, `PUT /admin/pages/:id` | `page.manage` | the whole page (`SitePageInputSchema`); built-in pages keep `slug` and `layout` and stay `PUBLISHED` (`PAGE_PROTECTED`) |
+| `DELETE /admin/pages/:id` | `page.manage` | pages staff created only |
+| public `POST /public/contact` `{ name, email, phone?, topic, message, website? }` | none | returns `{ reference }`. Saves the message and emails the support address (reply-to: the sender). `website` is a hidden field: when filled, nothing is saved |
+| `GET /admin/contact-messages?status=&q=&cursor=` | `contact.manage` | 50 at a time, newest first; `q` matches the reference, name, email or text |
+| `GET /admin/contact-messages/counts`, `GET /admin/contact-messages/:id` | `contact.manage` | counts by status; one message with its replies |
+| `PATCH /admin/contact-messages/:id` `{ status?, note? }` | `contact.manage` | the note is internal and stays out of the audit log |
+| `POST /admin/contact-messages/:id/replies` `{ body, resolve }` | `contact.manage` | emails the sender with their message quoted (reply-to: the support address) and keeps the reply; `EMAIL_UNAVAILABLE` until email is set up |
+| `DELETE /admin/contact-messages/:id` | `contact.manage` | spam, or a sender's erasure request |
 
 `GET /users/me` also returns `hasPassword`, `googleLinked` and `mfaEnabled`. `PUT /events/:id/design/:output` and `POST /events/:id/videos` accept the wider customization (placed photos, font pairing, opening, effect, hidden sections) and reject photos that are not approved images of the event (`CUSTOMIZATION_INVALID`).
 

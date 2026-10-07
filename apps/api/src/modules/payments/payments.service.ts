@@ -10,6 +10,7 @@ import type { AuthUser, EventAccessContext } from '../../common/request-context'
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ConsentService } from '../users/consent.service';
 import { SETTINGS_STORE } from '../settings/settings.service';
 import { PAYMENT_PROVIDER, RazorpayProvider, type PaymentProvider } from './payment-provider';
 
@@ -29,6 +30,7 @@ export class PaymentsService {
     private readonly audit: AuditService,
     private readonly analytics: AnalyticsService,
     private readonly notifications: NotificationsService,
+    private readonly consents: ConsentService,
     /** Set by tests only; production reads Razorpay from the Super Admin's settings. */
     @Optional() @Inject(PAYMENT_PROVIDER) private readonly override: PaymentProvider | null,
     @Inject(SETTINGS_STORE) private readonly settings: SettingsStore,
@@ -71,8 +73,14 @@ export class PaymentsService {
     if (!access && plan.interval === 'ONE_TIME') throw new AppError('BAD_REQUEST', 'Choose the event to upgrade.');
 
     const { amountMinor, couponId } = await this.priceWithCoupon(plan, input.couponCode);
-    const order = await this.prisma.order.create({
-      data: { userId: user.id, eventId: access?.eventId ?? null, planId: plan.id, couponId, amountMinor, currency: plan.currency },
+    const versions = await this.consents.versions(['terms', 'refund']);
+    const order = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({
+        data: { userId: user.id, eventId: access?.eventId ?? null, planId: plan.id, couponId, amountMinor, currency: plan.currency, termsAcceptedAt: new Date() },
+      });
+      // The buyer's ticked box (an explicit action, as the e-commerce rules require), kept with the order.
+      await tx.consent.create({ data: { userId: user.id, kind: 'purchase_terms', granted: true, version: `${versions.terms};${versions.refund}`, source: `order:${created.id}` } });
+      return created;
     });
     this.analytics.track('checkout_started', { eventId: access?.eventId, userId: user.id }, { plan: plan.key, amountMinor });
     await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'order.created', targetType: 'Order', targetId: order.id, eventId: access?.eventId ?? null, metadata: { plan: plan.key, amountMinor }, meta });
@@ -83,24 +91,37 @@ export class PaymentsService {
       return { orderId: order.id, status: 'PAID' as const, amountMinor: 0 };
     }
 
+    return this.checkoutSession(user, { ...order, plan });
+  }
+
+  /**
+   * What the browser needs to open Razorpay Checkout for an order, creating the
+   * gateway order the first time. Razorpay accepts several attempts on one
+   * order, so a retry reuses it and can never be charged twice.
+   */
+  private async checkoutSession(user: AuthUser, order: Order & { plan: PricingPlan }) {
     const provider = await this.requireProvider(true);
     try {
-      const providerOrder = await provider.createOrder({
-        amountMinor,
-        currency: plan.currency,
-        receipt: order.id,
-        notes: { orderId: order.id, plan: plan.key, ...(access ? { eventId: access.eventId } : {}) },
-      });
-      await this.prisma.order.update({ where: { id: order.id }, data: { providerOrderId: providerOrder.providerOrderId } });
+      let providerOrderId = order.providerOrderId;
+      if (!providerOrderId) {
+        const created = await provider.createOrder({
+          amountMinor: order.amountMinor,
+          currency: order.currency,
+          receipt: order.id,
+          notes: { orderId: order.id, plan: order.plan.key, ...(order.eventId ? { eventId: order.eventId } : {}) },
+        });
+        providerOrderId = created.providerOrderId;
+        await this.prisma.order.update({ where: { id: order.id }, data: { providerOrderId } });
+      }
       const profile = await this.prisma.user.findUnique({ where: { id: user.id }, select: { name: true, email: true, phone: true } });
       return {
         orderId: order.id,
         status: 'CREATED' as const,
-        amountMinor,
-        currency: plan.currency,
-        planName: plan.name,
+        amountMinor: order.amountMinor,
+        currency: order.currency,
+        planName: order.plan.name,
         keyId: provider.publicKey,
-        providerOrderId: providerOrder.providerOrderId,
+        providerOrderId,
         prefill: { name: profile?.name ?? '', email: profile?.email ?? '', contact: profile?.phone ?? '' },
       };
     } catch (error) {
@@ -108,6 +129,58 @@ export class PaymentsService {
       this.logger.error({ err: error }, 'Payment order creation failed');
       throw new AppError('PAYMENTS_UNAVAILABLE', 'We could not start the payment. Please try again.');
     }
+  }
+
+  /**
+   * The payment status page: one of the signed-in user's own orders, with what
+   * it bought and the payment that settled it.
+   */
+  async orderStatus(user: AuthUser, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId: user.id },
+      include: {
+        plan: { select: { key: true, name: true, interval: true } },
+        coupon: { select: { code: true } },
+        payments: { where: { status: { in: ['CAPTURED', 'REFUNDED'] } }, orderBy: { createdAt: 'desc' }, take: 1, select: { provider: true, providerPaymentId: true, verifiedAt: true } },
+      },
+    });
+    if (!order) throw AppError.notFound('Order');
+    const [event, entitlement] = await Promise.all([
+      order.eventId ? this.prisma.event.findFirst({ where: { id: order.eventId, deletedAt: null }, select: { id: true, title: true } }) : null,
+      order.status === 'PAID' ? this.prisma.entitlement.findFirst({ where: { sourceType: 'ORDER', sourceId: order.id }, select: { validUntil: true } }) : null,
+    ]);
+    const payment = order.payments[0];
+    return {
+      id: order.id,
+      status: order.status,
+      kind: order.kind,
+      amountMinor: order.amountMinor,
+      currency: order.currency,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      plan: order.plan,
+      couponCode: order.coupon?.code ?? null,
+      event,
+      payment: payment ? { provider: payment.provider, reference: payment.provider === 'RAZORPAY' ? payment.providerPaymentId : null, paidAt: payment.verifiedAt } : null,
+      /** Yearly plans: when the access ends. */
+      validUntil: entitlement?.validUntil ?? null,
+    };
+  }
+
+  /** "Try again" on the status page: reopens checkout for the same order (failed or never completed). */
+  async resumeCheckout(user: AuthUser, orderId: string, meta: RequestMeta) {
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, userId: user.id }, include: { plan: true } });
+    if (!order) throw AppError.notFound('Order');
+    if (order.status === 'PAID') return { orderId: order.id, status: 'PAID' as const, amountMinor: order.amountMinor };
+    if (order.kind !== 'PURCHASE' || (order.status !== 'CREATED' && order.status !== 'FAILED') || !order.plan.active) {
+      throw new AppError('ORDER_NOT_PAYABLE', 'This order can no longer be paid. Choose a plan to start again.');
+    }
+    if (order.eventId && !(await this.prisma.event.findFirst({ where: { id: order.eventId, deletedAt: null }, select: { id: true } }))) {
+      throw new AppError('ORDER_NOT_PAYABLE', 'The event for this order was deleted.');
+    }
+    if (order.status === 'FAILED') await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CREATED' } });
+    await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'order.checkout_resumed', targetType: 'Order', targetId: order.id, eventId: order.eventId, metadata: { from: order.status }, meta });
+    return this.checkoutSession(user, order);
   }
 
   /** Checkout callback. Signature is verified server-side before anything is granted. */
@@ -199,6 +272,39 @@ export class PaymentsService {
         sourceId: order.id,
         validUntil,
       })),
+    });
+  }
+
+  /** Payment history: every order of the signed-in user, newest first (purchases and complimentary upgrades). */
+  async listForUser(user: AuthUser) {
+    const orders = await this.prisma.order.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: {
+        plan: { select: { key: true, name: true, interval: true } },
+        coupon: { select: { code: true } },
+        payments: { where: { status: { in: ['CAPTURED', 'REFUNDED'] } }, orderBy: { createdAt: 'desc' }, take: 1, select: { provider: true, providerPaymentId: true, verifiedAt: true } },
+      },
+    });
+    const eventIds = [...new Set(orders.map((o) => o.eventId).filter((id): id is string => !!id))];
+    const events = eventIds.length ? await this.prisma.event.findMany({ where: { id: { in: eventIds } }, select: { id: true, title: true, deletedAt: true } }) : [];
+    return orders.map((o) => {
+      const event = events.find((e) => e.id === o.eventId);
+      const payment = o.payments[0];
+      return {
+        id: o.id,
+        status: o.status,
+        kind: o.kind,
+        amountMinor: o.amountMinor,
+        currency: o.currency,
+        createdAt: o.createdAt,
+        plan: o.plan,
+        couponCode: o.coupon?.code ?? null,
+        // A deleted event keeps its title in the history; the link only works while it exists.
+        event: event ? { id: event.id, title: event.title, available: !event.deletedAt } : null,
+        payment: payment ? { provider: payment.provider, reference: payment.provider === 'RAZORPAY' ? payment.providerPaymentId : null, paidAt: payment.verifiedAt } : null,
+      };
     });
   }
 

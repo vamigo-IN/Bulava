@@ -17,7 +17,7 @@ const ALL_ROLES = ['USER', 'SUPPORT', 'CONTENT_MANAGER', 'FINANCE_MANAGER', 'PLA
 export const UsersQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   role: z.enum([...ALL_ROLES, 'STAFF']).optional(),
-  status: z.enum(['ACTIVE', 'SUSPENDED', 'DELETED']).optional(),
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'DELETED', 'PENDING_DELETION']).optional(),
 });
 export const UpdateUserSchema = z.object({
   status: z.enum(['ACTIVE', 'SUSPENDED']).optional(),
@@ -245,6 +245,8 @@ export class AdminUsersService {
   async update(actor: AuthUser, userId: string, input: z.infer<typeof UpdateUserSchema>, meta: RequestMeta) {
     const target = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, platformRole: true, status: true, deletedAt: true } });
     if (!target || target.deletedAt) throw AppError.notFound('User');
+    // Only the owner undoes a deletion (by signing in), so their events come back with the account.
+    if (target.status === 'PENDING_DELETION') throw new AppError('BAD_REQUEST', 'This account is waiting to be deleted. Only its owner can restore it, by signing in.');
     if (target.platformRole === 'SUPER_ADMIN') throw new AppError('SUPER_ADMIN_PROTECTED', 'The Super Admin cannot be changed or suspended. They can hand the role over from Staff & roles.');
     if (userId === actor.id) throw new AppError('BAD_REQUEST', 'You cannot change your own account here.');
     const staffManager = platformRoleHasPermission(actor.platformRole, 'staff.manage');

@@ -28,6 +28,8 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
   DELETED
+  /// The owner deleted the account; it can be restored by signing in until deletionScheduledAt.
+  PENDING_DELETION
 }
 
 /// Staff roles. Exactly one SUPER_ADMIN may exist (a partial unique index enforces it);
@@ -62,6 +64,10 @@ model User {
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   deletedAt            DateTime?
+  /// When the owner asked for the account to be deleted (also the moment their events went offline).
+  deletionRequestedAt  DateTime?
+  /// After this, the worker erases the account for good; until then signing in can restore it.
+  deletionScheduledAt  DateTime?
 
   sessions         Session[]
   ownedEvents      Event[]              @relation("EventOwner")
@@ -74,6 +80,7 @@ model User {
   recoveryCodes    MfaRecoveryCode[]
   memberInvites    EventMemberInvite[]  @relation("MemberInvitesSent")
 
+  @@index([status, deletionScheduledAt])
   @@map("users")
 }
 
@@ -1368,6 +1375,8 @@ model Order {
   /// Why a grant was made (required for ADMIN_GRANT).
   note            String?
   grantedById     String?     @db.Uuid
+  /// When the buyer ticked the Terms and the Refund Policy for this purchase (also kept as a Consent).
+  termsAcceptedAt DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -1512,6 +1521,105 @@ model Testimonial {
 
   @@index([published, sortOrder])
   @@map("testimonials")
+}
+
+enum SitePageLayout {
+  /// One reading column with an "On this page" index (policies).
+  DOCUMENT
+  /// Each section a card (About).
+  CARDS
+  /// The contact form, contact actions and the sections beside them.
+  CONTACT
+}
+
+enum SitePageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum SitePageFooterGroup {
+  COMPANY
+  LEGAL
+}
+
+/// Site pages at /<slug> (About, Contact, the policies and pages staff add),
+/// edited in the admin console. Built-in pages are seeded once and are never
+/// overwritten by later seeds; they can be edited but not deleted, unpublished
+/// or moved, because the footer, the checkout and the payment gateway link to them.
+model SitePage {
+  id          String               @id @default(uuid(7)) @db.Uuid
+  slug        String               @unique
+  title       String
+  description String
+  layout      SitePageLayout       @default(DOCUMENT)
+  status      SitePageStatus       @default(DRAFT)
+  system      Boolean              @default(false)
+  footerGroup SitePageFooterGroup?
+  sortOrder   Int                  @default(0)
+  /// [{ heading, body }], validated by SitePageInputSchema (@bulava/validation).
+  sections    Json                 @default("[]")
+  publishedAt DateTime?
+  updatedById String?              @db.Uuid
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([status, footerGroup, sortOrder])
+  @@map("site_pages")
+}
+
+enum ContactTopic {
+  GENERAL
+  EVENT_HELP
+  BILLING
+  PARTNERSHIP
+  PRIVACY
+  FEEDBACK
+}
+
+enum ContactStatus {
+  NEW
+  OPEN
+  RESOLVED
+  SPAM
+}
+
+/// A message sent through the public contact form, handled in the console's
+/// inbox. Nothing links it to an account: the sender is whoever they say they are.
+model ContactMessage {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  /// Short reference shown to the sender and quoted in replies (e.g. BLV-7KQ2M9).
+  reference   String         @unique
+  name        String
+  email       String         @db.Citext
+  phone       String?
+  topic       ContactTopic
+  message     String
+  status      ContactStatus  @default(NEW)
+  /// Staff only; never sent to the sender.
+  note        String?
+  handledById String?        @db.Uuid
+  repliedAt   DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  replies     ContactReply[]
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("contact_messages")
+}
+
+/// A reply emailed to the sender from the console.
+model ContactReply {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  messageId String         @db.Uuid
+  message   ContactMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  body      String
+  sentById  String?        @db.Uuid
+  createdAt DateTime       @default(now())
+
+  @@index([messageId, createdAt])
+  @@map("contact_replies")
 }
 
 // ───────────────────────── Public registration (spec §89) ─────────────────────────

@@ -7,6 +7,8 @@ export type PlatformPermission =
   | 'pricing.manage'
   | 'user.manage'
   | 'content.manage'
+  | 'page.manage'
+  | 'contact.manage'
   | 'media.moderate'
   | 'billing.read'
   | 'payment.refund'
@@ -235,7 +237,8 @@ export interface OrdersResponse {
   totals: Partial<Record<OrderStatus, { count: number; amountMinor: number }>>;
 }
 
-export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+/** PENDING_DELETION: the owner deleted the account and can still restore it by signing in. */
+export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETED' | 'PENDING_DELETION';
 
 export interface AdminUser {
   id: string;
@@ -407,6 +410,60 @@ export interface Testimonial {
   consentAt: string;
   published: boolean;
   sortOrder: number;
+}
+
+/** A site page (About, Contact, the policies, pages staff add). */
+export interface SitePage {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  layout: 'DOCUMENT' | 'CARDS' | 'CONTACT';
+  status: 'DRAFT' | 'PUBLISHED';
+  /** Built-in: the address and layout are fixed, it stays published and can't be deleted. */
+  system: boolean;
+  footerGroup: 'COMPANY' | 'LEGAL' | null;
+  sortOrder: number;
+  sections: Array<{ heading: string; body: string }>;
+  publishedAt: string | null;
+  updatedAt: string;
+  createdAt: string;
+  /** Its address on the public site. */
+  url: string;
+}
+
+export type ContactStatus = 'NEW' | 'OPEN' | 'RESOLVED' | 'SPAM';
+export type ContactTopic = 'GENERAL' | 'EVENT_HELP' | 'BILLING' | 'PARTNERSHIP' | 'PRIVACY' | 'FEEDBACK';
+
+export interface ContactMessageSummary {
+  id: string;
+  reference: string;
+  name: string;
+  email: string;
+  topic: ContactTopic;
+  status: ContactStatus;
+  preview: string;
+  replies: number;
+  repliedAt: string | null;
+  createdAt: string;
+}
+
+export interface ContactMessageDetail {
+  id: string;
+  reference: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  topic: ContactTopic;
+  message: string;
+  status: ContactStatus;
+  note: string | null;
+  handledByName: string | null;
+  repliedAt: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  replies: Array<{ id: string; body: string; createdAt: string; sentByName: string | null }>;
 }
 
 export interface AuditEntry {

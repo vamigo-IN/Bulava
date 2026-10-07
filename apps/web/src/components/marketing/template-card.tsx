@@ -1,7 +1,6 @@
-import { Play } from 'lucide-react';
+import { ArrowRight, Clapperboard, Globe, Image as ImageIcon, Play } from 'lucide-react';
 import Link from 'next/link';
-import type { Translator } from '@bulava/localization';
-import { TiltCard } from '@/components/effects/tilt-card';
+import type { MessageKey, Translator } from '@bulava/localization';
 // Single modules, not the package entry: importing that would ship every client component
 // of the template engine (openings, music, RSVP forms) with every page that shows a card.
 import { backdropArt, backdropTitleTop, SceneStill } from '@bulava/template-engine/src/art/scenes';
@@ -11,10 +10,11 @@ import type { TemplateSummary } from '@/lib/server-api';
 import { cardPreview, POSTER_HEIGHT, POSTER_WIDTH, posterPreview } from '@/lib/template-previews';
 import { LiveThumbnail } from './live-thumbnail';
 
+/** Badges are clay pills on the card; only the text takes the badge's colour. */
 const BADGE_STYLE = {
-  NEW: 'bg-emerald-700 text-white',
-  POPULAR: 'bg-gold-600 text-white',
-  BESTSELLER: 'bg-brand-700 text-gold-200',
+  NEW: 'text-emerald-700',
+  POPULAR: 'text-gold-600',
+  BESTSELLER: 'text-brand-700',
 } as const;
 
 const PHONE_FRAME = 'phone-frame transition-all duration-500 hover:shadow-[0_0_40px_rgba(227,197,133,0.2)]';
@@ -105,7 +105,9 @@ export function PosterScene({ template, width, height }: { template: TemplateSum
  * drawn or painted scene, or a styled poster from the template's theme.
  */
 function VideoPoster({ template, width, height, priority }: { template: TemplateSummary; width: number; height: number; priority: boolean }) {
-  const image = width === POSTER_WIDTH && height === POSTER_HEIGHT ? posterPreview(template.key) : null;
+  // The poster was rendered at the gallery size; any phone of the same shape, up to that size, can show it.
+  const sameShape = width <= POSTER_WIDTH && Math.abs(width / height - POSTER_WIDTH / POSTER_HEIGHT) < 0.01;
+  const image = sameShape ? posterPreview(template.key) : null;
   if (image) {
     return (
       <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
@@ -138,11 +140,26 @@ function VideoPoster({ template, width, height, priority }: { template: Template
   );
 }
 
+/** A hex colour mixed with white (`amount` 0 = unchanged, 1 = white): the stage's pastel tints. */
+function tint(hex: string | undefined, amount: number, fallback: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex ?? '');
+  if (!m) return fallback;
+  const n = Number.parseInt(m[1]!, 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix((n >> 16) & 255)} ${mix((n >> 8) & 255)} ${mix(n & 255)})`;
+}
+
+const FORMAT_ICON = { WEBSITE: Globe, VIDEO: Clapperboard, DIGITAL_CARD: ImageIcon } as const;
+
+/** The card's phone: the gallery poster's shape at 80% (posters are pre-rendered at 220 × 400). */
+const CARD_PHONE = { width: 176, height: 320 };
+
 /**
- * A gallery card: the live phone preview leans toward the pointer in 3D (the
- * cursor reads "View" over it) and lifts off its floor shadow; name, plan and
- * a live-demo link sit underneath. `headingLevel` follows the page outline:
- * 2 directly under a page's h1, 3 inside a section.
+ * A gallery card. The phone rises out of a soft stage tinted with the template's
+ * own colours, lifting as the card does (the cursor reads "View" over it); the
+ * occasion, name, price, palette and actions sit underneath. Cards need 280px
+ * (see TemplateExplorer). `headingLevel` follows the page outline: 2 directly
+ * under a page's h1, 3 inside a section.
  */
 export function TemplateCard({
   template,
@@ -159,46 +176,87 @@ export function TemplateCard({
 }) {
   const link = href ?? `/templates/${template.key}`;
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
+  const c = template.definition?.theme.colors;
+  const palette = c ? [c.primary, c.secondary, c.accent, c.background] : [];
+  const tradition = template.tags.find((tag) => TRADITION_TAGS.has(tag));
+  const stage = `radial-gradient(70% 55% at 50% 38%, rgba(255,255,255,0.9), transparent 70%), linear-gradient(160deg, ${tint(c?.accent, 0.78, '#f7ead2')}, ${tint(c?.primary, 0.86, '#f3dcd8')})`;
   return (
-    <article className="group flex flex-col items-center">
-      <div className="relative">
-        <span aria-hidden="true" className="absolute -bottom-5 left-1/2 h-8 w-4/5 -translate-x-1/2 rounded-[50%] bg-night-900/25 blur-xl transition-[opacity,scale] duration-500 group-hover:scale-90 group-hover:opacity-60" />
-        <div className="relative transition-[translate] duration-500 ease-out group-hover:-translate-y-2">
-          <TiltCard className="rounded-[2.2rem]" max={6}>
-            <Link href={link} data-cursor="view" className="relative block rounded-[2.2rem]" aria-label={template.name}>
-              <TemplatePhone template={template} />
-            </Link>
-          </TiltCard>
-          {template.badge ? (
-            <span className={`pointer-events-none absolute top-4 -left-2 z-30 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-lg ${BADGE_STYLE[template.badge]}`}>
-              {t(`template.badge.${template.badge}`)}
-            </span>
-          ) : null}
-        </div>
+    <article className="clay clay-lift group flex h-full flex-col rounded-[1.6rem] p-2.5">
+      {/* The stage: the phone stands near the bottom edge and rises on hover. */}
+      <div className="relative h-[300px] overflow-hidden rounded-[1.2rem] shadow-[inset_0_2px_3px_rgba(255,255,255,0.7),inset_0_-10px_24px_-12px_rgba(70,40,26,0.25)]" style={{ background: stage }}>
+        <Link
+          href={link}
+          data-cursor="view"
+          aria-label={template.name}
+          className="absolute top-7 left-1/2 block -translate-x-1/2 rounded-[2rem] shadow-[0_30px_50px_-22px_rgba(70,40,26,0.55)] transition-[translate] duration-500 ease-out group-hover:-translate-y-2.5"
+        >
+          <TemplatePhone template={template} width={CARD_PHONE.width} height={CARD_PHONE.height} />
+        </Link>
+        {template.badge ? (
+          <span className={`pointer-events-none absolute top-3 left-3 z-30 rounded-full bg-surface/95 px-3 py-1 text-[10.5px] font-bold tracking-[0.14em] uppercase shadow-clay-sm ${BADGE_STYLE[template.badge]}`}>
+            {t(`template.badge.${template.badge}`)}
+          </span>
+        ) : null}
+        <ul className="pointer-events-none absolute top-3 right-3 z-30 flex gap-1.5">
+          {template.outputs.map((format) => {
+            const Icon = FORMAT_ICON[format];
+            return (
+              <li key={format} className="grid size-7 place-items-center rounded-full bg-surface/95 text-brand-700 shadow-clay-sm">
+                <Icon aria-hidden className="size-3.5" />
+                <span className="sr-only">{t(`filter.type.${format}`)}</span>
+              </li>
+            );
+          })}
+        </ul>
       </div>
-      <div className="mt-6 w-full max-w-[234px] text-center">
-        <p className="text-[11px] font-semibold tracking-[0.22em] text-gold-600 uppercase">{template.category}</p>
-        <Heading className="mt-1.5 font-display text-[1.4rem] leading-snug">
-          <Link href={link} className="transition-colors duration-300 hover:text-brand-700">
-            {template.name}
-          </Link>
-        </Heading>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm">
+      <div className="flex flex-1 flex-col px-2.5 pt-4 pb-1.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-[11px] font-semibold tracking-[0.2em] text-gold-600 uppercase">
+              {template.category}
+              {tradition ? ` · ${t(`tag.${tradition}` as MessageKey)}` : null}
+            </p>
+            <Heading className="mt-1 truncate font-display text-[1.35rem] leading-snug">
+              <Link href={link} className="transition-colors duration-300 hover:text-brand-700">
+                {template.name}
+              </Link>
+            </Heading>
+          </div>
           {priceLabel ? (
-            <span className="text-stone-600">
-              <span className="font-semibold text-ink">{priceLabel}</span> · {t(`filter.tier.${template.tier}`)}
+            <p className="shrink-0 text-right leading-tight">
+              <span className="block font-display text-[1.3rem] text-ink">{priceLabel}</span>
+              <span className="block text-[10.5px] font-semibold tracking-[0.14em] text-stone-500 uppercase">{t(`filter.tier.${template.tier}`)}</span>
+            </p>
+          ) : (
+            <span className="mt-1 shrink-0 rounded-full bg-surface px-3 py-1 text-xs font-semibold text-emerald-700 shadow-clay-sm">{t('template.free')}</span>
+          )}
+        </div>
+        <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+          {palette.length ? (
+            <span aria-hidden="true" className="flex -space-x-1.5">
+              {palette.map((color, i) => (
+                <span key={i} className="size-5 rounded-full shadow-[0_0_0_2px_var(--color-surface),0_2px_4px_rgba(70,40,26,0.25)]" style={{ background: color }} />
+              ))}
             </span>
           ) : (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200">{t('template.free')}</span>
+            <span />
           )}
           {template.outputs.includes('WEBSITE') ? (
-            <Link href={`/templates/${template.key}/demo`} className="group/demo inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-brand-700">
+            <Link href={`/templates/${template.key}/demo`} className="btn-3d group/demo min-h-10 rounded-xl px-4 text-xs">
               <Play aria-hidden className="size-3 fill-current transition-transform duration-300 group-hover/demo:scale-125" />
-              <span className="link-grow">{t('template.demo')}</span>
+              {t('template.demo')}
             </Link>
-          ) : null}
+          ) : (
+            <Link href={link} className="btn-3d btn-3d-light group/view min-h-10 rounded-xl px-4 text-xs">
+              {t('template.view')}
+              <ArrowRight aria-hidden className="size-3.5 transition-transform duration-300 group-hover/view:translate-x-0.5" />
+            </Link>
+          )}
         </div>
       </div>
     </article>
   );
 }
+
+/** Tags shown on cards as the tradition (the first one a template has; Signature is a collection, not a tradition). */
+const TRADITION_TAGS = new Set(['hindu', 'sikh', 'muslim', 'south-indian', 'christian', 'bengali', 'marathi', 'gujarati', 'punjabi', 'rajasthani', 'destination', 'modern']);

@@ -19,6 +19,9 @@ import { renderVideoJob } from './render';
 async function main(): Promise<void> {
   const log = pino({ name: 'bulava-video-worker', level: process.env.LOG_LEVEL ?? 'info' });
   initSentry('video-worker');
+  // A promise nobody awaited must not stop the worker (Node's default): it is logged instead,
+  // and Sentry (when set up) reports it through its own handler.
+  process.on('unhandledRejection', (reason) => log.error({ err: reason }, 'Unhandled promise rejection'));
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) throw new Error('REDIS_URL is required');
 

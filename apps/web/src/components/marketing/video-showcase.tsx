@@ -11,7 +11,7 @@ const VideoPlayer = dynamic(() => import('./video-player').then((m) => m.VideoPl
   loading: () => <Placeholder />,
 });
 
-/** Night-toned stand-in while the player loads (the showcase sits on dark sections). */
+/** Night-toned stand-in inside the phone screen while the player loads. */
 function Placeholder() {
   return <div className="h-full w-full animate-pulse bg-gradient-to-b from-night-700 to-night-800" />;
 }
@@ -60,14 +60,14 @@ export function VideoShowcase({ templates, playLabel }: { templates: Array<{ key
           style={{ transitionDelay: `${i * 120}ms` }}
         >
           <div className="relative">
-            <span aria-hidden="true" className="absolute -bottom-6 left-1/2 h-10 w-4/5 -translate-x-1/2 rounded-[50%] bg-black/60 blur-2xl" />
+            <span aria-hidden="true" className="absolute -bottom-6 left-1/2 h-10 w-4/5 -translate-x-1/2 rounded-[50%] bg-[rgba(70,40,26,0.4)] blur-2xl" />
             <TiltCard className="rounded-[2.2rem]" max={5} glare={false}>
-              <div className="phone-frame shadow-[0_0_0_1px_rgba(227,197,133,0.18),0_40px_80px_-30px_rgba(0,0,0,0.9)] transition-shadow duration-500 group-hover:shadow-[0_0_0_1px_rgba(227,197,133,0.4),0_40px_90px_-24px_rgba(227,197,133,0.35)]" style={{ width: 244, height: 434 }}>
+              <div className="phone-frame shadow-[0_40px_80px_-32px_rgba(70,40,26,0.6)] transition-shadow duration-500 group-hover:shadow-[0_44px_90px_-28px_rgba(122,29,39,0.5)]" style={{ width: 244, height: 434 }}>
                 {near ? <VideoPlayer definition={tpl.definition} eventType={tpl.eventType} label={playLabel} /> : <Placeholder />}
               </div>
             </TiltCard>
           </div>
-          <figcaption className="mt-7 font-display text-2xl text-ivory transition-colors duration-300 group-hover:text-gold-200">{tpl.name}</figcaption>
+          <figcaption className="mt-7 font-display text-2xl text-ink transition-colors duration-300 group-hover:text-brand-700">{tpl.name}</figcaption>
         </figure>
       ))}
     </div>

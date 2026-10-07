@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import type { PublicSiteConfig } from '@bulava/validation';
-import { isPrivatePath } from '@/lib/private-routes';
+import { isTrackerFreePath } from '@/lib/private-routes';
 
 type Fn = ((...args: unknown[]) => void) & Record<string, unknown>;
 type AnalyticsWindow = Window & {
@@ -130,15 +130,16 @@ function whenEngagedOrIdle(load: () => void) {
  * Trackers and the Super Admin's code snippets (Site settings > Tracking &
  * code), loaded only on public marketing pages, never on private pages
  * (dashboard, sign-in, invitations, photo rooms, check-in, walls, event
- * pages), so tokens and personal data never reach third parties. Everything
- * is added from this bundle rather than inline, which keeps private pages'
- * nonce-based Content-Security-Policy intact. Moving from a public page into a
- * private one reloads the page, so nothing loaded here keeps running there.
+ * pages) or the contact form, so tokens and personal data never reach third
+ * parties. Everything is added from this bundle rather than inline, which keeps
+ * private pages' nonce-based Content-Security-Policy intact. Moving from a
+ * public page into one of those reloads the page, so nothing loaded here keeps
+ * running there.
  */
 export function AnalyticsScripts() {
   const pathname = usePathname();
   useEffect(() => {
-    if (isPrivatePath(pathname)) {
+    if (isTrackerFreePath(pathname)) {
       if (state.loaded) window.location.reload();
       return;
     }
@@ -153,7 +154,7 @@ export function AnalyticsScripts() {
       void fetch('/api/v1/public/site-config', { credentials: 'omit' })
         .then((res) => (res.ok ? (res.json() as Promise<{ success: boolean; data: PublicSiteConfig }>) : null))
         .then((body) => {
-          if (!body?.success || isPrivatePath(window.location.pathname)) return;
+          if (!body?.success || isTrackerFreePath(window.location.pathname)) return;
           const config = body.data;
           const trackers = loadTrackers(config.tracking);
           injectHtml(config.code.headHtml, document.head);

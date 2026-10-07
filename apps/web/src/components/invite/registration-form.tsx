@@ -125,7 +125,7 @@ function RegistrationInner({ slug, info, timeZone }: { slug: string; info: Publi
         <span>{t('register.consent')}</span>
       </label>
 
-      <Button type="submit" size="lg" className="w-full bg-[var(--t-primary)] text-[var(--t-bg)] hover:opacity-90" disabled={busy || !consent || !name.trim()}>
+      <Button type="submit" size="lg" className="btn-3d-template w-full" disabled={busy || !consent || !name.trim()}>
         {busy ? t('register.sending') : info.waitlist ? t('register.joinWaitlist') : t('register.submit')}
       </Button>
     </form>

@@ -2,6 +2,7 @@ import { seedPlatformAdmin } from './admin-seed';
 import { createPrismaClient } from './client';
 import { seedOriginalMusic } from './music-seed';
 import { seedReferenceData, seedTemplates } from './seed-data';
+import { seedSitePages } from './site-pages';
 
 /**
  * Idempotent seed: reference data, the template catalog, and (when ADMIN_EMAIL
@@ -22,7 +23,8 @@ async function main(): Promise<void> {
   try {
     await seedReferenceData(prisma);
     const result = await seedTemplates(prisma, { updateChanged: process.argv.includes('--update-templates') });
-    console.log(`Reference data seeded. Templates: ${result.created} created, ${result.updated} updated, ${result.retired} retired.`);
+    const pages = await seedSitePages(prisma);
+    console.log(`Reference data seeded. Templates: ${result.created} created, ${result.updated} updated, ${result.retired} retired. Site pages: ${pages} created.`);
 
     const email = process.env.ADMIN_EMAIL?.trim();
     const password = process.env.ADMIN_PASSWORD;

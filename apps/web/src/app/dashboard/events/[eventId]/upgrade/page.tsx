@@ -1,12 +1,14 @@
 'use client';
 
-import { Check } from 'lucide-react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { Check, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { createTranslator } from '@bulava/localization';
-import { apiPost, apiPut } from '@/lib/api';
+import { apiPost } from '@/lib/api';
+import { paymentStatusPath, runCheckout, type CheckoutSession } from '@/lib/checkout';
 import { errorMessage, useT } from '@/lib/i18n';
-import { useDesign, useInvalidateEvent, useOrders, usePlans } from '@/lib/queries';
+import { useDesign, useOrders, usePlans } from '@/lib/queries';
 import type { Plan } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { track } from '@/lib/track';
@@ -14,39 +16,7 @@ import { Alert, Badge, Button, Card, Input, Spinner } from '@/components/ui/prim
 
 const inr = (minor: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(minor / 100);
 
-interface CreatedOrder {
-  orderId: string;
-  status: 'CREATED' | 'PAID';
-  amountMinor: number;
-  currency?: string;
-  planName?: string;
-  keyId?: string;
-  providerOrderId?: string;
-  prefill?: { name: string; email: string; contact: string };
-}
-
-interface RazorpayResponse {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-}
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void; on: (event: string, cb: (e: unknown) => void) => void };
-  }
-}
-
-function loadCheckout(): Promise<boolean> {
-  if (window.Razorpay) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    const s = document.createElement('script');
-    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
-}
+const ORDER_TONE = { PAID: 'success', FAILED: 'danger', REFUNDED: 'warning', CANCELLED: 'neutral', CREATED: 'neutral' } as const;
 
 function features(plan: Plan): string[] {
   const t = createTranslator('en');
@@ -70,73 +40,41 @@ function features(plan: Plan): string[] {
 
 /**
  * Checkout. The browser only opens Razorpay; success is decided server-side
- * (signature verification here, plus the webhook), never by the browser.
+ * (signature verification, plus the webhook), never by the browser. Every
+ * checkout that gets as far as paying ends on the payment status page.
  */
 export default function UpgradePage() {
   const t = useT();
+  const router = useRouter();
   const { eventId } = useParams<{ eventId: string }>();
   const params = useSearchParams();
   const plans = usePlans();
   const design = useDesign(eventId);
   const orders = useOrders(eventId);
-  const invalidate = useInvalidateEvent(eventId);
   const [coupon, setCoupon] = useState('');
+  /** The purchase terms box: an explicit tick each visit, never remembered or pre-ticked. */
+  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger' | 'info'; text: string } | null>(null);
 
   if (plans.isPending || design.isPending) return <Spinner label={t('common.loading')} />;
   const perEvent = (plans.data ?? []).filter((p) => p.interval === 'ONE_TIME' && p.priceMinor > 0);
   const currentTier = design.data?.entitlements['templates.maxTier']?.limit ?? 0;
-
-  const afterSuccess = async () => {
-    setMessage({ tone: 'success', text: t('upgrade.success') });
-    await invalidate();
-    const template = params.get('template');
-    if (template) await apiPut(`/events/${eventId}/design/website`, { templateKey: template }).catch(() => undefined);
-  };
+  const template = params.get('template');
 
   const buy = async (plan: Plan) => {
     setBusy(plan.key);
     setMessage(null);
     track('checkout_started', { plan: plan.key });
     try {
-      const order = await apiPost<CreatedOrder>(`/events/${eventId}/orders`, { planKey: plan.key, couponCode: coupon.trim() || undefined });
-      if (order.status === 'PAID') {
-        await afterSuccess();
+      const order = await apiPost<CheckoutSession>(`/events/${eventId}/orders`, { planKey: plan.key, couponCode: coupon.trim() || undefined, acceptTerms: agreed });
+      // A 100% coupon is paid already; everything else goes through Razorpay first.
+      const outcome = order.status === 'PAID' ? 'paid' : await runCheckout(order, { unavailable: t('upgrade.unavailable') });
+      if (outcome === 'dismissed') {
         setBusy(null);
         return;
       }
-      if (!(await loadCheckout()) || !window.Razorpay) throw new Error(t('upgrade.unavailable'));
-      const rzp = new window.Razorpay({
-        key: order.keyId,
-        order_id: order.providerOrderId,
-        amount: order.amountMinor,
-        currency: order.currency,
-        name: 'Bulava',
-        description: order.planName,
-        prefill: order.prefill,
-        theme: { color: '#5b0e1b' },
-        modal: { ondismiss: () => setBusy(null) },
-        handler: async (res: RazorpayResponse) => {
-          try {
-            await apiPost(`/orders/${order.orderId}/verify`, {
-              razorpayOrderId: res.razorpay_order_id,
-              razorpayPaymentId: res.razorpay_payment_id,
-              razorpaySignature: res.razorpay_signature,
-            });
-            await afterSuccess();
-          } catch (err) {
-            setMessage({ tone: 'danger', text: errorMessage(t, err) });
-          } finally {
-            setBusy(null);
-          }
-        },
-      });
-      rzp.on('payment.failed', () => {
-        track('payment_failed', { plan: plan.key });
-        setBusy(null);
-      });
-      rzp.open();
+      router.push(paymentStatusPath(order.orderId, outcome === 'paid' ? undefined : outcome, template));
     } catch (err) {
       setMessage({ tone: 'danger', text: err instanceof Error && !('code' in err) ? err.message : errorMessage(t, err) });
       setBusy(null);
@@ -150,6 +88,32 @@ export default function UpgradePage() {
         <p className="mt-1 text-stone-600">{t('upgrade.subtitle')}</p>
       </div>
       {message ? <Alert tone={message.tone === 'info' ? 'info' : message.tone}>{message.text}</Alert> : null}
+      {/* Before paying: an optional coupon, and the terms of the purchase (never pre-ticked). */}
+      <section className="clay-inset grid gap-5 rounded-3xl p-5 sm:p-6 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:items-start">
+        <label className="block text-sm font-medium text-stone-800">
+          {t('upgrade.coupon')}
+          <Input className="mt-1 uppercase" value={coupon} onChange={(e) => setCoupon(e.target.value)} maxLength={40} />
+        </label>
+        <div>
+          <label className="flex cursor-pointer items-start gap-3 text-[0.9375rem] leading-relaxed text-stone-800">
+            <input type="checkbox" className="mt-1 size-5 shrink-0 rounded border-stone-300 accent-brand-700" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} aria-describedby="purchase-terms-note" />
+            <span>
+              {t('upgrade.consent.before')}{' '}
+              <Link href="/terms" target="_blank" className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4">
+                {t('auth.consent.terms')}
+              </Link>{' '}
+              {t('auth.consent.and')}{' '}
+              <Link href="/refund" target="_blank" className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4">
+                {t('upgrade.consent.refund')}
+              </Link>
+              {t('upgrade.consent.after')}
+            </span>
+          </label>
+          <p id="purchase-terms-note" className="mt-2 pl-8 text-xs leading-relaxed text-stone-600">
+            {agreed ? t('upgrade.consent.secure') : t('upgrade.consent.required')}
+          </p>
+        </div>
+      </section>
       <div className="grid gap-5 md:grid-cols-2">
         {perEvent.map((plan) => {
           const tier = plan.features.find((f) => f.featureKey === 'templates.maxTier')?.limit ?? 0;
@@ -173,32 +137,29 @@ export default function UpgradePage() {
                   </li>
                 ))}
               </ul>
-              <Button size="lg" className="mt-6 rounded-full" disabled={owned || busy !== null} onClick={() => buy(plan)}>
+              <Button size="lg" className="mt-6 rounded-full" disabled={owned || busy !== null || !agreed} onClick={() => buy(plan)}>
                 {owned ? t('upgrade.included') : busy === plan.key ? t('common.loading') : t('upgrade.pay', { amount: inr(plan.priceMinor) })}
               </Button>
             </Card>
           );
         })}
       </div>
-      <Card className="max-w-md rounded-3xl">
-        <label className="block text-sm font-medium">
-          {t('upgrade.coupon')}
-          <Input className="mt-1 uppercase" value={coupon} onChange={(e) => setCoupon(e.target.value)} maxLength={40} />
-        </label>
-      </Card>
       {orders.data?.length ? (
         <section>
           <h3 className="mb-2 font-display text-2xl">{t('upgrade.history')}</h3>
-          <ul className="divide-y divide-gold-100 rounded-2xl border border-gold-200 bg-white">
+          <ul className="clay divide-y divide-gold-100 overflow-hidden rounded-2xl">
             {orders.data.map((o) => (
-              <li key={o.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span>
-                  {o.plan.name} · {new Date(o.createdAt).toLocaleDateString('en-IN')}
-                </span>
-                <span className="flex items-center gap-2">
-                  {inr(o.amountMinor)}
-                  <Badge tone={o.status === 'PAID' ? 'success' : o.status === 'FAILED' ? 'danger' : 'neutral'}>{o.status}</Badge>
-                </span>
+              <li key={o.id}>
+                <Link href={paymentStatusPath(o.id)} className="group flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-gold-100/40">
+                  <span>
+                    {o.plan.name} · {new Date(o.createdAt).toLocaleDateString('en-IN')}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    {inr(o.amountMinor)}
+                    <Badge tone={ORDER_TONE[o.status]}>{t(`payment.status.${o.status}`)}</Badge>
+                    <ChevronRight aria-hidden className="size-4 text-stone-400 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+### Reliability and CI
+
+- **CI on supported runtimes.** Every GitHub action is on its Node 24 release (Node 20 is deprecated on GitHub's runners). Runners are pinned to Ubuntu 24.04, so `ubuntu-latest` moving to Ubuntu 26 on 19 October 2026 can't change a build without a commit. pnpm's version now comes only from `packageManager`.
+- **Steadier app builds.** The two Next.js apps download about 40 Google Fonts families while they build. Building them at the same time could trip Google's rate limit, which caused the occasional "App build failed; retrying" warning, so CI now builds them one after the other. A retry now shows its reason on the run page.
+- **Error handling.**
+  - The admin console has error and "page not found" screens, and the website has a last-resort error page for when its root layout fails.
+  - The API and the workers log an unhandled promise rejection instead of exiting.
+  - The worker's daily jobs (event lifecycle, purges of deleted events and accounts, stale uploads) log an item that fails and carry on with the rest.
+
+### Consent, account deletion and payment history
+
+- **Consent boxes.** Creating an account (with email or Google) and buying a plan each need a box the person ticks: Terms and Privacy at sign-up, and Terms and Refund policy at checkout. The boxes are never pre-ticked, and each consent is recorded with the version of the policy that was shown. Google sign-up works only from the sign-up page with the box ticked.
+- **Deleting an account, with 30 days to change your mind.** Deleting needs the password (or typing DELETE for Google-only accounts). Events go offline at once. Signing in within 30 days offers **Restore my account**, which brings everything back. After 30 days the account and its events are erased, and the person gets a last email. Payment records, consent records and security logs are kept without contact details, as the law requires.
+- **Payment history.** **Payments** in the account menu, and in Account settings, lists every plan bought with its status, amount and payment ID. Each payment opens its receipt.
+- **Legal pages for Indian law.** The privacy policy and terms are rewritten around the DPDP Act and Rules, the IT Act with the SPDI and Intermediary Rules, and the Consumer Protection (E-Commerce) Rules. They now cover itemised notice and consent, rights and how to use them, breach reporting, children's data, content rules, takedown timelines and the Grievance Appellate Committee. There are two new pages: **Account deletion policy** and **Grievance redressal** (timelines, plus the National Consumer Helpline, e-Daakhil and the Data Protection Board).
+
+### Policies, About and Contact, managed from the console
+
+- **Finished pages.** About, Contact, the privacy policy, terms of service, refund and cancellation policy, shipping and delivery policy, and a new cookie policy replace the drafts. They are written in plain English for India's Digital Personal Data Protection Act, the IT Act and rules, and the consumer e-commerce rules. Everything they say about cookies, retention, security and refunds matches what the product does.
+- **Pages in the admin console.** Content managers edit every page under **Website > Pages**, with a live preview, and can create new pages, keep them as drafts and choose their footer column. Built-in pages keep their address, stay published and can't be deleted.
+- **Company details in one place.** The legal name, registered address and grievance officer (**SEO > Business details**) fill the policies and the contact page. Lines that need a detail stay hidden until it is entered.
+- **One support address.** support@bulava.in is the default everywhere: footer, pages, contact form and replies.
+- **Contact form and inbox.** The contact page has a form, and every message gets a reference number. Messages arrive in **Support > Messages** (new `contact.manage` permission, given to Support), where staff reply by email, set a status and keep internal notes. New messages are also emailed to the support address. Spam is deleted after 30 days, and other messages two years after they were last touched.
+- **Footer text in the console.** The line under the logo, the description, the copyright line and an extra line (for example the CIN or GSTIN) are set under **Branding & contact > Footer**. The Company and Legal columns list the pages.
+
+### Payment status page
+
+After checkout, buyers land on a status page. It thanks them and shows the receipt once the payment is confirmed. While a confirmation is still pending, it keeps checking and asks them not to pay again. If a payment fails, it shows the reason and a **Try again** button. Retrying reopens the same Razorpay order, so nobody can be charged twice. Payment history and payment notifications link to this page.
+
+### A cleaner templates gallery
+
+Filters moved to a sidebar (a fold-out panel on phones), with a count next to each choice. Active filters show as chips you can remove one by one. The cards are shorter and quieter: the phone rises out of a stage tinted with the template's own colours, with its formats, colour palette, price and a demo button.
+
+### A new look for the public site
+
+The marketing pages and the sign-in screens have been redesigned in a soft 3D ("clay") style on a warm cream background, still in Bulava maroon and gold ([web-design.md](docs/web-design.md)).
+
+- **Type.** Headings use Fraunces and text uses DM Sans. These are the only two fonts that preload.
+- **3D buttons and cards.** Buttons are glossy and lift slightly on hover. Cards stand out from the page, and inputs look pressed in. All surfaces are lit from the same side.
+- **One light canvas.** The home page no longer switches between dark and light sections. Only the pricing band and the footer stay dark. The header is a solid bar from the top of the page.
+- **Template cards** work like product cards. Each shows its category and plan, its price and a "Live demo" button. On phones, the filter chips sit in rows you scroll sideways.
+- **Content pages.** About and contact show their sections as numbered cards. Contact has one-tap email, call and WhatsApp tiles, taken from the site settings. Privacy, terms and refunds are laid out as one document with an "On this page" index, and the pages refresh every 5 minutes.
+- **Shared parts.** The dashboard uses the same buttons and form fields. Its layouts are unchanged.
+
 ### Faster marketing pages
 
 The home page scored 26 for performance in Lighthouse on a phone. It took 10.5 s to show its headline and blocked the main thread for 12 s. The main causes and their fixes:

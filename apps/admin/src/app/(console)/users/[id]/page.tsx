@@ -113,7 +113,7 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
   const self = user.id === me.id;
   const isStaff = user.platformRole !== 'USER';
   // The Super Admin is protected; staff accounts are the Super Admin's to manage.
-  const canAct = !self && user.platformRole !== 'SUPER_ADMIN' && user.status !== 'DELETED' && (isStaff ? canManageStaff : canManageUsers);
+  const canAct = !self && user.platformRole !== 'SUPER_ADMIN' && user.status !== 'DELETED' && user.status !== 'PENDING_DELETION' && (isStaff ? canManageStaff : canManageUsers);
   const refresh = () => invalidate(['admin', 'user', user.id], ['admin', 'users'], ['admin', 'staff']);
   const setStatus = useMutation({
     mutationFn: (status: 'ACTIVE' | 'SUSPENDED') => apiPatch(`/admin/users/${user.id}`, { status }),

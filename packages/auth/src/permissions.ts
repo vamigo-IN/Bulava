@@ -33,6 +33,10 @@ export const PLATFORM_PERMISSIONS = [
   'pricing.manage',
   'user.manage',
   'content.manage',
+  /** Site pages: About, Contact, the policies, and new pages. */
+  'page.manage',
+  /** The contact-form inbox: read, reply, resolve. */
+  'contact.manage',
   'media.moderate',
   /** Orders, payments and customers' payment history. */
   'billing.read',
@@ -108,8 +112,8 @@ export const EVENT_ROLE_PERMISSIONS: Record<EventRole, readonly EventPermission[
 
 export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, readonly PlatformPermission[]> = {
   USER: [],
-  SUPPORT: ['admin.read', 'billing.read', 'media.moderate'],
-  CONTENT_MANAGER: ['admin.read', 'template.manage', 'asset.manage', 'content.manage', 'media.moderate'],
+  SUPPORT: ['admin.read', 'billing.read', 'media.moderate', 'contact.manage'],
+  CONTENT_MANAGER: ['admin.read', 'template.manage', 'asset.manage', 'content.manage', 'page.manage', 'media.moderate'],
   FINANCE_MANAGER: ['admin.read', 'billing.read', 'payment.refund', 'pricing.manage'],
   PLATFORM_ADMIN: PLATFORM_PERMISSIONS.filter((p) => !SUPER_ONLY.includes(p)),
   SUPER_ADMIN: PLATFORM_PERMISSIONS,

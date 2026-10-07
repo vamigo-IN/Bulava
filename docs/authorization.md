@@ -41,7 +41,9 @@ Staff access to the admin console is a separate system: `User.platformRole` maps
 | `admin.read`: open the console, look up accounts and events | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `billing.read`: payments, revenue, payment history | ✓ | | ✓ | ✓ | ✓ |
 | `media.moderate` | ✓ | ✓ | | ✓ | ✓ |
-| `template.manage`, `asset.manage`, `content.manage` | | ✓ | | ✓ | ✓ |
+| `contact.manage`: the contact-form inbox (read, reply, resolve) | ✓ | | | ✓ | ✓ |
+| `template.manage`, `asset.manage`, `content.manage` (testimonials) | | ✓ | | ✓ | ✓ |
+| `page.manage`: site pages (About, Contact, policies, new pages) | | ✓ | | ✓ | ✓ |
 | `pricing.manage`, `payment.refund` | | | ✓ | ✓ | ✓ |
 | `user.manage`: suspend customers, sign them out | | | | ✓ | ✓ |
 | `plan.grant`: complimentary upgrades | | | | | ✓ |

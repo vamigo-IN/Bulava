@@ -34,7 +34,7 @@
 | Public registration: consent recorded, duplicates refused, no link handed out for existing guests, row-locked capacity, per-IP rate limit | `RegistrationsService` |
 | Licensed content only: assets and music need licences allowing commercial on-demand use before approval or playback | admin service, render context |
 | Audit log for sign-in events, event/function/guest/access changes, invitations, RSVPs, registrations, payments, admin actions, lifecycle and purges | `AuditService` |
-| Privacy: consent records, personal data export, account deletion (anonymization), event deletion with retention purge | users controller, worker lifecycle |
+| Privacy: consent records with the policy version (sign-up, Google sign-up, each purchase; boxes never pre-ticked), personal data export, account deletion with a 30-day restore window (password or a typed DELETE to request it, a one-use token to restore it) and erasure by the worker afterwards, event deletion with retention purge | `ConsentService`, `AccountService`, worker lifecycle |
 | Production config refuses dev secrets, insecure cookies and disabled rate limits | `config/env.ts` |
 | Containers run as non-root with dropped capabilities and `no-new-privileges`; API and Alpine workers use read-only filesystems; Postgres and Redis are never published | Dockerfiles, `docker-compose.prod.yml` |
 | Supply chain: `pnpm audit`, gitleaks secret scan and Trivy image scan in CI; `pnpm audit --prod` reports no known vulnerabilities at 1.0.0, with patched transitive versions pinned in the root `pnpm.overrides` where a direct dependency lags (for example `js-yaml` 5.x under `@nestjs/swagger`). Images carry runtime code only: Next's file tracing skips rspack (`outputFileTracingExcludes`), the video worker's Remotion bundler is a dev dependency, and the video worker applies Debian's security updates at build time | `.github/workflows/ci.yml`, `package.json`, `infrastructure/docker/` |
@@ -49,7 +49,8 @@
 - Uploaded SVG design assets are only ever displayed with `<img>` (scripts do not run there), but they are not sanitized; keep asset uploads limited to trusted staff. The same holds for an SVG logo or favicon.
 - Header and footer code saved in the console runs with full script rights on marketing pages (within the hosts the CSP allows). Only the Super Admin can save it; paste code only from trusted providers.
 - Integration keys are encrypted with `TOKEN_ENCRYPTION_KEY`, like invitation links. Rotating that key means entering them again in the console.
-- The legal texts (privacy policy, terms) need review by counsel before launch (spec §84).
+- The legal pages (privacy, terms, refunds, shipping, cookies, account deletion, grievance redressal) are written for the DPDP Act and Rules, the IT Act with the SPDI and Intermediary Rules, and the Consumer Protection (E-Commerce) Rules, but still need review by counsel before launch (spec §84). Their company details (legal name, address, grievance officer) come from the settings and must be filled in.
+- Users who signed up before consent was recorded have no consent rows; they are not asked again.
 
 ## Reporting
 

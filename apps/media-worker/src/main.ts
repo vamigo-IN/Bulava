@@ -12,6 +12,9 @@ import { processMediaItem } from './processor';
 async function main(): Promise<void> {
   const log = pino({ name: 'bulava-media-worker', level: process.env.LOG_LEVEL ?? 'info' });
   initSentry('media-worker');
+  // A promise nobody awaited must not stop the worker (Node's default): it is logged instead,
+  // and Sentry (when set up) reports it through its own handler.
+  process.on('unhandledRejection', (reason) => log.error({ err: reason }, 'Unhandled promise rejection'));
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) throw new Error('REDIS_URL is required');
 

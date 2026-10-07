@@ -32,6 +32,12 @@ export class PaymentsController {
     return this.payments.listForEvent(access);
   }
 
+  /** Payment history for the dashboard: the signed-in user's own orders. */
+  @Get('orders')
+  myOrders(@CurrentUser() user: AuthUser) {
+    return this.payments.listForUser(user);
+  }
+
   /** Yearly plans (Studio) belong to the user, not an event. */
   @Post('orders')
   @ApiZodBody(CreateOrderSchema)
@@ -44,6 +50,21 @@ export class PaymentsController {
   @ApiZodBody(VerifyPaymentSchema)
   verify(@CurrentUser() user: AuthUser, @Param('orderId', ParseIdPipe) orderId: string, @ZodBody(VerifyPaymentSchema) body: VerifyPaymentInput) {
     return this.payments.verifyCheckout(user, orderId, body);
+  }
+
+  /** The payment status page (the buyer's own orders only); polled while a payment is being confirmed. */
+  @Get('orders/:orderId')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  status(@CurrentUser() user: AuthUser, @Param('orderId', ParseIdPipe) orderId: string) {
+    return this.payments.orderStatus(user, orderId);
+  }
+
+  /** Reopens checkout for an order that failed or was never completed (same gateway order, no double charge). */
+  @Post('orders/:orderId/checkout')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  resume(@CurrentUser() user: AuthUser, @Param('orderId', ParseIdPipe) orderId: string, @ReqMeta() meta: RequestMeta) {
+    return this.payments.resumeCheckout(user, orderId, meta);
   }
 
   /** Razorpay calls this server-to-server; authenticity comes from the HMAC signature. */

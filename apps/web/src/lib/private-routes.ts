@@ -8,3 +8,15 @@ const PRIVATE_PREFIXES = ['/dashboard', '/login', '/signup', '/invite', '/p', '/
 export function isPrivatePath(pathname: string): boolean {
   return PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
+
+/**
+ * Public pages where people type personal details (the contact form). They stay
+ * pre-rendered with the marketing CSP, but third-party trackers never load
+ * there: some read form fields (Meta Pixel's automatic matching, session replays).
+ */
+const FORM_PATHS = ['/contact'];
+
+/** Private pages and public forms: no trackers or custom code. */
+export function isTrackerFreePath(pathname: string): boolean {
+  return isPrivatePath(pathname) || FORM_PATHS.includes(pathname);
+}

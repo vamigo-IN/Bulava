@@ -8,6 +8,8 @@ import { RedisService } from '../../infrastructure/redis/redis.service';
 import { AppError, type ErrorCode } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import { AuditService } from '../audit/audit.service';
+import { AccountService } from '../users/account.service';
+import { ConsentService } from '../users/consent.service';
 import { MfaService } from './mfa.service';
 import { SessionService, type IssuedSession } from './session.service';
 
@@ -24,6 +26,8 @@ interface Flow {
   mode: Mode;
   /** The signed-in user linking Google (link mode only). */
   userId?: string;
+  /** Started from the sign-up page with the Terms and Privacy box ticked: a new account may be created. */
+  consented?: boolean;
 }
 
 interface GoogleClaims extends JWTPayload {
@@ -37,6 +41,7 @@ export type GoogleCallbackResult =
   | { kind: 'session'; session: IssuedSession; redirect: string }
   | { kind: 'mfa'; redirect: string }
   | { kind: 'linked'; redirect: string }
+  | { kind: 'restore'; redirect: string }
   | { kind: 'error'; code: ErrorCode | 'GOOGLE_CANCELLED'; redirect: string };
 
 /** Same-site relative paths only, so the flow can never be turned into an open redirect. */
@@ -70,6 +75,8 @@ export class GoogleAuthService {
     private readonly sessions: SessionService,
     private readonly mfa: MfaService,
     private readonly audit: AuditService,
+    private readonly consents: ConsentService,
+    private readonly account: AccountService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -90,7 +97,7 @@ export class GoogleAuthService {
   }
 
   /** Builds Google's consent URL and remembers the flow. Returns the state for the browser cookie. */
-  async start(input: { next?: string | null; mode: Mode; userId?: string }): Promise<{ url: string; state: string }> {
+  async start(input: { next?: string | null; mode: Mode; userId?: string; consented?: boolean }): Promise<{ url: string; state: string }> {
     if (!this.enabled) throw new AppError('GOOGLE_UNAVAILABLE', 'Google sign-in is not configured.');
     const state = generateSecureToken();
     const flow: Flow = {
@@ -99,6 +106,7 @@ export class GoogleAuthService {
       next: safeNext(input.next, input.mode === 'link' ? '/dashboard/account' : '/dashboard'),
       mode: input.mode,
       userId: input.userId,
+      consented: input.consented === true,
     };
     await this.redis.client.set(this.flowKey(state), JSON.stringify(flow), 'EX', FLOW_TTL_SECONDS);
     const url = new URL(this.config.GOOGLE_AUTH_URL);
@@ -165,12 +173,26 @@ export class GoogleAuthService {
         }
         user = await this.prisma.user.update({ where: { id: existing.id }, data: { googleSub: sub } });
       } else {
-        user = await this.prisma.user.create({
-          data: { email, name: (claims.name?.trim() || email.split('@')[0]!).slice(0, 120), googleSub: sub, emailVerifiedAt: new Date() },
+        // A new account needs the sign-up page's ticked box; from the sign-in page, send them there first.
+        if (!flow.consented) return { kind: 'error', code: 'CONSENT_REQUIRED', redirect: this.web('/signup?error=CONSENT_REQUIRED') };
+        const versions = await this.consents.versions(['terms', 'privacy']);
+        user = await this.prisma.$transaction(async (tx) => {
+          const createdUser = await tx.user.create({
+            data: { email, name: (claims.name?.trim() || email.split('@')[0]!).slice(0, 120), googleSub: sub, emailVerifiedAt: new Date() },
+          });
+          await this.consents.recordSignup(tx, createdUser.id, versions, 'signup_google');
+          await this.audit.record({ actorType: 'USER', actorId: createdUser.id, action: 'user.signup', targetType: 'User', targetId: createdUser.id, metadata: { method: 'google' }, meta }, tx);
+          return createdUser;
         });
         created = true;
-        await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'user.signup', targetType: 'User', targetId: user.id, metadata: { method: 'google' }, meta });
       }
+    }
+    // An account waiting to be deleted: Google proved it is the owner, so offer to restore it.
+    if (AccountService.restorable(user)) {
+      const token = await this.account.restoreToken(user.id);
+      await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'user.restore_offered', targetType: 'User', targetId: user.id, metadata: { method: 'google' }, meta });
+      // The token travels in the fragment: never sent to servers or logged.
+      return { kind: 'restore', redirect: this.web(`/login#restore=${token}&until=${encodeURIComponent(user.deletionScheduledAt!.toISOString())}`) };
     }
     if (user.status !== 'ACTIVE' || user.deletedAt) return fail('GOOGLE_FAILED', 'signin', 'account not active');
 

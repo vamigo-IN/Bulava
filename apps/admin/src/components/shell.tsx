@@ -7,7 +7,9 @@ import {
   Blocks,
   CodeXml,
   FileClock,
+  FileText,
   Image as ImageIcon,
+  Inbox,
   LayoutDashboard,
   LayoutTemplate,
   LogOut,
@@ -39,6 +41,8 @@ interface NavItem {
   label: AdminMessageKey;
   icon: LucideIcon;
   permission: PlatformPermission;
+  /** Shows the number of new contact-form messages. */
+  badge?: 'contact';
 }
 
 const NAV: Array<{ group: AdminMessageKey | null; items: NavItem[] }> = [
@@ -60,6 +64,10 @@ const NAV: Array<{ group: AdminMessageKey | null; items: NavItem[] }> = [
     ],
   },
   {
+    group: 'nav.group.support',
+    items: [{ href: '/messages', label: 'nav.messages', icon: Inbox, permission: 'contact.manage', badge: 'contact' }],
+  },
+  {
     group: 'nav.group.people',
     items: [
       { href: '/users', label: 'nav.users', icon: Users, permission: 'admin.read' },
@@ -71,6 +79,7 @@ const NAV: Array<{ group: AdminMessageKey | null; items: NavItem[] }> = [
   {
     group: 'nav.group.website',
     items: [
+      { href: '/pages', label: 'nav.pages', icon: FileText, permission: 'page.manage' },
       { href: '/settings', label: 'nav.siteBranding', icon: Palette, permission: 'settings.manage' },
       { href: '/settings/seo', label: 'nav.siteSeo', icon: Search, permission: 'settings.manage' },
       { href: '/settings/code', label: 'nav.siteCode', icon: CodeXml, permission: 'settings.manage' },
@@ -186,6 +195,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                   >
                     <item.icon className="size-4 shrink-0" aria-hidden />
                     {t(item.label)}
+                    {item.badge === 'contact' ? <NewMessagesBadge /> : null}
                   </Link>
                 </li>
               ))}
@@ -237,6 +247,18 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       </div>
     </MeContext.Provider>
+  );
+}
+
+/** New contact-form messages, refreshed every minute (only rendered for staff who can see them). */
+function NewMessagesBadge() {
+  const counts = useQuery({ queryKey: ['admin', 'contact', 'counts'], queryFn: () => apiGet<Record<string, number>>('/admin/contact-messages/counts'), refetchInterval: 60_000 });
+  const n = counts.data?.NEW ?? 0;
+  if (!n) return null;
+  return (
+    <span className="ml-auto rounded-full bg-gold-300 px-1.5 py-px text-[0.65rem] font-bold text-brand-900 tabular-nums" aria-label={t('nav.newMessages', { count: n })}>
+      {n > 99 ? '99+' : n}
+    </span>
   );
 }
 

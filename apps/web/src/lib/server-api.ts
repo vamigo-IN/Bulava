@@ -1,4 +1,5 @@
 import type { TemplateDefinition } from '@bulava/template-schema';
+import type { PublicSitePage, PublicSitePageLink } from '@bulava/validation';
 
 const API = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
 
@@ -24,6 +25,34 @@ export async function serverApi<T>(path: string, options: { revalidate?: number 
   } catch {
     return null;
   }
+}
+
+/** Published site pages for the footer and sitemap; the built-in ones while the API can't be reached (and at build time). */
+export const FALLBACK_SITE_PAGES: PublicSitePageLink[] = [
+  { slug: 'about', title: 'About Bulava', footerGroup: 'COMPANY', sortOrder: 0, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'contact', title: 'Contact us', footerGroup: 'COMPANY', sortOrder: 1, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'privacy', title: 'Privacy policy', footerGroup: 'LEGAL', sortOrder: 0, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'terms', title: 'Terms of service', footerGroup: 'LEGAL', sortOrder: 1, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'refund', title: 'Refund and cancellation policy', footerGroup: 'LEGAL', sortOrder: 2, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'shipping', title: 'Shipping and delivery policy', footerGroup: 'LEGAL', sortOrder: 3, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'cookies', title: 'Cookie policy', footerGroup: 'LEGAL', sortOrder: 4, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'account-deletion', title: 'Account deletion policy', footerGroup: 'LEGAL', sortOrder: 5, updatedAt: '2026-10-07T00:00:00.000Z' },
+  { slug: 'grievance-redressal', title: 'Grievance redressal', footerGroup: 'LEGAL', sortOrder: 6, updatedAt: '2026-10-07T00:00:00.000Z' },
+];
+
+export const getSitePages = () => serverApi<PublicSitePageLink[]>('/public/pages', { revalidate: 60 }).then((p) => (p?.length ? p : FALLBACK_SITE_PAGES));
+
+/**
+ * One published page. Unlike `serverApi`, an unreachable API throws instead of
+ * reading as "not found", so a regeneration that fails keeps the last good
+ * page rather than caching a 404 for a policy page.
+ */
+export async function getSitePage(slug: string): Promise<PublicSitePage | null> {
+  const res = await fetch(`${API}/api/v1/public/pages/${encodeURIComponent(slug)}`, { headers: { accept: 'application/json' }, next: { revalidate: 60 } });
+  if (res.status === 404) return null;
+  const body = (await res.json().catch(() => null)) as { success: boolean; data: PublicSitePage } | null;
+  if (!res.ok || !body?.success) throw new Error(`Site page ${slug}: API answered ${res.status}`);
+  return body.data;
 }
 
 export interface TemplateSummary {
