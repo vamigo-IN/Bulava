@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { generateSecureToken, hashToken } from '@bulava/auth';
+import { SettingsStore } from '@bulava/settings';
+import { googleReady } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
@@ -10,6 +12,8 @@ import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import { AuditService } from '../audit/audit.service';
 import { AccountService } from '../users/account.service';
 import { ConsentService } from '../users/consent.service';
+import { SETTINGS_STORE } from '../settings/settings.service';
+import { googleRedirectUri } from './google-redirect';
 import { MfaService } from './mfa.service';
 import { SessionService, type IssuedSession } from './session.service';
 
@@ -28,6 +32,12 @@ interface Flow {
   userId?: string;
   /** Started from the sign-up page with the Terms and Privacy box ticked: a new account may be created. */
   consented?: boolean;
+}
+
+/** The OAuth web client from Google Cloud. */
+interface GoogleClient {
+  clientId: string;
+  clientSecret: string;
 }
 
 interface GoogleClaims extends JWTPayload {
@@ -63,6 +73,10 @@ const base64url = (b: Buffer) => b.toString('base64url');
  * - An existing password account is never merged silently: Bulava does not
  *   verify emails at sign-up, so the owner links Google while signed in.
  * - Accounts with two-step sign-in still need their second factor.
+ *
+ * The OAuth client comes from the Super Admin's settings (Integrations →
+ * Google sign-in), or from GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET until those
+ * are first saved, so it can be set up or changed without a restart.
  */
 @Injectable()
 export class GoogleAuthService {
@@ -77,11 +91,20 @@ export class GoogleAuthService {
     private readonly audit: AuditService,
     private readonly consents: ConsentService,
     private readonly account: AccountService,
+    @Inject(SETTINGS_STORE) private readonly settings: SettingsStore,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  get enabled(): boolean {
-    return Boolean(this.config.GOOGLE_CLIENT_ID && this.config.GOOGLE_CLIENT_SECRET);
+  /** The configured client; null while Google sign-in is off or incomplete. */
+  private async client(): Promise<GoogleClient | null> {
+    const s = await this.settings.get('google');
+    if (!googleReady(s.value, s.secrets)) return null;
+    return { clientId: s.value.clientId!, clientSecret: s.secrets.clientSecret! };
+  }
+
+  /** Whether the sign-in and sign-up pages offer "Continue with Google". */
+  async enabled(): Promise<boolean> {
+    return (await this.client()) !== null;
   }
 
   private web(path: string): string {
@@ -89,7 +112,7 @@ export class GoogleAuthService {
   }
 
   private redirectUri(): string {
-    return this.config.GOOGLE_REDIRECT_URI ?? this.web('/api/v1/auth/google/callback');
+    return googleRedirectUri(this.config);
   }
 
   private flowKey(state: string): string {
@@ -98,12 +121,13 @@ export class GoogleAuthService {
 
   /** Builds Google's consent URL and remembers the flow. Returns the state for the browser cookie. */
   async start(input: { next?: string | null; mode: Mode; userId?: string; consented?: boolean }): Promise<{ url: string; state: string }> {
-    if (!this.enabled) throw new AppError('GOOGLE_UNAVAILABLE', 'Google sign-in is not configured.');
+    const client = await this.client();
+    if (!client) throw new AppError('GOOGLE_UNAVAILABLE', 'Google sign-in is not configured.');
     const state = generateSecureToken();
     const flow: Flow = {
       verifier: generateSecureToken(48),
       nonce: generateSecureToken(),
-      next: safeNext(input.next, input.mode === 'link' ? '/dashboard/account' : '/dashboard'),
+      next: safeNext(input.next, input.mode === 'link' ? '/dashboard/account/security' : '/dashboard'),
       mode: input.mode,
       userId: input.userId,
       consented: input.consented === true,
@@ -111,7 +135,7 @@ export class GoogleAuthService {
     await this.redis.client.set(this.flowKey(state), JSON.stringify(flow), 'EX', FLOW_TTL_SECONDS);
     const url = new URL(this.config.GOOGLE_AUTH_URL);
     url.search = new URLSearchParams({
-      client_id: this.config.GOOGLE_CLIENT_ID!,
+      client_id: client.clientId,
       redirect_uri: this.redirectUri(),
       response_type: 'code',
       scope: 'openid email profile',
@@ -127,9 +151,10 @@ export class GoogleAuthService {
   async callback(query: { code?: string; state?: string; error?: string }, cookieState: string | undefined, meta: RequestMeta): Promise<GoogleCallbackResult> {
     const fail = (code: ErrorCode | 'GOOGLE_CANCELLED', mode: Mode = 'signin', reason?: string): GoogleCallbackResult => {
       if (reason) this.logger.warn({ reason }, 'Google sign-in failed');
-      return { kind: 'error', code, redirect: mode === 'link' ? this.web(`/dashboard/account?google=${code}`) : this.web(`/login?error=${code}`) };
+      return { kind: 'error', code, redirect: mode === 'link' ? this.web(`/dashboard/account/security?google=${code}`) : this.web(`/login?error=${code}`) };
     };
-    if (!this.enabled) return fail('GOOGLE_UNAVAILABLE');
+    const client = await this.client();
+    if (!client) return fail('GOOGLE_UNAVAILABLE');
     if (!query.state || !cookieState || query.state !== cookieState) return fail('GOOGLE_FAILED', 'signin', 'state mismatch');
     // Single use: a replayed callback finds nothing.
     const raw = await this.redis.client.getdel(this.flowKey(query.state));
@@ -140,7 +165,7 @@ export class GoogleAuthService {
 
     let claims: GoogleClaims;
     try {
-      claims = await this.exchange(query.code, flow);
+      claims = await this.exchange(query.code, flow, client);
     } catch (error) {
       await this.audit.record({ actorType: 'ANONYMOUS', action: 'user.google_signin', targetType: 'User', result: 'FAILURE', metadata: { reason: 'TOKEN_REJECTED' }, meta });
       return fail('GOOGLE_FAILED', flow.mode, (error as Error).message);
@@ -219,14 +244,14 @@ export class GoogleAuthService {
   }
 
   /** Code → tokens (PKCE) → verified ID token claims. */
-  private async exchange(code: string, flow: Flow): Promise<GoogleClaims> {
+  private async exchange(code: string, flow: Flow, client: GoogleClient): Promise<GoogleClaims> {
     const res = await fetch(this.config.GOOGLE_TOKEN_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
       body: new URLSearchParams({
         code,
-        client_id: this.config.GOOGLE_CLIENT_ID!,
-        client_secret: this.config.GOOGLE_CLIENT_SECRET!,
+        client_id: client.clientId,
+        client_secret: client.clientSecret,
         redirect_uri: this.redirectUri(),
         grant_type: 'authorization_code',
         code_verifier: flow.verifier,
@@ -240,7 +265,7 @@ export class GoogleAuthService {
     const issuer = this.config.GOOGLE_ISSUER;
     const { payload } = await jwtVerify<GoogleClaims>(body.id_token, this.jwks, {
       issuer: [issuer, issuer.replace(/^https:\/\//, '')],
-      audience: this.config.GOOGLE_CLIENT_ID!,
+      audience: client.clientId,
       clockTolerance: 60,
     });
     if (payload.nonce !== flow.nonce) throw new Error('nonce mismatch');

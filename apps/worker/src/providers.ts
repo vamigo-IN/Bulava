@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { CloudflareSaasProvider, ManualHostnameProvider, type HostnameProvider, type RoutingTarget } from '@bulava/domains';
-import type { ResolvedSetting, SettingsStore } from '@bulava/settings';
+import { WHATSAPP_DELIVERY_TAG, whatsappReady, type ResolvedSetting, type SettingsStore } from '@bulava/settings';
 
 export interface EmailMessage {
   to: string;
@@ -30,9 +30,22 @@ export interface WhatsAppTemplateMessage {
   copyCode?: string;
 }
 
+/** Where a sent message stands, as its provider reports it; `status` null = nothing newer to report. */
+export interface WhatsAppDeliveryState {
+  status: 'sent' | 'delivered' | 'read' | 'failed' | null;
+  error?: string;
+}
+
 export interface WhatsAppProvider {
   readonly name: string;
+  /** Recorded on invitation delivery rows ('getgabs', 'meta'). */
+  readonly tag?: string;
   sendTemplate(message: WhatsAppTemplateMessage): Promise<{ messageId: string }>;
+  /**
+   * Asks for a sent message's delivery state. Only providers that report it on
+   * request have this (GetGabs); Meta pushes statuses to the webhook instead.
+   */
+  deliveryState?(messageId: string): Promise<WhatsAppDeliveryState>;
 }
 
 export interface SmtpOptions {
@@ -99,6 +112,7 @@ export function emailProviderFromSettings(s: ResolvedSetting<'email'>): SmtpEmai
 /** WhatsApp Business messages through Meta's Cloud API (approved templates only). */
 export class MetaWhatsAppProvider implements WhatsAppProvider {
   readonly name = 'META_CLOUD';
+  readonly tag = WHATSAPP_DELIVERY_TAG.META_CLOUD;
 
   constructor(
     private readonly options: { phoneNumberId: string; accessToken: string; apiVersion: string; apiBase?: string },
@@ -151,6 +165,93 @@ export class WhatsAppSendError extends Error {
   }
 }
 
+export const GETGABS_API_BASE = 'https://app.getgabs.com';
+
+const digits = (phone: string) => phone.replace(/[^\d]/g, '');
+
+/** What GetGabs answers: Meta's send response, or `{ status: false, message }` (and sometimes Meta's `error`) when it refuses. */
+interface GetGabsResponse {
+  status?: boolean;
+  messages?: Array<{ id?: string; message_status?: string }>;
+  message?: string | { status?: string; error_message?: string | null };
+  msg?: string;
+  error?: string | { message?: string; code?: number };
+}
+
+/** A refusal as a send error; GetGabs reports some with HTTP 200, which count as client errors unless they ask to slow down. */
+function getGabsError(httpStatus: number, body: GetGabsResponse): WhatsAppSendError {
+  const message =
+    (typeof body.error === 'object' ? body.error?.message : body.error) ??
+    (typeof body.message === 'string' ? body.message : undefined) ??
+    body.msg ??
+    `GetGabs answered HTTP ${httpStatus}`;
+  const code = typeof body.error === 'object' ? body.error?.code : undefined;
+  const status = httpStatus >= 200 && httpStatus < 300 ? (/rate|too many|try again/i.test(message) ? 429 : 400) : httpStatus;
+  return new WhatsAppSendError(message, code, status);
+}
+
+const DELIVERY_STATES = new Set(['sent', 'delivered', 'read', 'failed']);
+
+/**
+ * WhatsApp Business messages through GetGabs (app.getgabs.com), a Meta
+ * business partner: the same approved templates as the Cloud API, sent with
+ * the GetGabs API key from the sender number connected in its panel. GetGabs'
+ * webhook carries incoming chats, not delivery reports, so delivery is read
+ * back per message (see whatsapp-status.ts).
+ */
+export class GetGabsWhatsAppProvider implements WhatsAppProvider {
+  readonly name = 'GETGABS';
+  readonly tag = WHATSAPP_DELIVERY_TAG.GETGABS;
+
+  constructor(
+    private readonly options: { apiKey: string; senderNumber: string; campaignId?: string; apiBase?: string },
+    private readonly http: typeof fetch = fetch,
+  ) {}
+
+  private async post(path: string, payload: object): Promise<{ res: Response; body: GetGabsResponse }> {
+    const base = (this.options.apiBase || GETGABS_API_BASE).replace(/\/$/, '');
+    const res = await this.http(`${base}${path}`, {
+      method: 'POST',
+      // The key travels in the body: that is how GetGabs authenticates its messaging API.
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ api_key: this.options.apiKey, ...payload }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    return { res, body: (await res.json().catch(() => ({}))) as GetGabsResponse };
+  }
+
+  async sendTemplate(message: WhatsAppTemplateMessage): Promise<{ messageId: string }> {
+    // Component casing as in GetGabs' documentation.
+    const components = [
+      ...(message.params.length ? [{ type: 'BODY', parameters: message.params.map((text) => ({ type: 'text', text })) }] : []),
+      // Authentication templates carry the code again on their copy-code (URL) button.
+      ...(message.copyCode ? [{ type: 'button', sub_type: 'URL', index: 0, parameters: [{ type: 'text', text: message.copyCode }] }] : []),
+    ];
+    const { res, body } = await this.post('/whatsappbusiness/send-templated-message', {
+      sender: digits(this.options.senderNumber),
+      campaign_id: this.options.campaignId ?? '',
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: digits(message.to),
+      type: 'template',
+      template: { name: message.template, language: { code: message.language }, ...(components.length ? { components } : {}) },
+    });
+    if (!res.ok || body.status === false || body.error) throw getGabsError(res.status, body);
+    return { messageId: body.messages?.[0]?.id ?? '' };
+  }
+
+  async deliveryState(messageId: string): Promise<WhatsAppDeliveryState> {
+    const { res, body } = await this.post('/whatsappbusiness/getmessgageinfobyid', { message_id: messageId });
+    if (!res.ok || body.status === false) throw getGabsError(res.status, body);
+    const info = typeof body.message === 'object' && body.message ? body.message : {};
+    const status = String(info.status ?? '').toLowerCase();
+    return {
+      status: DELIVERY_STATES.has(status) ? (status as WhatsAppDeliveryState['status']) : null,
+      ...(info.error_message ? { error: String(info.error_message).slice(0, 500) } : {}),
+    };
+  }
+}
+
 export interface WhatsAppChannel {
   provider: WhatsAppProvider;
   /** Approved template names by purpose; a missing one keeps that message off WhatsApp. */
@@ -158,15 +259,15 @@ export interface WhatsAppChannel {
   language: string;
 }
 
-export function whatsappFromSettings(s: ResolvedSetting<'whatsapp'>, apiBase?: string): WhatsAppChannel | null {
+/** The provider the settings choose, or null while WhatsApp is off or incomplete. `bases` point the APIs elsewhere (tests). */
+export function whatsappFromSettings(s: ResolvedSetting<'whatsapp'>, bases: { meta?: string; getgabs?: string } = {}): WhatsAppChannel | null {
   const v = s.value;
-  const token = s.secrets.accessToken;
-  if (!v.enabled || !v.phoneNumberId || !token) return null;
-  return {
-    provider: new MetaWhatsAppProvider({ phoneNumberId: v.phoneNumberId, accessToken: token, apiVersion: v.apiVersion, apiBase }),
-    templates: v.templates,
-    language: v.templateLanguage,
-  };
+  if (!whatsappReady(v, s.secrets)) return null;
+  const provider =
+    v.provider === 'GETGABS'
+      ? new GetGabsWhatsAppProvider({ apiKey: s.secrets.apiKey!, senderNumber: v.senderNumber!, campaignId: v.campaignId, apiBase: bases.getgabs })
+      : new MetaWhatsAppProvider({ phoneNumberId: v.phoneNumberId!, accessToken: s.secrets.accessToken!, apiVersion: v.apiVersion, apiBase: bases.meta });
+  return { provider, templates: v.templates, language: v.templateLanguage };
 }
 
 export interface DomainRouting {
@@ -188,7 +289,7 @@ export class SettingsProviders {
 
   constructor(
     private readonly store: SettingsStore,
-    private readonly options: { webHost: string; whatsappApiBase?: string; cloudflareApiBase?: string },
+    private readonly options: { webHost: string; whatsappApiBase?: string; getgabsApiBase?: string; cloudflareApiBase?: string },
   ) {}
 
   async email(): Promise<EmailProvider | null> {
@@ -204,7 +305,9 @@ export class SettingsProviders {
   async whatsapp(): Promise<WhatsAppChannel | null> {
     const s = await this.store.get('whatsapp');
     const key = fingerprint(s.value, s.secrets);
-    if (this.whatsappCache?.key !== key) this.whatsappCache = { key, channel: whatsappFromSettings(s, this.options.whatsappApiBase) };
+    if (this.whatsappCache?.key !== key) {
+      this.whatsappCache = { key, channel: whatsappFromSettings(s, { meta: this.options.whatsappApiBase, getgabs: this.options.getgabsApiBase }) };
+    }
     return this.whatsappCache.channel;
   }
 

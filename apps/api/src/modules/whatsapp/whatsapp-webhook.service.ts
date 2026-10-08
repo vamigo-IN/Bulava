@@ -1,27 +1,60 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { DeliveryStatus } from '@bulava/database';
+import { recordWhatsAppDelivery } from '@bulava/database';
 import { SettingsStore } from '@bulava/settings';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import { SETTINGS_STORE } from '../settings/settings.service';
 
+/** A WhatsApp message id ("wamid."), as Meta and GetGabs report them. */
+const WAMID = /^wamid\.[A-Za-z0-9+/=_-]{8,300}$/;
+
+/** Compares secrets in constant time, whatever their lengths. */
+function sameSecret(given: string, expected: string): boolean {
+  const digest = (v: string) => createHash('sha256').update(v.trim()).digest();
+  return timingSafeEqual(digest(given), digest(expected));
+}
+
+/** GetGabs nests some details as JSON inside a string field. */
+function parseJson(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'string' || !value.trimStart().startsWith('{')) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The messages an incoming GetGabs chat answers: a tapped button, a quoted reply, a form opened from a message. */
+export function repliedTo(event: GetGabsWebhookEvent): string[] {
+  const context = parseJson(event.message_text)?.context;
+  const ids = [
+    event.targeted_message_id,
+    event.targetedMsgId,
+    parseJson(event.replyformsg)?.message_id,
+    typeof context === 'object' && context !== null ? (context as { id?: unknown }).id : undefined,
+  ];
+  return [...new Set(ids.filter((id): id is string => typeof id === 'string' && WAMID.test(id)))];
+}
+
 /**
- * WhatsApp Business Cloud API webhook service.
- * Follows Meta's Webhooks Overview specifications:
- * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview/
+ * Webhooks from the WhatsApp providers (Integrations → WhatsApp Business).
  *
- * 1. Verification Handshake (GET):
- *    Meta sends `hub.mode=subscribe`, `hub.verify_token`, and `hub.challenge`.
- *    We verify the token matches the stored `webhookVerifyToken` and return the
- *    challenge string as plain text with HTTP 200.
+ * Meta's Cloud API (`/whatsapp/webhook`, see
+ * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview/):
+ * a verification handshake (GET, answered with `hub.challenge` when the verify
+ * token matches) and signed deliveries (POST, HMAC-SHA256 of the raw body with
+ * the app secret in `X-Hub-Signature-256`) carrying message statuses.
  *
- * 2. Event Notifications (POST):
- *    Meta sends event payloads with an `X-Hub-Signature-256` header.
- *    We verify authenticity using HMAC-SHA256 over the raw request body with
- *    the Meta `appSecret`.
- *    Events processed: message status updates (sent, delivered, read, failed),
- *    which update `InvitationDelivery` delivery records.
+ * GetGabs (`/whatsapp/getgabs?token=…`, its "Webhook URL for All Chats"):
+ * incoming chats. GetGabs does not sign them, so the URL carries a secret
+ * token. A reply to an invitation (a quick-reply button, a quoted reply)
+ * proves it was read; GetGabs reports delivery itself only on request, which
+ * the worker asks for.
+ *
+ * Every report goes through `recordWhatsAppDelivery`, which only moves an
+ * invitation's delivery forward (reports can arrive out of order).
  */
 @Injectable()
 export class WhatsAppWebhookService {
@@ -33,35 +66,24 @@ export class WhatsAppWebhookService {
   ) {}
 
   /**
-   * Meta verification handshake (GET).
-   *
-   * Meta sends: `hub.mode=subscribe`, `hub.verify_token=<token>`, `hub.challenge=<challenge>`.
-   * We verify the token matches our stored `webhookVerifyToken` and return the
-   * challenge string to prove endpoint ownership.
+   * Meta verification handshake (GET): `hub.mode=subscribe`, `hub.verify_token`
+   * and `hub.challenge`; the challenge goes back when the token matches the
+   * stored `webhookVerifyToken`, proving the endpoint is ours.
    */
   async verifyChallenge(mode: string | undefined, token: string | undefined, challenge: string | undefined): Promise<string> {
     if (mode !== 'subscribe' || !token || !challenge) {
       throw new AppError('BAD_REQUEST', 'Invalid webhook verification request.');
     }
-    const s = await this.settings.get('whatsapp');
-    const secrets = s.secrets as Record<string, string | undefined>;
-    const verifyToken = secrets.webhookVerifyToken;
-    if (!verifyToken || token.trim() !== verifyToken.trim()) {
+    const verifyToken = (await this.settings.get('whatsapp')).secrets.webhookVerifyToken;
+    if (!verifyToken || !sameSecret(token, verifyToken)) {
       throw new AppError('FORBIDDEN', 'Webhook verify token mismatch.');
     }
     return challenge;
   }
 
-  /**
-   * Meta webhook event (POST).
-   *
-   * Authenticity comes from HMAC-SHA256(`rawBody`, appSecret) compared to
-   * the `X-Hub-Signature-256` header (after stripping the `sha256=` prefix).
-   */
+  /** Meta event delivery (POST), authenticated by HMAC-SHA256(raw body, app secret) against `X-Hub-Signature-256`. */
   async handleWebhook(rawBody: Buffer | undefined, signature: string | undefined): Promise<{ ok: true }> {
-    const s = await this.settings.get('whatsapp');
-    const secrets = s.secrets as Record<string, string | undefined>;
-    const appSecret = secrets.appSecret;
+    const appSecret = (await this.settings.get('whatsapp')).secrets.appSecret;
     if (!rawBody || !signature || !appSecret) {
       throw new AppError('FORBIDDEN', 'Invalid webhook signature.');
     }
@@ -82,60 +104,42 @@ export class WhatsAppWebhookService {
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
         if (change.field !== 'messages') continue;
-        await this.processStatuses(change.value?.statuses ?? []);
+        for (const status of change.value?.statuses ?? []) {
+          if (!status.id || !status.status) continue;
+          // Meta's wamid is the message id the worker stored when it sent the invitation.
+          await recordWhatsAppDelivery(this.prisma, { providerMessageId: status.id }, status.status, status.errors?.[0]?.title ?? null);
+        }
       }
     }
 
     return { ok: true };
   }
 
-  /**
-   * Process message status updates: update invitation delivery records
-   * so the dashboard can show whether a WhatsApp invitation was delivered or read.
-   */
-  private async processStatuses(statuses: WhatsAppStatus[]) {
-    for (const status of statuses) {
-      if (!status.id || !status.status) continue;
-
-      // Meta's wamid maps to the messageId we stored when the message was sent.
-      const providerMessageId = status.id;
-      const mapped = this.mapStatus(status.status);
-      if (!mapped) continue;
-
-      try {
-        await this.prisma.invitationDelivery.updateMany({
-          where: { providerMessageId },
-          data: {
-            status: mapped,
-            ...(status.errors?.[0]?.title ? { error: status.errors[0].title } : {}),
-          },
-        });
-      } catch (error) {
-        // A status for a message we don't know about is fine: Meta retries and
-        // sends statuses for messages we may have sent from other tools.
-        this.logger.debug({ providerMessageId, status: status.status, err: error }, 'WhatsApp status update skipped');
+  /** GetGabs: one incoming chat (or, should GetGabs forward them, a status of a message this number sent). */
+  async handleGetGabs(token: string, body: unknown): Promise<{ ok: true }> {
+    const expected = (await this.settings.get('whatsapp')).secrets.webhookToken;
+    if (!expected || !token || !sameSecret(token, expected)) {
+      throw new AppError('FORBIDDEN', 'Unknown webhook.');
+    }
+    const event = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {}) as GetGabsWebhookEvent;
+    let changed = 0;
+    if (event.direction === 'outbound') {
+      if (typeof event.message_id === 'string' && WAMID.test(event.message_id)) {
+        const report = typeof event.status === 'string' ? event.status : null;
+        changed = await recordWhatsAppDelivery(this.prisma, { providerMessageId: event.message_id }, report, typeof event.error_message === 'string' ? event.error_message : null);
+      }
+    } else {
+      for (const id of repliedTo(event)) {
+        const count = await recordWhatsAppDelivery(this.prisma, { providerMessageId: id }, 'read');
+        changed += count;
       }
     }
-  }
-
-  /** Map Meta's status names to our internal delivery statuses. */
-  private mapStatus(metaStatus: string): DeliveryStatus | null {
-    switch (metaStatus) {
-      case 'sent':
-        return DeliveryStatus.SENT;
-      case 'delivered':
-        return DeliveryStatus.DELIVERED;
-      case 'read':
-        return DeliveryStatus.READ;
-      case 'failed':
-        return DeliveryStatus.FAILED;
-      default:
-        return null;
-    }
+    if (changed) this.logger.debug({ changed }, 'GetGabs webhook updated invitation deliveries');
+    return { ok: true };
   }
 }
 
-// ───── Meta webhook payload types ─────
+// ───── Meta webhook payload ─────
 
 interface WhatsAppWebhookBody {
   object?: string;
@@ -158,4 +162,25 @@ interface WhatsAppStatus {
   timestamp?: string;
   recipient_id?: string;
   errors?: Array<{ code?: number; title?: string }>;
+}
+
+// ───── GetGabs webhook payload (its "All Chats" webhook; every field optional) ─────
+
+export interface GetGabsWebhookEvent {
+  message_id?: unknown;
+  message_text?: unknown;
+  message_type?: unknown;
+  message_sub_type?: unknown;
+  message_from?: unknown;
+  /** inbound (from a customer) or outbound. */
+  direction?: unknown;
+  status?: unknown;
+  error_message?: unknown;
+  /** The message a button reply answers. */
+  targeted_message_id?: unknown;
+  /** JSON: the message a quoted reply answers ({ message_id, … }). */
+  replyformsg?: unknown;
+  /** Forms and flows: the message that opened it. */
+  targetedMsgId?: unknown;
+  timestamp?: unknown;
 }

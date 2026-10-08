@@ -7,7 +7,7 @@ import { z } from 'zod';
  * browser: the console only sees whether each secret is set.
  */
 
-export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'maps', 'domains'] as const;
+export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'google', 'maps', 'domains'] as const;
 export type SettingGroup = (typeof SETTING_GROUPS)[number];
 
 const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
@@ -194,9 +194,25 @@ export const EmailSettingsSchema = z.object({
   replyTo: opt(z.email().max(200)),
 });
 
+/**
+ * Who sends WhatsApp messages: GetGabs (a Meta business partner: an API key,
+ * templates managed in its panel) or Meta's Cloud API directly. Both send the
+ * same approved templates with the same variables.
+ */
+export const WHATSAPP_PROVIDERS = ['GETGABS', 'META_CLOUD'] as const;
+export type WhatsAppProviderName = (typeof WHATSAPP_PROVIDERS)[number];
+/** The `provider` recorded on an invitation's delivery row. */
+export const WHATSAPP_DELIVERY_TAG: Record<WhatsAppProviderName, string> = { GETGABS: 'getgabs', META_CLOUD: 'meta' };
+
 export const WhatsAppSettingsSchema = z.object({
   enabled: z.boolean().default(false),
-  provider: z.literal('META_CLOUD').default('META_CLOUD'),
+  provider: z.enum(WHATSAPP_PROVIDERS).default('GETGABS'),
+  // ── GetGabs ──
+  /** The WhatsApp Business number GetGabs sends from. */
+  senderNumber: opt(e164),
+  /** Optional: a GetGabs campaign, so messages sent through the API show in its reports. */
+  campaignId: opt(z.string().trim().max(64).regex(/^[A-Za-z0-9_-]+$/, 'Letters, numbers, - and _ only')),
+  // ── Meta Cloud API ──
   phoneNumberId: opt(z.string().trim().regex(/^\d{5,20}$/, 'The phone number ID from WhatsApp Manager (digits)')),
   businessAccountId: opt(z.string().trim().regex(/^\d{5,20}$/, 'Digits only')),
   apiVersion: z.string().trim().regex(/^v\d{1,2}\.\d$/, 'Like v21.0').default('v21.0'),
@@ -213,6 +229,33 @@ export const WhatsAppSettingsSchema = z.object({
     .default({}),
   templateLanguage: z.string().trim().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, 'Like en or en_US').default('en'),
 });
+
+/**
+ * Whether WhatsApp can send: switched on, and the chosen provider has its
+ * sender and credentials. `secrets` holds the secret values, or anything
+ * truthy for a secret that is set.
+ */
+export function whatsappReady(value: z.infer<typeof WhatsAppSettingsSchema>, secrets: Partial<Record<(typeof SETTING_SECRETS)['whatsapp'][number], unknown>>): boolean {
+  if (!value.enabled) return false;
+  return value.provider === 'GETGABS' ? Boolean(value.senderNumber && secrets.apiKey) : Boolean(value.phoneNumberId && secrets.accessToken);
+}
+
+/** "Continue with Google": an OAuth web client from Google Cloud. The client secret is a secret of this group. */
+export const GoogleSettingsSchema = z.object({
+  /** Offer the button once the client is set; off hides it without forgetting the client. */
+  enabled: z.boolean().default(true),
+  clientId: opt(
+    z
+      .string()
+      .trim()
+      .regex(/^\d{4,30}-[a-z0-9]{8,64}\.apps\.googleusercontent\.com$/, 'The client ID from Google Cloud, ending in .apps.googleusercontent.com'),
+  ),
+});
+
+/** Whether "Continue with Google" is offered: switched on with a client ID and secret. */
+export function googleReady(value: z.infer<typeof GoogleSettingsSchema>, secrets: Partial<Record<(typeof SETTING_SECRETS)['google'][number], unknown>>): boolean {
+  return Boolean(value.enabled && value.clientId && secrets.clientSecret);
+}
 
 export const MapsSettingsSchema = z.object({
   enabled: z.boolean().default(false),
@@ -236,6 +279,7 @@ export const SETTING_SCHEMAS = {
   payments: PaymentSettingsSchema,
   email: EmailSettingsSchema,
   whatsapp: WhatsAppSettingsSchema,
+  google: GoogleSettingsSchema,
   maps: MapsSettingsSchema,
   domains: DomainSettingsSchema,
 } as const;
@@ -250,7 +294,9 @@ export const SETTING_SECRETS = {
   code: [],
   payments: ['keySecret', 'webhookSecret'],
   email: ['password'],
-  whatsapp: ['accessToken', 'appSecret', 'webhookVerifyToken'],
+  // GetGabs: the API key, and the token in its webhook URL. Meta: the system-user token, the app secret and the webhook verify token.
+  whatsapp: ['apiKey', 'webhookToken', 'accessToken', 'appSecret', 'webhookVerifyToken'],
+  google: ['clientSecret'],
   maps: [],
   domains: ['cloudflareApiToken'],
 } as const satisfies Record<SettingGroup, readonly string[]>;

@@ -14,3 +14,4 @@ export {
   whatsappMessagesUsed,
   type FeatureValue,
 } from './features';
+export { recordWhatsAppDelivery, type WhatsAppDeliveryReport } from './whatsapp-delivery';

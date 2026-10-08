@@ -43,7 +43,7 @@ Emails are localized to the guest's preferred language, falling back to the even
 | Channel | Provider | Status |
 |---|---|---|
 | Email | SMTP via nodemailer, set up in the admin console (Integrations > Email; `SMTP_*` variables until first saved there) | implemented |
-| WhatsApp Business | Meta Cloud API with approved templates (Integrations > WhatsApp) | implemented |
+| WhatsApp Business | GetGabs (default) or Meta's Cloud API, with approved templates (Integrations > WhatsApp Business) | implemented |
 | SMS | provider interface in `apps/worker/src/providers.ts` | not configured; rows are marked `SKIPPED` |
 | Push | — | not started |
 
@@ -53,7 +53,14 @@ Hosts can also share invitations themselves: the dashboard builds WhatsApp links
 
 ## WhatsApp Business
 
-The Super Admin connects the platform's WhatsApp Business number in Integrations: phone number ID, a permanent system-user token (stored encrypted), and the names of two templates approved in WhatsApp Manager, one for invitations and one for reminders. Both templates take the same body variables: `{{1}}` the guest's name, `{{2}}` the event (for function reminders, "function · event"), `{{3}}` the guest's personal invitation link. *Test connection* checks the token and number (with its quality rating) and can send Meta's `hello_world` sample to a phone.
+The Super Admin connects the platform's WhatsApp Business number in Integrations → WhatsApp Business, through one of two providers ([ADR-042](decisions.md)):
+
+- **GetGabs** (the default; [app.getgabs.com](https://app.getgabs.com), a Meta business partner). Its panel connects the number to Meta and holds the templates. Bulava needs the production **API key** (stored encrypted), the **sender number** connected in GetGabs, and optionally a **campaign ID** (GetGabs → Campaign Lists) so Bulava's messages appear in that campaign's report. Messages go to `POST https://app.getgabs.com/whatsappbusiness/send-templated-message`, Meta's template message body with the key, sender and campaign added.
+- **Meta Cloud API** (direct): the phone number ID, a permanent system-user token (stored encrypted) and, for delivery statuses, the app secret and a webhook verify token.
+
+Both send the same templates, approved by Meta (created in GetGabs → Templates, or in WhatsApp Manager) and named in the settings with their language: one for invitations and one for reminders. Both take the same body variables: `{{1}}` the guest's name, `{{2}}` the event (for function reminders, "function · event"), `{{3}}` the guest's personal invitation link.
+
+*Check connection* tests the provider. For GetGabs it opens a session with the API key, then looks up each template named in the settings: it must exist, be approved, be in the language Bulava sends, and have as many variables as Bulava fills (3, or 1 for the sign-in code). For Meta it checks the token and the number, with its quality rating. Given a phone number, it also sends a real message through the worker, exactly as guests get them: the first template set, with sample details.
 
 Two more templates are for hosts rather than guests, and travel through the `whatsapp` queue without a notification row: a **preview link** template (`{{1}}` the host's first name, `{{2}}` the design's name, `{{3}}` the preview link) sent right after the template page's quick start, and a **sign-in code** template of Meta's *Authentication* category with a copy-code button (the six-digit code fills `{{1}}` and the button) for signing in with a WhatsApp number and for proving a number during the quick start. Without them, previews are not sent and hosts sign in with email; nothing else changes ([authentication.md](authentication.md#quick-start-whatsapp-codes-and-provisional-accounts)).
 
@@ -61,7 +68,9 @@ Two more templates are for hosts rather than guests, and travel through the `wha
 - **Sending invitations.** *Send on WhatsApp* on the Invitations page (`POST /events/:id/invitations/whatsapp`) queues one message per guest with a phone number (their event-wide link first), skips anyone messaged in the last 10 minutes, and stops at the allowance (`PLAN_UPGRADE_REQUIRED` on a plan without messages, `PLAN_LIMIT_REACHED` when used up). `GET /events/:id/invitations/channels` tells the page what is available and how much is used.
 - **Reminders.** While a reminder template is set, RSVP and function reminders go on WhatsApp to guests with a phone number, as long as the allowance lasts, and by email to everyone else.
 - **No overspending.** Host sends and the worker's reminder dispatch take the same per-event lock (`lockWhatsAppAllowance`, a transaction-scoped advisory lock) before counting what is left, so two at once cannot spend the same messages.
-- **Failures.** A permanent error from Meta (wrong number, template or token) marks the notification and its delivery `FAILED` with Meta's message, and is not retried or charged. Rate limits and server errors fail the job, so the queue retries it with backoff.
+- **Failures.** A permanent error from the provider (wrong number, template or key; GetGabs reports some refusals with HTTP 200 and `status: false`) marks the notification and its delivery `FAILED` with the provider's message, and is not retried or charged. Rate limits and server errors fail the job, so the queue retries it with backoff.
+- **Delivery status.** The invitations page shows whether each WhatsApp invitation was delivered and read. Meta pushes statuses to `POST /api/v1/whatsapp/webhook`, signed with the app secret (the `GET` handshake answers with the verify token). GetGabs reports a message's status only when asked (`/whatsappbusiness/getmessgageinfobyid`), so the worker's `whatsapp-status` task (every 10 minutes) asks about each invitation 5 minutes, 1 hour, 6 hours, 1 day and 3 days after sending. Reports only move a delivery forward (sent, delivered, read, or failed), because they can arrive out of order (`recordWhatsAppDelivery` in `@bulava/database`).
+- **GetGabs' chats webhook (optional).** In GetGabs → Settings → Developer Tools, *Webhook URL for All Chats* takes `<site>/api/v1/whatsapp/getgabs?token=<webhook token>`. When a guest replies to an invitation or taps one of its buttons, the invitation is marked read at once; other chats are acknowledged and ignored. GetGabs does not sign its calls, so the address carries a secret token, generated in the console and shown in full only until it is saved. It travels in the query string, which Nginx does not log and the API's logs redact.
 
 ## Announcements
 

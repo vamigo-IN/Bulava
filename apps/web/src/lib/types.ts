@@ -24,6 +24,7 @@ export interface User {
 export interface EventType {
   key: string;
   name: string;
+  description: string | null;
   detailsSchemaKey: string | null;
   defaultFunctions: Array<{ name: string; slug: string }>;
   defaultGroups: Array<{ name: string; slug: string }>;
@@ -53,6 +54,8 @@ export interface EventSummary {
   endDate: string | null;
   details: Record<string, string>;
   counts: { functions: number; guests: number };
+  /** The website design the host chose; null while the event type's default stands in. */
+  design: { templateKey: string; templateName: string; tier: 'FREE' | 'STANDARD' | 'PREMIUM' } | null;
   /** The host's shareable, watermarked preview link: /preview/<token>. */
   previewToken: string;
   /** "quick_start" when it began on the template page. */
@@ -60,6 +63,8 @@ export interface EventSummary {
   role?: string;
   /** What the signed-in member may do in this event (the dashboard shows only that). */
   permissions?: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** What a host shares: one event link (public, private link, secret link) or personal invitations. */

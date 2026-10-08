@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { hashPassword, isLinkMode, permissionsForEventRole, type EventPermission, type EventRole } from '@bulava/auth';
-import { isSupportedLanguage } from '@bulava/localization';
+import { isSupportedLanguage, zonedWallTimeToUtcIso } from '@bulava/localization';
 import {
   slugify,
   validateEventDetails,
@@ -26,6 +26,8 @@ export const newPreviewToken = () => randomBytes(18).toString('base64url');
 const eventInclude = {
   accessPolicy: { select: { mode: true, pinHash: true, requireOtp: true } },
   _count: { select: { functions: { where: { deletedAt: null } }, guests: { where: { deletedAt: null } } } },
+  // The chosen website design, for the dashboard's event cards (none until the host picks one).
+  templateSelections: { where: { output: 'WEBSITE' }, take: 1, select: { templateVersion: { select: { template: { select: { key: true, name: true, tier: true } } } } } },
 } satisfies Prisma.EventInclude;
 
 type EventWithPolicy = Prisma.EventGetPayload<{ include: typeof eventInclude }>;
@@ -47,6 +49,8 @@ export interface EventDto {
   endDate: Date | null;
   details: unknown;
   counts: { functions: number; guests: number };
+  /** The website design the host chose; null while the type's default stands in. */
+  design: { templateKey: string; templateName: string; tier: string } | null;
   /** The host's shareable, watermarked preview link token (members only see this DTO). */
   previewToken: string;
   /** "quick_start" when it began on the template page. */
@@ -76,12 +80,18 @@ function toDto(event: EventWithPolicy, role?: string): EventDto {
     endDate: event.endDate,
     details: event.details,
     counts: { functions: event._count.functions, guests: event._count.guests },
+    design: designOf(event),
     previewToken: event.previewToken,
     source: event.source,
     ...(role ? { role, permissions: permissionsForEventRole(role as EventRole) } : {}),
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
   };
+}
+
+function designOf(event: EventWithPolicy): EventDto['design'] {
+  const template = event.templateSelections[0]?.templateVersion.template;
+  return template ? { templateKey: template.key, templateName: template.name, tier: template.tier } : null;
 }
 
 interface DefaultItem {
@@ -199,7 +209,9 @@ export class EventsService {
 
       if (input.applyDefaults) {
         const maxFunctions = EntitlementsService.limit(features, FEATURE_KEYS.FUNCTIONS_MAX);
-        const defaults = asDefaultItems(type.defaultFunctions);
+        // The host may keep only some of the suggestions (no Mehendi, say); unknown slugs are ignored.
+        const chosen = input.functionSlugs ? new Set(input.functionSlugs) : null;
+        const defaults = asDefaultItems(type.defaultFunctions).filter((f) => !chosen || chosen.has(f.slug));
         await tx.eventFunction.createMany({
           data: (maxFunctions === null ? defaults : defaults.slice(0, maxFunctions)).map((f, index) => ({
             eventId: created.id,
@@ -230,7 +242,32 @@ export class EventsService {
       return tx.event.findUniqueOrThrow({ where: { id: created.id }, include: eventInclude });
     });
 
+    if (input.date) {
+      await this.setMainDate(event.id, type, input.date, input.timezone);
+      return toDto(await this.prisma.event.findUniqueOrThrow({ where: { id: event.id }, include: eventInclude }), 'OWNER');
+    }
     return toDto(event, 'OWNER');
+  }
+
+  /**
+   * A day chosen before the functions have their own dates (event creation, the
+   * quick start): it goes on the main function, the one named after the event
+   * type or else the first, at 10 am in the event's time zone. Without
+   * functions it becomes the event's start date.
+   */
+  async setMainDate(eventId: string, type: { key: string; name: string }, date: string, timezone: string): Promise<void> {
+    const startsAt = new Date(zonedWallTimeToUtcIso(`${date}T10:00`, timezone));
+    const functions = await this.prisma.eventFunction.findMany({ where: { eventId, deletedAt: null }, orderBy: { sortOrder: 'asc' } });
+    if (!functions.length) {
+      await this.prisma.event.update({ where: { id: eventId }, data: { startDate: startsAt, endDate: startsAt } });
+      return;
+    }
+    const main = functions.find((f) => f.slug === type.key.toLowerCase() || f.name.toLowerCase() === type.name.toLowerCase()) ?? functions[0]!;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventFunction.update({ where: { id: main.id }, data: { startsAt } });
+      const agg = await tx.eventFunction.aggregate({ where: { eventId, deletedAt: null, status: { not: 'CANCELLED' } }, _min: { startsAt: true }, _max: { endsAt: true, startsAt: true } });
+      await tx.event.update({ where: { id: eventId }, data: { startDate: agg._min.startsAt, endDate: agg._max.endsAt ?? agg._max.startsAt } });
+    });
   }
 
   /**

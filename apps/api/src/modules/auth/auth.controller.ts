@@ -56,7 +56,8 @@ export class AuthController {
   @Public()
   @Get('providers')
   async providers() {
-    return { google: this.google.enabled, phoneOtp: await this.phoneOtp.available() };
+    const [google, phoneOtp] = await Promise.all([this.google.enabled(), this.phoneOtp.available()]);
+    return { google, phoneOtp };
   }
 
   /** A provisional (WhatsApp-only) account adds an email and a password. */
@@ -82,7 +83,7 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   @Get('google/start')
   async googleStart(@Query('next') next: string | undefined, @Query('consent') consent: string | undefined, @Res() res: Response) {
-    if (!this.google.enabled) return res.redirect(302, `${this.config.WEB_ORIGIN.replace(/\/$/, '')}/login?error=GOOGLE_UNAVAILABLE`);
+    if (!(await this.google.enabled())) return res.redirect(302, `${this.config.WEB_ORIGIN.replace(/\/$/, '')}/login?error=GOOGLE_UNAVAILABLE`);
     // consent=1: the sign-up page's box was ticked, so a new account may be created (and its consent recorded).
     const { url, state } = await this.google.start({ next, mode: 'signin', consented: consent === '1' });
     this.setGoogleState(res, state);
@@ -95,7 +96,7 @@ export class AuthController {
   @Post('google/link')
   @HttpCode(200)
   async googleLink(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
-    const { url, state } = await this.google.start({ mode: 'link', userId: user.id, next: '/dashboard/account' });
+    const { url, state } = await this.google.start({ mode: 'link', userId: user.id, next: '/dashboard/account/security' });
     this.setGoogleState(res, state);
     return { url };
   }

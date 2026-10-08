@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CalendarHeart, CheckCircle2, ChevronDown, Clapperboard, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserCheck, UserRound, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { Bell, CalendarHeart, CheckCircle2, ChevronDown, House, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -12,6 +12,7 @@ import { useMe, useNotifications } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/primitives';
 import { BrandLogo } from '@/components/marketing/brand-logo';
+import { notificationView } from './notification-text';
 
 const MENU_MOTION = {
   initial: { opacity: 0, y: -6, scale: 0.97 },
@@ -40,14 +41,6 @@ function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, close: ()
   }, [ref, open, close]);
 }
 
-const NOTIF_ICON: Record<string, LucideIcon> = {
-  RSVP_RECEIVED: CheckCircle2,
-  RENDER_COMPLETE: Clapperboard,
-  PAYMENT: Wallet,
-  REGISTRATION_RECEIVED: UserCheck,
-  MEMBER_ADDED: Users,
-};
-
 function Notifications() {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -59,15 +52,6 @@ function Notifications() {
   const markAll = async () => {
     await Promise.all((list.data ?? []).filter((n) => !n.readAt).map((n) => apiPost(`/notifications/${n.id}/read`).catch(() => undefined)));
     await client.invalidateQueries({ queryKey: ['notifications'] });
-  };
-  const label = (n: NonNullable<typeof list.data>[number]) => {
-    const p = n.payload;
-    if (n.type === 'RSVP_RECEIVED') return t('notif.RSVP_RECEIVED', { guest: String(p.guestName ?? ''), event: String(p.eventTitle ?? '') });
-    if (n.type === 'RENDER_COMPLETE') return t('notif.RENDER_COMPLETE');
-    if (n.type === 'PAYMENT') return t('notif.PAYMENT', { plan: String(p.plan ?? '') });
-    if (n.type === 'REGISTRATION_RECEIVED') return t('notif.REGISTRATION_RECEIVED', { guest: String(p.guestName ?? ''), event: String(p.eventTitle ?? '') });
-    if (n.type === 'MEMBER_ADDED') return t('notif.MEMBER_ADDED', { event: String(p.eventTitle ?? '') });
-    return n.type;
   };
   return (
     <div ref={box} className="relative">
@@ -96,7 +80,7 @@ function Notifications() {
             <ul className="max-h-96 overflow-y-auto">
               {list.data?.length ? (
                 list.data.map((n, i) => {
-                  const Icon = NOTIF_ICON[n.type] ?? Bell;
+                  const { icon: Icon, text, href } = notificationView(t, n);
                   return (
                     <motion.li key={n.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="border-b border-gold-100 last:border-0">
                       <div className="flex gap-3 px-5 py-3.5 text-sm transition-colors duration-200 hover:bg-gold-100/30">
@@ -104,20 +88,12 @@ function Notifications() {
                           <Icon className="size-4" />
                         </span>
                         <div className="min-w-0">
-                          {n.eventId || (n.type === 'PAYMENT' && typeof n.payload.orderId === 'string') ? (
-                            <Link
-                              href={
-                                n.type === 'PAYMENT' && typeof n.payload.orderId === 'string'
-                                  ? `/dashboard/payments/${n.payload.orderId}`
-                                  : `/dashboard/events/${n.eventId}${n.type === 'RSVP_RECEIVED' ? '/rsvps' : n.type === 'RENDER_COMPLETE' ? '/video' : ''}`
-                              }
-                              onClick={() => setOpen(false)}
-                              className="font-medium text-ink transition-colors hover:text-brand-700"
-                            >
-                              {label(n)}
+                          {href ? (
+                            <Link href={href} onClick={() => setOpen(false)} className="font-medium text-ink transition-colors hover:text-brand-700">
+                              {text}
                             </Link>
                           ) : (
-                            <span className="font-medium text-ink">{label(n)}</span>
+                            <span className="font-medium text-ink">{text}</span>
                           )}
                           <p className="mt-0.5 text-xs text-stone-500">{new Date(n.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                         </div>
@@ -162,6 +138,10 @@ function AccountMenu({ name, onLogout }: { name?: string; onLogout: () => void }
         {open ? (
           <motion.div {...MENU_MOTION} role="menu" className={cn(MENU_PANEL, 'w-56 py-1.5')}>
             <Link role="menuitem" href="/dashboard" onClick={() => setOpen(false)} className={cn(item, 'sm:hidden')}>
+              <House aria-hidden className="size-4 text-gold-600" />
+              {t('dash.nav.home')}
+            </Link>
+            <Link role="menuitem" href="/dashboard/events" onClick={() => setOpen(false)} className={cn(item, 'sm:hidden')}>
               <CalendarHeart aria-hidden className="size-4 text-gold-600" />
               {t('dash.nav.events')}
             </Link>
@@ -211,7 +191,8 @@ function Shell({ children }: { children: ReactNode }) {
   };
 
   const nav = [
-    { href: '/dashboard', label: t('dash.nav.events'), active: pathname === '/dashboard' || pathname.startsWith('/dashboard/events') },
+    { href: '/dashboard', label: t('dash.nav.home'), active: pathname === '/dashboard' },
+    { href: '/dashboard/events', label: t('dash.nav.events'), active: pathname.startsWith('/dashboard/events') },
     { href: '/templates', label: t('nav.templates'), active: false },
   ];
 

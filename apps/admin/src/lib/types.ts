@@ -339,7 +339,7 @@ export interface StaffOverview {
 
 // ───── Site settings ─────
 
-export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'maps' | 'domains';
+export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'google' | 'maps' | 'domains';
 
 export interface SettingCheckStep {
   label: string;
@@ -378,7 +378,16 @@ export interface SettingsOverview {
     source: 'environment';
     lastCheck: SettingCheckResult | null;
   };
-  origins: { web: string; paymentsWebhook: string; whatsappWebhook: string };
+  origins: {
+    web: string;
+    paymentsWebhook: string;
+    /** Meta's Cloud API webhook. */
+    whatsappWebhook: string;
+    /** GetGabs' webhook, without its token (which follows). */
+    getgabsWebhook: string;
+    /** Where Google returns after "Continue with Google". */
+    googleRedirect: string;
+  };
   assetPreviews: Record<'logo' | 'favicon' | 'ogImage', string | null>;
 }
 

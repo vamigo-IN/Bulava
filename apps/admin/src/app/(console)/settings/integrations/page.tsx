@@ -2,8 +2,8 @@
 
 import { Check, Copy, MapPin } from 'lucide-react';
 import { useState } from 'react';
-import type { SettingValues } from '@bulava/validation';
-import { CheckPanel, GroupSecret, SettingsCard, SettingsPage, TextField, useGroupEditor } from '@/components/settings';
+import { whatsappReady, type SettingValues } from '@bulava/validation';
+import { CheckPanel, GroupSecret, SettingsCard, SettingsPage, TextField, useGroupEditor, type GroupEditor } from '@/components/settings';
 import { useMe } from '@/components/shell';
 import { Alert, Badge, Button, Card, Checkbox, Field, Input, Select } from '@/components/ui';
 import { t, type AdminMessageKey } from '@/lib/i18n';
@@ -12,6 +12,7 @@ import type { SettingGroupView, SettingsOverview } from '@/lib/types';
 type Payments = SettingValues['payments'];
 type Email = SettingValues['email'];
 type WhatsApp = SettingValues['whatsapp'];
+type Google = SettingValues['google'];
 type Maps = SettingValues['maps'];
 type Domains = SettingValues['domains'];
 type Status = { tone: 'success' | 'warning' | 'neutral'; label: string };
@@ -21,6 +22,11 @@ const SECURITY: Array<{ value: Email['security']; label: AdminMessageKey }> = [
   { value: 'ssl', label: 'int.email.security.ssl' },
   { value: 'starttls', label: 'int.email.security.starttls' },
   { value: 'none', label: 'int.email.security.none' },
+];
+
+const WHATSAPP_PROVIDERS: Array<{ value: WhatsApp['provider']; label: AdminMessageKey }> = [
+  { value: 'GETGABS', label: 'int.whatsapp.provider.getgabs' },
+  { value: 'META_CLOUD', label: 'int.whatsapp.provider.meta' },
 ];
 
 const DOMAIN_MODES: Array<{ value: Domains['mode']; label: AdminMessageKey }> = [
@@ -44,7 +50,8 @@ export default function IntegrationsPage() {
         <>
           <PaymentsForm view={overview.groups.payments} webhookUrl={overview.origins.paymentsWebhook} />
           <EmailForm view={overview.groups.email} />
-          <WhatsAppForm view={overview.groups.whatsapp} webhookUrl={overview.origins.whatsappWebhook ?? ''} />
+          <WhatsAppForm view={overview.groups.whatsapp} origins={overview.origins} />
+          <GoogleForm view={overview.groups.google} redirectUri={overview.origins.googleRedirect} />
           <MapsForm view={overview.groups.maps} />
           <DomainsForm view={overview.groups.domains} webHost={new URL(overview.origins.web).hostname} />
           <StorageCard storage={overview.storage} />
@@ -142,13 +149,16 @@ function EmailForm({ view }: { view: SettingGroupView }) {
   );
 }
 
-function WhatsAppForm({ view, webhookUrl }: { view: SettingGroupView; webhookUrl: string }) {
+function WhatsAppForm({ view, origins }: { view: SettingGroupView; origins: SettingsOverview['origins'] }) {
   const editor = useGroupEditor<WhatsApp>('whatsapp', view);
   const { draft, set } = editor;
   const saved = view.value as WhatsApp;
   const templates = draft.templates ?? {};
   const [to, setTo] = useState('');
-  const complete = Boolean(saved.phoneNumberId && view.secrets.accessToken?.set && (saved.templates?.invitation || saved.templates?.reminder));
+  const getgabs = draft.provider === 'GETGABS';
+  // Ready to send once switched on: the saved provider's credentials and a guest template.
+  const credentials = whatsappReady({ ...saved, enabled: true }, { apiKey: view.secrets.apiKey?.set, accessToken: view.secrets.accessToken?.set });
+  const complete = credentials && Boolean(saved.templates?.invitation || saved.templates?.reminder);
   return (
     <SettingsCard
       title={t('int.whatsapp')}
@@ -166,22 +176,64 @@ function WhatsAppForm({ view, webhookUrl }: { view: SettingGroupView; webhookUrl
       }
     >
       <Checkbox label={t('int.whatsapp.enabled')} checked={draft.enabled} onChange={(e) => set('enabled', e.target.checked)} />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <TextField label={t('int.whatsapp.phoneNumberId')} inputMode="numeric" spellCheck={false} className="[&_input]:font-mono" value={draft.phoneNumberId} onChange={(v) => set('phoneNumberId', v)} />
-        <TextField
-          label={t('int.whatsapp.businessAccountId')}
-          inputMode="numeric"
-          spellCheck={false}
-          className="[&_input]:font-mono"
-          value={draft.businessAccountId}
-          onChange={(v) => set('businessAccountId', v)}
-        />
-        <TextField label={t('int.whatsapp.apiVersion')} placeholder="v21.0" spellCheck={false} className="[&_input]:font-mono" value={draft.apiVersion} onChange={(v) => set('apiVersion', v)} />
-      </div>
-      <GroupSecret editor={editor} view={view} name="accessToken" label={t('int.whatsapp.accessToken')} />
-      <GroupSecret editor={editor} view={view} name="appSecret" label={t('int.whatsapp.appSecret')} />
+      <Field label={t('int.whatsapp.provider')} hint={t('int.whatsapp.providerHint')}>
+        {(p) => (
+          <Select {...p} value={draft.provider} className="max-w-md" onChange={(e) => set('provider', e.target.value as WhatsApp['provider'])}>
+            {WHATSAPP_PROVIDERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.label)}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      {getgabs ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              label={t('int.whatsapp.getgabs.sender')}
+              hint={t('int.whatsapp.getgabs.senderHint')}
+              type="tel"
+              autoComplete="off"
+              placeholder="+919876543210"
+              className="[&_input]:font-mono"
+              value={draft.senderNumber}
+              onChange={(v) => set('senderNumber', v)}
+            />
+            <TextField
+              label={t('int.whatsapp.getgabs.campaign')}
+              hint={t('int.whatsapp.getgabs.campaignHint')}
+              spellCheck={false}
+              autoComplete="off"
+              className="[&_input]:font-mono"
+              value={draft.campaignId}
+              onChange={(v) => set('campaignId', v)}
+            />
+          </div>
+          <GroupSecret editor={editor} view={view} name="apiKey" label={t('int.whatsapp.getgabs.apiKey')} hint={t('int.whatsapp.getgabs.apiKeyHint')} />
+        </>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <TextField label={t('int.whatsapp.phoneNumberId')} inputMode="numeric" spellCheck={false} className="[&_input]:font-mono" value={draft.phoneNumberId} onChange={(v) => set('phoneNumberId', v)} />
+            <TextField
+              label={t('int.whatsapp.businessAccountId')}
+              inputMode="numeric"
+              spellCheck={false}
+              className="[&_input]:font-mono"
+              value={draft.businessAccountId}
+              onChange={(v) => set('businessAccountId', v)}
+            />
+            <TextField label={t('int.whatsapp.apiVersion')} placeholder="v21.0" spellCheck={false} className="[&_input]:font-mono" value={draft.apiVersion} onChange={(v) => set('apiVersion', v)} />
+          </div>
+          <GroupSecret editor={editor} view={view} name="accessToken" label={t('int.whatsapp.accessToken')} />
+          <GroupSecret editor={editor} view={view} name="appSecret" label={t('int.whatsapp.appSecret')} />
+        </>
+      )}
       <h3 className="pt-2 text-sm font-semibold text-stone-900">{t('int.whatsapp.templates')}</h3>
-      <p className="-mt-2 text-xs text-stone-500">{t('int.whatsapp.templatesHint')}</p>
+      <p className="-mt-2 text-xs text-stone-500">
+        {t(getgabs ? 'int.whatsapp.templatesWhere.getgabs' : 'int.whatsapp.templatesWhere.meta')} {t('int.whatsapp.templatesHint')}
+      </p>
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField
           label={t('int.whatsapp.invitationTemplate')}
@@ -221,9 +273,101 @@ function WhatsAppForm({ view, webhookUrl }: { view: SettingGroupView; webhookUrl
         />
       </div>
       <h3 className="pt-2 text-sm font-semibold text-stone-900">{t('int.whatsapp.webhookTitle')}</h3>
-      <p className="-mt-2 text-xs text-stone-500">{t('int.whatsapp.webhookHint')}</p>
-      <GroupSecret editor={editor} view={view} name="webhookVerifyToken" label={t('int.whatsapp.webhookVerifyToken')} />
-      <CopyLine label={t('int.whatsapp.webhookUrl')} value={webhookUrl} />
+      {getgabs ? (
+        <>
+          <p className="-mt-2 text-xs text-stone-500">{t('int.whatsapp.getgabs.webhookHint')}</p>
+          <GetGabsWebhook editor={editor} view={view} baseUrl={origins.getgabsWebhook} />
+        </>
+      ) : (
+        <>
+          <p className="-mt-2 text-xs text-stone-500">{t('int.whatsapp.webhookHint')}</p>
+          <GroupSecret editor={editor} view={view} name="webhookVerifyToken" label={t('int.whatsapp.webhookVerifyToken')} />
+          <CopyLine label={t('int.whatsapp.webhookUrl')} value={origins.whatsappWebhook} />
+        </>
+      )}
+    </SettingsCard>
+  );
+}
+
+/** A random token for a webhook address (hex, so it needs no escaping in a URL). */
+function newWebhookToken(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * GetGabs does not sign its webhook calls, so the address carries a secret
+ * token. The console makes one and shows the whole address until it is saved;
+ * from then on the token is write-only, like every other secret.
+ */
+function GetGabsWebhook({ editor, view, baseUrl }: { editor: GroupEditor<WhatsApp>; view: SettingGroupView; baseUrl: string }) {
+  const pending = editor.secrets.webhookToken;
+  const saved = view.secrets.webhookToken;
+  const cancel = (
+    <Button size="sm" variant="ghost" onClick={() => editor.setSecret('webhookToken', undefined)}>
+      {t('common.cancel')}
+    </Button>
+  );
+  if (typeof pending === 'string') {
+    return (
+      <div className="space-y-2">
+        <CopyLine label={t('int.whatsapp.getgabs.webhookNew')} value={`${baseUrl}${pending}`} />
+        <p className="text-xs text-amber-800">{t('int.whatsapp.getgabs.webhookOnce')}</p>
+        {cancel}
+      </div>
+    );
+  }
+  if (pending === null) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-red-700">{t('int.whatsapp.getgabs.webhookWillRemove')}</span>
+        {cancel}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-stone-700">{saved?.set ? t('int.whatsapp.getgabs.webhookSaved', { hint: saved.hint ?? '••••' }) : t('int.whatsapp.getgabs.webhookNone')}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" onClick={() => editor.setSecret('webhookToken', newWebhookToken())}>
+          {saved?.set ? t('int.whatsapp.getgabs.regenerate') : t('int.whatsapp.getgabs.generate')}
+        </Button>
+        {saved?.set ? (
+          <Button size="sm" variant="ghost" className="text-red-700" onClick={() => editor.setSecret('webhookToken', null)}>
+            {t('settings.secret.remove')}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function GoogleForm({ view, redirectUri }: { view: SettingGroupView; redirectUri: string }) {
+  const editor = useGroupEditor<Google>('google', view);
+  const { draft, set } = editor;
+  const saved = view.value as Google;
+  return (
+    <SettingsCard
+      title={t('int.google')}
+      description={t('int.google.hint')}
+      view={view}
+      editor={editor}
+      status={status(saved.enabled, Boolean(saved.clientId && view.secrets.clientSecret?.set))}
+      savedMessage={t('settings.savedIntegration')}
+      after={<CheckPanel target="google" lastCheck={view.lastCheck} dirty={editor.dirty} />}
+    >
+      <Checkbox label={t('int.google.enabled')} checked={draft.enabled} onChange={(e) => set('enabled', e.target.checked)} />
+      <p className="text-sm text-stone-600">{t('int.google.steps')}</p>
+      <CopyLine label={t('int.google.redirectUri')} value={redirectUri} />
+      <TextField
+        label={t('int.google.clientId')}
+        placeholder="1234567890-abc123.apps.googleusercontent.com"
+        spellCheck={false}
+        autoComplete="off"
+        className="[&_input]:font-mono"
+        value={draft.clientId}
+        onChange={(v) => set('clientId', v)}
+      />
+      <GroupSecret editor={editor} view={view} name="clientSecret" label={t('int.google.clientSecret')} />
     </SettingsCard>
   );
 }

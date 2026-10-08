@@ -51,7 +51,8 @@ export function UseTemplateButton({ template, className, children }: { template:
   const [open, setOpen] = useState(false);
   if (session.status === 'signed-in') {
     return (
-      <Link href={`/dashboard/events/new?template=${template.key}`} className={className}>
+      // The template's first occasion is preselected, so the guided creation starts on the details.
+      <Link href={`/dashboard/events/new?template=${template.key}${template.eventTypes[0] ? `&type=${template.eventTypes[0]}` : ''}`} className={className}>
         {children}
       </Link>
     );

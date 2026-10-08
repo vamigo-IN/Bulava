@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { lockWhatsAppAllowance, whatsappMessagesLeft, whatsappMessagesUsed, type Prisma } from '@bulava/database';
-import { FEATURE_KEYS, type BulkCreateInvitationsInput, type CreateInvitationInput } from '@bulava/validation';
+import { FEATURE_KEYS, WHATSAPP_DELIVERY_TAG, type BulkCreateInvitationsInput, type CreateInvitationInput } from '@bulava/validation';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
@@ -118,7 +118,11 @@ export class InvitationsService {
    * leaves QUEUED are re-queued by the worker.
    */
   private async deliver(access: EventAccessContext, channel: 'EMAIL' | 'WHATSAPP', invitationIds: string[] | undefined, meta: RequestMeta) {
-    const delivery = channel === 'EMAIL' ? ({ channel: 'EMAIL', provider: 'smtp' } as const) : ({ channel: 'WHATSAPP_API', provider: 'meta' } as const);
+    // The provider the settings choose now; the worker records the one that actually sends.
+    const delivery =
+      channel === 'EMAIL'
+        ? { channel: 'EMAIL' as const, provider: 'smtp' }
+        : { channel: 'WHATSAPP_API' as const, provider: WHATSAPP_DELIVERY_TAG[(await this.settings.get('whatsapp')).value.provider] };
     const r = await this.prisma.$transaction(
       async (tx) => {
         let quota = Number.POSITIVE_INFINITY;

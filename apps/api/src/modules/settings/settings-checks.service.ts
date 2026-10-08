@@ -1,7 +1,9 @@
 import { promises as dns } from 'node:dns';
 import { randomUUID } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { Inject, Injectable } from '@nestjs/common';
-import { SettingsStore } from '@bulava/settings';
+import { SettingsStore, type ResolvedSetting } from '@bulava/settings';
 import { ObjectStorage, StorageKeys } from '@bulava/storage';
 import { z, type SettingCheckResult, type SettingCheckStep, type SettingGroup } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
@@ -10,19 +12,73 @@ import { STORAGE } from '../../infrastructure/storage/storage.module';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import { AuditService } from '../audit/audit.service';
+import { googleRedirectUri } from '../auth/google-redirect';
 import { escapeHtml } from '../guest-access/otp.service';
 import { SETTINGS_STORE } from './settings.service';
 
-export const CHECKABLE = ['payments', 'email', 'whatsapp', 'maps', 'domains', 'storage'] as const;
+export const CHECKABLE = ['payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'storage'] as const;
 export type Checkable = (typeof CHECKABLE)[number];
 export const RunCheckSchema = z.object({ to: z.string().trim().max(200).optional() });
 
 const TIMEOUT = 10_000;
 
 /** External APIs; tests and staging can point them elsewhere. */
-function apiBase(name: 'RAZORPAY_API_BASE' | 'CLOUDFLARE_API_BASE' | 'WHATSAPP_API_BASE', fallback: string): string {
+function apiBase(name: 'RAZORPAY_API_BASE' | 'CLOUDFLARE_API_BASE' | 'WHATSAPP_API_BASE' | 'GETGABS_API_BASE', fallback: string): string {
   return (process.env[name] || fallback).replace(/\/$/, '');
 }
+
+/**
+ * A JSON request with node's http client, which (unlike fetch) may send a body
+ * with GET: GetGabs' session endpoint expects one. Never throws on an HTTP
+ * status; a body that is not JSON comes back as {}.
+ */
+export function requestJson(url: string, options: { method: string; body?: object; headers?: Record<string, string> }): Promise<{ status: number; body: Record<string, unknown> }> {
+  return new Promise((resolve, reject) => {
+    const payload = options.body ? JSON.stringify(options.body) : undefined;
+    const target = new URL(url);
+    const req = (target.protocol === 'https:' ? httpsRequest : httpRequest)(
+      target,
+      {
+        method: options.method,
+        headers: { accept: 'application/json', ...(payload ? { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(payload)) } : {}), ...options.headers },
+        timeout: TIMEOUT,
+      },
+      (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk: string) => {
+          if (text.length < 1_000_000) text += chunk;
+        });
+        res.on('end', () => {
+          let body: Record<string, unknown> = {};
+          try {
+            const parsed: unknown = JSON.parse(text);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed as Record<string, unknown>;
+          } catch {
+            // Not JSON: an HTML error page, for example.
+          }
+          resolve({ status: res.statusCode ?? 0, body });
+        });
+      },
+    );
+    req.on('timeout', () => req.destroy(Object.assign(new Error('No answer within 10 seconds'), { name: 'TimeoutError' })));
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+/** The message in a JSON error answer, whichever field the API uses. */
+function errorText(body: Record<string, unknown>): string | undefined {
+  const error = body.error;
+  if (typeof error === 'object' && error !== null && typeof (error as { message?: unknown }).message === 'string') return (error as { message: string }).message.slice(0, 300);
+  for (const value of [error, body.error_description, body.message, body.msg]) if (typeof value === 'string' && value) return value.slice(0, 300);
+  return undefined;
+}
+
+/** How many variables ({{1}}, {{2}}, …) Bulava fills in each kind of template. */
+const TEMPLATE_VARIABLES = { invitation: 3, reminder: 3, preview: 3, otp: 1 } as const;
+const TEMPLATE_KIND_LABEL = { invitation: 'invitation', reminder: 'reminder', preview: 'preview link', otp: 'sign-in code' } as const;
 
 function describe(error: unknown): string {
   if (error instanceof Error) return error.name === 'TimeoutError' ? 'No answer within 10 seconds' : error.message.slice(0, 300);
@@ -71,6 +127,9 @@ export class SettingsChecksService {
           break;
         case 'whatsapp':
           await this.whatsapp(steps, input.to);
+          break;
+        case 'google':
+          await this.google(steps);
           break;
         case 'maps':
           await this.maps(steps);
@@ -157,10 +216,120 @@ export class SettingsChecksService {
   private async whatsapp(steps: SettingCheckStep[], to: string | undefined) {
     const s = await this.store.get('whatsapp');
     steps.push({ label: 'WhatsApp switched on', ok: s.value.enabled ? true : null, detail: s.value.enabled ? undefined : 'Off: nothing is sent on WhatsApp.' });
+    const connected = s.value.provider === 'GETGABS' ? await this.getgabs(steps, s) : await this.metaCloud(steps, s);
+    if (!connected) return;
+    const { invitation, reminder, preview, otp } = s.value.templates;
+    steps.push({
+      label: 'Message templates',
+      ok: invitation && reminder ? true : null,
+      detail: invitation && reminder ? `${invitation}, ${reminder}` : 'Add the approved template names for invitations and reminders.',
+    });
+    steps.push({
+      label: 'Host messages',
+      ok: null,
+      detail: [
+        preview ? `Preview links: ${preview}.` : 'No preview link template: quick-start previews are not sent on WhatsApp.',
+        otp ? `Sign-in codes: ${otp}.` : 'No sign-in code template: hosts sign in with email or Google only.',
+      ].join(' '),
+    });
+    if (to) await this.whatsappTest(steps, s, to);
+  }
+
+  /** GetGabs: the API key (it must open a session), each template as GetGabs has it, and the optional webhook. */
+  private async getgabs(steps: SettingCheckStep[], s: ResolvedSetting<'whatsapp'>): Promise<boolean> {
+    const apiKey = s.secrets.apiKey;
+    if (!s.value.senderNumber || !apiKey) {
+      steps.push({ label: 'GetGabs account', ok: false, detail: 'Add the API key (GetGabs → Settings → Developer Tools) and the WhatsApp number GetGabs sends from.' });
+      return false;
+    }
+    steps.push({ label: 'Provider', ok: null, detail: `GetGabs, sending from ${s.value.senderNumber}${s.value.campaignId ? ` in campaign ${s.value.campaignId}` : ''}.` });
+    const base = apiBase('GETGABS_API_BASE', 'https://app.getgabs.com');
+    const session = await requestJson(`${base}/partners/getSessionToken`, { method: 'GET', body: { api_key: apiKey } }).catch((error: unknown) => ({
+      status: 0,
+      body: { message: describe(error) } as Record<string, unknown>,
+    }));
+    const token = typeof session.body.access_token === 'string' && session.body.access_token ? session.body.access_token : null;
+    if (token) {
+      steps.push({ label: 'GetGabs accepted the API key', ok: true });
+      await this.getgabsTemplates(steps, base, token, apiKey, s.value);
+    } else if (
+      session.status === 401 ||
+      session.status === 403 ||
+      // A clear refusal; anything else (such as a key reported missing) is no proof the key is wrong.
+      (session.body.status === false && /invalid|unauthori[sz]ed|not found|incorrect|wrong|expired|disabled/i.test(errorText(session.body) ?? ''))
+    ) {
+      steps.push({ label: 'GetGabs accepted the API key', ok: false, detail: `GetGabs answered: ${errorText(session.body) ?? `HTTP ${session.status}`}. Copy the key again from GetGabs.` });
+      return false;
+    } else {
+      // The session endpoint is not the messaging API: an unexpected answer is no proof the key is wrong.
+      steps.push({
+        label: 'GetGabs accepted the API key',
+        ok: null,
+        detail: `GetGabs did not confirm it (${session.status ? `HTTP ${session.status}` : (errorText(session.body) ?? 'no answer')}). Send a test message to check the key.`,
+      });
+    }
+    steps.push({
+      label: 'Delivery reports',
+      ok: null,
+      detail: 'GetGabs reports delivery on request: Bulava asks about each invitation 5 minutes, 1 hour, 6 hours, 1 day and 3 days after sending.',
+    });
+    steps.push(
+      s.secrets.webhookToken
+        ? { label: 'Webhook', ok: true, detail: 'Replies to invitations mark them read, once the URL is in GetGabs → Settings → Developer Tools → Webhook URL for All Chats.' }
+        : { label: 'Webhook', ok: null, detail: 'Optional: generate a webhook token so that replies to invitations mark them read.' },
+    );
+    return true;
+  }
+
+  /** Each template as GetGabs has it: approved, in the language Bulava sends, with as many variables as Bulava fills. */
+  private async getgabsTemplates(steps: SettingCheckStep[], base: string, token: string, apiKey: string, v: ResolvedSetting<'whatsapp'>['value']) {
+    for (const kind of ['invitation', 'reminder', 'preview', 'otp'] as const) {
+      const name = v.templates[kind];
+      if (!name) continue;
+      const label = `Template ${name} (${TEMPLATE_KIND_LABEL[kind]})`;
+      const res = await requestJson(`${base}/partners/api/template/fetchJson`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: { adminauthToken: apiKey, template_name: name },
+      }).catch(() => null);
+      const template = res?.body.template as { status?: unknown; language?: unknown; components?: Array<{ type?: unknown; text?: unknown }> } | undefined;
+      if (!res || typeof template !== 'object' || template === null) {
+        const missing = res !== null && (res.status === 404 || res.body.status === false);
+        steps.push({
+          label,
+          ok: missing ? false : null,
+          detail: missing
+            ? `GetGabs has no template by this name (${errorText(res.body) ?? `HTTP ${res.status}`}). Create it in GetGabs → Templates and wait for Meta's approval.`
+            : 'GetGabs did not return it; check the name in GetGabs → Templates.',
+        });
+        continue;
+      }
+      const status = typeof template.status === 'string' ? template.status.toUpperCase() : null;
+      const language = typeof template.language === 'string' ? template.language : null;
+      const body = Array.isArray(template.components) ? template.components.find((c) => typeof c.type === 'string' && c.type.toUpperCase() === 'BODY')?.text : undefined;
+      const variables = typeof body === 'string' ? new Set((body.match(/\{\{\s*\d+\s*\}\}/g) ?? []).map((m) => m.replace(/\s/g, ''))).size : null;
+      const failures = [
+        status && status !== 'APPROVED' ? `Meta has not approved it (${status})` : null,
+        variables !== null && variables !== TEMPLATE_VARIABLES[kind] ? `it has ${variables} variables; Bulava fills ${TEMPLATE_VARIABLES[kind]}` : null,
+      ].filter((f): f is string => Boolean(f));
+      const languageNote =
+        language && language !== v.templateLanguage
+          ? `GetGabs lists it in ${language}, but Bulava sends ${v.templateLanguage}: set the template language to ${language} unless the template also exists in ${v.templateLanguage}.`
+          : null;
+      steps.push({
+        label,
+        ok: failures.length ? false : languageNote ? null : true,
+        detail: failures.length ? `${failures.join('; ')}.` : (languageNote ?? `${status ?? 'Found'} · ${language ?? v.templateLanguage}`),
+      });
+    }
+  }
+
+  /** Meta's Cloud API: the token and phone number (with its quality rating), and the optional webhook. */
+  private async metaCloud(steps: SettingCheckStep[], s: ResolvedSetting<'whatsapp'>): Promise<boolean> {
     const token = s.secrets.accessToken;
     if (!s.value.phoneNumberId || !token) {
       steps.push({ label: 'WhatsApp Business account', ok: false, detail: 'Add the phone number ID and a permanent access token from Meta Business (WhatsApp Manager → API setup).' });
-      return;
+      return false;
     }
     const base = `${apiBase('WHATSAPP_API_BASE', 'https://graph.facebook.com')}/${s.value.apiVersion}`;
     const res = await fetch(`${base}/${s.value.phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`, {
@@ -170,32 +339,93 @@ export class SettingsChecksService {
     const body = (await res.json().catch(() => ({}))) as { display_phone_number?: string; verified_name?: string; quality_rating?: string; error?: { message?: string } };
     if (!res.ok) {
       steps.push({ label: 'Meta accepted the token', ok: false, detail: body.error?.message ?? `Meta answered ${res.status}.` });
-      return;
+      return false;
     }
     steps.push({ label: 'Meta accepted the token', ok: true, detail: `${body.verified_name ?? 'Business'} · ${body.display_phone_number ?? ''} · quality ${body.quality_rating ?? 'unknown'}` });
-    const templates = s.value.templates;
-    steps.push({
-      label: 'Message templates',
-      ok: templates.invitation && templates.reminder ? true : null,
-      detail: templates.invitation && templates.reminder ? `${templates.invitation}, ${templates.reminder}` : 'Add the approved template names for invitations and reminders.',
-    });
     steps.push(
       s.secrets.appSecret && s.secrets.webhookVerifyToken
         ? { label: 'Webhook configured', ok: true, detail: 'Delivery status updates (sent, delivered, read, failed) are verified with App Secret and Webhook Verify Token.' }
         : { label: 'Webhook configured', ok: null, detail: 'Optional: add App Secret and Webhook Verify Token to track real-time message delivery status from Meta.' },
     );
-    if (to) {
-      const number = to.replace(/[^\d]/g, '');
-      const send = await fetch(`${base}/${s.value.phoneNumberId}/messages`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        // hello_world is Meta's pre-approved sample template.
-        body: JSON.stringify({ messaging_product: 'whatsapp', to: number, type: 'template', template: { name: 'hello_world', language: { code: 'en_US' } } }),
-        signal: AbortSignal.timeout(TIMEOUT),
-      });
-      const sent = (await send.json().catch(() => ({}))) as { messages?: Array<{ id: string }>; error?: { message?: string } };
-      steps.push(send.ok ? { label: `Test message sent to +${number}`, ok: true } : { label: 'Test message', ok: false, detail: sent.error?.message ?? `Meta answered ${send.status}.` });
+    return true;
+  }
+
+  /**
+   * A real message, sent by the worker with its settings exactly as guests and
+   * hosts get them: the first template set (invitation, reminder, preview link,
+   * sign-in code) with sample details in its variables.
+   */
+  private async whatsappTest(steps: SettingCheckStep[], s: ResolvedSetting<'whatsapp'>, to: string) {
+    const number = `+${to.replace(/[^\d]/g, '')}`;
+    if (!/^\+[1-9]\d{7,14}$/.test(number)) {
+      steps.push({ label: 'Test message', ok: false, detail: 'Enter the number in international format, like +919876543210.' });
+      return;
     }
+    const kind = (['invitation', 'reminder', 'preview', 'otp'] as const).find((k) => s.value.templates[k]);
+    if (!kind) {
+      steps.push({ label: 'Test message', ok: false, detail: 'Add a template name first: the test sends one of your approved templates.' });
+      return;
+    }
+    const site = (await this.store.get('site')).value.name;
+    const web = this.config.WEB_ORIGIN.replace(/\/$/, '');
+    const params =
+      kind === 'otp'
+        ? ['123456']
+        : kind === 'preview'
+          ? ['Test', `${site} sample design`, `${web}/templates`]
+          : ['Test guest', kind === 'reminder' ? `Sangeet · ${site} test event` : `${site} test event`, `${web}/`];
+    try {
+      const result = (await this.queues.runAndWait('whatsapp', { to: number, template: kind, params, ...(kind === 'otp' ? { copyCode: '123456' } : {}) }, 45_000)) as {
+        outcome?: string;
+        detail?: string;
+        messageId?: string;
+      } | null;
+      if (result?.outcome === 'sent') {
+        steps.push({ label: `Test message sent to ${number}`, ok: true, detail: `${result.detail ?? kind}, with sample details${result.messageId ? ` · message ${result.messageId}` : ''}.` });
+      } else if (result?.outcome === 'skipped') {
+        steps.push({ label: 'Test message', ok: false, detail: `${result.detail ?? 'Skipped'}. Settings reach the worker within 15 seconds of saving; try again.` });
+      } else {
+        steps.push({ label: 'Test message', ok: false, detail: result?.detail ?? 'The worker did not send it.' });
+      }
+    } catch (error) {
+      const message = describe(error);
+      steps.push({ label: 'Test message', ok: false, detail: /timed out|timeout/i.test(message) ? 'No worker picked up the message: is the worker running?' : message });
+    }
+  }
+
+  /**
+   * Google sign-in: the client ID and secret are tried at Google's token
+   * endpoint with a made-up code, which Google answers with invalid_grant when
+   * the client is right and invalid_client when it is not.
+   */
+  private async google(steps: SettingCheckStep[]) {
+    const s = await this.store.get('google');
+    steps.push({ label: 'Continue with Google switched on', ok: s.value.enabled ? true : null, detail: s.value.enabled ? undefined : 'Off: the sign-in and sign-up pages do not offer Google.' });
+    const secret = s.secrets.clientSecret;
+    if (!s.value.clientId || !secret) {
+      steps.push({ label: 'OAuth client', ok: false, detail: 'Add the client ID and client secret of a Web application client (Google Cloud → APIs & Services → Credentials).' });
+      return;
+    }
+    const redirect = googleRedirectUri(this.config);
+    const res = await fetch(this.config.GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+      body: new URLSearchParams({ grant_type: 'authorization_code', code: 'bulava-connection-check', client_id: s.value.clientId, client_secret: secret, redirect_uri: redirect }),
+      signal: AbortSignal.timeout(TIMEOUT),
+    });
+    const body = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
+    const label = 'Google accepted the client ID and secret';
+    if (body.error === 'invalid_grant') {
+      steps.push({ label, ok: true });
+    } else if (body.error === 'invalid_client' || body.error === 'unauthorized_client') {
+      steps.push({ label, ok: false, detail: `Google answered: ${body.error_description ?? body.error}. Copy both again from the client in Google Cloud.` });
+    } else if (body.error === 'redirect_uri_mismatch') {
+      steps.push({ label: 'Authorized redirect URI', ok: false, detail: `Add ${redirect} under Authorized redirect URIs on the client in Google Cloud.` });
+      return;
+    } else {
+      steps.push({ label, ok: null, detail: `Unexpected answer from Google (HTTP ${res.status}${body.error ? `, ${body.error}` : ''}).` });
+    }
+    steps.push({ label: 'Authorized redirect URI', ok: null, detail: `${redirect} must be listed on the client; Google checks it when someone signs in.` });
   }
 
   private async maps(steps: SettingCheckStep[]) {

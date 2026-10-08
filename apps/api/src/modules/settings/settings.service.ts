@@ -6,6 +6,7 @@ import {
   SETTING_GROUPS,
   SETTING_SECRETS,
   trackerSources,
+  whatsappReady,
   z,
   type PublicSiteConfig,
   type SaveSettingsInput,
@@ -18,6 +19,7 @@ import { STORAGE } from '../../infrastructure/storage/storage.module';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import { AuditService } from '../audit/audit.service';
+import { googleRedirectUri } from '../auth/google-redirect';
 
 export const SETTINGS_STORE = Symbol('SETTINGS_STORE');
 
@@ -63,7 +65,7 @@ export class PlatformSettingsService {
   async messaging(): Promise<{ email: boolean; whatsappInvitations: boolean; whatsappReminders: boolean }> {
     const [email, whatsapp] = await Promise.all([this.store.get('email'), this.store.get('whatsapp')]);
     const w = whatsapp.value;
-    const live = w.enabled && !!w.phoneNumberId && !!whatsapp.secrets.accessToken;
+    const live = whatsappReady(w, whatsapp.secrets);
     return {
       email: email.value.enabled && !!email.value.host,
       whatsappInvitations: live && !!w.templates.invitation,
@@ -75,7 +77,7 @@ export class PlatformSettingsService {
   async whatsappHost(): Promise<{ preview: boolean; otp: boolean }> {
     const whatsapp = await this.store.get('whatsapp');
     const w = whatsapp.value;
-    const live = w.enabled && !!w.phoneNumberId && !!whatsapp.secrets.accessToken;
+    const live = whatsappReady(w, whatsapp.secrets);
     return { preview: live && !!w.templates.preview, otp: live && !!w.templates.otp };
   }
 
@@ -108,13 +110,18 @@ export class PlatformSettingsService {
     const editorIds = [...new Set(groups.map((g) => g.updatedById).filter((id): id is string => Boolean(id)))];
     const editors = new Map((await this.prisma.user.findMany({ where: { id: { in: editorIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
     const site = groups.find((g) => g.group === 'site')!.value as ResolvedSetting<'site'>['value'];
+    const web = this.config.WEB_ORIGIN.replace(/\/$/, '');
     const preview = async (key: string | undefined) => (key ? this.storage.presignDownload(key, { expiresInSeconds: 3600 }) : null);
     return {
       groups: Object.fromEntries(groups.map((g) => [g.group, this.view(g, editors)])),
       storage: { ...this.storageView(), lastCheck: await this.store.lastCheck('storage') },
       origins: {
         web: this.config.WEB_ORIGIN,
-        paymentsWebhook: `${this.config.WEB_ORIGIN.replace(/\/$/, '')}/api/v1/payments/razorpay/webhook`,
+        paymentsWebhook: `${web}/api/v1/payments/razorpay/webhook`,
+        whatsappWebhook: `${web}/api/v1/whatsapp/webhook`,
+        /** Followed by the webhook token, which the console knows only while it is being set. */
+        getgabsWebhook: `${web}/api/v1/whatsapp/getgabs?token=`,
+        googleRedirect: googleRedirectUri(this.config),
       },
       assetPreviews: { logo: await preview(site.logoKey), favicon: await preview(site.faviconKey), ogImage: await preview(site.ogImageKey) },
     };

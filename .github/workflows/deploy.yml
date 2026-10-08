@@ -54,6 +54,8 @@ jobs:
             "SHA='$SHA' DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$DEPLOY_PATH"
+          # The release now running, whose images stay for a rollback.
+          previous="$(git rev-parse --verify --quiet HEAD || true)"
           git fetch --quiet origin
           git checkout --quiet --force "$SHA"
           export BULAVA_VERSION="$SHA"
@@ -80,7 +82,10 @@ jobs:
             fi
           done
           compose ps
-          docker image prune -f --filter "until=168h" >/dev/null
+          # Free the disk: every release pulls new tags of each image, and Docker keeps tagged
+          # images forever. Keep this release's and the previous one's; remove older Bulava images.
+          bash infrastructure/scripts/prune-docker.sh "$SHA" "$previous"
+          git gc --auto --quiet || true
           REMOTE
       - name: Smoke check
         if: steps.target.outputs.configured == 'true'

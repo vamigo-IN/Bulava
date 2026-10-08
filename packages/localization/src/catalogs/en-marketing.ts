@@ -314,7 +314,6 @@ export const enMarketing = {
   'quick.otp.code': 'Code from WhatsApp',
   'quick.otp.submit': 'Verify and continue',
   'quick.otp.change': 'Use another number',
-  'quick.whatsappSent': 'Your preview link is on its way to WhatsApp.',
   'quick.consentRequired': 'Please accept the Terms of Service and the Privacy Policy to continue.',
   'quick.close': 'Close',
   'templates.detail.for': 'Designed for',
@@ -349,7 +348,6 @@ export const enMarketing = {
   'home.compare.no': 'No',
   'home.compare.partly': 'Partly',
   'home.testimonials.rating': '{rating} out of 5',
-  'nav.menuClose': 'Close menu',
 
   // Not found and error pages
   'notFound.eyebrow': 'Error 404',

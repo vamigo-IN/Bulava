@@ -28,8 +28,9 @@ export interface JobPayloads {
    * One approved WhatsApp template to a host's number: `template` names the kind
    * (the admin's settings map it to the approved template name), `params` fill
    * its body variables and `copyCode` an authentication template's copy button.
+   * Invitation and reminder kinds come only from the console's connection test.
    */
-  whatsapp: { to: string; template: 'preview' | 'otp'; params: string[]; copyCode?: string };
+  whatsapp: { to: string; template: 'invitation' | 'reminder' | 'preview' | 'otp'; params: string[]; copyCode?: string };
   analytics: {
     name: string;
     eventId?: string | null;
@@ -40,7 +41,7 @@ export interface JobPayloads {
     occurredAt: string;
   };
   exports: { exportType: 'GUESTS_CSV' | 'RSVPS_CSV'; eventId: string; requestedById: string };
-  cleanup: { task: 'expired-sessions' | 'stale-uploads' | 'deleted-events' | 'event-lifecycle' | 'reminders' | 'domains' };
+  cleanup: { task: 'expired-sessions' | 'stale-uploads' | 'deleted-events' | 'event-lifecycle' | 'reminders' | 'domains' | 'whatsapp-status' };
 }
 
 /** Sensible defaults per queue: retries with exponential backoff, bounded history. */

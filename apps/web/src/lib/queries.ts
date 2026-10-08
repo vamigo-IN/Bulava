@@ -132,6 +132,13 @@ export const useCatalog = (type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', eventType
     queryFn: () => apiGet<TemplateSummaryLite[]>(`/public/templates?type=${type}&eventType=${encodeURIComponent(eventType)}&include=definition`),
     staleTime: 300_000,
   });
+/** Template summaries without their definitions: enough for previews and links (the home page). */
+export const useTemplateList = (type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', eventType?: string) =>
+  useQuery({
+    queryKey: ['templates', 'list', type, eventType ?? 'all'],
+    queryFn: () => apiGet<TemplateSummaryLite[]>(`/public/templates?type=${type}${eventType ? `&eventType=${encodeURIComponent(eventType)}` : ''}`),
+    staleTime: 300_000,
+  });
 export const useNotifications = () =>
   useQuery({
     queryKey: moreKeys.notifications,

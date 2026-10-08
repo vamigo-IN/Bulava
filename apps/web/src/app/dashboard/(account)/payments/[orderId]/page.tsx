@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Check, CheckCircle2, Clock3, Copy, CreditCard, Loader2, Palette, RotateCcw, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Ban, Check, CheckCircle2, Clock3, Copy, CreditCard, Loader2, Palette, RotateCcw, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -164,7 +164,11 @@ export default function PaymentStatusPage() {
   const stepLabels: MessageKey[] = ['payment.step.placed', 'payment.step.payment', 'payment.step.confirmation', 'payment.step.active'];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 py-2 sm:py-6">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <Link href="/dashboard/payments" className="group inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-brand-700">
+        <ArrowLeft aria-hidden className="size-4 transition-transform group-hover:-translate-x-0.5" />
+        {t('payment.back')}
+      </Link>
       {/* What happened, in one glance. */}
       <section className="clay relative overflow-hidden rounded-[2rem] px-6 py-10 text-center sm:px-12 sm:py-12" aria-live="polite">
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 -top-24 h-72" style={{ background: `radial-gradient(closest-side, ${look.glow}, transparent)` }} />

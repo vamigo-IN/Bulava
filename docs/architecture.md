@@ -23,8 +23,8 @@ Bulava is an event platform with a template engine, invitation engine, media pla
 | Custom event domains (DNS ownership check, Cloudflare for SaaS certificates) | Done |
 | Nonce-based CSP on private pages and the admin console; WCAG 2.1 AA audit of public, dashboard, guest and template pages | Done |
 | Production compose, Nginx, CI/CD, backups, health checks, metrics, Sentry | Done |
-| Super Admin console: branding, SEO and AI crawlers, trackers and custom code, integrations (Razorpay, SMTP, WhatsApp, Google Maps, custom domains, storage test), staff roles, user profiles, payment states, complimentary upgrades | Done |
-| WhatsApp Business delivery (Meta Cloud API) with per-plan allowances; Google Maps on invitations | Done |
+| Super Admin console: branding, SEO and AI crawlers, trackers and custom code, integrations (Razorpay, SMTP, WhatsApp, Google sign-in, Google Maps, custom domains, storage test), staff roles, user profiles, payment states, complimentary upgrades | Done |
+| WhatsApp Business delivery (GetGabs by default, or Meta's Cloud API) with per-plan allowances and delivery/read status; Google Maps on invitations | Done |
 | Site pages edited in the console (About, Contact, policies, new pages), contact form with a staff inbox, payment status page | Done |
 | SMS delivery, AI assistant | Not started (see Roadmap) |
 

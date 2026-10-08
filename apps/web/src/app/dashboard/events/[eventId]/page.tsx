@@ -1,29 +1,28 @@
 'use client';
 
-import { ArrowRight, CircleCheckBig, CircleDashed, Eye, MailOpen, Palette, PartyPopper, UsersRound, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Check, Eye, MailOpen, Palette, PartyPopper, UsersRound, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { TemplateStyles, TemplateThumbnail } from '@bulava/template-engine';
-import { apiPatch } from '@/lib/api';
-import { errorMessage, useT } from '@/lib/i18n';
+import { useT } from '@/lib/i18n';
 import { can } from '@/lib/permissions';
-import { useDesign, useEvent, useInvalidateEvent, useInvitations, useLanguages, useMe, useRsvpSummary, useShareLink } from '@/lib/queries';
-import type { AccessMode, EventSummary } from '@/lib/types';
+import { useDesign, useEvent, useInvitations, useRsvpSummary } from '@/lib/queries';
+import { nextStep, progressOf, type SetupStep } from '@/lib/setup-steps';
 import { cn } from '@/lib/utils';
 import { CountUp, ProgressRing } from '@/components/dashboard/count-up';
 import { PreviewLinkCard } from '@/components/events/preview-link-card';
+import { usePublish } from '@/components/events/publish-dialog';
 import { ShareCard } from '@/components/events/share-card';
-import { Alert, Button, Card, Field, Input, Select } from '@/components/ui/primitives';
-
-const ACCESS_MODES: AccessMode[] = ['INVITE_ONLY', 'PRIVATE_LINK', 'GROUP_RESTRICTED', 'SECRET_TOKEN', 'PUBLIC'];
+import { useSetupSteps } from '@/components/events/use-setup-steps';
+import { Card } from '@/components/ui/primitives';
 
 function Stat({ label, value, icon: Icon, hint }: { label: string; value: number; icon: LucideIcon; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-gold-200/70 bg-white p-5 shadow-soft">
+    <div className="clay rounded-2xl p-5">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">{label}</p>
-        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100">
+        <span aria-hidden className="icon-3d size-9 shrink-0 rounded-xl">
           <Icon className="size-4" />
         </span>
       </div>
@@ -38,9 +37,7 @@ function Stat({ label, value, icon: Icon, hint }: { label: string; value: number
 export default function EventOverviewPage() {
   const t = useT();
   const { eventId } = useParams<{ eventId: string }>();
-  const base = `/dashboard/events/${eventId}`;
   const event = useEvent(eventId);
-  const me = useMe();
   // Each block loads only for members whose role includes it.
   const canInvites = can(event.data, 'invitation.read');
   const canRsvps = can(event.data, 'rsvp.read');
@@ -48,173 +45,150 @@ export default function EventOverviewPage() {
   const design = useDesign(eventId);
   const invitations = useInvitations(eventId, canInvites);
   const summary = useRsvpSummary(eventId, canRsvps);
-  const share = useShareLink(eventId, canInvites);
-  const languages = useLanguages();
-  const invalidate = useInvalidateEvent(eventId);
-  const [draft, setDraft] = useState<Partial<EventSummary>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const steps = useSetupSteps(canEdit ? event.data : undefined);
 
   if (!event.data) return null;
-  const current = { ...event.data, ...draft };
-  const dirty = Object.keys(draft).length > 0;
   const invites = invitations.data ?? [];
   const opened = invites.filter((i) => i.openedAt).length;
   const attending = summary.data?.functions.reduce((s, f) => s + f.headcount, 0) ?? 0;
   const website = design.data?.selections.WEBSITE;
+  const draft = event.data.status === 'DRAFT';
 
-  // Link-shared events need no guest list: publish, open registration and share the one link.
-  const linkShared = share.data?.kind === 'LINK';
-  const checklist = linkShared
-    ? [
-        { done: !!website && !website.isDefault, label: t('dash.checklist.design'), href: `${base}/design` },
-        { done: event.data.counts.functions > 0, label: t('dash.checklist.functions'), href: `${base}/functions` },
-        { done: event.data.status !== 'DRAFT', label: t('dash.checklist.publish'), href: base },
-        { done: !!share.data?.registrationOpen, label: t('dash.checklist.registration'), href: `${base}/registrations` },
-        { done: event.data.counts.guests > 0 || invites.some((i) => i.sentAt), label: t('dash.checklist.shareLink'), href: `${base}/invitations` },
-      ]
-    : [
-        { done: !!website && !website.isDefault, label: t('dash.checklist.design'), href: `${base}/design` },
-        { done: event.data.counts.functions > 0, label: t('dash.checklist.functions'), href: `${base}/functions` },
-        { done: event.data.counts.guests > 0, label: t('dash.checklist.guests'), href: `${base}/guests` },
-        { done: invites.length > 0, label: t('dash.checklist.invite'), href: `${base}/invitations` },
-        { done: event.data.status !== 'DRAFT', label: t('dash.checklist.publish'), href: base },
-        { done: invites.some((i) => i.sentAt), label: t('dash.checklist.share'), href: `${base}/invitations` },
-      ];
-  const progress = checklist.filter((c) => c.done).length;
-
-  const save = async (patch: Partial<EventSummary>) => {
-    setError(null);
-    setSaving(true);
-    try {
-      await apiPatch(`/events/${eventId}`, patch);
-      setDraft({});
-      await invalidate();
-    } catch (err) {
-      setError(errorMessage(t, err));
-    } finally {
-      setSaving(false);
-    }
-  };
+  const stats = (
+    <div className={cn('grid grid-cols-2 gap-3', canInvites && canRsvps ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
+      <Stat label={t('dash.stats.guests')} value={event.data.counts.guests} icon={UsersRound} />
+      {canInvites ? <Stat label={t('dash.stats.invited')} value={invites.length} icon={MailOpen} /> : null}
+      {canInvites ? (
+        <Stat label={t('dash.stats.opened')} value={opened} icon={Eye} hint={invites.length ? t('dash.stats.openRate', { rate: Math.round((opened / invites.length) * 100) }) : undefined} />
+      ) : null}
+      {canRsvps ? <Stat label={t('dash.stats.attending')} value={attending} icon={PartyPopper} /> : null}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      <div className={cn('grid grid-cols-2 gap-3', canInvites && canRsvps ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
-        <Stat label={t('dash.stats.guests')} value={event.data.counts.guests} icon={UsersRound} />
-        {canInvites ? <Stat label={t('dash.stats.invited')} value={invites.length} icon={MailOpen} /> : null}
-        {canInvites ? (
-          <Stat label={t('dash.stats.opened')} value={opened} icon={Eye} hint={invites.length ? t('dash.stats.openRate', { rate: Math.round((opened / invites.length) * 100) }) : undefined} />
-        ) : null}
-        {canRsvps ? <Stat label={t('dash.stats.attending')} value={attending} icon={PartyPopper} /> : null}
-      </div>
+      {/* While a draft, the way to a live invitation comes first; afterwards the numbers do. */}
+      {draft ? null : stats}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
+          {steps ? <SetupChecklist eventId={eventId} steps={steps} /> : null}
           {canEdit ? <PreviewLinkCard event={event.data} /> : null}
           {canInvites ? <ShareCard event={event.data} /> : null}
-
-          {canEdit ? (
-          <Card className="rounded-3xl">
-            <div className="flex items-center gap-5">
-              <div className="relative grid place-items-center">
-                <ProgressRing done={progress} total={checklist.length} />
-                <span className="absolute font-display text-lg text-ink">
-                  {progress}/{checklist.length}
-                </span>
-              </div>
-              <div className="min-w-0">
-                <h2 className="font-display text-2xl leading-tight">{t('dash.checklist.title')}</h2>
-                <p className="mt-1 text-sm text-stone-500">{progress === checklist.length ? t('dash.checklist.complete') : t('dash.checklist.progress', { done: progress, total: checklist.length })}</p>
-              </div>
-            </div>
-            <ol className="mt-6 grid gap-2 sm:grid-cols-2">
-              {checklist.map((c) => (
-                <li key={c.label}>
-                  <Link
-                    href={c.href}
-                    className={cn(
-                      'group flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 text-sm transition-[border-color,background-color,box-shadow] duration-300',
-                      c.done ? 'border-emerald-200/80 bg-emerald-50/70 text-emerald-900' : 'border-gold-200 bg-white hover:border-gold-300 hover:shadow-soft',
-                    )}
-                  >
-                    {c.done ? <CircleCheckBig aria-hidden className="size-5 shrink-0 text-emerald-700" /> : <CircleDashed aria-hidden className="size-5 shrink-0 text-gold-500" />}
-                    <span className="flex-1">{c.label}</span>
-                    {c.done ? null : <ArrowRight aria-hidden className="size-4 text-stone-400 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-brand-700" />}
-                  </Link>
-                </li>
-              ))}
-            </ol>
-            {event.data.status === 'DRAFT' ? (
-              me.data?.provisional ? (
-                // A WhatsApp-only account secures itself first; the API refuses to publish otherwise.
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <Link href={`/dashboard/claim?next=${encodeURIComponent(base)}`} className="btn-3d min-h-11 rounded-xl px-5 text-sm">
-                    {t('claim.banner.cta')}
-                  </Link>
-                  <p className="text-sm text-stone-600">{t('claim.publishFirst')}</p>
-                </div>
-              ) : (
-                <Button className="mt-5 w-full sm:w-auto" disabled={saving} onClick={() => save({ status: 'ACTIVE' })}>
-                  {t('event.publish')}
-                </Button>
-              )
-            ) : null}
-          </Card>
-          ) : null}
-
-          {canEdit ? (
-          <Card className="space-y-4 rounded-3xl">
-            {error ? <Alert>{error}</Alert> : null}
-            <Field label={t('event.field.title')}>
-              {(p) => <Input {...p} value={current.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />}
-            </Field>
-            <Field label={t('event.field.language')}>
-              {(p) => (
-                <Select {...p} value={current.language} onChange={(e) => setDraft({ ...draft, language: e.target.value })}>
-                  {languages.data?.map((l) => (
-                    <option key={l.code} value={l.code}>
-                      {l.nativeName} ({l.name})
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            {/* Full width: each mode's label explains it, and the longest needs the room. */}
-            <Field label={t('event.field.accessMode')}>
-              {(p) => (
-                <Select {...p} value={current.accessMode} onChange={(e) => setDraft({ ...draft, accessMode: e.target.value as AccessMode })}>
-                  {ACCESS_MODES.map((m) => (
-                    <option key={m} value={m}>
-                      {t(`access.${m}`)}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Button disabled={!dirty || saving} onClick={() => save({ title: current.title, language: current.language, accessMode: current.accessMode })}>
-              {saving ? t('common.saving') : t('common.save')}
-            </Button>
-          </Card>
-          ) : null}
         </div>
 
         <Card className="self-start rounded-3xl">
           <h2 className="font-display text-xl">{website?.isDefault ? t('design.default') : t('design.current')}</h2>
           {website && design.data ? (
-            <Link href={`${base}/design`} className="group mt-5 block">
+            <Link href={`/dashboard/events/${eventId}/design`} className="group mt-5 block">
               <div className="mx-auto w-fit overflow-hidden rounded-[1.6rem] border-[6px] border-ink shadow-lift transition-[translate,box-shadow] duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_30px_60px_-24px_rgba(47,7,16,0.45)]">
                 <TemplateStyles />
                 <TemplateThumbnail definition={website.definition} context={design.data.context} customization={website.customization} width={240} height={430} sections={3} />
               </div>
               <p className="mt-4 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-700">
                 <Palette aria-hidden className="size-4" />
-                {t('design.choose')}
+                {website.isDefault ? t('dash.step.design.action') : t('design.edit')}
                 <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
               </p>
             </Link>
           ) : null}
         </Card>
       </div>
+
+      {draft ? stats : null}
     </div>
+  );
+}
+
+/**
+ * The way from a new event to a live one, as a timeline: finished steps
+ * folded with a tick, the next one open with its explanation and button, the
+ * rest waiting below.
+ */
+function SetupChecklist({ eventId, steps }: { eventId: string; steps: SetupStep[] }) {
+  const t = useT();
+  const publish = usePublish();
+  const base = `/dashboard/events/${eventId}`;
+  const { done, total } = progressOf(steps);
+  const upNext = nextStep(steps);
+
+  const target = (step: SetupStep, className: string, children: ReactNode) =>
+    step.key === 'publish' && !step.done && publish ? (
+      <button type="button" onClick={publish} className={className}>
+        {children}
+      </button>
+    ) : (
+      <Link href={`${base}${step.section}`} className={className}>
+        {children}
+      </Link>
+    );
+
+  return (
+    <Card className="rounded-3xl p-5 sm:p-7">
+      <div className="flex items-center gap-5">
+        <div className="relative grid place-items-center">
+          <ProgressRing done={done} total={total} size={68} />
+          <span className="absolute font-display text-lg text-ink">
+            {done}/{total}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-display text-2xl leading-tight">{t('dash.checklist.title')}</h2>
+          <p className="mt-1 text-sm text-stone-500">{upNext ? t('dash.checklist.progress', { done, total }) : t('dash.checklist.complete')}</p>
+        </div>
+      </div>
+
+      <ol className="relative mt-6 space-y-2.5">
+        {steps.map((step, i) => {
+          const isNext = upNext?.key === step.key;
+          return (
+            <li key={step.key} className={cn('relative rounded-2xl border transition-[border-color,background-color,box-shadow] duration-300', isNext ? 'border-gold-300 bg-white p-4 shadow-clay-sm sm:p-5' : step.done ? 'border-emerald-200/70 bg-emerald-50/50 px-4 py-3' : 'border-gold-200/70 bg-white/60 px-4 py-3')}>
+              <div className="flex items-start gap-3.5">
+                <span
+                  aria-hidden
+                  className={cn(
+                    'mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold',
+                    step.done ? 'bg-emerald-600 text-white' : isNext ? 'bg-gradient-to-br from-brand-600 to-brand-900 text-gold-100 shadow-[0_6px_14px_-6px_rgba(91,14,27,0.8)]' : 'bg-stone-100 text-stone-500 ring-1 ring-stone-200',
+                  )}
+                >
+                  {step.done ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span className={cn('font-medium', isNext ? 'font-display text-xl text-ink' : step.done ? 'text-emerald-900' : 'text-ink')}>{t(step.title)}</span>
+                    {step.optional && !step.done ? <span className="rounded-full bg-sand px-2 py-0.5 text-[11px] font-medium text-stone-600">{t('next.optional')}</span> : null}
+                    {isNext ? <span className="rounded-full bg-gold-100 px-2 py-0.5 text-[11px] font-semibold text-gold-700">{t('next.eyebrow.todo')}</span> : null}
+                    <span className="sr-only">{step.done ? t('next.state.done') : t('next.state.todo')}</span>
+                  </p>
+                  {isNext || !step.done ? <p className={cn('mt-1 text-sm leading-relaxed', isNext ? 'text-stone-600' : 'text-stone-500')}>{t(step.body)}</p> : null}
+                  {isNext ? (
+                    <div className="mt-4">
+                      {target(
+                        step,
+                        'btn-3d min-h-11 rounded-2xl px-5 text-sm',
+                        <>
+                          {t(step.action)}
+                          <ArrowRight aria-hidden className="size-4" />
+                        </>,
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+                {!isNext
+                  ? target(
+                      step,
+                      'grid size-9 shrink-0 place-items-center rounded-full text-stone-400 transition-colors hover:bg-sand hover:text-brand-700',
+                      <>
+                        <ArrowRight aria-hidden className="size-4" />
+                        <span className="sr-only">{t(step.action)}</span>
+                      </>,
+                    )
+                  : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
   );
 }

@@ -200,24 +200,29 @@ const TimezoneSchema = z.string().min(1).max(64).refine((tz) => {
   }
 }, 'Unknown time zone');
 
+/** A calendar day, YYYY-MM-DD. */
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date');
+
 export const CreateEventSchema = z.object({
   typeKey: z.string().trim().min(1).max(40),
   title: trimmed(160),
   description: optionalText(4000),
   language: LanguageCodeSchema.default('en'),
   timezone: TimezoneSchema.default('Asia/Kolkata'),
+  /** The dashboard sends PRIVATE_LINK and asks again when the event is published. */
   accessMode: AccessModeSchema.default('INVITE_ONLY'),
   visibility: VisibilitySchema.default('UNLISTED'),
   details: z.record(z.string(), z.unknown()).default({}),
   /** Create the event type's suggested functions and groups. */
   applyDefaults: z.boolean().default(true),
+  /** Which suggested functions to create (their slugs); all of them when omitted. */
+  functionSlugs: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
+  /** The main function's day, at 10 am in the event's time zone; each function's own date comes later. */
+  date: dateOnly.optional(),
 });
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
 
 // ───────────────────────────── Quick start (preview before paying) ─────────────────────────────
-
-/** A calendar day, YYYY-MM-DD. */
-const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose a date');
 
 /**
  * The template page's quick start: the host's names, the date and a WhatsApp

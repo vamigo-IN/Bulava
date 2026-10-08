@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Deploys no longer fill the server's disk
+
+- **Old releases are cleaned up.** Every release brought new copies of each Bulava image and Docker kept them all, so the disk filled with each deploy. The deploy now keeps only the running release and the one before it (for a rollback), and removes unused build cache. `infrastructure/scripts/prune-docker.sh` does the same after a deploy by hand. It never touches containers, volumes or other sites' images.
+- **Smaller log files.** Container logs are capped at 30 MB per container instead of 100 MB.
+
+### A guided dashboard
+
+- **Home.** A new Home tab greets the host with the next celebration's countdown, the event to pick up where they left off (with its progress and the one thing to do next), their events, numbers across them, recent activity and shortcuts. Before the first event it offers occasions to start from, how Bulava works, and designs to browse. My events lists every event with its design as the cover and filters for drafts, live and past events.
+- **Creating an event in three short steps.** Pick the occasion from cards, add the names (the title fills itself), the day and the invitation language, then keep the functions you are having. A live invitation card follows along. Who can open the invitation is no longer asked here.
+- **Choose who can open it when you publish.** Events start as one private link. Publishing opens a dialog with the choices explained as cards, the private link recommended, and then the link to copy or share on WhatsApp. Settings changes it afterwards.
+- **What's next, on every page.** Each event page ends with the next step and its button, and a rail of every step (design, functions, guests, publish, share, replies). The sidebar ticks finished steps and shows the setup's progress, and the overview's checklist opens the next step with its explanation.
+- **A roomier design page.** Designs are browsed in a full-screen window with plan and search filters, full names and previews, and the chosen one shown live with your names before you pick it. The editor's tabs have icons, and the save button tells you when there are unsaved changes.
+- **An account area.** Profile, Sign-in & security, Payments and Privacy & data share one layout with a header showing how well the account is protected. Payments has totals and filters.
+
+### WhatsApp through GetGabs, and Google sign-in from the console
+
+- **GetGabs for WhatsApp.** Integrations → WhatsApp Business now asks which provider sends: GetGabs (the default) or Meta's Cloud API. For GetGabs, enter the production API key, the sender number and, if you like, a campaign ID, so that Bulava's messages appear in that campaign's report. Templates, their variables, plan allowances and failure handling are unchanged.
+- **Delivered and read, with GetGabs too.** GetGabs reports delivery only when asked, so the worker asks about each WhatsApp invitation 5 minutes, 1 hour, 6 hours, 1 day and 3 days after sending. With the optional chats webhook (the console generates its address), a guest's reply to an invitation marks it read at once.
+- **A connection check that catches template mistakes.** For GetGabs, the check confirms the API key, then that each template exists, is approved, is in the language Bulava sends and has the right number of variables. The test message now goes through the worker with your own first template and sample details, for both providers, instead of Meta's hello_world.
+- **Delivery statuses only move forward.** A late "delivered" report no longer turns a read invitation back into delivered. This also applies to Meta's webhook.
+- **Google sign-in in the console.** The Super Admin sets up "Continue with Google" under Integrations → Google sign-in: the client ID and secret, the redirect URI to register in Google Cloud, an on/off switch, and a check that Google accepts the client. Changes apply without a restart. `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are used only until the settings are first saved.
+- **Fixed:** the Meta webhook address in the WhatsApp settings was blank.
+
 ### Preview before paying: the new way to start
 
 - **Use this template, no sign-up wall.** On a template page, visitors enter their names, the date and a WhatsApp number and get a draft invitation with that design and a shareable preview link in under a minute. The account is made from the number alone; a password is not needed until they publish. The preview link also goes to their WhatsApp when the WhatsApp Business integration has a *preview link* template (Integrations → WhatsApp).

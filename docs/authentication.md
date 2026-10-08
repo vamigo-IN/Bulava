@@ -35,7 +35,7 @@ Every step is in the audit log (`user.mfa_enabled`, `user.mfa_disabled`, `user.m
 
 ### Google sign-in
 
-"Continue with Google" is the OpenID Connect authorization code flow with PKCE, implemented in `GoogleAuthService` with `jose` for ID token verification. The button appears only when `GET /auth/providers` reports `google: true`, which requires both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+"Continue with Google" is the OpenID Connect authorization code flow with PKCE, implemented in `GoogleAuthService` with `jose` for ID token verification. The button appears only when `GET /auth/providers` reports `google: true`: the Super Admin has set up an OAuth client in the console (Integrations → Google sign-in) and left it switched on. Until that group is first saved, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are used instead ([ADR-043](decisions.md)).
 
 | Step | Behaviour |
 |---|---|
@@ -44,16 +44,18 @@ Every step is in the audit log (`user.mfa_enabled`, `user.mfa_disabled`, `user.m
 | Accounts | The Google subject (`User.googleSub`, unique) identifies the account. A new email creates an account with a verified email and no password (`user.signup`, method `google`), but only when the flow started from the sign-up page with the Terms and Privacy box ticked (`/auth/google/start?consent=1`; the consents are recorded with source `signup_google`); from the sign-in page a new Google account is sent to `/signup?error=CONSENT_REQUIRED`. An account waiting to be deleted is offered a restore (`/login#restore=<token>&until=<date>`). An existing account with that email is linked automatically **only if its email was verified**. Bulava does not verify emails at sign-up, so a password account instead gets `GOOGLE_LINK_REQUIRED`: someone who registers another person's address first can never capture their Google sign-in, and the owner links Google from **Account** while signed in. |
 | Two-step | Accounts with an authenticator still need it. The callback creates the usual two-step challenge and redirects to `/login#mfa=<challenge>`. The fragment is never sent to servers or logged, and the sign-in page continues at the code step. |
 | Link / unlink | `POST /auth/google/link` (signed in) starts the same flow in link mode and records the subject on the current user. It refuses a Google account already linked elsewhere (`GOOGLE_ALREADY_LINKED`). `POST /auth/google/unlink` needs the account to have a password (`GOOGLE_UNLINK_BLOCKED`), so nobody locks themselves out. |
-| Errors | Failures redirect to `/login?error=<CODE>` (or `/dashboard/account?google=<CODE>` when linking) with a translated message: `GOOGLE_UNAVAILABLE`, `GOOGLE_FAILED`, `GOOGLE_CANCELLED`, `GOOGLE_LINK_REQUIRED`, `GOOGLE_ALREADY_LINKED`. |
+| Errors | Failures redirect to `/login?error=<CODE>` (or `/dashboard/account/security?google=<CODE>` when linking) with a translated message: `GOOGLE_UNAVAILABLE`, `GOOGLE_FAILED`, `GOOGLE_CANCELLED`, `GOOGLE_LINK_REQUIRED`, `GOOGLE_ALREADY_LINKED`. |
 
-Everything is audited (`user.login` / `user.signup` with method `google`, `user.google_linked`, `user.google_unlinked`, and failed `user.google_signin` with a reason). Accounts without a password can add one under **Account → Sign-in methods**. Turning on two-step sign-in asks for the password, so those accounts set one first.
+Everything is audited (`user.login` / `user.signup` with method `google`, `user.google_linked`, `user.google_unlinked`, and failed `user.google_signin` with a reason). Accounts without a password can add one under **Account → Sign-in & security**. Turning on two-step sign-in asks for the password, so those accounts set one first.
 
 **Setup:**
 
-1. In Google Cloud Console → APIs & Services, configure the OAuth consent screen (external, app name Bulava, scopes `openid`, `email`, `profile`).
+1. In Google Cloud Console → APIs & Services, configure the OAuth consent screen: external, the site's name and logo, a support email, the privacy policy and terms links, and the scopes `openid`, `email`, `profile`. Publish the app ("In production"), or only test users can sign in.
 2. Create an OAuth client ID of type *Web application*.
-3. Add the authorised redirect URI `<WEB_ORIGIN>/api/v1/auth/google/callback`, for example `https://bulava.in/api/v1/auth/google/callback` and, for development, `http://localhost:3000/api/v1/auth/google/callback`.
-4. Put the id and secret into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and restart the API. Set both or neither; the API refuses to start with only one.
+3. Add the authorised redirect URI the console shows, `<WEB_ORIGIN>/api/v1/auth/google/callback`: for example `https://bulava.in/api/v1/auth/google/callback` and, for development, `http://localhost:3000/api/v1/auth/google/callback`.
+4. In the admin console → Integrations → **Google sign-in**, paste the client ID and secret, save, and run the check. It sends Google a made-up code: Google answers `invalid_grant` when the client ID and secret are right and `invalid_client` when they are not. Changes apply within 15 seconds, without a restart; the switch on the card hides the button without forgetting the client.
+
+The environment variables still work as a fallback until the console saves the group (the first save copies them). Set both or neither; the API refuses to start with only one.
 
 ### Quick start, WhatsApp codes and provisional accounts
 
@@ -100,6 +102,6 @@ Guests have no account. The invitation token in `/invite/<token>` is the credent
 | `COOKIE_SECURE` | Must be `true` in production. |
 | `TOKEN_ENCRYPTION_KEY` | 32 bytes base64. Encrypts invitation tokens (so hosts can re-copy links), TOTP secrets and live-wall links. Dev value rejected in production. |
 | `STAFF_MFA_REQUIRED` | Staff need two-step sign-in for admin routes. Defaults to `true` in production (and `false` is refused there), `false` elsewhere. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Enable Google sign-in; both or neither. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in until it is saved in the console (Integrations → Google sign-in); both or neither. |
 | `GOOGLE_REDIRECT_URI` | Optional; defaults to `<WEB_ORIGIN>/api/v1/auth/google/callback`. |
 | `GOOGLE_ISSUER`, `GOOGLE_AUTH_URL`, `GOOGLE_TOKEN_URL`, `GOOGLE_JWKS_URL` | Google's endpoints by default; the e2e suite points them at a local mock provider. |

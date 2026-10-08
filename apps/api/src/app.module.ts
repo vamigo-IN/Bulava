@@ -109,9 +109,9 @@ import { ConsentService } from './modules/users/consent.service';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 import { PlatformPermissionGuard } from './common/guards/platform-permission.guard';
 
-/** Invitation tokens travel in URLs; keep them out of logs. */
+/** Invitation tokens and the GetGabs webhook token travel in URLs; keep them out of logs. */
 function redactUrl(url: string | undefined): string | undefined {
-  return url?.replace(/(\/public\/invitations\/)[^/?#]+/, '$1[REDACTED]');
+  return url?.replace(/(\/public\/invitations\/)[^/?#]+/, '$1[REDACTED]').replace(/(\/whatsapp\/getgabs)\?[^#]*/, '$1?[REDACTED]');
 }
 
 const bootConfig = loadConfig();

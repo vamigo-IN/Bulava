@@ -22,9 +22,10 @@ x-node-service: &node-service
     LOG_FORMAT: json
   security_opt: ["no-new-privileges:true"]
   cap_drop: [ALL]
+  # At most 30 MB of logs per container (the server is shared and its disk small).
   logging: &logging
     driver: json-file
-    options: { max-size: "20m", max-file: "5" }
+    options: { max-size: "10m", max-file: "3" }
   networks: [bulava-network]
 
 services:

@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, Post, Req, Res, type RawBodyRequest } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Req, Res, type RawBodyRequest } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -6,27 +6,20 @@ import { Public, SkipCsrf } from '../../common/decorators/auth.decorators';
 import { WhatsAppWebhookService } from './whatsapp-webhook.service';
 
 /**
- * WhatsApp Business Cloud API webhook controller.
- * Implements endpoints according to Meta's specifications:
- * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview/
+ * Webhooks of the WhatsApp providers. All are public (server to server) and
+ * authenticated by a secret each provider proves differently:
  *
- * Two endpoints on `/api/v1/whatsapp/webhook`:
- *   GET  – Meta's one-time verification handshake (responds with hub.challenge as text/plain)
- *   POST – Meta's real-time event updates (HMAC-SHA256 verified over raw request body)
- *
- * Both are public (server-to-server from Meta); authenticity is verified by
- * the webhook verify token (GET) or App Secret HMAC signature (POST),
- * exactly like the Razorpay webhook.
+ *   GET  /whatsapp/webhook          Meta's verification handshake (verify token; answers hub.challenge as text)
+ *   POST /whatsapp/webhook          Meta's message statuses (X-Hub-Signature-256 over the raw body, app secret)
+ *   POST /whatsapp/getgabs?token=…  GetGabs' incoming chats (a secret token in the URL, as GetGabs does not sign;
+ *                                   in the query string, which Nginx and the API keep out of their logs)
  */
 @ApiTags('whatsapp')
 @Controller()
 export class WhatsAppWebhookController {
   constructor(private readonly service: WhatsAppWebhookService) {}
 
-  /**
-   * Meta verification handshake.
-   * Responds with HTTP 200 and the hub.challenge value as plain text.
-   */
+  /** Meta verification handshake: HTTP 200 with the hub.challenge value as plain text. */
   @Public()
   @SkipCsrf()
   @Get('whatsapp/webhook')
@@ -41,11 +34,7 @@ export class WhatsAppWebhookController {
     res.status(200).type('text/plain').send(result);
   }
 
-  /**
-   * Meta event delivery.
-   * Real-time message status updates (sent, delivered, read, failed).
-   * Verified using X-Hub-Signature-256 HMAC-SHA256 signature with the Meta App Secret.
-   */
+  /** Meta event delivery: message statuses (sent, delivered, read, failed). */
   @Public()
   @SkipCsrf()
   @Throttle({ default: { limit: 300, ttl: 60_000 } })
@@ -53,5 +42,19 @@ export class WhatsAppWebhookController {
   @HttpCode(200)
   handleWebhook(@Req() req: RawBodyRequest<Request>) {
     return this.service.handleWebhook(req.rawBody, req.get('x-hub-signature-256') ?? undefined);
+  }
+
+  /**
+   * GetGabs "Webhook URL for All Chats" (GetGabs → Settings → Developer Tools).
+   * GetGabs counts anything but HTTP 200 as a failure, so a payload we do not
+   * use is still acknowledged; only a wrong token is refused.
+   */
+  @Public()
+  @SkipCsrf()
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
+  @Post('whatsapp/getgabs')
+  @HttpCode(200)
+  handleGetGabs(@Query('token') token: unknown, @Body() body: unknown) {
+    return this.service.handleGetGabs(typeof token === 'string' ? token : '', body);
   }
 }

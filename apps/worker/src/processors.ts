@@ -6,6 +6,7 @@ import { accountDeletedEmail, announcementEmail, functionReminderEmail, invitati
 import { dispatchReminders } from './reminders';
 import { checkDueDomains, type DnsResolver, type HostnameProvider, type RoutingTarget } from '@bulava/domains';
 import { WhatsAppSendError, type EmailMessage, type EmailProvider, type WhatsAppChannel } from './providers';
+import { refreshWhatsAppStatuses } from './whatsapp-status';
 
 export interface WorkerDeps {
   prisma: PrismaClient;
@@ -13,7 +14,7 @@ export interface WorkerDeps {
   email: () => Promise<EmailProvider | null>;
   /** The site name from the admin console (Branding & contact), shown in every email. */
   siteName: () => Promise<string>;
-  /** WhatsApp Business (Meta Cloud API); absent or null while it is not set up. */
+  /** WhatsApp Business (GetGabs or Meta's Cloud API, as the settings choose); absent or null while it is not set up. */
   whatsapp?: () => Promise<WhatsAppChannel | null>;
   /** Queue a notification row for delivery (used by scheduled reminders). */
   enqueueNotification?: (notificationId: string) => Promise<void>;
@@ -103,7 +104,7 @@ export async function processNotification(deps: WorkerDeps, job: JobPayloads['no
         if (typeof payload.invitationId === 'string') {
           await deps.prisma.invitationDelivery.updateMany({
             where: { invitationId: payload.invitationId, channel: 'WHATSAPP_API', status: 'QUEUED' },
-            data: { status: 'FAILED', error: error.message.slice(0, 500) },
+            data: { status: 'FAILED', error: error.message.slice(0, 500), ...(whatsapp.provider.tag ? { provider: whatsapp.provider.tag } : {}) },
           });
         }
         return 'failed';
@@ -112,9 +113,10 @@ export async function processNotification(deps: WorkerDeps, job: JobPayloads['no
     }
     await finish('SENT');
     if (typeof payload.invitationId === 'string') {
+      // The provider that actually sent it: delivery reports are read back from it (GetGabs) or pushed by it (Meta).
       await deps.prisma.invitationDelivery.updateMany({
         where: { invitationId: payload.invitationId, channel: 'WHATSAPP_API', status: 'QUEUED' },
-        data: { status: 'SENT', providerMessageId: messageId || null, sentAt: new Date() },
+        data: { status: 'SENT', providerMessageId: messageId || null, sentAt: new Date(), ...(whatsapp.provider.tag ? { provider: whatsapp.provider.tag } : {}) },
       });
     }
     deps.log.info({ notificationId: n.id, type: n.type }, 'WhatsApp message sent');
@@ -124,33 +126,43 @@ export async function processNotification(deps: WorkerDeps, job: JobPayloads['no
   return skip(`${n.channel} provider not configured`);
 }
 
+/** What became of a platform WhatsApp message (the job's return value, which the console's connection test shows). */
+export interface WhatsAppJobResult {
+  outcome: 'sent' | 'skipped' | 'failed';
+  /** The provider and template used, or why it was skipped or refused. */
+  detail: string;
+  messageId?: string;
+}
+
 /**
  * A platform message to a host's WhatsApp number (the preview link after the
- * quick start, a sign-in code). Nothing is stored: the payload carries what to
- * send, and a wrong number or template is logged rather than retried.
+ * quick start, a sign-in code, the console's test message). Nothing is stored:
+ * the payload carries what to send, and a wrong number or template is logged
+ * rather than retried.
  */
-export async function processWhatsApp(deps: WorkerDeps, job: JobPayloads['whatsapp']): Promise<string> {
+export async function processWhatsApp(deps: WorkerDeps, job: JobPayloads['whatsapp']): Promise<WhatsAppJobResult> {
   const whatsapp = (await deps.whatsapp?.()) ?? null;
   if (!whatsapp) {
     deps.log.warn({ template: job.template }, 'WhatsApp message skipped: not configured');
-    return 'skipped';
+    return { outcome: 'skipped', detail: 'WhatsApp is off or incomplete in the worker’s settings' };
   }
   const template = whatsapp.templates[job.template];
   if (!template) {
     deps.log.warn({ template: job.template }, 'WhatsApp message skipped: no approved template');
-    return 'skipped';
+    return { outcome: 'skipped', detail: `No ${job.template} template is set` };
   }
+  let messageId: string;
   try {
-    await whatsapp.provider.sendTemplate({ to: job.to, template, language: whatsapp.language, params: job.params, copyCode: job.copyCode });
+    ({ messageId } = await whatsapp.provider.sendTemplate({ to: job.to, template, language: whatsapp.language, params: job.params, copyCode: job.copyCode }));
   } catch (error) {
     if (error instanceof WhatsAppSendError && error.permanent) {
       deps.log.warn({ template: job.template, code: error.code, message: error.message }, 'WhatsApp message failed');
-      return 'failed';
+      return { outcome: 'failed', detail: `${whatsapp.provider.name} refused ${template}: ${error.message}` };
     }
     throw error;
   }
   deps.log.info({ template: job.template }, 'WhatsApp message sent');
-  return 'sent';
+  return { outcome: 'sent', detail: `${template} (${whatsapp.language}) through ${whatsapp.provider.name}`, ...(messageId ? { messageId } : {}) };
 }
 
 type NotificationRow = NonNullable<Awaited<ReturnType<PrismaClient['notification']['findUnique']>>>;
@@ -335,6 +347,12 @@ export async function processCleanup(deps: WorkerDeps & { deleteObject: (key: st
     if (!routing) return 'no-domains';
     const r = await checkDueDomains({ prisma: deps.prisma, ...routing });
     return `checked:${r.checked} active:${r.active}`;
+  }
+  if (job.task === 'whatsapp-status') {
+    const channel = (await deps.whatsapp?.()) ?? null;
+    if (!channel?.provider.deliveryState) return 'no-status-api';
+    const r = await refreshWhatsAppStatuses({ prisma: deps.prisma, provider: channel.provider, log: deps.log }, now);
+    return `checked:${r.checked} updated:${r.updated}`;
   }
   return 'noop';
 }

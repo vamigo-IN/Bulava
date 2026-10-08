@@ -41,22 +41,39 @@ export function envFallback(group: SettingGroup, env: NodeJS.ProcessEnv): EnvFal
         secrets: present({ cloudflareApiToken: env.CLOUDFLARE_API_TOKEN }),
       };
     }
-    case 'whatsapp':
-      if (!env.WHATSAPP_PHONE_NUMBER_ID) return null;
+    case 'whatsapp': {
+      if (!env.GETGABS_API_KEY && !env.WHATSAPP_PHONE_NUMBER_ID) return null;
+      // An explicit WHATSAPP_PROVIDER wins; otherwise whichever provider's credentials are present (GetGabs first).
+      const named = env.WHATSAPP_PROVIDER?.trim().toUpperCase();
+      const provider = named === 'GETGABS' || named === 'META_CLOUD' ? named : env.GETGABS_API_KEY ? 'GETGABS' : 'META_CLOUD';
       return {
         value: {
-          enabled: Boolean(env.WHATSAPP_ACCESS_TOKEN),
-          phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
+          enabled: provider === 'GETGABS' ? Boolean(env.GETGABS_API_KEY && env.GETGABS_SENDER_NUMBER) : Boolean(env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN),
+          provider,
+          senderNumber: env.GETGABS_SENDER_NUMBER || undefined,
+          campaignId: env.GETGABS_CAMPAIGN_ID || undefined,
+          phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || undefined,
           businessAccountId: env.WHATSAPP_BUSINESS_ACCOUNT_ID || undefined,
-          templates: { invitation: env.WHATSAPP_INVITATION_TEMPLATE || undefined, reminder: env.WHATSAPP_REMINDER_TEMPLATE || undefined },
+          templates: {
+            invitation: env.WHATSAPP_INVITATION_TEMPLATE || undefined,
+            reminder: env.WHATSAPP_REMINDER_TEMPLATE || undefined,
+            preview: env.WHATSAPP_PREVIEW_TEMPLATE || undefined,
+            otp: env.WHATSAPP_OTP_TEMPLATE || undefined,
+          },
           ...(env.WHATSAPP_TEMPLATE_LANGUAGE ? { templateLanguage: env.WHATSAPP_TEMPLATE_LANGUAGE } : {}),
         },
         secrets: present({
+          apiKey: env.GETGABS_API_KEY,
+          webhookToken: env.GETGABS_WEBHOOK_TOKEN,
           accessToken: env.WHATSAPP_ACCESS_TOKEN,
           appSecret: env.WHATSAPP_APP_SECRET,
           webhookVerifyToken: env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
         }),
       };
+    }
+    case 'google':
+      if (!env.GOOGLE_CLIENT_ID) return null;
+      return { value: { enabled: true, clientId: env.GOOGLE_CLIENT_ID }, secrets: present({ clientSecret: env.GOOGLE_CLIENT_SECRET }) };
     case 'maps':
       // Filled in but off: maps appear on guest invitations only once the Super Admin
       // has seen the preview work and switched them on (a key without the Maps Embed API

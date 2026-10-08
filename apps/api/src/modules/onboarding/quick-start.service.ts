@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { permissionsForEventRole } from '@bulava/auth';
-import type { Prisma } from '@bulava/database';
 import { validateEventDetails, type QuickStartInput, type QuickStartVerifyInput } from '@bulava/validation';
 import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
 import { QueueService } from '../../infrastructure/queue/queue.service';
@@ -29,11 +28,6 @@ export type QuickStartOutcome = QuickStartResult | { requiresOtp: true; target: 
 
 type Template = NonNullable<Awaited<ReturnType<PrismaService['template']['findUnique']>>>;
 type EventType = NonNullable<Awaited<ReturnType<PrismaService['eventType']['findFirst']>>>;
-
-/** 10:00 in India on the chosen day: a sensible first time for the main function. */
-function dayAtTen(date: string): Date {
-  return new Date(`${date}T10:00:00+05:30`);
-}
 
 /**
  * The template page's quick start: names, a date and a WhatsApp number become a
@@ -176,7 +170,7 @@ export class QuickStartService {
     );
     const access: EventAccessContext = { eventId: created.id, userId: user.id, role: 'OWNER', permissions: permissionsForEventRole('OWNER'), functionIds: [] };
 
-    if (input.date) await this.setMainDate(created.id, resolved.type, input.date);
+    if (input.date) await this.events.setMainDate(created.id, resolved.type, input.date, 'Asia/Kolkata');
     // The chosen design, whatever its tier: drafts carry a watermark until the plan allows it.
     await this.design.select(access, 'WEBSITE', { templateKey: resolved.template.key }, meta);
 
@@ -190,19 +184,5 @@ export class QuickStartService {
 
     const session = await this.sessions.issue(user, meta);
     return { user: toPublicUser(user), session, event: { id: created.id, previewToken: created.previewToken, previewUrl }, whatsappSent };
-  }
-
-  /** The chosen day goes on the main function (the one named after the event type, else the first). */
-  private async setMainDate(eventId: string, type: EventType, date: string): Promise<void> {
-    const functions = await this.prisma.eventFunction.findMany({ where: { eventId, deletedAt: null }, orderBy: { sortOrder: 'asc' } });
-    if (!functions.length) return;
-    const main = functions.find((f) => f.slug === type.key.toLowerCase() || f.name.toLowerCase() === type.name.toLowerCase()) ?? functions[0]!;
-    const startsAt = dayAtTen(date);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.eventFunction.update({ where: { id: main.id }, data: { startsAt } });
-      const agg = await tx.eventFunction.aggregate({ where: { eventId, deletedAt: null, status: { not: 'CANCELLED' } }, _min: { startsAt: true }, _max: { endsAt: true, startsAt: true } });
-      const data: Prisma.EventUpdateInput = { startDate: agg._min.startsAt, endDate: agg._max.endsAt ?? agg._max.startsAt };
-      await tx.event.update({ where: { id: eventId }, data });
-    });
   }
 }

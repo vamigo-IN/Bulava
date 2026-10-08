@@ -7,6 +7,7 @@ import { connectionFromUrl, createQueue, createWorker, QueueName } from '@bulava
 import { ObjectStorage } from '@bulava/storage';
 import { processAnalytics, processCleanup, processEmail, processNotification, processWhatsApp, type WorkerDeps } from './processors';
 import { SettingsProviders } from './providers';
+import { STATUS_SWEEP_MINUTES } from './whatsapp-status';
 import { systemResolver } from '@bulava/domains';
 import { SettingsStore, type SettingsDb } from '@bulava/settings';
 
@@ -34,6 +35,7 @@ async function main(): Promise<void> {
   const providers = new SettingsProviders(settings, {
     webHost: new URL(required('WEB_ORIGIN')).hostname,
     whatsappApiBase: process.env.WHATSAPP_API_BASE || undefined,
+    getgabsApiBase: process.env.GETGABS_API_BASE || undefined,
     cloudflareApiBase: process.env.CLOUDFLARE_API_BASE || undefined,
   });
   const deps: WorkerDeps = {
@@ -82,6 +84,8 @@ async function main(): Promise<void> {
   await cleanup.add('deleted-events', { task: 'deleted-events' }, { repeat: { pattern: '10 4 * * *' }, jobId: 'cleanup-deleted-events' });
   await cleanup.add('reminders', { task: 'reminders' }, { repeat: { pattern: '* * * * *' }, jobId: 'cleanup-reminders' });
   await cleanup.add('domains', { task: 'domains' }, { repeat: { pattern: '*/10 * * * *' }, jobId: 'cleanup-domains' });
+  // Delivery reports from providers that give them on request (GetGabs); the interval must match STATUS_SWEEP_MINUTES.
+  await cleanup.add('whatsapp-status', { task: 'whatsapp-status' }, { repeat: { pattern: `*/${STATUS_SWEEP_MINUTES} * * * *` }, jobId: 'cleanup-whatsapp-status' });
   log.info({ concurrency }, 'Worker started');
 
   const health = createServer((_, res) => {
