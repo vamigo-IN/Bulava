@@ -14,6 +14,7 @@
 - **Photo frames never look empty**: until you add a photo, a frame shows the art or your monogram.
 - **Galleries stay quick** with ten times the designs: the design picker and the gallery load each design's full details only when they show it live.
 - **Template releases sync themselves.** Every deploy brings new and changed templates live, including changes to a template's tier, tags or order (staff edits in the console are kept). `seed.js --templates-only --dry-run` previews what a release will change.
+- **One command to update the server**: `bash infrastructure/scripts/deploy-server.sh` checks out the release, pulls its images, shows the template changes, backs up, starts the stack, waits for the health checks and frees old images.
 
 ### Photo privacy, entry passes and a tidier setup
 

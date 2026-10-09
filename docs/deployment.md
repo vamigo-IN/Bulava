@@ -138,21 +138,25 @@ Work through this before pushing a release tag (for the first release, `v1.0.0`;
 
 Per-environment secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, optional `DEPLOY_PATH`. Repository variables for web builds: `WEB_ORIGIN`, `STORAGE_PUBLIC_ORIGIN`, optional `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_GA4_ID`. Application secrets stay in `.env.production` on the server and never pass through CI.
 
+## Updating the server by hand
+
+While no deploy target is configured in GitHub, update the server with one script, after CI has finished (green) for the commit:
+
+```bash
+cd /opt/bulava
+bash infrastructure/scripts/deploy-server.sh            # the latest main
+bash infrastructure/scripts/deploy-server.sh <sha>      # a given commit or v-tag (also a rollback)
+```
+
+It does what the deploy workflow does: checks out the release, pulls the images CI built for that commit (it stops if CI has not published them yet), prints what the [template migration](#template-releases) will change, backs up the database (`SKIP_BACKUP=1` skips this while backups are not set up), starts the stack, waits for every health check (printing the failing service's logs and the rollback command if one fails) and prunes old images.
+
 ## Disk space
 
 Every release brings a new copy of each Bulava image (about 930 MB to download and roughly 2 to 3 GB on disk for the six images), tagged with its commit, and Docker keeps every tagged image until it is removed. Releasing often on a small server therefore fills the disk with old releases. Building on the server is worse: each build leaves the previous image behind untagged and adds to Docker's build cache.
 
 `infrastructure/scripts/prune-docker.sh` frees that space without touching the other sites on the server. It removes Bulava's images (`IMAGE_PREFIX/*`) that no container uses, except the release tags it is given; untagged images no container uses; and build cache unused for three days (`KEEP_BUILD_CACHE=1` keeps it). It never removes containers or volumes, and the database lives in a volume. The deploy workflow runs it after every release, keeping that release and the previous one for a rollback. Container logs are capped at 30 MB per container (`docker-compose.prod.yml`).
 
-When updating by hand, prune after the new release is up:
-
-```bash
-cd /opt/bulava && git pull
-export BULAVA_VERSION=$(git rev-parse HEAD)          # the images CI built for this commit
-docker compose -f docker-compose.prod.yml --env-file .env.production pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
-bash infrastructure/scripts/prune-docker.sh "$BULAVA_VERSION"
-```
+When updating by hand, `infrastructure/scripts/deploy-server.sh` does all of it (see [Updating the server by hand](#updating-the-server-by-hand)), including the prune.
 
 To see where the space goes: `df -h /`, `docker system df` and `sudo du -sh /var/lib/docker /var/backups/bulava`. A weekly cron entry keeps a hand-updated server tidy (see the script's header).
 
@@ -160,7 +164,7 @@ To see where the space goes: `df -h /`, `docker system df` and `sudo du -sh /var
 
 New and changed catalog templates reach the server with the release, through the `migrate` job: it runs before the API starts and syncs the catalog (`seedTemplates`, [templates.md](templates.md#the-catalog)): new templates are created, changed designs become new published versions, and changed listings (tier, tags, order) are updated, while staff edits made in the console or Template Studio are kept. The API clears its cached template list when it starts, so the new templates show at once. Nothing else is needed for templates: no storage upload (the art is code, the gallery images are in the web image) and no manual SQL.
 
-To see what a release will change before starting it, run the migration as a dry run with the new image:
+`deploy-server.sh` prints the dry run's total before it starts the release. To see the full list yourself, run the migration as a dry run with the new image:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate node dist/seed.js --templates-only --dry-run
