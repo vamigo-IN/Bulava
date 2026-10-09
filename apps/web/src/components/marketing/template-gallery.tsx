@@ -2,6 +2,7 @@ import { ArrowRight, SlidersHorizontal, X } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
+import { forEvent, onePerLook } from '@/lib/template-looks';
 import { cn } from '@/lib/utils';
 import { filterItems, hrefFor, type ExplorerFilters, type ExplorerItem, type FilterKey, type FilterOption } from './template-explorer';
 import { TrackedLink } from './tracked-link';
@@ -15,10 +16,13 @@ export interface FilterGroup {
   visible?: number;
 }
 
-function GroupLinks({ group, items, current, t, basePath }: { group: FilterGroup; items: ExplorerItem[]; current: ExplorerFilters; t: Translator; basePath: string }) {
+/** What the gallery shows for some filters: the matching templates, each design once. */
+type View = (f: ExplorerFilters) => ExplorerItem[];
+
+function GroupLinks({ group, view, current, t, basePath }: { group: FilterGroup; view: View; current: ExplorerFilters; t: Translator; basePath: string }) {
   const value = current[group.key] ?? '';
-  // How many templates each choice would show, given the other filters.
-  const count = (v: string) => filterItems(items, { ...current, [group.key]: v }).length;
+  // How many designs each choice would show, given the other filters.
+  const count = (v: string) => view({ ...current, [group.key]: v }).length;
   const option = (o: FilterOption) => {
     const active = value === o.value;
     const n = count(o.value);
@@ -75,11 +79,11 @@ function GroupLinks({ group, items, current, t, basePath }: { group: FilterGroup
   );
 }
 
-function Filters({ groups, items, current, t, basePath }: { groups: FilterGroup[]; items: ExplorerItem[]; current: ExplorerFilters; t: Translator; basePath: string }) {
+function Filters({ groups, view, current, t, basePath }: { groups: FilterGroup[]; view: View; current: ExplorerFilters; t: Translator; basePath: string }) {
   return (
     <div className="space-y-7">
       {groups.map((g) => (
-        <GroupLinks key={g.key} group={g} items={items} current={current} t={t} basePath={basePath} />
+        <GroupLinks key={g.key} group={g} view={view} current={current} t={t} basePath={basePath} />
       ))}
     </div>
   );
@@ -97,7 +101,9 @@ export interface GalleryLabels {
  * The template gallery: filters in a sticky sidebar (a fold-out panel on phones),
  * the active filters as removable chips, and the cards. Filtering happens on the
  * server from the URL, so every choice is a link and a page ships only its cards.
- * The digital card gallery uses it too, with its own path, words and a search bar.
+ * A design made for several occasions shows once (its version for the occasion
+ * chosen). The digital card gallery uses it too, with its own path, words and a
+ * search bar.
  */
 export function TemplateGallery({
   items,
@@ -126,7 +132,8 @@ export function TemplateGallery({
   /** The results grid (cards sit two to a row on phones). */
   gridClassName?: string;
 }) {
-  const matching = filterItems(items, current);
+  const view: View = (f) => onePerLook(filterItems(items, f), (i) => i.look, f.event ? forEvent(f.event) : undefined);
+  const matching = view(current);
   const shown = matching.slice(0, limit);
   const active: Array<{ key: keyof ExplorerFilters; label: string }> = groups.flatMap((g) => {
     const value = current[g.key];
@@ -138,7 +145,7 @@ export function TemplateGallery({
     <div className="lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)] lg:gap-10">
       <aside aria-label={t('gallery.filters')} className="hidden lg:block">
         <div className="clay sticky top-24 max-h-[calc(100dvh-7.5rem)] overflow-y-auto rounded-[1.75rem] p-4 [scrollbar-width:thin]" data-lenis-prevent>
-          <Filters groups={groups} items={items} current={current} t={t} basePath={basePath} />
+          <Filters groups={groups} view={view} current={current} t={t} basePath={basePath} />
         </div>
       </aside>
 
@@ -157,7 +164,7 @@ export function TemplateGallery({
             </span>
           </summary>
           <div className="clay mt-3 rounded-[1.5rem] p-4">
-            <Filters groups={groups} items={items} current={current} t={t} basePath={basePath} />
+            <Filters groups={groups} view={view} current={current} t={t} basePath={basePath} />
           </div>
         </details>
 

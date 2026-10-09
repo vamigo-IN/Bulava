@@ -373,7 +373,8 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
     [select],
   );
 
-  const setFormat = useCallback((format: CardFormat) => change((d) => withCardFormat(d, format)), [change]);
+  // A new size takes the template's own layout for it, keeping the customer's changes (as starting over at that size would, without losing them).
+  const setFormat = useCallback((format: CardFormat) => change((d) => withCardFormat(d, format, template.definition, { tags: template.tags })), [change, template]);
   const restart = useCallback(
     (eventType?: string) =>
       change((d) => {

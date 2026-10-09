@@ -53,6 +53,7 @@ import { VideoShowcase } from '@/components/marketing/video-showcase';
 import { MagneticButton } from '@/lib/motion/magnetic-button';
 import { getGalleryTemplates, getPlans, getShowcase, getStats, getTemplate, getTemplateDefinitions, getTestimonials, tierPrice, type TemplateSummary } from '@/lib/server-api';
 import { getSiteConfig } from '@/lib/site-config';
+import { onePerLook } from '@/lib/template-looks';
 import { fullPreview } from '@/lib/template-previews';
 import { cn } from '@/lib/utils';
 import { Parallax, Reveal, StepsProgress } from './home-animations';
@@ -226,7 +227,9 @@ export default async function HomePage() {
     node: <TemplatePhone template={w} width={250} height={470} sections={1} />,
   }));
   const [spotlight] = withPicks(showcase.spotlight, websites, [websites.find((w) => w.featured && w.tier === 'PREMIUM'), websites[0]], 1);
-  const explorerItems: ExplorerItem[] = withPicks(showcase.collection, websites, websites).map((tpl) => ({
+  // Each design once: a design made for several occasions shows its picked or main version.
+  const designs = onePerLook(withPicks(showcase.collection, websites, websites), (w) => w.preview?.look);
+  const explorerItems: ExplorerItem[] = designs.map((tpl) => ({
     key: tpl.key,
     tier: tpl.tier,
     tags: tpl.tags,
@@ -390,7 +393,7 @@ export default async function HomePage() {
                   limit={12}
                   phoneLimit={6}
                   moreHref="/templates"
-                  moreLabel={t('home.grid.more', { count: websites.length })}
+                  moreLabel={t('home.grid.more', { count: designs.length })}
                   emptyLabel={t('home.grid.empty')}
                 />
               </Reveal>

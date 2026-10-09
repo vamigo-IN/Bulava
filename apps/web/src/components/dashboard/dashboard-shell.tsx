@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CalendarHeart, CheckCircle2, ChevronDown, House, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserRound } from 'lucide-react';
+import { Bell, CalendarHeart, CheckCircle2, ChevronDown, House, IdCard, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -149,6 +149,10 @@ function AccountMenu({ name, onLogout }: { name?: string; onLogout: () => void }
               <LayoutGrid aria-hidden className="size-4 text-gold-600" />
               {t('nav.templates')}
             </Link>
+            <Link role="menuitem" href="/cards" onClick={() => setOpen(false)} className={cn(item, 'sm:hidden')}>
+              <IdCard aria-hidden className="size-4 text-gold-600" />
+              {t('nav.cards')}
+            </Link>
             <Link role="menuitem" href="/dashboard/account" onClick={() => setOpen(false)} className={item}>
               <UserRound aria-hidden className="size-4 text-gold-600" />
               {t('dash.nav.account')}
@@ -194,6 +198,8 @@ function Shell({ children }: { children: ReactNode }) {
     { href: '/dashboard', label: t('dash.nav.home'), active: pathname === '/dashboard' },
     { href: '/dashboard/events', label: t('dash.nav.events'), active: pathname.startsWith('/dashboard/events') },
     { href: '/templates', label: t('nav.templates'), active: false },
+    // Digital cards: designed and downloaded without an event (included in plans that remove the watermark).
+    { href: '/cards', label: t('nav.cards'), active: false },
   ];
 
   return (

@@ -7,6 +7,7 @@ import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { type ExplorerFilters, type ExplorerItem } from '@/components/marketing/template-explorer';
 import { TemplateGallery, type FilterGroup } from '@/components/marketing/template-gallery';
 import { getShowcase, getTemplates, serverApi, type TemplateSummary } from '@/lib/server-api';
+import { onePerLook } from '@/lib/template-looks';
 import { cardPreview } from '@/lib/template-previews';
 
 export const revalidate = 60;
@@ -72,8 +73,11 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
     outputs: tpl.outputs,
     category: tpl.category,
     search: `${tpl.name} ${tpl.category} ${tpl.style ?? ''} ${tpl.tags.join(' ')}`.toLowerCase(),
+    look: tpl.preview?.look ?? null,
     node: <CardTile template={tpl} priority={i < 4} />,
   }));
+  // A design made for several occasions counts (and shows) once.
+  const designs = onePerLook(items, (i) => i.look).length;
 
   const pick = (value: string, allowed: readonly string[]) => (allowed.includes(value) ? value : '');
   const current: ExplorerFilters = {
@@ -134,7 +138,7 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
           <Mandala className="pointer-events-none absolute -top-64 left-1/2 -z-10 w-[720px] -translate-x-1/2 animate-spin-slow text-gold-500 opacity-[0.1]" />
           <div className="mx-auto max-w-7xl px-4 pt-12 pb-24 sm:px-6 sm:pt-16">
             <div className="mx-auto max-w-3xl text-center">
-              <p className="eyebrow text-brand-700">{cards.length ? t('cards.gallery.eyebrow', { count: cards.length }) : t('cards.recover.eyebrow')}</p>
+              <p className="eyebrow text-brand-700">{cards.length ? t('cards.gallery.eyebrow', { count: designs }) : t('cards.recover.eyebrow')}</p>
               <h1 className="mt-4 animate-settle-up font-display text-4xl leading-[1.08] text-ink sm:text-5xl lg:text-6xl">{t('cards.gallery.title')}</h1>
               <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-stone-600">{t('cards.gallery.subtitle', { price })}</p>
             </div>

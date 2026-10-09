@@ -1,5 +1,6 @@
 import { Injectable, type OnApplicationBootstrap } from '@nestjs/common';
 import type { Prisma, TemplateTier, TemplateType } from '@bulava/database';
+import { designLook, type Artboard, type ThemeColors } from '@bulava/template-schema';
 import { FEATURE_KEYS, z } from '@bulava/validation';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
@@ -22,7 +23,7 @@ export const TemplateListQuerySchema = z.object({
 });
 export type TemplateListQuery = z.infer<typeof TemplateListQuerySchema>;
 
-const LIST_CACHE_KEY = 'cache:templates:published:v3';
+const LIST_CACHE_KEY = 'cache:templates:published:v4';
 const LIST_TTL_SECONDS = 600;
 /** A published version never changes (Studio edits make a new draft), so its definition caches for long. */
 const definitionKey = (versionId: string) => `cache:templates:definition:${versionId}`;
@@ -46,11 +47,23 @@ export interface TemplateSummary {
   templateVersionId: string;
   /**
    * What a gallery card shows without the definition: the theme's colours, the
-   * hero section's variant, and the opening section's kind ("canvas" templates
-   * can also become digital cards).
+   * hero section's variant, the opening section's kind ("canvas" templates can
+   * also become digital cards), and the design's look (designLook: templates
+   * sharing one are the same design, for different occasions; galleries show
+   * each look once).
    */
-  preview: { colors: Record<string, string> | null; heroVariant: string | null; heroSection: string | null };
+  preview: { colors: Record<string, string> | null; heroVariant: string | null; heroSection: string | null; look: string | null };
   definition?: unknown;
+}
+
+/** The design's look from the parts of its definition the list reads (null for designs without an illustrated canvas opening). */
+function lookOf(row: { colors: Record<string, string> | null; heroSection: string | null; background: unknown; art: unknown[] | null } | undefined): string | null {
+  if (!row || row.heroSection !== 'canvas' || !row.colors || !row.background || !row.art?.length) return null;
+  try {
+    return designLook({ layers: row.art as Artboard['layers'], background: row.background as Artboard['background'] }, row.colors as ThemeColors);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -93,9 +106,13 @@ export class TemplatesService implements OnApplicationBootstrap {
     // Only the parts of each definition a card shows, read in the database.
     const ids = published.map((r) => r.currentVersion!.id);
     const looks = ids.length
-      ? await this.prisma.$queryRaw<Array<{ id: string; colors: Record<string, string> | null; heroVariant: string | null; heroSection: string | null }>>`
+      ? await this.prisma.$queryRaw<
+          Array<{ id: string; colors: Record<string, string> | null; heroVariant: string | null; heroSection: string | null; background: unknown; art: unknown[] | null }>
+        >`
           SELECT "id", "definition"->'theme'->'colors' AS "colors", "definition" #>> '{website,pages,0,sections,0,variant}' AS "heroVariant",
-            "definition" #>> '{website,pages,0,sections,0,section}' AS "heroSection"
+            "definition" #>> '{website,pages,0,sections,0,section}' AS "heroSection",
+            "definition" #> '{website,pages,0,sections,0,canvas,mobile,background}' AS "background",
+            jsonb_path_query_array("definition", '$.website.pages[0].sections[0].canvas.mobile.layers[*] ? (@.kind == "ornament" || @.kind == "scene")') AS "art"
           FROM "template_versions" WHERE "id" = ANY(${ids}::uuid[])`
       : [];
     const look = new Map(looks.map((l) => [l.id, l]));
@@ -119,6 +136,7 @@ export class TemplatesService implements OnApplicationBootstrap {
         colors: look.get(r.currentVersion!.id)?.colors ?? null,
         heroVariant: look.get(r.currentVersion!.id)?.heroVariant ?? null,
         heroSection: look.get(r.currentVersion!.id)?.heroSection ?? null,
+        look: lookOf(look.get(r.currentVersion!.id)),
       },
     }));
     await this.redis.client.set(LIST_CACHE_KEY, JSON.stringify(list), 'EX', LIST_TTL_SECONDS).catch(() => undefined);

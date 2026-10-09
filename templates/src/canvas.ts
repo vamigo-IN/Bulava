@@ -3,6 +3,7 @@ import { palette, TITLE } from './builder';
 import { CARD_SPECS } from './canvas-cards';
 import { at, b, canvasWebsite, eyebrows, t, text, type CanvasSpec } from './canvas-kit';
 import { FACTORY_SPECS } from './factory/collection';
+import { LOOKALIKES } from './lookalikes';
 
 /**
  * Canvas templates: pages whose hero and function cards are free-form
@@ -227,5 +228,34 @@ const SPECS: CanvasSpec[] = [
   },
 ];
 
+/** Colour presets a template may offer (TemplateDefinition capabilities.colorPresets). */
+const MAX_PRESETS = 12;
+
+/**
+ * Leaves out the retired lookalikes (lookalikes.ts) and gives each design kept
+ * their colours as presets, so a customer can still have that colourway.
+ */
+export function foldLookalikes(specs: CanvasSpec[], lookalikes: Readonly<Record<string, string>> = LOOKALIKES): CanvasSpec[] {
+  const twins = new Map<string, CanvasSpec[]>();
+  for (const spec of specs) {
+    const kept = lookalikes[spec.key];
+    if (kept) twins.set(kept, [...(twins.get(kept) ?? []), spec]);
+  }
+  const sameColors = (a: CanvasSpec['colors'], b: CanvasSpec['colors']) => JSON.stringify(a) === JSON.stringify(b);
+  return specs
+    .filter((spec) => !lookalikes[spec.key])
+    .map((spec) => {
+      const extra = twins.get(spec.key);
+      if (!extra) return spec;
+      const presets = [...(spec.presets?.length ? spec.presets : [{ name: spec.name, colors: spec.colors }])];
+      for (const twin of extra) {
+        if (presets.length >= MAX_PRESETS || presets.some((p) => sameColors(p.colors, twin.colors))) continue;
+        const own = twin.presets?.find((p) => sameColors(p.colors, twin.colors))?.name;
+        presets.push({ name: own && !presets.some((p) => p.name === own) ? own : twin.name, colors: twin.colors });
+      }
+      return { ...spec, presets };
+    });
+}
+
 /** Sort after the standard website templates (index.ts passes the offset). */
-export const canvasTemplates = (offset: number) => [...SPECS, ...CARD_SPECS, ...FACTORY_SPECS].map((spec, i) => canvasWebsite(spec, offset + i));
+export const canvasTemplates = (offset: number) => foldLookalikes([...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]).map((spec, i) => canvasWebsite(spec, offset + i));

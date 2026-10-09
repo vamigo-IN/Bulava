@@ -65,6 +65,8 @@ Section text is parsed by `parsePageBody` (`@bulava/validation`) and rendered by
 
 The digital card gallery (`/cards`) is the same `TemplateGallery` with its own groups (occasion, tradition, style), a search and an order above the results (a GET form, so it works before hydration), and two cards to a row on phones.
 
+Galleries show each design once: templates that are one design for different occasions share a look (`preview.look`), and `onePerLook` keeps the version for the occasion chosen, else the first in the gallery's order. Counts on the filters and in the eyebrows count designs, after the same step ([templates.md](templates.md#lookalikes)).
+
 ## Home page templates
 
 The home page's template sections (the hero's live phone and the two behind it, the illustrated scenes, the collection, the spotlight and the films) and the card gallery's Featured order show what staff chose in the console's Home page screen first (`GET /public/showcase`, `showcase.manage`), then their automatic choice fills what is left (`withPicks` in `app/page.tsx`); a pick that is unpublished later drops out. A new home section that shows templates gets a showcase section (`SHOWCASE_SECTIONS` in `@bulava/validation`) rather than hard-coded keys. A hero pick without a long pre-rendered preview plays live, which loads the template engine with the page: give it one with the preview script's `--full <key>` ([templates.md](templates.md#marketing-previews)). The console shows the same pre-rendered previews through a rewrite to the web app (`/template-previews/*`, `WEB_INTERNAL_URL`).

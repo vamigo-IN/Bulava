@@ -213,3 +213,12 @@ The home page picked its templates in code (a hero by key, two phones behind it 
 - **The card gallery's Featured order is a section too**, so the cards people see first are chosen the same way.
 
 Rejected: a `featured` flag per template (one flag cannot say which section or in what order) and a JSON platform setting (only the Super Admin edits settings).
+
+### ADR-051: One template per design and occasion; galleries show each design once (2026-10-09)
+The factory built each occasion's themes from shared kits, palettes and compositions, so the same design appeared under several names: in one occasion in different colourways (Bandhani Kanku, Gulaab Pankhudi, Gulabi Pankhuri and Mayur Sutra were Sona Sutra recoloured), across occasions with different wording (Rosewood Garden for weddings, Evergreen Garden for anniversaries), and once as a factory copy of a hand-made card (Rajwada Jharokha of Shahi Gajraj). Customers saw the same card again and again.
+
+- **A design is its art, not its colours.** `designLook` hashes the phone artboard's illustrations and their places, on light or dark stock. Palettes, fonts and words are what customers change in every editor, so they do not make a new design; light and dark stock does (a preset cannot turn a light card dark).
+- **Same occasion: one template.** The 54 lookalikes are retired (soft-deleted by the seed; cards and events made with them keep working), and the template kept offers their colours as presets. The catalog test now fails on two templates of an occasion with one look.
+- **Different occasions: one card in a gallery.** Versions for other occasions stay, because their wording, names and filters differ (an engagement customer still finds engagement cards). Galleries collapse each look to one card: the version for the occasion chosen, else the first in the gallery's order (featured, then catalog order, which puts a design's main occasion first). The look comes with the template list (`preview.look`), so templates staff publish later are grouped the same way.
+
+Rejected: retiring cross-occasion versions too (engagement, anniversary and function customers would lose designs worded for them; wedding designs can switch to engagement wording, but not to an anniversary's or a haldi's), and grouping by pixel similarity (it could not tell a recoloured card from a different couple, which matters to customers choosing by tradition).

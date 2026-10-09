@@ -309,6 +309,8 @@ export const enCards = {
   'cards.download.readyTitle': 'Your card is ready',
   'cards.download.readyFree': 'Here is your card with the Bulava watermark. Download it below.',
   'cards.download.readyPlan': 'Here is your card, without the watermark. Download it below.',
+  'cards.download.readyPlanSaved': 'Your card, without the watermark, is downloading. If it does not start, use the button below.',
+  'cards.download.otherWays': 'See the other ways to download',
   'cards.download.save': 'Download card ({width} × {height} px)',
   'cards.download.upgradeTitle': 'Want it without the watermark?',
   'cards.download.upgradeBody': 'Get the same card, clean, for {price}. We email it to you too.',

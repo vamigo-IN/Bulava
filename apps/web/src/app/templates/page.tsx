@@ -6,6 +6,7 @@ import { TemplateCard } from '@/components/marketing/template-card';
 import { type ExplorerItem } from '@/components/marketing/template-explorer';
 import { TemplateGallery, type FilterGroup } from '@/components/marketing/template-gallery';
 import { getGalleryTemplates, getPlans, serverApi, tierPrice } from '@/lib/server-api';
+import { onePerLook } from '@/lib/template-looks';
 
 export const revalidate = 60;
 
@@ -35,8 +36,11 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
       tags: tpl.tags,
       eventTypes: tpl.eventTypes,
       outputs: tpl.outputs,
+      look: tpl.preview?.look ?? null,
       node: <TemplateCard template={tpl} t={t} priceLabel={tierPrice(tpl.tier, plans)} headingLevel={2} />,
     }));
+  // A design made for several occasions counts (and shows) once.
+  const designs = onePerLook(items, (i) => i.look).length;
   const current = { tag: one(params.tag), tier: one(params.tier), event: one(params.event), format: one(params.format) };
   // The gallery grows on request, a page of cards at a time.
   const pages = Math.max(1, Math.min(20, Number.parseInt(one(params.page), 10) || 1));
@@ -62,7 +66,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] bg-[radial-gradient(ellipse_60%_70%_at_50%_0%,rgba(233,200,127,0.4),transparent_70%)]" />
           <Mandala className="pointer-events-none absolute -top-64 left-1/2 -z-10 w-[720px] -translate-x-1/2 animate-spin-slow text-gold-500 opacity-[0.1]" />
           <div className="mx-auto max-w-7xl px-4 pt-12 pb-24 sm:px-6 sm:pt-16">
-            <SectionHeading level={1} eyebrow={t('templates.count', { count: items.length })} title={t('templates.title')} subtitle={t('templates.subtitle')} />
+            <SectionHeading level={1} eyebrow={t('templates.count', { count: designs })} title={t('templates.title')} subtitle={t('templates.subtitle')} />
             <div className="mt-12">
               <TemplateGallery items={items} groups={groups} current={current} limit={pages * PAGE_SIZE} moreHref={`/templates?${moreParams.toString()}`} t={t} />
             </div>

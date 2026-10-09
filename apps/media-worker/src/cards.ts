@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import puppeteer, { type Browser } from 'puppeteer-core';
+import type { Browser } from 'puppeteer-core';
 import sharp, { type Metadata } from 'sharp';
 import { cardRenderToken } from '@bulava/auth';
 import type { CardExportKind, Prisma, PrismaClient } from '@bulava/database';
@@ -19,6 +19,9 @@ export interface CardDeps {
 }
 
 const MAX_PIXELS = 100_000_000; // decompression-bomb guard
+
+/** puppeteer-core is an ES module: loaded on the first card render (require(esm), Node 22.12+), not by every job that imports this file. */
+const loadPuppeteer = async () => (await import('puppeteer-core')).default;
 /** Photos are kept at most this large: sharp on a 3x export of the largest format. */
 const PHOTO_MAX = 2400;
 
@@ -102,7 +105,7 @@ export async function renderCard(deps: CardDeps, exportId: string): Promise<'REA
   let browser: Browser | null = null;
   let png: Uint8Array;
   try {
-    browser = await puppeteer.launch({
+    browser = await (await loadPuppeteer()).launch({
       executablePath: chromiumPath(),
       headless: true,
       // No sandbox inside the container (no user namespaces); /dev/shm is small there.

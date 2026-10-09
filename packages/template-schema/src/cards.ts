@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { createTranslator, formatEventTime, utcToZonedWallTime, zonedWallTimeToUtcIso } from '@bulava/localization';
 import type { Value } from './base';
 import { resolveBinding, resolveValue } from './bindings';
-import { ArtboardSchema, type Artboard, type ArtboardInput, type CanvasSection, type Layer, type LayerInput, type WidgetLayer } from './canvas';
+import { ArtboardSchema, type Artboard, type ArtboardInput, type CanvasSection, type Frame, type Layer, type LayerInput, type WidgetLayer } from './canvas';
 import { sampleRenderContext, type GalleryImage, type RenderContext } from './context';
 import { FontsSchema, ThemeColorsSchema, type PhotoSlot, type TemplateDefinition } from './definition';
 
@@ -481,9 +481,116 @@ export function fitBoard(board: Artboard, width: number, height: number): Artboa
   };
 }
 
-/** A design in another format: the board refitted, everything else kept. */
-export function withCardFormat(design: CardDesign, format: CardFormat): CardDesign {
+const same = (a: unknown, b: unknown) => stableStringify(a) === stableStringify(b);
+
+/** A length the customer changed, as the same proportion of the template's length at the new size. */
+function carryLength(fresh: number, base: number, current: number, min: number, max: number): number {
+  if (current === base) return fresh;
+  return clamp(round1(base > 0 ? fresh * (current / base) : current), min, max);
+}
+
+/** A border or stroke the customer changed: their colour (and dash), the width in proportion. */
+function carryLine<T extends { width: number }>(fresh: T | undefined, base: T | undefined, current: T | undefined, k: number): T | undefined {
+  if (!current) return undefined;
+  const width = fresh && base && base.width > 0 ? fresh.width * (current.width / base.width) : current.width * k;
+  return { ...current, width: clamp(round1(width), 0, 100) };
+}
+
+/**
+ * One template element at the new size: the template's own layout for that
+ * size (`fresh`), with what the customer changed on it carried over (their
+ * `current` element against the template's `base` at the old size): words,
+ * styles, colours, crops, hiding. Sizes they changed keep their proportion to
+ * the template's. Their moves stay only when both sizes come from the same
+ * artboard (`moved` is then their frame fitted to the new size).
+ */
+function carryEdits(fresh: Layer, base: Layer, current: Layer, moved: Frame | undefined, k: number): Layer {
+  if (fresh.kind !== current.kind || base.kind !== current.kind) return fresh;
+  const out = { ...fresh } as Record<string, unknown>;
+  const cur = current as unknown as Record<string, unknown>;
+  const was = base as unknown as Record<string, unknown>;
+  const now = fresh as unknown as Record<string, unknown>;
+  for (const key of Object.keys(cur)) {
+    if (key === 'id' || key === 'kind' || key === 'frame' || same(cur[key], was[key])) continue;
+    if (key === 'style' && current.kind === 'text' && base.kind === 'text' && fresh.kind === 'text') {
+      const style: Record<string, unknown> = { ...fresh.style };
+      for (const [prop, value] of Object.entries(current.style)) {
+        if (same(value, (base.style as Record<string, unknown>)[prop])) continue;
+        style[prop] = prop === 'size' ? carryLength(fresh.style.size, base.style.size, current.style.size, 6, 600) : value;
+      }
+      out.style = style;
+    } else if (key === 'radius') {
+      out.radius = carryLength(now.radius as number, was.radius as number, cur.radius as number, 0, 1000);
+    } else if (key === 'border' || key === 'stroke') {
+      out[key] = carryLine(now[key] as { width: number } | undefined, was[key] as { width: number } | undefined, cur[key] as { width: number } | undefined, k);
+    } else {
+      out[key] = cur[key];
+    }
+  }
+  if (!same(current.frame, base.frame)) {
+    if (moved) out.frame = moved;
+    else if (current.frame.rotate !== base.frame.rotate) out.frame = { ...fresh.frame, rotate: current.frame.rotate };
+  }
+  return out as unknown as Layer;
+}
+
+/**
+ * A design in another format, laid out the way the template lays itself out
+ * at that size (its phone or desktop artboard, fitted: the same as starting
+ * over at that size), with the customer's work carried over: their palette,
+ * fonts, details and photos, and on each element their words, styles,
+ * colours, crops and what they hid. Elements they deleted stay deleted;
+ * elements they added keep their place proportionally; the stacking order is
+ * theirs. Moves of the template's elements are kept between sizes drawn from
+ * the same artboard (a phone and a square card) and laid out afresh across
+ * artboards (a phone and a landscape card). Undo brings back the old size.
+ */
+export function withCardFormat(design: CardDesign, format: CardFormat, definition: TemplateDefinition, options: Pick<CardFromTemplateOptions, 'tags'> = {}): CardDesign {
   if (design.format === format) return design;
   const spec = CARD_FORMATS[format];
-  return { ...design, format, board: fitBoard(design.board, spec.width, spec.height) };
+  const fitted = fitBoard(design.board, spec.width, spec.height);
+  let before: CardDesign;
+  let after: CardDesign;
+  try {
+    const opts = { eventType: design.eventType, language: design.language, tags: options.tags };
+    before = cardFromTemplate(definition, { ...opts, format: design.format });
+    after = cardFromTemplate(definition, { ...opts, format });
+  } catch {
+    // The template can no longer make a card: refit what is there.
+    return { ...design, format, board: fitted };
+  }
+  const base = new Map(before.board.layers.map((l) => [l.id, l]));
+  const fresh = new Map(after.board.layers.map((l) => [l.id, l]));
+  const fittedById = new Map(fitted.layers.map((l) => [l.id, l]));
+  const sameArtboard = CARD_FORMATS[design.format].source === spec.source;
+  const k = Math.min(spec.width / design.board.width, spec.height / design.board.height);
+
+  // The customer's elements in their order: the template's at the new layout, their own fitted.
+  const layers: Layer[] = [];
+  for (const layer of design.board.layers) {
+    const now = fresh.get(layer.id);
+    const was = base.get(layer.id);
+    if (now && was) layers.push(carryEdits(now, was, layer, sameArtboard ? fittedById.get(layer.id)?.frame : undefined, k));
+    else if (!was) layers.push(fittedById.get(layer.id) ?? layer);
+    // A template element the new size's layout does not have (corner art drawn for phones only) is left out.
+  }
+  // Elements only the new size's layout has, each after the element below it there.
+  const placed = new Set(layers.map((l) => l.id));
+  for (const [i, layer] of after.board.layers.entries()) {
+    if (placed.has(layer.id) || base.has(layer.id)) continue; // there already, or deleted by the customer
+    const below = after.board.layers
+      .slice(0, i)
+      .reverse()
+      .find((l) => placed.has(l.id));
+    layers.splice(below ? layers.findIndex((l) => l.id === below.id) + 1 : 0, 0, layer);
+    placed.add(layer.id);
+  }
+
+  // The card's own surface: theirs where they changed it, the template's otherwise.
+  const board = { ...after.board, layers };
+  for (const key of ['background', 'texture', 'textureStrength'] as const) {
+    if (!same(design.board[key], before.board[key])) (board as Record<string, unknown>)[key] = design.board[key];
+  }
+  const next = CardDesignSchema.safeParse({ ...design, format, board });
+  return next.success ? next.data : { ...design, format, board: fitted };
 }

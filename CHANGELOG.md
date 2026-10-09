@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Every design once, cards that resize properly, and a quicker download for plan holders
+
+- **No more repeated designs.** 54 templates that were another design of the same occasion in a different colour are gone (for example *Rajwada Jharokha*, which repeated *Shahi Gajraj*); the design that stays now offers their colours as presets, so nothing is lost. Cards and invitations already made with them keep working.
+- **One card per design in the galleries.** When a design comes in versions for several occasions (a wedding card and its anniversary version), the templates and cards galleries, the home page and the design picker show it once: the version for the occasion you choose.
+- **Changing a card's size lays it out properly.** Switching to landscape (or any size) now arranges the card the way the template does at that size, as *Reset to the original template* did, while keeping your words, colours, photos, sizes and the elements you added or removed.
+- **Plan holders download straight away.** If your plan covers watermark-free cards, *Download* makes your clean card and saves it at once, with no options to choose from and nothing to fill in.
+- **Cards in the dashboard.** The dashboard's header (and its menu on phones) now links to Cards.
+
 ### Choose the home page's templates, and filter cards like templates
 
 - **Pick what the home page shows** in the console's new *Home page* screen: the invitation playing in the hero and the two phones behind it, the illustrated scenes, the collection, the spotlight, the video invitations, and the first cards in the card gallery. Your picks come first, in your order, with previews; anything left is filled automatically, and a template that is unpublished later drops out on its own.

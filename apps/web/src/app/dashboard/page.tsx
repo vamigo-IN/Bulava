@@ -28,6 +28,7 @@ import { useT } from '@/lib/i18n';
 import { occasionIcon } from '@/lib/occasions';
 import { useEvents, useEventTypes, useMe, useNotifications, useTemplateList } from '@/lib/queries';
 import { nextStep, progressOf } from '@/lib/setup-steps';
+import { forEvent, onePerLook } from '@/lib/template-looks';
 import { cardPreview } from '@/lib/template-previews';
 import type { EventSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -330,7 +331,9 @@ function Shortcuts({ event }: { event: EventSummary }) {
 function ExploreDesigns({ typeKey }: { typeKey?: string }) {
   const t = useT();
   const templates = useTemplateList('WEBSITE', typeKey);
-  const shown = (templates.data ?? []).filter((tpl) => cardPreview(tpl.key)).slice(0, 4);
+  const shown = onePerLook(templates.data ?? [], (tpl) => tpl.preview?.look, forEvent(typeKey))
+    .filter((tpl) => cardPreview(tpl.key))
+    .slice(0, 4);
   if (!shown.length) return null;
   return (
     <section aria-labelledby="explore-title">

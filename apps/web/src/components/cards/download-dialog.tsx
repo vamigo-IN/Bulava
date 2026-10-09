@@ -14,6 +14,8 @@ import type { CardEditorApi } from './editor-types';
 import { OrderStatus } from './order-status';
 
 type Step =
+  /** A plan holder's download, started as the dialog opens: nothing to choose or fill in. */
+  | { kind: 'starting' }
   | { kind: 'choose' }
   | { kind: 'free' }
   | { kind: 'paid'; notice?: string }
@@ -26,9 +28,10 @@ const ACCENT = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-vis
 
 /**
  * Downloading a card (docs/cards.md#downloads): the free card with the
- * watermark for a mobile number, the watermark-free card for the price
- * (number, name, email, the ticked Terms, then Razorpay), or straight away for
- * a signed-in customer whose plan covers it. Closing it never touches the
+ * watermark for a mobile number, or the watermark-free card for the price
+ * (number, name, email, the ticked Terms, then Razorpay). A signed-in customer
+ * whose plan covers watermark-free cards gets no choice and no form: the clean
+ * card is made and saved as the dialog opens. Closing it never touches the
  * design; reopening it after paying goes straight to the bought card.
  */
 export function DownloadDialog({
@@ -49,7 +52,8 @@ export function DownloadDialog({
   onClose: () => void;
 }) {
   const { design, t, config, template } = editor;
-  const [step, setStep] = useState<Step>(paidOrder ? { kind: 'order', orderToken: paidOrder.orderToken } : { kind: 'choose' });
+  const plan = config?.account?.planDownload ? config.account : null;
+  const [step, setStep] = useState<Step>(plan ? { kind: 'starting' } : paidOrder ? { kind: 'order', orderToken: paidOrder.orderToken } : { kind: 'choose' });
   const [phone, setPhone] = useState(config?.account?.phone ?? '');
   const [offers, setOffers] = useState(false);
   const [name, setName] = useState(config?.account?.name ?? '');
@@ -60,7 +64,8 @@ export function DownloadDialog({
   const [problem, setProblem] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const price = formatRupees(config?.priceMinor ?? 5000);
-  const plan = config?.account?.planDownload ? config.account : null;
+  // A plan download saves itself once, when its image is ready.
+  const autoSaved = useRef(false);
 
   useEffect(() => {
     void cardApi.event({ type: 'DOWNLOAD_MODAL_OPENED', templateKey: template.key, ...(sessionToken ? { session: sessionToken } : {}), meta: { format: design.format } });
@@ -145,6 +150,22 @@ export function DownloadDialog({
       startDownload(url);
     });
 
+  // Plan holders: make the clean card as soon as the dialog opens (once; "Try again" asks again)…
+  const planStarted = useRef(false);
+  useEffect(() => {
+    if (step.kind !== 'starting' || planStarted.current) return;
+    planStarted.current = true;
+    void planDownload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.kind]);
+  // …and save it the moment it is ready.
+  useEffect(() => {
+    if (step.kind !== 'ready' || step.option !== 'PLAN' || autoSaved.current) return;
+    autoSaved.current = true;
+    void saveFile(step.card);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   const pay = (e: FormEvent) => {
     e.preventDefault();
     const next: Record<string, string> = {};
@@ -193,6 +214,32 @@ export function DownloadDialog({
 
   let body: ReactNode;
   switch (step.kind) {
+    case 'starting':
+      body = problem ? (
+        <div className="space-y-4 py-4 text-center">
+          <h2 id="download-title" className="font-display text-2xl text-ink">
+            {t('cards.download.failedTitle')}
+          </h2>
+          <p className="text-sm text-stone-600">{problem}</p>
+          <button type="button" disabled={working} onClick={() => void planDownload()} className={cn('btn-3d min-h-12 w-full justify-center rounded-xl', ACCENT)}>
+            {t('cards.download.tryAgain')}
+          </button>
+          <button type="button" onClick={() => setStep({ kind: 'choose' })} className="text-sm font-semibold text-brand-700 hover:underline">
+            {t('cards.download.otherWays')}
+          </button>
+        </div>
+      ) : (
+        <div role="status" className="space-y-4 py-6 text-center">
+          <LoaderCircle aria-hidden className="mx-auto size-10 animate-spin text-brand-700" />
+          <h2 id="download-title" className="font-display text-2xl text-ink">
+            {t('cards.download.making')}
+          </h2>
+          <p className="flex items-center justify-center gap-1.5 text-sm text-stone-600">
+            <Crown aria-hidden className="size-4 text-brand-700" /> {plan?.planName ? t('cards.download.planNamed', { plan: plan.planName }) : t('cards.download.plan')}
+          </p>
+        </div>
+      );
+      break;
     case 'choose':
       body = (
         <div className="space-y-5">
@@ -358,7 +405,7 @@ export function DownloadDialog({
           <h2 id="download-title" className="font-display text-2xl text-ink sm:text-3xl">
             {t('cards.download.readyTitle')}
           </h2>
-          <p className="text-sm text-stone-600">{step.option === 'FREE' ? t('cards.download.readyFree') : t('cards.download.readyPlan')}</p>
+          <p className="text-sm text-stone-600">{step.option === 'FREE' ? t('cards.download.readyFree') : t('cards.download.readyPlanSaved')}</p>
           {preview(step.option === 'FREE', 'mx-auto w-40')}
           {problem ? <Problem text={problem} /> : null}
           <button type="button" disabled={working} onClick={() => void saveFile(step.card)} className={cn('btn-3d min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60', ACCENT)}>

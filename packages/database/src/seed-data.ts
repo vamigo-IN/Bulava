@@ -304,7 +304,9 @@ export async function seedTemplates(
     const catalogOwned = !existing.currentVersion || CATALOG_CHANGELOGS.has(existing.currentVersion.changelog ?? '');
     // A listing staff changed in the console stays theirs; the design still follows the catalog.
     const ownListing: Partial<typeof listing> = staffListed.has(existing.id) ? { languages: listing.languages, outputs: listing.outputs } : listing;
-    const changed = canonicalJson(existing.currentVersion?.definition) !== canonicalJson(validated.definition);
+    // The stored design as the current schema reads it: a field added with a default (a photo's crop) is no new design.
+    const storedDesign = existing.currentVersion ? validateTemplateDefinition(existing.currentVersion.definition) : null;
+    const changed = canonicalJson(storedDesign?.ok ? storedDesign.definition : existing.currentVersion?.definition) !== canonicalJson(validated.definition);
     if (changed && (catalogOwned || options.updateChanged)) {
       result.updated++;
       result.changes.push({ key: meta.key, change: 'update' });

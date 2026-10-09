@@ -20,7 +20,7 @@ Template (catalog entry: name, category, style, tier, badge, tags, event types, 
 
 ## The catalog
 
-597 templates: 577 websites, 17 videos and 3 image cards, across every event type and the major traditions (Hindu, Sikh, Muslim, South Indian, Kerala, Christian, Bengali, Marathi, Gujarati, Punjabi, Rajasthani), in Free, Standard and Premium tiers. 513 of the websites come from the [template factory](#template-factory): 194 weddings, 103 for the other wedding functions and anniversaries, 96 birthdays and 120 for baby showers, naming ceremonies, mundans, housewarmings, pujas and festivals.
+543 templates: 523 websites, 17 videos and 3 image cards, across every event type and the major traditions (Hindu, Sikh, Muslim, South Indian, Kerala, Christian, Bengali, Marathi, Gujarati, Punjabi, Rajasthani), in Free, Standard and Premium tiers. 460 of the websites come from the [template factory](#template-factory): 150 weddings, 111 for engagements, the other wedding functions and anniversaries, 91 birthdays and 108 for baby showers, naming ceremonies, mundans, housewarmings, pujas and festivals. The 470 canvas templates are 397 designs: some designs come in versions for several occasions ([Lookalikes](#lookalikes)).
 
 - **Flagship websites** open on an illustrated 3D scene: *Marigold Mahal* (toran), *Divine Gopuram* (temple at sunrise), *Rajwada Royale* (palace on the lake), *Noor-e-Nikah* (receding arches), *Anand Karaj* (golden sarovar), *Mangal Mandap*, *Midnight Gold* (noir medallion), *Blush & Bloom* (flower arch), *Shubho Bibaho* (lotus pond), *Kerala Kasavu* (backwaters) and *Bansuri* (moonlit Vrindavan).
 - **Illustrated films** are filmed inside the same scenes: *The Divine Flute*, *Temple Dawn*, *Royal Reveal*, *Noor Arches*, *Golden Sarovar*, *Marigold Mahal Film*, *Kasavu Backwaters*, *Blush & Bloom Film*, *Birthday Bash*, *Griha Pravesh Blessings* and *Lotus Blessings Film*. Each uses a different scene, so no two films look alike.
@@ -38,6 +38,13 @@ Lookalike templates are removed, never hard-deleted: `Template.deletedAt` hides 
 
 - **Catalog**: add the key to `RETIRED_TEMPLATE_KEYS` (`templates/src/website.ts`). The seed switches those templates off wherever they exist and never recreates them.
 - **Admin console**: *Templates → Delete* soft-deletes one (audited); the *Deleted* view lists them with *Restore*. A deleted template cannot be published until it is restored, and the seed skips templates staff deleted.
+
+### Lookalikes
+
+A design is its illustrations and where they sit on the phone artboard, on light or dark stock: `designLook` (`@bulava/template-schema`) hashes exactly that, leaving out palettes, fonts and words, which customers change themselves. So:
+
+- **One template per design and occasion.** Two templates of one occasion that share a look are the same design in two colourways; the catalog test fails on them. `templates/src/lookalikes.ts` lists the ones retired on 2026-10-09 (54, among them Rajwada Jharokha, a factory copy of Shahi Gajraj), each pointing at the template kept, which takes their colours as presets (`foldLookalikes`, at most 12), so no colourway is lost. The keys are in `RETIRED_TEMPLATE_KEYS`.
+- **One card per design in galleries.** A design may have versions for several occasions (a wedding design and its anniversary version, each with its own wording and names). The API lists each template's look (`preview.look`), and galleries show a look once (`onePerLook`, `apps/web/src/lib/template-looks.ts`): the version for the occasion chosen, else the first in the gallery's order. This applies to `/templates` (the occasion filter picks the version whose main event type it is), `/cards` (the occasion filter is the category), the home page's collection and the dashboard's design picker (always showing the design in use).
 
 ## TemplateDefinition (schemaVersion 1)
 
@@ -272,7 +279,7 @@ Rules the compositions keep, so a new theme only chooses art:
 - Occasions whose title is the event's own (housewarming, puja, festival) set it smaller, on two lines.
 - A theme may reorder its occasion's event types (`eventTypes`); the first decides the sample content of its previews (a mundan theme shows a mundan). Festival themes are tagged (`eid`, `holi`, `christmas`, `navratri`, `pongal`) so previews use that festival's sample title (`SAMPLE_VARIANTS`).
 
-To add a theme: write it in the occasion's `themes-*.ts` (a unique word, a palette with light accents for dark stock, a kit, and layouts with distinct words), run the catalog tests (unique names and themes, no two layouts of a theme with the same composition and art, the test matrix), seed, and generate its previews. Children's themes use the *Playful* font pairing (Baloo 2 and Pacifico).
+To add a theme: write it in the occasion's `themes-*.ts` (a unique word, a palette with light accents for dark stock, a kit, and layouts with distinct words), run the catalog tests (unique names and themes, no two layouts of a theme with the same composition and art, no two templates of an occasion with one look, the test matrix), seed, and generate its previews. A theme that would repeat another theme's design in new colours belongs in that theme's presets instead. Children's themes use the *Playful* font pairing (Baloo 2 and Pacifico).
 
 ### Openings, effects and music
 

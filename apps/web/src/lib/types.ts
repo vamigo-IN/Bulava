@@ -368,8 +368,8 @@ export interface TemplateSummaryLite {
   tags: string[];
   eventTypes: string[];
   outputs: Array<'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD'>;
-  /** What a card shows without the definition: the theme's colours and the hero section's variant. */
-  preview?: { colors: import('@bulava/template-schema').ThemeColors | null; heroVariant: string | null };
+  /** What a card shows without the definition: the theme's colours, the hero section's variant, and the design's look (shared by one design's versions for other occasions). */
+  preview?: { colors: import('@bulava/template-schema').ThemeColors | null; heroVariant: string | null; look?: string | null };
   definition?: import('@bulava/template-schema').TemplateDefinition;
 }
 

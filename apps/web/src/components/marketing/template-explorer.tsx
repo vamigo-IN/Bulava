@@ -14,6 +14,8 @@ export interface ExplorerItem {
   category?: string;
   /** Lower-case text a search matches (name, occasion, style and tags). */
   search?: string;
+  /** The design's look: items sharing one are one design for different occasions, shown once (lib/template-looks). */
+  look?: string | null;
   node: ReactNode;
 }
 

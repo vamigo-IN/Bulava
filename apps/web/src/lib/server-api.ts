@@ -72,7 +72,8 @@ export interface TemplateSummary {
   outputs: Array<'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD'>;
   templateVersionId: string;
   /** What a card shows without the definition: the theme's colours, the hero section's variant and kind ("canvas" templates also make digital cards). */
-  preview?: { colors: ThemeColors | null; heroVariant: string | null; heroSection?: string | null };
+  /** `look`: one design for several occasions shares it (lib/template-looks shows each once). */
+  preview?: { colors: ThemeColors | null; heroVariant: string | null; heroSection?: string | null; look?: string | null };
   /** Lists leave definitions out (they run to megabytes); single templates and `keys` lists carry them. */
   definition?: TemplateDefinition;
 }

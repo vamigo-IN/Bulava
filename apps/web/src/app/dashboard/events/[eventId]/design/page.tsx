@@ -12,6 +12,7 @@ import { TIER_RANK, TemplatePicker } from '@/components/design/template-picker';
 import { apiPut } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { useApprovedPhotos, useDesign, useEvent, useInvalidateEvent, useTemplateDefinition, useTemplateList } from '@/lib/queries';
+import { forEvent, onePerLook } from '@/lib/template-looks';
 import { cardPreview } from '@/lib/template-previews';
 import type { MediaItem, TemplateSummaryLite } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -77,8 +78,14 @@ function DesignEditor() {
   const photos = useMemo(() => mergePhotos(uploaded, approved.data), [uploaded, approved.data]);
 
   const maxTier = design.data?.entitlements['templates.maxTier']?.limit ?? 0;
-  const templates = useMemo(() => catalog.data ?? [], [catalog.data]);
-  const selected: TemplateSummaryLite | undefined = templates.find((x) => x.key === selectedKey);
+  const all = useMemo(() => catalog.data ?? [], [catalog.data]);
+  const selected: TemplateSummaryLite | undefined = all.find((x) => x.key === selectedKey);
+  // The picker shows each design once (its version for this occasion), and always the one in use.
+  const templates = useMemo(() => {
+    const designs = onePerLook(all, (x) => x.preview?.look, forEvent(event.data?.typeKey));
+    const inUse = all.find((x) => x.key === current?.templateKey);
+    return inUse && !designs.includes(inUse) ? [inUse, ...designs.filter((x) => !x.preview?.look || x.preview.look !== inUse.preview?.look)] : designs;
+  }, [all, event.data?.typeKey, current?.templateKey]);
   const chosen = useTemplateDefinition(selectedKey);
   const definition: TemplateDefinition | undefined = chosen.data?.definition ?? (current?.templateKey === selectedKey ? current?.definition : undefined);
 

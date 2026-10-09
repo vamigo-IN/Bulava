@@ -1,5 +1,6 @@
 import { INVOCATION, palette, website, type CatalogEntry, type WebsiteSpec } from './builder';
 import { SIGNATURE_SPECS } from './signature';
+import { LOOKALIKES } from './lookalikes';
 
 const W = ['WEDDING'];
 const WE = ['WEDDING', 'ENGAGEMENT'];
@@ -363,6 +364,8 @@ const SPECS: WebsiteSpec[] = [
  * events already using one keep their pinned version and keep working.
  */
 export const RETIRED_TEMPLATE_KEYS: readonly string[] = [
+  // Card designs that were another design's colourway (their colours are its presets now).
+  ...Object.keys(LOOKALIKES),
   'walima-nights',
   'phulkari-phere',
   'heritage-haveli',

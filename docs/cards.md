@@ -34,7 +34,9 @@ A **card design** (`CardDesignSchema`) is self-contained: `{ v, templateKey, for
 | Square | 640 × 640 | 1080 × 1080 | the phone artboard |
 | Landscape 16:10 | 1440 × 900 | 1920 × 1200 | the desktop artboard |
 
-`fitBoard` moves a design to another size without stretching or cropping: layers spanning the board stretch with it, layers touching an edge stay on that edge (corner art keeps bleeding off it), the rest keep their place proportionally, and sizes, type and borders scale by the smaller ratio. Switching format in the editor is one undo step.
+`cardFromTemplate` fits the format's artboard with `fitBoard`, without stretching or cropping: layers spanning the board stretch with it, layers touching an edge stay on that edge (corner art keeps bleeding off it), the rest keep their place proportionally, and sizes, type and borders scale by the smaller ratio.
+
+Switching format in the editor (`withCardFormat`, one undo step) lays the card out as the template does at that size, the same as starting over there, and carries the customer's work across: palette, fonts, details and photos, and on each element their words, styles, colours, crops and what they hid. Element by element (by layer id), a size they changed keeps its proportion to the template's at the new size; elements they deleted stay deleted; elements they added keep their place proportionally; the stacking order stays theirs. Their moves of the template's elements survive between sizes drawn from the same artboard (phone, story, portrait, square) and are laid out afresh across artboards (phone and landscape), where a position on one means nothing on the other.
 
 ## Editor
 
@@ -92,6 +94,8 @@ worker: email with the image attached and the order link → SENT, or FAILED aft
 ## Plan holders
 
 `GET /public/cards/config` tells a signed-in customer whether their plan covers watermark-free cards: a plan in force whose `branding.watermark` is off. The setting `cards.planDownloads` decides which plans count: `any` (default: a yearly plan, or an event's plan while the event exists), `subscription` (yearly plans only) or `off`. `POST /cards/session/plan-download` checks it again.
+
+For them *Download* offers no choice and asks for nothing: the dialog opens on "Making your card…", makes the clean image and saves it as soon as it is ready (with a button to save it again). If that fails (the plan ended meanwhile, say) it offers to try again or to see the other ways to download.
 
 ## Tracking
 
