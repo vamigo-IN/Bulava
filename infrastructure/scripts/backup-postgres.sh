@@ -22,10 +22,14 @@ log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 die() { log "ERROR: $*"; exit 1; }
 
 [ -f "$ENV_FILE" ] || die "missing $ENV_FILE"
-set -a
-# shellcheck disable=SC1090
-. "$ENV_FILE"
-set +a
+# .env.production is a Docker Compose env file: unquoted values with spaces, parentheses or <>
+# are fine there but not valid shell, so it is never sourced. Read the settings this script
+# needs line by line; a value already in the environment (cron, a one-off run) wins.
+env_get() { grep -E "^$1=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- | sed -e 's/\r$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/" || true; }
+for var in POSTGRES_USER POSTGRES_DB BACKUP_RETENTION_DAYS BACKUP_AGE_RECIPIENT BACKUP_ALLOW_UNENCRYPTED \
+  BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY; do
+  if [ -z "${!var:-}" ]; then printf -v "$var" '%s' "$(env_get "$var")"; fi
+done
 
 : "${POSTGRES_USER:?}" "${POSTGRES_DB:?}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
