@@ -19,7 +19,7 @@
     "@bulava/template-schema": "workspace:*",
     "@sentry/node": "^11.1.0",
     "pino": "^9.0.0",
-    "puppeteer-core": "24.43.1",
+    "puppeteer-core": "25.12.0",
     "sharp": "0.35.5"
   },
   "devDependencies": {
