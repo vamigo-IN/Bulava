@@ -12,6 +12,7 @@ import { toPublicUser, type PublicUser } from '../auth/public-user';
 import { MfaService } from '../auth/mfa.service';
 import { SessionService, type IssuedSession } from '../auth/session.service';
 import { EventLinksService } from '../domains/event-links.service';
+import { PHONE_RESEND_AFTER_SECONDS, PhoneOtpService } from '../onboarding/phone-otp.service';
 import { SETTINGS_STORE } from '../settings/settings.service';
 import { accountDeletionScheduledEmail } from './account-email';
 
@@ -37,8 +38,32 @@ export class AccountService {
     private readonly mfa: MfaService,
     private readonly queues: QueueService,
     private readonly links: EventLinksService,
+    private readonly phoneOtp: PhoneOtpService,
     @Inject(SETTINGS_STORE) private readonly store: SettingsStore,
   ) {}
+
+  /** A code on WhatsApp to the account's own number: confirmed, it signs in with WhatsApp too. */
+  async sendPhoneConfirmation(userId: string, meta: RequestMeta): Promise<{ sent: true; target: string; sendId: string; resendAfter: number }> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { phone: true, phoneVerifiedAt: true } });
+    if (!user.phone) throw new AppError('BAD_REQUEST', 'Add a WhatsApp number first.');
+    if (user.phoneVerifiedAt) throw new AppError('CONFLICT', 'This number is already confirmed.');
+    const { target, sendId } = await this.phoneOtp.send(user.phone, 'confirm');
+    await this.audit.record({ actorType: 'USER', actorId: userId, action: 'user.phone_code_sent', targetType: 'User', targetId: userId, metadata: { purpose: 'confirm' }, meta });
+    return { sent: true, target, sendId, resendAfter: PHONE_RESEND_AFTER_SECONDS };
+  }
+
+  /** The code from WhatsApp confirms the number (and secures an account made from it). */
+  async confirmPhone(userId: string, code: string, meta: RequestMeta): Promise<PublicUser> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { phone: true } });
+    if (!user.phone) throw new AppError('BAD_REQUEST', 'Add a WhatsApp number first.');
+    await this.phoneOtp.verify(user.phone, code, 'confirm');
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.user.update({ where: { id: userId }, data: { phoneVerifiedAt: new Date(), provisional: false } });
+      await this.audit.record({ actorType: 'USER', actorId: userId, action: 'user.phone_verified', targetType: 'User', targetId: userId, meta }, tx);
+      return row;
+    });
+    return toPublicUser(updated);
+  }
 
   /** Name, WhatsApp number (a changed number needs verifying again) and the WhatsApp-updates consent. */
   async updateProfile(userId: string, input: UpdateProfileInput, meta: RequestMeta): Promise<PublicUser> {

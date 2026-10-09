@@ -21,17 +21,20 @@ export function LiveScreen({ definition, eventType }: { definition: TemplateDefi
 export function LiveThumbnailView({
   definition,
   eventType,
+  tags,
   width,
   height,
   sections,
 }: {
   definition: TemplateDefinition;
   eventType: string;
+  /** The template's tags: a festival's design previews with that festival's sample title. */
+  tags?: readonly string[];
   width: number;
   height: number;
   sections: number;
 }) {
-  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, noPhotos: true }), [eventType]);
+  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, noPhotos: true, tags }), [eventType, tags]);
   return (
     <>
       <TemplateStyles />

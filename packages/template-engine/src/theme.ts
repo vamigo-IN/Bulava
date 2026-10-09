@@ -26,6 +26,8 @@ export const FONT_CSS_VARS: Record<string, string> = {
   'Yeseva One': '--font-yeseva',
   'Rozha One': '--font-rozha',
   'Yatra One': '--font-yatra',
+  'Baloo 2': '--font-baloo',
+  Pacifico: '--font-pacifico',
 };
 
 const family = (name: string) => `var(${FONT_CSS_VARS[name] ?? '--font-none'}, '${name}')`;

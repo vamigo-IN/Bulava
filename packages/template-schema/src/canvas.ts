@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ConditionSchema, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, ValueSchema } from './base';
+import { ConditionSchema, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, SCENE_NAMES, ValueSchema } from './base';
 
 /**
  * Canvas sections: free-form artboards designed by hand in the Studio's Canvas
@@ -23,9 +23,13 @@ export const ColorRefSchema = z.union([hex, z.enum(PALETTE_KEYS), z.literal('tra
 export type ColorRef = z.infer<typeof ColorRefSchema>;
 
 export const GradientSchema = z.object({
+  /** Linear runs along `angle`; radial spreads from the centre (a glow, a spotlight, a vignette). */
+  kind: z.enum(['linear', 'radial']).default('linear'),
   from: ColorRefSchema,
+  /** An optional middle stop. */
+  via: ColorRefSchema.optional(),
   to: ColorRefSchema,
-  /** Degrees, CSS convention (180 = top to bottom). */
+  /** Degrees, CSS convention (180 = top to bottom). Linear only. */
   angle: z.number().min(0).max(360).default(180),
 });
 
@@ -68,8 +72,11 @@ export type Frame = z.infer<typeof FrameSchema>;
 
 /** Entrances play once when the section scrolls into view (never for reduced-motion users). */
 export const LAYER_ENTRANCES = ['none', 'fade', 'fadeUp', 'fadeDown', 'zoomIn', 'slideLeft', 'slideRight', 'blurIn', 'pop'] as const;
-/** Ambient loops drawn from the engine's existing motion vocabulary. */
-export const LAYER_MOTIONS = ['none', 'float', 'sway', 'twinkle', 'spin', 'breathe'] as const;
+/** Ambient loops drawn from the engine's existing motion vocabulary; `shimmer` sweeps light across foil. */
+export const LAYER_MOTIONS = ['none', 'float', 'sway', 'twinkle', 'spin', 'breathe', 'shimmer'] as const;
+
+/** How a layer mixes with what is below it (CSS mix-blend-mode): textures, glows, inked looks. */
+export const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'soft-light'] as const;
 
 export const LayerAnimationSchema = z.object({
   entrance: z.enum(LAYER_ENTRANCES).default('none'),
@@ -90,6 +97,7 @@ const base = {
   hidden: z.boolean().default(false),
   visibleWhen: ConditionSchema.optional(),
   animation: LayerAnimationSchema.default({ entrance: 'none', delaySec: 0, durationSec: 0.8, motion: 'none' }),
+  blend: z.enum(BLEND_MODES).default('normal'),
 };
 
 export const TEXT_SHADOWS = ['none', 'soft', 'glow', 'hard'] as const;
@@ -115,6 +123,8 @@ export const TextStyleSchema = z.object({
    * as the engine does for every template text. Off for decorative lettering.
    */
   contrast: z.boolean().default(true),
+  /** Metallic foil made from the colour (gold from a gold, silver from a grey…), like a foil-stamped card. */
+  foil: z.boolean().default(false),
 });
 
 export const TextLayerSchema = z.object({
@@ -164,6 +174,67 @@ export const ShapeLayerSchema = z.object({
   shadow: z.boolean().default(false),
 });
 
+/**
+ * Illustrations the engine draws in full colour (template-engine art/illustrations):
+ * the tint is their main colour, the rest follows the palette. Frames, borders,
+ * garlands and strings are drawn to the layer's own proportions.
+ */
+export const ILLUSTRATIONS = [
+  'elephant',
+  'royalPeacock',
+  'jharokha',
+  'ornateFrame',
+  'filigreeCorner',
+  'flourish',
+  'medallion',
+  'paisleyOrnate',
+  'roseCluster',
+  'floralGarland',
+  'templeBells',
+  'jasmineStrand',
+  'bananaLeaf',
+  'kolam',
+  'mehendiHand',
+  'domes',
+  'arabesque',
+  'doves',
+  'rings',
+  'cake',
+  'balloonBunch',
+  'bunting',
+  'giftBox',
+  'fairyLights',
+  'moonCloud',
+  'house',
+  'diyaRow',
+  'rangoliBloom',
+  'coupleHindu',
+  'coupleVarmala',
+  'coupleSikh',
+  'coupleNikah',
+  'coupleSouth',
+  'coupleChristian',
+  'coupleBengali',
+  'coupleElder',
+  'kidBoy',
+  'kidGirl',
+  'babyCradle',
+  'momToBe',
+  'brideBust',
+  'groomBust',
+  'stork',
+  'teddyBear',
+  'unicorn',
+  'dino',
+  'rocket',
+  'cupcake',
+  'doli',
+  'dhol',
+  'haldiBowl',
+  'champagne',
+] as const;
+export type IllustrationName = (typeof ILLUSTRATIONS)[number];
+
 /** Decorations the engine draws itself (no assets to license). */
 export const ORNAMENT_LAYERS = [
   ...ORNAMENTS.filter((o) => o !== 'none'),
@@ -181,8 +252,12 @@ export const ORNAMENT_LAYERS = [
   'archFrame',
   'templeBorder',
   'seaWaves',
+  ...ILLUSTRATIONS,
 ] as const;
 export type OrnamentLayerName = (typeof ORNAMENT_LAYERS)[number];
+
+/** A soft drop shadow, or a glow in the layer's colour (lanterns, foil on dark cards). */
+export const ORNAMENT_SHADOWS = ['none', 'soft', 'glow'] as const;
 
 export const OrnamentLayerSchema = z.object({
   ...base,
@@ -191,6 +266,24 @@ export const OrnamentLayerSchema = z.object({
   color: ColorRefSchema.default('secondary'),
   flipX: z.boolean().default(false),
   flipY: z.boolean().default(false),
+  /** Metallic foil made from the colour, on line ornaments and the metal of illustrations. */
+  foil: z.boolean().default(false),
+  shadow: z.enum(ORNAMENT_SHADOWS).default('none'),
+});
+
+/** Scenes a canvas can place (the noir scene needs the hero's monogram and photo, so it stays a hero backdrop). */
+export const CANVAS_SCENES = SCENE_NAMES.filter((s) => s !== 'noir') as Exclude<(typeof SCENE_NAMES)[number], 'noir'>[];
+
+/**
+ * An illustrated scene (a palace at dusk, a lotus pond, a temple gateway…)
+ * inside a frame, anchored at its bottom centre like a hero, in the palette's
+ * colours. Without `sky` only the drawn layers show, over what is below.
+ */
+export const SceneLayerSchema = z.object({
+  ...base,
+  kind: z.literal('scene'),
+  scene: z.enum(CANVAS_SCENES as [Exclude<(typeof SCENE_NAMES)[number], 'noir'>, ...Exclude<(typeof SCENE_NAMES)[number], 'noir'>[]]),
+  sky: z.boolean().default(true),
 });
 
 /** Small line icons for detail rows and buttons (drawn by the engine). */
@@ -261,7 +354,7 @@ export const WidgetLayerSchema = z.object({
   ]),
 });
 
-export const LayerSchema = z.discriminatedUnion('kind', [TextLayerSchema, ImageLayerSchema, ShapeLayerSchema, OrnamentLayerSchema, IconLayerSchema, WidgetLayerSchema]);
+export const LayerSchema = z.discriminatedUnion('kind', [TextLayerSchema, ImageLayerSchema, ShapeLayerSchema, OrnamentLayerSchema, IconLayerSchema, WidgetLayerSchema, SceneLayerSchema]);
 export type Layer = z.infer<typeof LayerSchema>;
 export type LayerInput = z.input<typeof LayerSchema>;
 export type TextLayer = z.infer<typeof TextLayerSchema>;
@@ -270,9 +363,13 @@ export type ShapeLayer = z.infer<typeof ShapeLayerSchema>;
 export type OrnamentLayer = z.infer<typeof OrnamentLayerSchema>;
 export type IconLayer = z.infer<typeof IconLayerSchema>;
 export type WidgetLayer = z.infer<typeof WidgetLayerSchema>;
+export type SceneLayer = z.infer<typeof SceneLayerSchema>;
 export type LayerKind = Layer['kind'];
 
 // ─────────────────────────── Artboards ───────────────────────────
+
+/** A surface over the whole artboard, like the stock a card is printed on. */
+export const TEXTURES = ['none', 'paper', 'linen', 'grain', 'watercolor'] as const;
 
 export const ArtboardSchema = z.object({
   /** Design units; the phone artboard is usually 390 wide, the desktop one 1440. */
@@ -281,6 +378,9 @@ export const ArtboardSchema = z.object({
   background: FillSchema.default({ type: 'color', color: 'background' }),
   /** Ambient particles over this artboard (website only). */
   effect: z.enum(EFFECTS).default('none'),
+  texture: z.enum(TEXTURES).default('none'),
+  /** 0–1. */
+  textureStrength: z.number().min(0).max(1).default(0.5),
   /** Bottom to top. */
   layers: z.array(LayerSchema).max(120).default([]),
 });
@@ -338,9 +438,8 @@ export function fillSolidColors(fill: Fill, colors: PaletteColors): string[] | n
       return c ? [c] : null;
     }
     case 'gradient': {
-      const a = solidColorOf(fill.gradient.from, colors);
-      const b = solidColorOf(fill.gradient.to, colors);
-      return a && b ? [a, b] : null;
+      const stops = [fill.gradient.from, ...(fill.gradient.via ? [fill.gradient.via] : []), fill.gradient.to].map((ref) => solidColorOf(ref, colors));
+      return stops.every((c): c is string => c !== null) ? stops : null;
     }
     case 'pattern': {
       const c = solidColorOf(fill.base, colors);
@@ -365,7 +464,8 @@ export function layerBackdrop(board: Pick<Artboard, 'background' | 'layers'>, in
   for (let i = index - 1; i >= 0; i--) {
     const below = board.layers[i]!;
     if (below.hidden || !covers(below.frame, target.frame)) continue;
-    if (below.kind === 'image') return null;
+    // Photos and illustrated scenes have no single colour to check against.
+    if (below.kind === 'image' || below.kind === 'scene') return null;
     if (below.kind === 'shape' && below.shape !== 'line' && below.opacity >= 0.85) {
       if (below.fill.type === 'none') continue;
       if (below.fill.type === 'image') return null;

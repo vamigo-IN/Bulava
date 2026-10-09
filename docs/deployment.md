@@ -122,7 +122,7 @@ Work through this before pushing a release tag (for the first release, `v1.0.0`;
 4. **Edge.** DNS resolves, the host Nginx site passes `nginx -t`, and the certificate is issued (steps 7 and 8 above).
 5. **First sign-in.** At `https://admin.<domain>`: set up two-step sign-in, save the recovery codes, change the seeded password, and check **Staff** shows exactly one Super Admin. Remove `ADMIN_PASSWORD` from `.env.production` afterwards if you like; seeds never revert a changed password.
 6. **Settings (Super Admin).** Branding and SEO; SMTP, Razorpay (live keys) and, if used, WhatsApp (GetGabs: API key, sender number, approved templates), Google sign-in and Maps, each with its check passing; the Razorpay webhook (step 10).
-7. **Catalog.** `/templates` lists 73 templates, the same as a local seed, and the admin **Music library** shows *Shubh Aarambh (Tanpura & Bansuri)* approved (both come from the migrate job).
+7. **Catalog.** `/templates` lists 597 templates, the same as a local seed, and the admin **Music library** shows *Shubh Aarambh (Tanpura & Bansuri)* approved (both come from the migrate job).
 8. **Safety nets.** A scheduled backup ran and one restore was tested ([below](#backups-and-restore-spec-71)); `/health` is monitored; `METRICS_TOKEN` is set; `SENTRY_DSN` if you use Sentry.
 9. **Licences and content.** The Remotion company licence before rendering videos commercially; legal pages and Hindi/Hinglish strings reviewed.
 10. **Release.** `git tag v1.0.0 && git push origin v1.0.0`. The production environment's required reviewers approve the deploy, which backs up the database, starts the stack, waits for every health check and checks the public site from outside.
@@ -155,6 +155,18 @@ bash infrastructure/scripts/prune-docker.sh "$BULAVA_VERSION"
 ```
 
 To see where the space goes: `df -h /`, `docker system df` and `sudo du -sh /var/lib/docker /var/backups/bulava`. A weekly cron entry keeps a hand-updated server tidy (see the script's header).
+
+## Template releases
+
+New and changed catalog templates reach the server with the release, through the `migrate` job: it runs before the API starts and syncs the catalog (`seedTemplates`, [templates.md](templates.md#the-catalog)): new templates are created, changed designs become new published versions, and changed listings (tier, tags, order) are updated, while staff edits made in the console or Template Studio are kept. The API clears its cached template list when it starts, so the new templates show at once. Nothing else is needed for templates: no storage upload (the art is code, the gallery images are in the web image) and no manual SQL.
+
+To see what a release will change before starting it, run the migration as a dry run with the new image:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate node dist/seed.js --templates-only --dry-run
+```
+
+It prints one line per template (`create`, `update`, `sync`, `retire`) and a total, and writes nothing. To apply just the catalog without a full release: the same command without `--dry-run`. If the database was restored from a backup older than the catalog, `up -d` (or that command) brings the templates back.
 
 ## Rollback
 

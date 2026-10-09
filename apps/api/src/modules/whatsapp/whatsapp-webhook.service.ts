@@ -5,6 +5,7 @@ import { SettingsStore } from '@bulava/settings';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import { SETTINGS_STORE } from '../settings/settings.service';
+import { WhatsAppDeliveryService } from './whatsapp-delivery.service';
 
 /** A WhatsApp message id ("wamid."), as Meta and GetGabs report them. */
 const WAMID = /^wamid\.[A-Za-z0-9+/=_-]{8,300}$/;
@@ -62,6 +63,7 @@ export class WhatsAppWebhookService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly deliveries: WhatsAppDeliveryService,
     @Inject(SETTINGS_STORE) private readonly settings: SettingsStore,
   ) {}
 
@@ -108,6 +110,8 @@ export class WhatsAppWebhookService {
           if (!status.id || !status.status) continue;
           // Meta's wamid is the message id the worker stored when it sent the invitation.
           await recordWhatsAppDelivery(this.prisma, { providerMessageId: status.id }, status.status, status.errors?.[0]?.title ?? null);
+          // Sign-in codes have no delivery row: someone may be waiting for one (a number not on WhatsApp fails here).
+          if (status.status === 'failed') await this.deliveries.recordFailure(status.id, status.errors?.[0]?.title ?? null);
         }
       }
     }
@@ -126,7 +130,9 @@ export class WhatsAppWebhookService {
     if (event.direction === 'outbound') {
       if (typeof event.message_id === 'string' && WAMID.test(event.message_id)) {
         const report = typeof event.status === 'string' ? event.status : null;
-        changed = await recordWhatsAppDelivery(this.prisma, { providerMessageId: event.message_id }, report, typeof event.error_message === 'string' ? event.error_message : null);
+        const error = typeof event.error_message === 'string' ? event.error_message : null;
+        changed = await recordWhatsAppDelivery(this.prisma, { providerMessageId: event.message_id }, report, error);
+        if (report?.toLowerCase() === 'failed') await this.deliveries.recordFailure(event.message_id, error);
       }
     } else {
       for (const id of repliedTo(event)) {

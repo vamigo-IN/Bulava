@@ -10,6 +10,9 @@ import { keys, useEvents, useMe } from '@/lib/queries';
 import type { User } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Alert, Button, Field, Input } from '@/components/ui/primitives';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { useProviders } from '@/components/auth/google-button';
+import { WhatsAppConfirm } from '@/components/account/whatsapp-confirm';
 
 /** Profile: what the account holds at a glance, and the details hosts can change. */
 export default function AccountPage() {
@@ -18,7 +21,9 @@ export default function AccountPage() {
   const events = useEvents();
   const orders = useQuery({ queryKey: ['orders', 'mine'], queryFn: () => apiGet<Array<{ status: string; kind: string }>>('/orders') });
   const user = me.data;
-  const methods = user ? [user.hasPassword, user.googleLinked, user.mfaEnabled].filter(Boolean).length : 0;
+  const methods = user ? [user.hasPassword, user.googleLinked, user.phoneVerified, user.mfaEnabled].filter(Boolean).length : 0;
+  /** Confirmed on this visit: the card stays to say so. */
+  const [phoneConfirmed, setPhoneConfirmed] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -48,6 +53,7 @@ export default function AccountPage() {
       </ul>
 
       {user ? <ProfileCard me={user} /> : null}
+      {user?.phone && (!user.phoneVerified || phoneConfirmed) ? <ConfirmPhoneCard confirmed={phoneConfirmed} onConfirmed={() => setPhoneConfirmed(true)} /> : null}
     </div>
   );
 }
@@ -121,8 +127,8 @@ function ProfileCard({ me }: { me: User }) {
           <Field label={t('auth.field.email')} hint={t('account.emailHint')}>
             {(p) => <Input {...p} type="email" value={me.email ?? ''} readOnly disabled />}
           </Field>
-          <Field label={t('account.phone')} hint={t('account.phone.hint')}>
-            {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" placeholder="98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} />}
+          <Field label={t('account.phone')} hint={me.phone && phone.trim() === me.phone ? t(me.phoneVerified ? 'account.phone.confirmed' : 'account.phone.unconfirmed') : t('account.phone.hint')}>
+            {(p) => <PhoneInput {...p} placeholder="98765 43210" value={phone} onChange={setPhone} />}
           </Field>
         </div>
 
@@ -146,5 +152,40 @@ function ProfileCard({ me }: { me: User }) {
         </div>
       </div>
     </form>
+  );
+}
+
+/** A saved number that was never confirmed: a code on WhatsApp confirms it, and then it signs in too. */
+function ConfirmPhoneCard({ confirmed, onConfirmed }: { confirmed: boolean; onConfirmed: () => void }) {
+  const t = useT();
+  const client = useQueryClient();
+  const providers = useProviders();
+  if (!providers.phoneOtp && !confirmed) return null;
+  return (
+    <section aria-labelledby="confirm-phone" className="clay rounded-[1.75rem] p-5 sm:p-7">
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#075E54] text-white">
+          <MessageCircle className="size-5" />
+        </span>
+        <div>
+          <h2 id="confirm-phone" className="font-display text-2xl leading-tight">
+            {t('account.phone.confirmTitle')}
+          </h2>
+          <p className="mt-0.5 text-sm text-stone-600">{t('account.phone.confirmHint')}</p>
+        </div>
+      </div>
+      <div className="mt-5">
+        {confirmed ? (
+          <Alert tone="success">{t('account.phone.confirmedNow')}</Alert>
+        ) : (
+          <WhatsAppConfirm
+            onConfirmed={async () => {
+              onConfirmed();
+              await client.invalidateQueries({ queryKey: keys.me });
+            }}
+          />
+        )}
+      </div>
+    </section>
   );
 }

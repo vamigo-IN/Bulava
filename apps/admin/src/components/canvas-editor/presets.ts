@@ -1,4 +1,5 @@
-import type { Artboard, ArtboardInput, IconName, LayerInput, OrnamentLayerName, SHAPES } from '@bulava/template-schema';
+import { FRAME_SIZED, ILLUSTRATION_ASPECT } from '@bulava/template-engine';
+import { ILLUSTRATIONS, type Artboard, type ArtboardInput, type ColorRef, type IconName, type IllustrationName, type LayerInput, type OrnamentLayerName, type SceneLayer, type SHAPES } from '@bulava/template-schema';
 
 /**
  * Starting points for new layers: each lands centred on the artboard at a size
@@ -10,6 +11,7 @@ export type LayerPreset =
   | { group: 'image'; key: 'library' | 'cover' | 'photo' }
   | { group: 'shape'; key: (typeof SHAPES)[number] }
   | { group: 'ornament'; key: OrnamentLayerName }
+  | { group: 'scene'; key: SceneLayer['scene'] }
   | { group: 'icon'; key: IconName }
   | { group: 'widget'; key: 'countdown' | 'button' | 'details' };
 
@@ -21,6 +23,56 @@ export function layerId(prefix: string, taken: Set<string>): string {
 }
 
 const centred = (board: Pick<Artboard, 'width' | 'height'>, w: number, h: number) => ({ x: Math.round((board.width - w) / 2), y: Math.round((board.height - h) / 2), w, h });
+
+const ILLUSTRATION_NAMES = new Set<string>(ILLUSTRATIONS);
+export const isIllustration = (name: OrnamentLayerName): name is IllustrationName => ILLUSTRATION_NAMES.has(name);
+
+/** The colour an illustration starts with: its main colour (henna, leaves, an ivory elephant…); others take the palette's secondary. */
+export function illustrationTint(name: IllustrationName): ColorRef {
+  const tints: Partial<Record<IllustrationName, ColorRef>> = {
+    elephant: 'accent',
+    royalPeacock: 'accent',
+    mehendiHand: '#8a3a17',
+    bananaLeaf: '#3d7f3e',
+    roseCluster: '#6b8f6e',
+    floralGarland: '#6b8f6e',
+    arabesque: 'primary',
+    coupleHindu: 'primary',
+    coupleVarmala: 'primary',
+    coupleSikh: 'primary',
+    coupleNikah: 'primary',
+    coupleSouth: 'primary',
+    coupleChristian: 'accent',
+    coupleBengali: 'primary',
+    coupleElder: 'primary',
+    kidBoy: 'primary',
+    kidGirl: 'primary',
+    babyCradle: 'accent',
+    momToBe: 'primary',
+    brideBust: 'primary',
+    groomBust: 'primary',
+    stork: 'accent',
+    teddyBear: 'primary',
+    unicorn: 'accent',
+    dino: '#5cb85c',
+    rocket: 'primary',
+    cupcake: 'primary',
+    doli: 'primary',
+    dhol: 'primary',
+    champagne: '#f3d38a',
+  };
+  return tints[name] ?? 'secondary';
+}
+
+/** An illustration's starting frame: at its own proportions, or across the board for garlands, strings and frames. */
+function illustrationFrame(name: IllustrationName, board: Pick<Artboard, 'width' | 'height'>, u: (n: number) => number) {
+  if (name === 'ornateFrame') return { x: u(12), y: u(12), w: board.width - 2 * u(12), h: board.height - 2 * u(12) };
+  if (name === 'jasmineStrand') return centred(board, u(30), u(300));
+  if (FRAME_SIZED.has(name)) return { x: 0, y: 0, w: board.width, h: u(110) };
+  const aspect = ILLUSTRATION_ASPECT[name];
+  const w = aspect >= 1 ? u(240) : Math.round(u(260) * aspect);
+  return centred(board, w, Math.round(w / aspect));
+}
 
 export function newLayer(preset: LayerPreset, board: Pick<Artboard, 'width' | 'height'>, taken: Set<string>, assetId?: string): LayerInput {
   // Everything is designed in phone units; wider boards get the same proportions.
@@ -55,10 +107,16 @@ export function newLayer(preset: LayerPreset, board: Pick<Artboard, 'width' | 'h
     }
     case 'ornament': {
       const id = layerId(preset.key, taken);
+      if (isIllustration(preset.key)) return { id, kind: 'ornament', ornament: preset.key, frame: illustrationFrame(preset.key, board, u), color: illustrationTint(preset.key) };
       const wide = new Set<OrnamentLayerName>(['toran', 'templeBorder', 'seaWaves', 'archFrame']);
       const tall = new Set<OrnamentLayerName>(['marigoldStrand', 'lantern', 'diya', 'kalash', 'gateLeaf']);
       const frame = wide.has(preset.key) ? { x: 0, y: 0, w: board.width, h: u(90) } : tall.has(preset.key) ? centred(board, u(80), u(200)) : centred(board, u(220), u(220));
       return { id, kind: 'ornament', ornament: preset.key, frame, color: 'secondary' };
+    }
+    case 'scene': {
+      // Scenes are drawn on a 3:2 canvas anchored at the bottom centre: across the board, at the bottom.
+      const h = Math.min(board.height, Math.round((board.width * 2) / 3));
+      return { id: layerId(preset.key, taken), kind: 'scene', scene: preset.key, frame: { x: 0, y: board.height - h, w: board.width, h }, sky: true };
     }
     case 'icon':
       return { id: layerId(preset.key, taken), kind: 'icon', icon: preset.key, frame: centred(board, u(44), u(44)), color: 'primary', circle: 'accent' };

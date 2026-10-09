@@ -20,9 +20,11 @@ export const CheckInSchema = z.object({
 export type CheckInInput = z.infer<typeof CheckInSchema>;
 
 /**
- * Event-day check-in. Each guest gets a stable CHECK_IN QR code that opens
- * /checkin/<code> on staff phones; staff must be signed in with guest access
- * to the event. Duplicate check-ins are refused unless re-entry is allowed.
+ * Event-day check-in. When the host turns on entry passes (`Event.entryPasses`),
+ * each guest's invitation carries a stable CHECK_IN QR code that opens
+ * /checkin/<code> on staff phones (or the dashboard's scanner); staff must be
+ * signed in with guest access to the event. Duplicate check-ins are refused
+ * unless re-entry is allowed.
  */
 @Injectable()
 export class CheckInService {
@@ -131,6 +133,23 @@ export class CheckInService {
       meta,
     });
     return { id: row.id, guestName: guest.name, checkedInAt: row.checkedInAt, reentry: !!previous };
+  }
+
+  async settings(access: EventAccessContext): Promise<{ entryPasses: boolean }> {
+    const event = await this.prisma.event.findUniqueOrThrow({ where: { id: access.eventId }, select: { entryPasses: true } });
+    return { entryPasses: event.entryPasses };
+  }
+
+  /** Turns QR entry passes on or off; invitations show the pass only while it is on. */
+  async updateSettings(access: EventAccessContext, input: { entryPasses: boolean }, meta: RequestMeta): Promise<{ entryPasses: boolean }> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.event.update({ where: { id: access.eventId }, data: { entryPasses: input.entryPasses } });
+      await this.audit.record(
+        { actorType: 'USER', actorId: access.userId, action: 'checkin.settings_updated', targetType: 'Event', targetId: access.eventId, eventId: access.eventId, metadata: { entryPasses: input.entryPasses }, meta },
+        tx,
+      );
+    });
+    return { entryPasses: input.entryPasses };
   }
 
   /** Attendance dashboard: checked-in guests and headcount per function vs expected. */

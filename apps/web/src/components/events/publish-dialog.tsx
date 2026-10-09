@@ -118,14 +118,14 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
               <AccessOptions value={access} onChange={setAccess} disabled={busy} />
             </div>
 
-            {!event.design || event.counts.functions === 0 ? (
+            {!event.design || event.counts.readyFunctions === 0 ? (
               <ul className="mt-5 space-y-2">
                 {!event.design ? (
                   <Warning icon={Palette} href={`${base}/design`} action={t('dash.step.design.action')} onNavigate={() => ref.current?.close()}>
                     {t('publish.warn.design')}
                   </Warning>
                 ) : null}
-                {event.counts.functions === 0 ? (
+                {event.counts.readyFunctions === 0 ? (
                   <Warning icon={TriangleAlert} href={`${base}/functions`} action={t('dash.step.functions.action')} onNavigate={() => ref.current?.close()}>
                     {t('publish.warn.functions')}
                   </Warning>

@@ -1,27 +1,32 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
 import {
+  ILLUSTRATIONS,
   layerBackdrop,
   resolveBinding,
   resolveValue,
   type Artboard,
   type Fonts,
   type IconLayer,
+  type IllustrationName,
   type ImageLayer,
   type Layer,
   type OrnamentLayer,
   type RenderContext,
+  type SceneLayer,
   type ShapeLayer,
   type TextLayer,
   type ThemeColors,
   type WidgetLayer,
 } from '@bulava/template-schema';
-import { Diya, Kalash, MarigoldStrand, Toran } from '../art/motifs';
-import { artworkAssetUrl } from '../art/scenes';
+import { Illustration } from '../art/illustrations';
+import { foilCss, hex, metalStops, useSafeId } from '../art/kit';
+import { Diya, Kalash, MarigoldStrand, r2, Toran } from '../art/motifs';
+import { artworkAssetUrl, sceneArt } from '../art/scenes';
 import { ArchFrame, Ornament, TempleBorder, type OrnamentName } from '../ornaments';
 import { Crescent, CrestFrame, GateLeaf, GothicArch, Lantern, PeacockFeather, RoseWindow, SeaWaves } from '../ornaments-signature';
 import type { RenderMode, RenderSlots } from '../types';
-import { fillBackdrop, fillStyle, fontFamilyFor, resolveColor, solidHex, textInk } from './colors';
+import { fillBackdrop, fillStyle, fontFamilyFor, resolveColor, solidHex, textInk, textureStyle } from './colors';
 import { FitText } from './fit-text';
 import { Icon } from './icons';
 import { calendarUrl } from './links';
@@ -59,7 +64,9 @@ const ENTRANCE_CLASS: Record<string, string> = {
   blurIn: 'bulava-cv-blur',
   pop: 'bulava-cv-pop',
 };
-const MOTION_CLASS: Record<string, string> = { float: 'bulava-bob', sway: 'bulava-sway-soft', twinkle: 'bulava-twinkle', spin: 'bulava-spin-slow', breathe: 'bulava-breathe' };
+const MOTION_CLASS: Record<string, string> = { float: 'bulava-bob', sway: 'bulava-sway-soft', twinkle: 'bulava-twinkle', spin: 'bulava-spin-slow', breathe: 'bulava-breathe', shimmer: 'bulava-glint' };
+
+const ILLUSTRATION_NAMES: ReadonlySet<string> = new Set(ILLUSTRATIONS);
 
 function isEmpty(v: unknown): boolean {
   return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
@@ -98,7 +105,9 @@ export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode
         if (content === null) return null;
         const f = layer.frame;
         const entrance = live && layer.animation.entrance !== 'none' ? ENTRANCE_CLASS[layer.animation.entrance] : undefined;
-        const motion = mode !== 'thumbnail' && mode !== 'edit' && layer.animation.motion !== 'none' ? MOTION_CLASS[layer.animation.motion] : undefined;
+        // Foil text shimmers itself (the light moves across its own background).
+        const ownShimmer = layer.kind === 'text' && layer.style.foil && layer.animation.motion === 'shimmer';
+        const motion = mode !== 'thumbnail' && mode !== 'edit' && layer.animation.motion !== 'none' && !ownShimmer ? MOTION_CLASS[layer.animation.motion] : undefined;
         return (
           <div
             key={layer.id}
@@ -111,6 +120,7 @@ export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode
               height: pct(f.h, H),
               transform: f.rotate ? `rotate(${f.rotate}deg)` : undefined,
               opacity: layer.opacity,
+              mixBlendMode: layer.blend !== 'normal' ? layer.blend : undefined,
             }}
           >
             <div
@@ -124,6 +134,7 @@ export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode
           </div>
         );
       })}
+      {board.texture !== 'none' ? <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...textureStyle(board.texture, board.textureStrength, backdrop) }} /> : null}
     </div>
   );
 }
@@ -158,6 +169,8 @@ function renderLayer(layer: Layer, env: LayerEnv): ReactNode | null {
       return <IconView layer={layer} env={env} />;
     case 'widget':
       return <WidgetView layer={layer} env={env} />;
+    case 'scene':
+      return <SceneView layer={layer} env={env} />;
     default:
       return null;
   }
@@ -180,12 +193,33 @@ function textShadow(kind: TextLayer['style']['shadow'], size: string, accent: st
 
 const TRANSFORM: Record<string, CSSProperties['textTransform']> = { none: 'none', upper: 'uppercase', lower: 'lowercase', capitalize: 'capitalize' };
 
+/**
+ * Static renders (thumbnails, gallery previews) have no browser to measure in,
+ * so text that should shrink is scaled by an estimate instead: average glyph
+ * widths for the font role, letter spacing and capitals, then the largest
+ * scale at which the text fits the box (on one line, or wrapped). Long names
+ * come out smaller rather than cut off.
+ */
+function estimatedFit(text: string, s: TextLayer['style'], frame: { w: number; h: number }, singleLine: boolean): number {
+  // Generous widths: a thumbnail's text may come out a little small, never cut off.
+  const glyph = (s.font === 'script' ? 0.52 : s.font === 'body' ? 0.58 : 0.62) * (s.transform === 'upper' ? 1.2 : 1) + s.letterSpacing;
+  const width = Array.from(text).length * s.size * glyph;
+  if (singleLine) return Math.max(0.4, Math.min(1, (frame.w * 0.96) / width));
+  for (let fit = 1; fit > 0.4; fit -= 0.05) {
+    const lines = Math.ceil((width * fit) / (frame.w * 0.92));
+    if (lines * s.size * fit * s.lineHeight <= frame.h) return fit;
+  }
+  return 0.4;
+}
+
 function TextView({ layer, env }: { layer: TextLayer; env: LayerEnv }) {
   const value = resolveValue(layer.content, env.ctx, env.opts);
   if (value === undefined || value === '') return null;
   const s = layer.style;
   const size = env.u(s.size);
   const text = String(value);
+  const ink = textInk(s.color, env.backdrop, env.colors, s.contrast);
+  const shimmer = s.foil && layer.animation.motion === 'shimmer' && env.mode !== 'thumbnail' && env.mode !== 'edit';
   const style: CSSProperties = {
     width: '100%',
     height: '100%',
@@ -193,7 +227,7 @@ function TextView({ layer, env }: { layer: TextLayer; env: LayerEnv }) {
     alignItems: s.valign === 'top' ? 'flex-start' : s.valign === 'bottom' ? 'flex-end' : 'center',
     justifyContent: s.align === 'left' ? 'flex-start' : s.align === 'right' ? 'flex-end' : 'center',
     textAlign: s.align,
-    color: textInk(s.color, env.backdrop, env.colors, s.contrast),
+    color: ink,
     fontFamily: fontFamilyFor(s.font),
     fontSize: size,
     fontWeight: s.weight,
@@ -205,19 +239,34 @@ function TextView({ layer, env }: { layer: TextLayer; env: LayerEnv }) {
     whiteSpace: 'pre-wrap',
     overflowWrap: 'break-word',
     overflow: layer.overflow === 'wrap' ? 'visible' : 'hidden',
+    // Foil: a metallic gradient made from the colour, painted through the letters. A shadow
+    // would show through transparent glyphs, so it becomes a drop shadow around them.
+    ...(s.foil
+      ? {
+          color: 'transparent',
+          WebkitTextFillColor: 'transparent',
+          backgroundImage: foilCss(hex(ink)),
+          backgroundSize: shimmer ? '250% 100%' : '100% 100%',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          textShadow: undefined,
+          filter: s.shadow === 'none' ? undefined : s.shadow === 'glow' ? `drop-shadow(0 0 calc(${size} * 0.25) ${env.colors.accent}aa)` : `drop-shadow(0 calc(${size} * 0.04) calc(${size} * 0.12) rgba(0,0,0,0.45))`,
+        }
+      : {}),
   };
   // Shrinking needs the browser; static renders (thumbnails) keep the design size.
   const shrink = layer.overflow === 'shrink' && env.mode !== 'thumbnail';
   // A box too short for two lines is a single line: it shrinks to fit the width instead of wrapping.
   const singleLine = layer.frame.h < s.size * s.lineHeight * 1.8;
+  const estimate = layer.overflow === 'shrink' && !shrink ? estimatedFit(text, s, layer.frame, singleLine) : 1;
   return (
-    <div style={style}>
+    <div style={style} className={shimmer ? 'bulava-shimmer' : undefined}>
       {shrink ? (
         <FitText lineHeight={s.lineHeight} singleLine={singleLine}>
           {text}
         </FitText>
       ) : (
-        <span style={{ display: 'block', width: '100%', whiteSpace: singleLine ? 'nowrap' : undefined }}>{text}</span>
+        <span style={{ display: 'block', width: '100%', whiteSpace: singleLine ? 'nowrap' : undefined, ...(estimate < 1 ? { fontSize: `calc(1em * ${r2(estimate)})` } : {}) }}>{text}</span>
       )}
     </div>
   );
@@ -311,10 +360,19 @@ function ShapeView({ layer, env }: { layer: ShapeLayer; env: LayerEnv }) {
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: '100%', overflow: 'visible', filter: shadow ? `drop-shadow(0 ${env.u(f.w * 0.04)} ${env.u(f.w * 0.08)} rgba(0,0,0,0.3))` : undefined }} aria-hidden="true">
         {layer.fill.type === 'gradient' ? (
           <defs>
-            <linearGradient id={gradientId} gradientTransform={`rotate(${layer.fill.gradient.angle - 90} 0.5 0.5)`}>
-              <stop offset="0" stopColor={resolveColor(layer.fill.gradient.from, env.colors)} />
-              <stop offset="1" stopColor={resolveColor(layer.fill.gradient.to, env.colors)} />
-            </linearGradient>
+            {(() => {
+              const g = layer.fill.gradient;
+              const stops = [g.from, ...(g.via ? [g.via] : []), g.to].map((ref, i, all) => <stop key={i} offset={i / (all.length - 1)} stopColor={resolveColor(ref, env.colors)} />);
+              return g.kind === 'radial' ? (
+                <radialGradient id={gradientId} cx="0.5" cy="0.5" r="0.5">
+                  {stops}
+                </radialGradient>
+              ) : (
+                <linearGradient id={gradientId} gradientTransform={`rotate(${g.angle - 90} 0.5 0.5)`}>
+                  {stops}
+                </linearGradient>
+              );
+            })()}
           </defs>
         ) : null}
         <path d={path} fill={fill} stroke={stroke ? resolveColor(stroke.color, env.colors) : undefined} strokeWidth={stroke ? (stroke.width / f.w) * 100 : undefined} strokeDasharray={stroke?.dash ? `${(stroke.dash / f.w) * 100}` : undefined} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
@@ -342,9 +400,46 @@ function ShapeView({ layer, env }: { layer: ShapeLayer; env: LayerEnv }) {
 
 const FILL: CSSProperties = { display: 'block', width: '100%', height: '100%' };
 
+/** Each line ornament's drawing box, so foil runs across the whole motif (user-space gradient). */
+const ORNAMENT_BOX: Partial<Record<string, readonly [number, number]>> = {
+  mandala: [200, 200],
+  paisley: [120, 160],
+  floral: [160, 160],
+  geometric: [200, 200],
+  lotus: [200, 120],
+  peacock: [200, 200],
+  stars: [200, 120],
+  laurel: [200, 170],
+  lantern: [60, 120],
+  crescent: [100, 100],
+  peacockFeather: [80, 220],
+  roseWindow: [200, 200],
+  gothicArch: [300, 420],
+  crest: [200, 240],
+  gateLeaf: [180, 400],
+  archFrame: [300, 400],
+  templeBorder: [400, 40],
+  seaWaves: [400, 120],
+};
+
+function ornamentShadow(kind: OrnamentLayer['shadow'], color: string, env: LayerEnv, w: number): string | undefined {
+  if (kind === 'soft') return `drop-shadow(0 ${env.u(w * 0.02)} ${env.u(w * 0.035)} rgba(0,0,0,0.38))`;
+  if (kind === 'glow') return `drop-shadow(0 0 ${env.u(w * 0.03)} ${hex(color)}cc) drop-shadow(0 0 ${env.u(w * 0.09)} ${hex(color)}77)`;
+  return undefined;
+}
+
 function OrnamentView({ layer, env }: { layer: OrnamentLayer; env: LayerEnv }) {
+  const uid = useSafeId();
   const flip = layer.flipX || layer.flipY ? `scale(${layer.flipX ? -1 : 1}, ${layer.flipY ? -1 : 1})` : undefined;
   const color = resolveColor(layer.color, env.colors, env.colors.secondary);
+  const filter = ornamentShadow(layer.shadow, color, env, layer.frame.w);
+  if (ILLUSTRATION_NAMES.has(layer.ornament)) {
+    return (
+      <div style={{ width: '100%', height: '100%', transform: flip, filter }} aria-hidden="true">
+        <Illustration name={layer.ornament as IllustrationName} color={hex(color)} colors={env.colors} foil={layer.foil} w={layer.frame.w} h={layer.frame.h} style={FILL} />
+      </div>
+    );
+  }
   let node: ReactNode;
   switch (layer.ornament) {
     case 'toran':
@@ -392,9 +487,46 @@ function OrnamentView({ layer, env }: { layer: OrnamentLayer; env: LayerEnv }) {
     default:
       node = <Ornament name={layer.ornament as OrnamentName} style={FILL} />;
   }
+  // Foil on a line ornament: its currentColor strokes and fills take a metallic gradient
+  // (a scoped rule beats the SVG's own attributes; the motif's other colours stay).
+  const box = ORNAMENT_BOX[layer.ornament];
+  const foil = layer.foil && box;
   return (
-    <div style={{ width: '100%', height: '100%', color, transform: flip }} aria-hidden="true">
+    <div data-foil={foil ? uid : undefined} style={{ width: '100%', height: '100%', color, transform: flip, filter }} aria-hidden="true">
+      {foil ? (
+        <>
+          <svg width="0" height="0" style={{ position: 'absolute' }} focusable="false">
+            <defs>
+              <linearGradient id={`${uid}f`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={box[0]} y2={box[1]}>
+                {metalStops(hex(color)).map(([offset, stop], i) => (
+                  <stop key={i} offset={offset} stopColor={stop} />
+                ))}
+              </linearGradient>
+            </defs>
+          </svg>
+          <style>{`[data-foil="${uid}"] [stroke="currentColor"]{stroke:url(#${uid}f)}[data-foil="${uid}"] [fill="currentColor"]{fill:url(#${uid}f)}`}</style>
+        </>
+      ) : null}
       {node}
+    </div>
+  );
+}
+
+// ─────────────────────────── Scenes ───────────────────────────
+
+/**
+ * An illustrated scene inside the frame, anchored bottom-centre like a hero
+ * (the frame crops its sides and sky), in the palette's colours.
+ */
+function SceneView({ layer, env }: { layer: SceneLayer; env: LayerEnv }) {
+  const art = sceneArt(layer.scene, env.colors);
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: layer.sky ? art.background : undefined }} aria-hidden="true">
+      {art.layers.map((l, i) => (
+        <div key={i} style={{ position: 'absolute', inset: 0 }}>
+          {l.node}
+        </div>
+      ))}
     </div>
   );
 }
@@ -446,7 +578,7 @@ function WidgetView({ layer, env }: { layer: WidgetLayer; env: LayerEnv }) {
         variant={w.variant}
         target={target}
         isStatic={env.mode === 'thumbnail' || env.mode === 'edit'}
-        labels={[env.t('template.countdown.days'), env.t('template.countdown.hours'), env.t('template.countdown.minutes'), env.t('template.countdown.seconds')]}
+        labels={(['days', 'hours', 'minutes', 'seconds'] as const).map((unit) => env.t(w.variant === 'inline' ? `template.countdown.short.${unit}` : `template.countdown.${unit}`)) as [string, string, string, string]}
         numberStyle={numberStyle}
         labelStyle={labelStyle}
         boxStyle={boxStyle}

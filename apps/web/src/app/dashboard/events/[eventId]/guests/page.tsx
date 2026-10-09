@@ -8,6 +8,7 @@ import { apiDelete, apiPost } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { useFunctions, useGroups, useGuests, useInvalidateEvent } from '@/lib/queries';
 import { Alert, Badge, Button, Card, Checkbox, EmptyState, Field, Input, Spinner } from '@/components/ui/primitives';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { GuestAccessEditor } from '@/components/events/guest-access-editor';
 
 export default function GuestsPage() {
@@ -75,14 +76,7 @@ export default function GuestsPage() {
             </Field>
             <Field label={t('guest.field.phone')} error={fieldErrors.phone}>
               {(p) => (
-                <Input
-                  {...p}
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="98765 43210"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
+                <PhoneInput {...p} placeholder="98765 43210" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
               )}
             </Field>
             <Field label={t('guest.field.email')} error={fieldErrors.email}>

@@ -1,48 +1,18 @@
-import type { ArtboardInput, CanvasSectionInput, EffectName, LayerInput, LookName, PhotoSlot, Value } from '@bulava/template-schema';
-import { fontsFor, palette, SLOTS, TITLE, type CatalogEntry, type CatalogMeta, type FontPreset, type SlotKey } from './builder';
+import type { ArtboardInput, LayerInput } from '@bulava/template-schema';
+import { palette, TITLE } from './builder';
+import { CARD_SPECS } from './canvas-cards';
+import { at, b, canvasWebsite, eyebrows, t, text, type CanvasSpec } from './canvas-kit';
+import { FACTORY_SPECS } from './factory/collection';
 
 /**
  * Canvas templates: pages whose hero and function cards are free-form
  * artboards (docs/templates.md#canvas-sections), the kind of composition a
- * designer lays out in the Studio's Canvas editor. These two show what the
- * canvas can do with the engine's own ornaments, shapes, icons and widgets, and
- * no licensed images; designers add painted or photographic layers from the
- * asset library. The rest of each page uses the standard sections.
+ * designer lays out in the Studio's Canvas editor. Rose Arch and Confetti Pop
+ * use the engine's line ornaments, shapes, icons and widgets; the card
+ * collection (canvas-cards.ts) adds the full-colour illustrations, foil,
+ * scenes and paper textures. Designers add painted or photographic layers from
+ * the asset library. The rest of each page uses the standard sections.
  */
-
-const b = (binding: string, extra: Partial<{ format: 'date' | 'dateWithWeekday' | 'time' | 'upper' | 'dateTime'; fallback: Value }> = {}): Value => ({ binding, ...extra });
-const t = (key: string): Value => ({ t: key });
-
-interface CanvasSpec extends Omit<CatalogMeta, 'sortOrder'> {
-  colors: ReturnType<typeof palette>;
-  presets?: Array<{ name: string; colors: ReturnType<typeof palette> }>;
-  fonts: FontPreset;
-  look: LookName;
-  effect: EffectName;
-  slots: SlotKey[];
-  photoSlots: PhotoSlot[];
-  hero: CanvasSectionInput;
-  card: CanvasSectionInput;
-  /** Standard sections after the canvas ones (before rsvp and footer). */
-  middle: Array<{ id: string; section: string; variant?: string; props?: Record<string, Value> }>;
-}
-
-/** Shorthand for a layer frame. */
-const at = (x: number, y: number, w: number, h: number, rotate?: number) => ({ x, y, w, h, ...(rotate ? { rotate } : {}) });
-
-const text = (id: string, content: Value, frame: ReturnType<typeof at>, style: NonNullable<Extract<LayerInput, { kind: 'text' }>['style']>, extra: Partial<Extract<LayerInput, { kind: 'text' }>> = {}): LayerInput => ({
-  id,
-  kind: 'text',
-  frame,
-  content,
-  style,
-  ...extra,
-});
-
-/** The eyebrow line reads differently for each event type the template serves. */
-function eyebrows(id: string, frame: ReturnType<typeof at>, lines: Array<[string[], Value]>, style: NonNullable<Extract<LayerInput, { kind: 'text' }>['style']>): LayerInput[] {
-  return lines.map(([eventTypes, content], i) => text(`${id}-${i + 1}`, content, frame, style, { visibleWhen: { eventTypes }, animation: { entrance: 'fadeDown', delaySec: 0.1 } }));
-}
 
 // ─────────────────────────── Rose Arch ───────────────────────────
 
@@ -257,56 +227,5 @@ const SPECS: CanvasSpec[] = [
   },
 ];
 
-function canvasWebsite(spec: CanvasSpec, sortOrder: number): CatalogEntry {
-  return {
-    meta: {
-      key: spec.key,
-      name: spec.name,
-      description: spec.description,
-      category: spec.category,
-      style: spec.style,
-      tier: spec.tier,
-      badge: spec.badge,
-      featured: spec.featured,
-      tags: spec.tags,
-      eventTypes: spec.eventTypes,
-      sortOrder,
-    },
-    definition: {
-      schemaVersion: 1,
-      templateKey: spec.key,
-      type: 'WEBSITE',
-      name: spec.name,
-      description: spec.description,
-      eventTypes: spec.eventTypes,
-      languages: ['en', 'hi', 'hi-Latn'],
-      theme: { colors: spec.colors, radius: 20, ornament: 'none', pattern: 'none', heroTone: 'light', look: spec.look, effect: spec.effect },
-      fonts: fontsFor(spec.fonts),
-      capabilities: {
-        editable: { colors: true, fonts: true, music: false, background: false, layout: true, photos: true, text: true, animation: true },
-        colorPresets: spec.presets ?? [],
-        textSlots: spec.slots.map((s) => SLOTS[s]),
-        maxPhotos: 6,
-        photoSlots: spec.photoSlots,
-      },
-      website: {
-        intro: 'none',
-        pages: [
-          {
-            id: 'home',
-            sections: [
-              { id: 'hero', section: 'canvas', canvas: spec.hero },
-              { id: 'functions', section: 'canvas', canvas: spec.card },
-              ...spec.middle,
-              { id: 'rsvp', section: 'rsvp' },
-              { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
-            ] as never,
-          },
-        ],
-      },
-    },
-  };
-}
-
 /** Sort after the standard website templates (index.ts passes the offset). */
-export const canvasTemplates = (offset: number): CatalogEntry[] => SPECS.map((spec, i) => canvasWebsite(spec, offset + i));
+export const canvasTemplates = (offset: number) => [...SPECS, ...CARD_SPECS, ...FACTORY_SPECS].map((spec, i) => canvasWebsite(spec, offset + i));

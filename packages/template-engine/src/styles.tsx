@@ -26,6 +26,11 @@ const STYLES = `
 .bulava-eq { height: 30%; animation: bulava-eq 0.9s ease-in-out infinite; }
 /* Invitation prompts ("Tap to open") breathe instead of fading, so the text stays readable. */
 .bulava-breathe { display: inline-block; animation: bulava-breathe 2.4s ease-in-out infinite; }
+/* Foil: light sweeps across foil text; other layers glint. */
+@keyframes bulava-shimmer { 0%, 15% { background-position: 110% 0; } 85%, 100% { background-position: -10% 0; } }
+@keyframes bulava-glint { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.22) saturate(1.05); } }
+.bulava-shimmer { animation: bulava-shimmer 5s ease-in-out infinite alternate; }
+.bulava-glint { animation: bulava-glint 3.6s ease-in-out infinite; }
 /* Bands: whole sections on the primary or accent colour, with inks computed for that colour (see themeStyle). */
 .bulava-band-primary { background-color: var(--t-primary); color: var(--bp-text); --t-text: var(--bp-text); --t-muted-ink: var(--bp-muted); --t-primary-ink: var(--bp-primary-ink); --t-secondary-ink: var(--bp-secondary-ink); --t-accent-ink: var(--bp-accent-ink); --t-heading-ink: var(--bp-accent-ink); --t-card: rgb(255 255 255 / 0.08); --t-card-alt: rgb(255 255 255 / 0.12); --t-line: color-mix(in srgb, var(--t-accent) 45%, transparent); --t-button: var(--bp-button); --t-on-button: var(--bp-on-button); }
 .bulava-band-accent { background-color: var(--t-accent); color: var(--ba-text); --t-text: var(--ba-text); --t-muted-ink: var(--ba-muted); --t-primary-ink: var(--ba-primary-ink); --t-secondary-ink: var(--ba-secondary-ink); --t-accent-ink: var(--ba-accent-ink); --t-heading-ink: var(--ba-accent-ink); --t-card: rgb(255 255 255 / 0.1); --t-card-alt: rgb(255 255 255 / 0.16); --t-line: color-mix(in srgb, var(--t-primary) 35%, transparent); --t-button: var(--ba-button); --t-on-button: var(--ba-on-button); }
@@ -51,7 +56,7 @@ const STYLES = `
 @media (hover: hover) { .bulava-tilt:hover { transform: perspective(700px) rotateX(4deg) rotateY(-6deg) scale(1.03); } }
 @media (prefers-reduced-motion: reduce) {
   .bulava-twinkle, .bulava-sway, .bulava-drift, .bulava-spin-slow, .bulava-bob, .bulava-eq, .bulava-breathe,
-  .bulava-flicker, .bulava-glow, .bulava-float-up, .bulava-sway-soft, .bulava-orb, .bulava-medallion, .bulava-vinyl, .bulava-flip-leaf { animation: none; }
+  .bulava-flicker, .bulava-glow, .bulava-float-up, .bulava-sway-soft, .bulava-orb, .bulava-medallion, .bulava-vinyl, .bulava-flip-leaf, .bulava-shimmer, .bulava-glint { animation: none; }
   .bulava-flip, .bulava-curtain, .bulava-3d-card, .bulava-tilt { transition: none; }
   .bulava-float-up { display: none; }
 }

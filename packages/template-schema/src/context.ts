@@ -1,6 +1,6 @@
 import type { PhotoSlot } from './definition';
 import { SAMPLE_IMAGE_SIZE, sampleImageDataUri } from './sample-images';
-import { SAMPLE_PRESETS } from './sample-presets';
+import { samplePreset } from './sample-presets';
 /**
  * RenderContext: the data a template may bind to. Built by the API AFTER
  * authorization, so it only ever contains what the viewer may see.
@@ -106,7 +106,7 @@ export function buildRenderContext(input: {
 }
 
 /** Sample context for Template Studio previews and automated template tests. */
-export function sampleRenderContext(overrides: Partial<{ language: string; longNames: boolean; noPhotos: boolean; typeKey: string }> = {}): RenderContext {
+export function sampleRenderContext(overrides: Partial<{ language: string; longNames: boolean; noPhotos: boolean; typeKey: string; tags: readonly string[] }> = {}): RenderContext {
   const long = overrides.longNames ?? false;
   const venue: VenueContext = {
     name: long ? 'The Grand Maharaja Heritage Palace Banquet & Convention Centre' : 'Rambagh Palace',
@@ -115,7 +115,7 @@ export function sampleRenderContext(overrides: Partial<{ language: string; longN
     mapUrl: 'https://maps.google.com/?q=Rambagh+Palace',
   };
   const typeKey = overrides.typeKey ?? 'WEDDING';
-  const preset = SAMPLE_PRESETS[typeKey] ?? SAMPLE_PRESETS.CUSTOM!;
+  const preset = samplePreset(typeKey, overrides.tags);
   const at = (day: number, hourUtc: number) => new Date(Date.UTC(2026, 11, 14 + day, hourUtc, 30)).toISOString();
   const fns: FunctionContext[] = preset.functions.map((name, i) => ({
     id: `f${i + 1}`,

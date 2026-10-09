@@ -68,6 +68,8 @@ export default function FunctionsPage() {
                         {fn.status === 'CANCELLED' || fn.status === 'POSTPONED' ? (
                           <Badge tone="warning">{t(`function.status.${fn.status}`)}</Badge>
                         ) : null}
+                        {/* Without a date a function is a placeholder: guests and the design do not see it yet. */}
+                        {!fn.startsAt ? <Badge tone="warning">{t('function.hiddenNoDate')}</Badge> : !fn.venue ? <Badge>{t('function.noVenue')}</Badge> : null}
                       </div>
                       {fn.startsAt ? (
                         <p className="mt-1 text-sm text-stone-600">

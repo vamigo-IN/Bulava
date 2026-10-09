@@ -2,6 +2,57 @@
 
 ## Unreleased
 
+### 513 new illustrated invitations
+
+- **Designs for every occasion**, each an illustrated theme in several layouts with a card for every function:
+  - **194 for weddings**: Rajasthani palaces with elephants (*Rajwada*, *Gulabi*, *Panna*), peacock gardens (*Mayur*), South Indian temples (*Kanchi*, *Kerala*), nikah nights of lanterns and domes (*Mehtab*, *Zardozi*), an Anand Karaj (*Laavan*), a Bengali biye (*Sindoor*), Marathi, Gujarati and Banarasi weddings (*Paithani*, *Bandhani*, *Banaras*), church and garden weddings (*Rosewood*, *Lily*), and modern looks in silver, black and gold, sage, blush, terracotta, lavender and ivory.
+  - **103 for the other wedding days and anniversaries**: engagements and rokas, haldi, mehendi, sangeet, reception, and golden, silver and ruby anniversaries.
+  - **96 birthdays**: unicorns, dinosaurs, rockets, teddies and cupcakes for children, the birthday girl and boy, first birthdays, milestone parties in black and gold or neon, and a sixtieth or seventy-fifth with the kalash and diyas.
+  - **120 for families and festivals**: godh bharai, valaikappu and baby showers, namkaran and mundan, griha pravesh, pujas and upanayanam, Diwali, Eid, Holi, Christmas, Navratri and Pongal.
+- **New illustrations**: eight couples (Hindu, after the varmala, Sikh, nikah, South Indian, Christian, Bengali, and a couple married for decades), the bride and groom as portraits, a girl and a boy, a baby in a cradle, a mother-to-be, a stork, a teddy, a unicorn, a dinosaur, a rocket, a cupcake, a doli, a dhol, a bowl of haldi and a champagne toast.
+- **A Playful font pairing** (Baloo 2 and Pacifico) for children's invitations; any design can switch to it.
+- **Photo frames never look empty**: until you add a photo, a frame shows the art or your monogram.
+- **Galleries stay quick** with ten times the designs: the design picker and the gallery load each design's full details only when they show it live.
+- **Template releases sync themselves.** Every deploy brings new and changed templates live, including changes to a template's tier, tags or order (staff edits in the console are kept). `seed.js --templates-only --dry-run` previews what a release will change.
+
+### Photo privacy, entry passes and a tidier setup
+
+- **Only your team adds photos.** The album link and QR code now open the gallery, where anyone can see and download the photos; nobody can upload with them. Your team (co-hosts and photographers) uploads from the Photos page. To let invited guests add photos from their invitation, turn on *Invited guests can add photos*.
+- **The live wall shows a gallery QR code**, *Scan to see and download the photos*, instead of an upload code.
+- **Entry passes are your choice.** Invitations show a QR entry pass only when you turn on *Entry with QR passes* on the Check-in page.
+- **Scan passes with your phone.** The check-in desk has a camera scanner, and *Scan the next guest* keeps the line moving. Typing the code still works.
+- **+91 by default.** Phone and WhatsApp number fields start with India's code; pick another country if needed.
+- **Empty functions stay hidden.** Functions without a date no longer appear on the invitation. The Functions step is ticked once a function has a date, time and venue, and the Functions page marks the ones guests cannot see yet.
+- **No public link before publishing.** The public page's link appears once you publish. After that, preview links lead to the public page.
+
+### Illustrated cards
+
+- **Nine new invitations designed like printed cards:**
+  - *Shahi Gajraj*: a gilded jharokha guarded by two elephants.
+  - *Mor Pankh*: a peacock in a watercolour garden.
+  - *Kovil Mani*: temple bells, jasmine and a gopuram at dusk.
+  - *Noor Mahal*: lanterns, a crescent moon and a skyline of domes.
+  - *Eternal Bloom*: roses and doves.
+  - *Mehendi Rang*: a hand painted with henna.
+  - *Cake & Candles*, for birthdays.
+  - *Twinkle Star*, for baby showers and naming ceremonies.
+  - *Shubh Griha*, for housewarmings.
+
+  Each has a phone and a desktop design, a card for every function and three colour presets.
+- **Foil, paper and illustrations for canvas designs.** Names can be stamped in metallic foil that catches the light. Cards can be printed on paper, linen, grain or a watercolour wash. The Canvas editor adds 28 full-colour illustrations and the illustrated scenes as layers, with previews in its add menu. Layers also get blend modes, soft shadows and glows, and radial gradients.
+- **The inline countdown reads Hrs, Min and Sec.** It used to cut words to three letters, which also broke the Hindi labels.
+- **Deploys no longer republish a catalog template over rounding noise** in its numbers.
+
+### Codes at sign-up and sign-in, and Continue with WhatsApp
+
+- **Sign-ups confirm the email first.** Creating an account with an email now sends a 6-digit code to it; the account is made once the code is entered. Until then nothing is saved, so nobody can take an address that isn't theirs.
+- **A code with every password sign-in.** After the right password, a code goes to the account's email and finishes the sign-in. Accounts with an authenticator app keep using it instead. The email also says what to do if it wasn't you.
+- **Forgot password?** The sign-in page now resets a password with a code sent by email. Other devices are signed out.
+- **Continue with WhatsApp.** The sign-in and sign-up pages open with WhatsApp, then Google, then email. A code on WhatsApp signs in, or creates the account for a new number with just a name and the Terms box. The page shows when the message is sent and delivered. If the number isn't on WhatsApp, it offers Google or email and password instead.
+- **Confirm your WhatsApp number.** A number added on the profile or at sign-up is confirmed with a code from the account page (or Sign-in & security) before it can sign in. Accounts made with WhatsApp add an email the same way, with a code.
+- **The console asks for the emailed code too**, unless the staff account uses an authenticator app.
+- **Six boxes for codes.** Code fields accept typing, pasting and the phone's suggested code, and send the code when the sixth digit arrives.
+
 ### Deploys no longer fill the server's disk
 
 - **Old releases are cleaned up.** Every release brought new copies of each Bulava image and Docker kept them all, so the disk filled with each deploy. The deploy now keeps only the running release and the one before it (for a rollback), and removes unused build cache. `infrastructure/scripts/prune-docker.sh` does the same after a deploy by hand. It never touches containers, volumes or other sites' images.

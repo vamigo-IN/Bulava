@@ -6,7 +6,7 @@ import { UploadRoom, type RoomInfo } from '@/components/photos/upload-room';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Share your photos',
+  title: 'Photos',
   robots: { index: false, follow: false },
   referrer: 'no-referrer',
 };

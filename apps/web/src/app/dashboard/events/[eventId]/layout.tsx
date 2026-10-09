@@ -191,11 +191,13 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {/* The watermarked preview: works before publishing, whatever the access mode. */}
-            <a href={`/preview/${event.previewToken}`} target="_blank" rel="noreferrer" className={HEADER_BUTTON}>
-              {t('dash.nav.preview')}
-              <ExternalLink aria-hidden className="size-4" />
-            </a>
+            {/* The watermarked preview: before publishing only (afterwards it leads to the public page). */}
+            {status === 'DRAFT' ? (
+              <a href={`/preview/${event.previewToken}`} target="_blank" rel="noreferrer" className={HEADER_BUTTON}>
+                {t('dash.nav.preview')}
+                <ExternalLink aria-hidden className="size-4" />
+              </a>
+            ) : null}
             {(event.accessMode === 'PUBLIC' || event.accessMode === 'PRIVATE_LINK') && can(event, 'invitation.read') && status === 'ACTIVE' ? (
               <a href={`/e/${event.slug}`} target="_blank" rel="noreferrer" className={HEADER_BUTTON}>
                 {t('dash.nav.viewSite')}

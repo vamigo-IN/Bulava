@@ -4,22 +4,30 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import {
   ClaimAccountSchema,
+  EmailCodeResendSchema,
+  EmailCodeSchema,
+  ForgotPasswordSchema,
   LoginMfaSchema,
   LoginSchema,
   MfaDisableSchema,
   MfaEnableSchema,
   MfaRegenerateSchema,
   MfaSetupSchema,
+  ResetPasswordSchema,
   RestoreAccountSchema,
   SetPasswordSchema,
   SignupSchema,
   type ClaimAccountInput,
+  type EmailCodeInput,
+  type EmailCodeResendInput,
+  type ForgotPasswordInput,
   type LoginInput,
   type LoginMfaInput,
   type MfaDisableInput,
   type MfaEnableInput,
   type MfaRegenerateInput,
   type MfaSetupInput,
+  type ResetPasswordInput,
   type RestoreAccountInput,
   type SetPasswordInput,
   type SignupInput,
@@ -32,12 +40,14 @@ import type { AuthUser } from '../../common/request-context';
 import { PhoneOtpService } from '../onboarding/phone-otp.service';
 import { AccountService } from '../users/account.service';
 import { AuthService, toPublicUser } from './auth.service';
+import { EmailCodeService } from './email-code.service';
 import { GOOGLE_STATE_COOKIE, GOOGLE_STATE_COOKIE_PATH, GoogleAuthService } from './google-auth.service';
 import { MfaService } from './mfa.service';
 import { SessionService } from './session.service';
-import { clearSessionCookies, REFRESH_COOKIE, setSessionCookies } from './cookies';
+import { clearSessionCookies, finishSignIn, REFRESH_COOKIE, setSessionCookies } from './cookies';
 
 const AUTH_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
+
 
 @ApiTags('auth')
 @Controller('auth')
@@ -49,23 +59,37 @@ export class AuthController {
     private readonly google: GoogleAuthService,
     private readonly account: AccountService,
     private readonly phoneOtp: PhoneOtpService,
+    private readonly emailCodes: EmailCodeService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  /** Which sign-in methods the apps should offer. */
+  /**
+   * Which sign-in methods the apps should offer. `emailCodes`: email codes can
+   * be sent, which signing up with an email and resetting a password need.
+   */
   @Public()
   @Get('providers')
   async providers() {
-    const [google, phoneOtp] = await Promise.all([this.google.enabled(), this.phoneOtp.available()]);
-    return { google, phoneOtp };
+    const [google, phoneOtp, emailCodes] = await Promise.all([this.google.enabled(), this.phoneOtp.available(), this.emailCodes.available()]);
+    return { google, phoneOtp, emailCodes };
   }
 
-  /** A provisional (WhatsApp-only) account adds an email and a password. */
+  /** An account without an email (made from a WhatsApp number) adds one with a password; a code to it comes first. */
+  @Throttle(AUTH_THROTTLE)
   @Post('claim')
   @HttpCode(200)
   @ApiZodBody(ClaimAccountSchema)
   claim(@CurrentUser() user: AuthUser, @ZodBody(ClaimAccountSchema) body: ClaimAccountInput, @ReqMeta() meta: RequestMeta) {
     return this.auth.claim(user.id, body, meta);
+  }
+
+  /** The code sent to the new address: it is added to the account. */
+  @Throttle(AUTH_THROTTLE)
+  @Post('claim/verify')
+  @HttpCode(200)
+  @ApiZodBody(EmailCodeSchema)
+  claimVerify(@CurrentUser() user: AuthUser, @ZodBody(EmailCodeSchema) body: EmailCodeInput, @ReqMeta() meta: RequestMeta) {
+    return this.auth.completeClaim(user.id, body.challengeToken, body.code, meta);
   }
 
   private setGoogleState(res: Response, state: string) {
@@ -140,20 +164,30 @@ export class AuthController {
     return { hasPassword: true };
   }
 
+  /** Signing up with an email: nothing is saved yet; a code goes to the address (`signup/verify` makes the account). */
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Post('signup')
+  @HttpCode(200)
   @ApiZodBody(SignupSchema)
-  async signup(
-    @ZodBody(SignupSchema) body: SignupInput,
-    @ReqMeta() meta: RequestMeta,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { user, session } = await this.auth.signup(body, meta);
-    setSessionCookies(res, session, this.config);
-    return { user, accessToken: session.accessToken, accessExpiresAt: session.accessExpiresAt };
+  signup(@ZodBody(SignupSchema) body: SignupInput, @ReqMeta() meta: RequestMeta) {
+    return this.auth.signup(body, meta);
   }
 
+  /** The code from the sign-up email: the account is made, its address confirmed, and the browser signed in. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('signup/verify')
+  @ApiZodBody(EmailCodeSchema)
+  async signupVerify(@ZodBody(EmailCodeSchema) body: EmailCodeInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    return finishSignIn(res, await this.auth.completeSignup(body.challengeToken, body.code, meta), this.config);
+  }
+
+  /**
+   * Email and password. A right password is never a session by itself: the
+   * answer asks for the authenticator code (`mfaRequired`) or for the code just
+   * emailed (`emailCodeRequired`), or offers to restore an account waiting to be deleted.
+   */
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Post('login')
@@ -165,12 +199,48 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.login(body, meta);
-    // Two-step accounts: no session yet, only a challenge for the code step. Accounts waiting
-    // to be deleted: no session either, only the offer to restore.
-    if ('mfaRequired' in result || 'restoreRequired' in result) return result;
-    const { user, session } = result;
-    setSessionCookies(res, session, this.config);
-    return { user, accessToken: session.accessToken, accessExpiresAt: session.accessExpiresAt };
+    if ('emailCodeRequired' in result) return result;
+    return finishSignIn(res, result, this.config);
+  }
+
+  /** Second step of a password sign-in: the code emailed to the account's address. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('login/email')
+  @HttpCode(200)
+  @ApiZodBody(EmailCodeSchema)
+  async loginEmail(@ZodBody(EmailCodeSchema) body: EmailCodeInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    return finishSignIn(res, await this.auth.completeLogin(body.challengeToken, body.code, meta), this.config);
+  }
+
+  /** Another code for a step that is waiting for one, 30 seconds after the last. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('email-code/resend')
+  @HttpCode(200)
+  @ApiZodBody(EmailCodeResendSchema)
+  resendEmailCode(@ZodBody(EmailCodeResendSchema) body: EmailCodeResendInput) {
+    return this.auth.resendEmailCode(body.challengeToken);
+  }
+
+  /** "Forgot password?": a code to the address (the same answer whether or not it has an account). */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('password/forgot')
+  @HttpCode(200)
+  @ApiZodBody(ForgotPasswordSchema)
+  forgotPassword(@ZodBody(ForgotPasswordSchema) body: ForgotPasswordInput, @ReqMeta() meta: RequestMeta) {
+    return this.auth.forgotPassword(body.email, meta);
+  }
+
+  /** The reset code and a new password: other sessions end and this browser is signed in. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('password/reset')
+  @HttpCode(200)
+  @ApiZodBody(ResetPasswordSchema)
+  async resetPassword(@ZodBody(ResetPasswordSchema) body: ResetPasswordInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    return finishSignIn(res, await this.auth.resetPassword(body.challengeToken, body.code, body.newPassword, meta), this.config);
   }
 
   /** Restores an account waiting to be deleted, with the token from signing in (password or Google). */

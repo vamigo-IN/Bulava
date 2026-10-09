@@ -23,7 +23,7 @@ export class ConsentService {
   }
 
   /** The Terms and the Privacy Policy, accepted when an account is created. */
-  async recordSignup(tx: Tx, userId: string, versions: Record<string, string>, source: 'signup' | 'signup_google' | 'quick_start'): Promise<void> {
+  async recordSignup(tx: Tx, userId: string, versions: Record<string, string>, source: 'signup' | 'signup_google' | 'signup_whatsapp' | 'quick_start'): Promise<void> {
     await tx.consent.createMany({
       data: SIGNUP_CONSENTS.map(({ kind, slug }) => ({ userId, kind, granted: true, version: versions[slug] ?? `${slug}@unknown`, source })),
     });

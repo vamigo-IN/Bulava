@@ -11,6 +11,7 @@ import { track } from '@/lib/track';
 import type { EventType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Alert, Button, Field, Input, Select } from '@/components/ui/primitives';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 const t = createTranslator('en');
 
@@ -225,7 +226,7 @@ export function QuickStartModal({ template, open, onClose }: { template: Templat
                 {(p) => <Input {...p} type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} />}
               </Field>
               <Field label={t('quick.phone')} hint={t('quick.phoneHint')}>
-                {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98765 43210" />}
+                {(p) => <PhoneInput {...p} required value={phone} onChange={setPhone} placeholder="98765 43210" />}
               </Field>
             </div>
             <div className="space-y-2 rounded-2xl bg-[#f8f2ea] p-4 shadow-clay-inset">

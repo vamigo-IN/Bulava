@@ -1,4 +1,5 @@
 import { loadFont as alexBrush } from '@remotion/google-fonts/AlexBrush';
+import { loadFont as baloo } from '@remotion/google-fonts/Baloo2';
 import { loadFont as cinzel } from '@remotion/google-fonts/Cinzel';
 import { loadFont as cormorant } from '@remotion/google-fonts/CormorantGaramond';
 import { loadFont as greatVibes } from '@remotion/google-fonts/GreatVibes';
@@ -9,6 +10,7 @@ import { loadFont as notoSans } from '@remotion/google-fonts/NotoSans';
 import { loadFont as notoSansDevanagari } from '@remotion/google-fonts/NotoSansDevanagari';
 import { loadFont as notoSerif } from '@remotion/google-fonts/NotoSerif';
 import { loadFont as notoSerifDevanagari } from '@remotion/google-fonts/NotoSerifDevanagari';
+import { loadFont as pacifico } from '@remotion/google-fonts/Pacifico';
 import { loadFont as parisienne } from '@remotion/google-fonts/Parisienne';
 import { loadFont as pinyon } from '@remotion/google-fonts/PinyonScript';
 import { loadFont as playfair } from '@remotion/google-fonts/PlayfairDisplay';
@@ -50,4 +52,6 @@ export function loadTemplateFonts(): void {
   load(() => yeseva('normal', { weights: ['400'], subsets: ['latin'] }));
   load(() => rozha('normal', { weights: ['400'], subsets: ['devanagari', 'latin'] }));
   load(() => yatra('normal', { weights: ['400'], subsets: ['devanagari', 'latin'] }));
+  load(() => baloo('normal', { weights: ['400', '600', '700', '800'], subsets: ['devanagari', 'latin'] }));
+  load(() => pacifico('normal', { weights: ['400'], subsets: ['latin'] }));
 }

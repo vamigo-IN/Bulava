@@ -18,6 +18,8 @@ import { AudienceModule } from './modules/audience/audience.service';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthService } from './modules/auth/auth.service';
 import { PhoneAuthController } from './modules/auth/phone-auth.controller';
+import { EmailCodeService } from './modules/auth/email-code.service';
+import { WhatsAppDeliveryService } from './modules/whatsapp/whatsapp-delivery.service';
 import { PhoneOtpService } from './modules/onboarding/phone-otp.service';
 import { PreviewController } from './modules/onboarding/preview.controller';
 import { PreviewService } from './modules/onboarding/preview.service';
@@ -246,6 +248,8 @@ const bootConfig = loadConfig();
     MfaService,
     GoogleAuthService,
     PhoneOtpService,
+    EmailCodeService,
+    WhatsAppDeliveryService,
     AuthService,
     QuickStartService,
     PreviewService,

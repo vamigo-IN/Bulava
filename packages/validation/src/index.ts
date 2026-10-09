@@ -125,6 +125,34 @@ export const LoginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof LoginSchema>;
 
+// ───────────────────────────── One-time codes ─────────────────────────────
+
+/** The 6-digit code from an email or a WhatsApp message; a space typed in the middle is fine. */
+export const OneTimeCodeSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/\s/g, ''))
+  .pipe(z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'));
+
+/** Ties a code step to the request that started it (signing up, signing in, adding an email, a password reset). */
+export const ChallengeTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{20,200}$/, 'This step expired. Please start again.');
+
+/** POST /auth/signup/verify, /auth/login/email and /auth/claim/verify: the code sent to the email address. */
+export const EmailCodeSchema = z.object({ challengeToken: ChallengeTokenSchema, code: OneTimeCodeSchema });
+export type EmailCodeInput = z.infer<typeof EmailCodeSchema>;
+
+/** POST /auth/email-code/resend: a new code for the same step. */
+export const EmailCodeResendSchema = z.object({ challengeToken: ChallengeTokenSchema });
+export type EmailCodeResendInput = z.infer<typeof EmailCodeResendSchema>;
+
+/** POST /auth/password/forgot. */
+export const ForgotPasswordSchema = z.object({ email: z.email().max(254).transform((v) => v.toLowerCase()) });
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
+
+/** POST /auth/password/reset: the emailed code and the new password. */
+export const ResetPasswordSchema = EmailCodeSchema.extend({ newPassword: z.string().min(10, 'At least 10 characters').max(128) });
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+
 // ───────────────────────────── Two-step sign-in ─────────────────────────────
 
 /** A 6-digit authenticator code; people often type a space in the middle. */
@@ -246,7 +274,7 @@ export const QuickStartSchema = z.object({
 export type QuickStartInput = z.infer<typeof QuickStartSchema>;
 
 /** The six-digit code sent on WhatsApp. */
-export const OtpCodeSchema = z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code');
+export const OtpCodeSchema = OneTimeCodeSchema;
 
 /** Second step when the WhatsApp number already has an account: the code proves it is theirs. */
 export const QuickStartVerifySchema = QuickStartSchema.extend({ code: OtpCodeSchema });
@@ -258,9 +286,28 @@ export type PhoneOtpRequestInput = z.infer<typeof PhoneOtpRequestSchema>;
 export const PhoneOtpVerifySchema = z.object({ phone: PhoneSchema, code: OtpCodeSchema });
 export type PhoneOtpVerifyInput = z.infer<typeof PhoneOtpVerifySchema>;
 
+/** POST /auth/phone/status: whether the code's WhatsApp message got through (the id from sending it). */
+export const PhoneOtpStatusSchema = z.object({ sendId: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/) });
+export type PhoneOtpStatusInput = z.infer<typeof PhoneOtpStatusSchema>;
+
+/** POST /auth/phone/signup: a new account for a number its owner has just proved with a code. */
+export const PhoneSignupSchema = z.object({
+  signupToken: ChallengeTokenSchema,
+  name: trimmed(120),
+  acceptTerms: agreed('Please accept the Terms of Service and the Privacy Policy'),
+  /** Permission to send updates on WhatsApp (a separate, optional consent). */
+  whatsappUpdates: z.boolean().default(false),
+});
+export type PhoneSignupInput = z.infer<typeof PhoneSignupSchema>;
+
+/** POST /users/me/phone/confirm: the code sent to the account's own number. */
+export const PhoneConfirmSchema = z.object({ code: OtpCodeSchema });
+export type PhoneConfirmInput = z.infer<typeof PhoneConfirmSchema>;
+
 /**
- * An account made from a WhatsApp number alone (the quick start) adds an email
- * and a password, so it can sign in anywhere and receive receipts.
+ * An account made from a WhatsApp number (the quick start, or signing up with
+ * WhatsApp) adds an email and a password, so it can sign in anywhere and receive
+ * receipts. The email is attached once the code sent to it is entered.
  */
 export const ClaimAccountSchema = z.object({
   email: z.email().max(254).transform((v) => v.toLowerCase()),
@@ -485,6 +532,10 @@ export type SetSeatingInput = z.infer<typeof SetSeatingSchema>;
 
 export const LogisticsSettingsSchema = z.object({ collectGuestTravel: z.boolean() });
 export type LogisticsSettingsInput = z.infer<typeof LogisticsSettingsSchema>;
+
+/** Entry with QR passes: each guest's invitation carries a pass the team scans at the entrance. */
+export const CheckInSettingsSchema = z.object({ entryPasses: z.boolean() });
+export type CheckInSettingsInput = z.infer<typeof CheckInSettingsSchema>;
 
 // ───────────────────────────── Reminders ─────────────────────────────
 

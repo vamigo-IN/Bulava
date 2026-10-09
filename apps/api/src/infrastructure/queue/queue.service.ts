@@ -57,6 +57,13 @@ export class QueueService implements OnModuleDestroy {
     }
   }
 
+  /** A job's state and its worker's result, to report progress; never its data. Null once it is gone. */
+  async jobState<N extends QueueName>(name: N, jobId: string): Promise<{ state: string; result: unknown } | null> {
+    const job = await this.queue(name).getJob(jobId);
+    if (!job) return null;
+    return { state: await job.getState(), result: job.returnvalue };
+  }
+
   async counts(): Promise<Record<string, Record<string, number>>> {
     const out: Record<string, Record<string, number>> = {};
     for (const name of Object.values(QueueName)) {

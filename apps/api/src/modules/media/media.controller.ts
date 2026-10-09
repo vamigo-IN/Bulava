@@ -185,7 +185,7 @@ export class MediaController {
   }
 }
 
-/** The album link for guests: no account needed, the album code is the credential. */
+/** The album link: the gallery for anyone holding it; uploads only with an invitation, when the host allows guest uploads. */
 @ApiTags('public-media')
 @Public()
 @Controller('public/media-rooms')
@@ -206,8 +206,8 @@ export class PublicMediaController {
   @Post(':code/uploads')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiZodBody(MediaUploadRequestSchema)
-  requestUpload(@Param('code') code: string, @ZodBody(MediaUploadRequestSchema) body: MediaUploadRequestInput, @ReqMeta() meta: RequestMeta) {
-    return this.media.requestUpload(code, body, meta);
+  requestUpload(@Param('code') code: string, @ZodBody(MediaUploadRequestSchema) body: MediaUploadRequestInput, @ReqMeta() meta: RequestMeta, @Req() req: Request) {
+    return this.media.requestUpload(code, body, meta, this.invite(req));
   }
 
   @Post(':code/uploads/:itemId/complete')
@@ -240,12 +240,13 @@ export class PublicWallController {
     return this.wall.publicWall(token);
   }
 
+  /** The QR code the wall shows: the album's gallery, to see and download the photos. */
   @Get(':token/qr.svg')
   @SetMetadata(RAW_RESPONSE, true)
   @Header('Content-Type', 'image/svg+xml')
   @Header('Cache-Control', 'private, max-age=300')
   @Header('X-Robots-Tag', 'noindex, nofollow')
   qr(@Param('token') token: string) {
-    return this.wall.uploadQrSvg(token);
+    return this.wall.galleryQrSvg(token);
   }
 }

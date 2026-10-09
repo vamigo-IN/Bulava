@@ -1,5 +1,6 @@
 import type { CookieOptions, Response } from 'express';
 import type { AppConfig } from '../../config/env';
+import type { LoginResult } from './auth.service';
 import type { IssuedSession } from './session.service';
 
 export const ACCESS_COOKIE = 'bulava_at';
@@ -35,4 +36,14 @@ export function clearSessionCookies(res: Response, config: AppConfig): void {
   res.clearCookie(ACCESS_COOKIE, { ...base(config), path: '/' });
   res.clearCookie(REFRESH_COOKIE, { ...base(config), path: REFRESH_COOKIE_PATH });
   res.clearCookie(SESSION_HINT_COOKIE, { ...base(config), httpOnly: false, path: '/' });
+}
+
+/**
+ * The end of a sign-in step: the session goes into cookies, or the next step
+ * (the authenticator app, a restore offer) goes back to the page.
+ */
+export function finishSignIn(res: Response, result: LoginResult, config: AppConfig) {
+  if ('mfaRequired' in result || 'restoreRequired' in result) return result;
+  setSessionCookies(res, result.session, config);
+  return { user: result.user, accessToken: result.session.accessToken, accessExpiresAt: result.session.accessExpiresAt };
 }

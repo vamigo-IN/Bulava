@@ -1,4 +1,5 @@
-import type { TemplateDefinition } from '@bulava/template-schema';
+import type { TemplateDefinition, ThemeColors } from '@bulava/template-schema';
+import { cardPreview, posterPreview } from './template-previews';
 import type { PublicSitePage, PublicSitePageLink } from '@bulava/validation';
 
 const API = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
@@ -70,6 +71,9 @@ export interface TemplateSummary {
   languages: string[];
   outputs: Array<'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD'>;
   templateVersionId: string;
+  /** What a card shows without the definition: the theme's colours and the hero section's variant. */
+  preview?: { colors: ThemeColors | null; heroVariant: string | null };
+  /** Lists leave definitions out (they run to megabytes); single templates and `keys` lists carry them. */
   definition?: TemplateDefinition;
 }
 
@@ -100,7 +104,35 @@ export interface Testimonial {
   rating: number;
 }
 
-export const getTemplates = () => serverApi<TemplateSummary[]>('/public/templates?include=definition').then((t) => t ?? []);
+/** Every published template, without definitions. */
+export const getTemplates = () => serverApi<TemplateSummary[]>('/public/templates').then((t) => t ?? []);
+
+/** Definitions for a few templates (the API serves at most 60 at a time). */
+export async function getTemplateDefinitions(keys: string[]): Promise<Map<string, TemplateDefinition>> {
+  const out = new Map<string, TemplateDefinition>();
+  for (let i = 0; i < keys.length; i += 60) {
+    const batch = keys.slice(i, i + 60);
+    const list = await serverApi<TemplateSummary[]>(`/public/templates?include=definition&keys=${batch.map(encodeURIComponent).join(',')}`);
+    for (const t of list ?? []) if (t.definition) out.set(t.key, t.definition);
+  }
+  return out;
+}
+
+/** Can a gallery show this template from its pre-rendered image (lib/template-previews)? */
+const hasImage = (t: TemplateSummary) => (t.outputs.includes('WEBSITE') ? cardPreview(t.key) !== null : posterPreview(t.key) !== null);
+
+/**
+ * Templates for galleries: every one, with definitions only for the few that
+ * must be drawn live because no pre-rendered image exists yet (new in the
+ * Studio, or not yet photographed).
+ */
+export async function getGalleryTemplates(): Promise<TemplateSummary[]> {
+  const list = await getTemplates();
+  const live = list.filter((t) => !hasImage(t)).map((t) => t.key);
+  if (!live.length) return list;
+  const defs = await getTemplateDefinitions(live.slice(0, 120));
+  return list.map((t) => (defs.has(t.key) ? { ...t, definition: defs.get(t.key)! } : t));
+}
 export const getTemplate = (key: string) => serverApi<TemplateSummary>(`/public/templates/${encodeURIComponent(key)}`);
 export const getPlans = () => serverApi<Plan[]>('/meta/plans', { revalidate: 300 }).then((p) => p ?? []);
 export const getStats = () => serverApi<SiteStats>('/public/site-stats', { revalidate: 300 });

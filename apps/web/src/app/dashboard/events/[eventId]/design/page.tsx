@@ -11,7 +11,7 @@ import { MotionPanel, PhotosPanel, SectionsPanel, StylePanel, WordsPanel } from 
 import { TIER_RANK, TemplatePicker } from '@/components/design/template-picker';
 import { apiPut } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
-import { useApprovedPhotos, useCatalog, useDesign, useEvent, useInvalidateEvent } from '@/lib/queries';
+import { useApprovedPhotos, useDesign, useEvent, useInvalidateEvent, useTemplateDefinition, useTemplateList } from '@/lib/queries';
 import { cardPreview } from '@/lib/template-previews';
 import type { MediaItem, TemplateSummaryLite } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -45,7 +45,8 @@ function DesignEditor() {
   const params = useSearchParams();
   const event = useEvent(eventId);
   const design = useDesign(eventId);
-  const catalog = useCatalog('WEBSITE', event.data?.typeKey ?? 'WEDDING');
+  // The designs as summaries (hundreds of them); the chosen one's definition is fetched on its own.
+  const catalog = useTemplateList('WEBSITE', event.data?.typeKey ?? 'WEDDING');
   const approved = useApprovedPhotos(eventId);
   const invalidate = useInvalidateEvent(eventId);
 
@@ -78,7 +79,8 @@ function DesignEditor() {
   const maxTier = design.data?.entitlements['templates.maxTier']?.limit ?? 0;
   const templates = useMemo(() => catalog.data ?? [], [catalog.data]);
   const selected: TemplateSummaryLite | undefined = templates.find((x) => x.key === selectedKey);
-  const definition: TemplateDefinition | undefined = selected?.definition ?? (current?.templateKey === selectedKey ? current?.definition : undefined);
+  const chosen = useTemplateDefinition(selectedKey);
+  const definition: TemplateDefinition | undefined = chosen.data?.definition ?? (current?.templateKey === selectedKey ? current?.definition : undefined);
 
   const previewContext: RenderContext | undefined = useMemo(() => (design.data ? withPhotos(design.data.context, photos, custom) : undefined), [design.data, custom, photos]);
   // What carries over to another design: the host's words, photos and music.
@@ -201,10 +203,17 @@ function DesignEditor() {
           <div className="clay space-y-4 rounded-[1.75rem] p-4">
             <div className="flex items-center justify-between gap-2 px-1">
               <h3 className="text-xs font-semibold tracking-[0.16em] text-stone-500 uppercase">{t('design.livePreview')}</h3>
-              <a href={`/preview/${event.data.previewToken}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline" title={t('design.previewSavedHint')}>
-                {t('share.preview.open')}
-                <ExternalLink aria-hidden className="size-3.5" />
-              </a>
+              {event.data.status === 'DRAFT' ? (
+                <a href={`/preview/${event.data.previewToken}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline" title={t('design.previewSavedHint')}>
+                  {t('share.preview.open')}
+                  <ExternalLink aria-hidden className="size-3.5" />
+                </a>
+              ) : event.data.accessMode === 'PUBLIC' || event.data.accessMode === 'PRIVATE_LINK' ? (
+                <a href={`/e/${event.data.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
+                  {t('dash.nav.viewSite')}
+                  <ExternalLink aria-hidden className="size-3.5" />
+                </a>
+              ) : null}
             </div>
             {definition && previewContext ? (
               <div className="relative mx-auto overflow-hidden rounded-[2rem] border-[7px] border-ink bg-white shadow-xl" style={{ width: 'min(100%, 360px)' }}>

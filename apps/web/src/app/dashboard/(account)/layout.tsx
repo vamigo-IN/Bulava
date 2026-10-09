@@ -102,6 +102,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
               {user.provisional ? <Fact ok={false}>{t('account.fact.provisional')}</Fact> : null}
               <Fact ok={user.hasPassword}>{user.hasPassword ? t('account.fact.password') : t('account.fact.noPassword')}</Fact>
               {user.googleLinked ? <Fact ok>{t('account.fact.google')}</Fact> : null}
+              {user.phoneVerified ? <Fact ok>{t('account.fact.whatsapp')}</Fact> : null}
               <Fact ok={user.mfaEnabled}>{user.mfaEnabled ? t('account.fact.twoStep') : t('account.fact.noTwoStep')}</Fact>
             </div>
           ) : null}

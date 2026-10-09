@@ -1,13 +1,13 @@
 'use client';
 
-import { Component, Eye, EyeOff, Flower2, GripVertical, Image as ImageIcon, Lock, LockOpen, Shapes, Sparkles, Type, type LucideIcon } from 'lucide-react';
+import { Component, Eye, EyeOff, Flower2, GripVertical, Image as ImageIcon, Landmark, Lock, LockOpen, Shapes, Sparkles, Type, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { Artboard, Layer } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { layerLabel } from './geometry';
 
-const KIND_ICON: Record<Layer['kind'], LucideIcon> = { text: Type, image: ImageIcon, shape: Shapes, ornament: Flower2, icon: Sparkles, widget: Component };
+const KIND_ICON: Record<Layer['kind'], LucideIcon> = { text: Type, image: ImageIcon, shape: Shapes, ornament: Flower2, icon: Sparkles, widget: Component, scene: Landmark };
 
 /**
  * The layer list, top-most first (as drawn). Drag a row to reorder, click to

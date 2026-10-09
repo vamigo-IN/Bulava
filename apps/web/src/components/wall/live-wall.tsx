@@ -16,7 +16,8 @@ interface WallPhoto {
 interface WallData {
   event: { title: string; language: string; typeKey: string; partnerOne: string | null; partnerTwo: string | null };
   room: { name: string };
-  uploadUrl: string | null;
+  /** The gallery the QR code opens (see and download the photos), when it is public. */
+  galleryUrl: string | null;
   pollSeconds: number;
   items: WallPhoto[];
 }
@@ -158,7 +159,7 @@ function Wall({ token, data, unavailable }: { token: string; data: WallData | nu
             </p>
           </div>
 
-          {data?.uploadUrl ? (
+          {data?.galleryUrl ? (
             <div className="rounded-2xl bg-white p-4 text-center text-stone-800 shadow-xl">
               <img src={`/api/v1/public/walls/${token}/qr.svg`} alt={t('wall.screen.scan')} className="mx-auto aspect-square w-full max-w-[220px]" />
               <p className="mt-2 font-semibold">{t('wall.screen.scan')}</p>

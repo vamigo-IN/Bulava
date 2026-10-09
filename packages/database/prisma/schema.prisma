@@ -258,6 +258,8 @@ model Event {
   settings           Json        @default("{}")
   /// Guests may add their own arrival/departure details from their invitation.
   collectGuestTravel Boolean     @default(false)
+  /// Guests get a QR entry pass on their invitation, scanned at the entrance. Off unless the host turns it on.
+  entryPasses        Boolean     @default(false)
   /// The host's shareable preview link (/preview/<token>): the invitation with a watermark,
   /// before the event is published and whatever its access mode. Unguessable, replaceable.
   previewToken       String      @unique
@@ -1158,10 +1160,13 @@ model MediaRoom {
   name                String
   slug                String
   isMain              Boolean           @default(false)
-  galleryVisibility   GalleryVisibility @default(INVITE_ONLY)
+  /// Who sees the guest gallery (the album link and the wall's QR code open it). Public by default: view and download.
+  galleryVisibility   GalleryVisibility @default(PUBLIC)
   moderationMode      ModerationMode    @default(AUTO_APPROVE)
-  uploadsEnabled      Boolean           @default(true)
-  downloadPolicy      Json              @default("{\"guestsCanDownload\":false,\"originalQuality\":false}")
+  /// Invited guests may add photos from their invitation link. The team (media.upload) always can, from the
+  /// dashboard; nobody uploads with the album link alone.
+  uploadsEnabled      Boolean           @default(false)
+  downloadPolicy      Json              @default("{\"guestsCanDownload\":true,\"originalQuality\":false}")
   liveWallEnabled     Boolean           @default(false)
   /// Secret link for the live photo wall (/wall/<token>): SHA-256 for lookup,
   /// AES-GCM ciphertext so the host can copy it again. Rotating replaces both.

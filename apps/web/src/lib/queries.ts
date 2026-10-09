@@ -132,7 +132,15 @@ export const useCatalog = (type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', eventType
     queryFn: () => apiGet<TemplateSummaryLite[]>(`/public/templates?type=${type}&eventType=${encodeURIComponent(eventType)}&include=definition`),
     staleTime: 300_000,
   });
-/** Template summaries without their definitions: enough for previews and links (the home page). */
+/** One template with its definition (the design being edited, the picker's focused design). */
+export const useTemplateDefinition = (key: string | null) =>
+  useQuery({
+    queryKey: ['templates', 'one', key],
+    queryFn: () => apiGet<TemplateSummaryLite>(`/public/templates/${encodeURIComponent(key!)}`),
+    enabled: !!key,
+    staleTime: 300_000,
+  });
+/** Template summaries without their definitions: enough for previews and links (the home page, the design picker). */
 export const useTemplateList = (type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', eventType?: string) =>
   useQuery({
     queryKey: ['templates', 'list', type, eventType ?? 'all'],

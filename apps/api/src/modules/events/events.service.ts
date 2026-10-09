@@ -25,7 +25,9 @@ export const newPreviewToken = () => randomBytes(18).toString('base64url');
 
 const eventInclude = {
   accessPolicy: { select: { mode: true, pinHash: true, requireOtp: true } },
-  _count: { select: { functions: { where: { deletedAt: null } }, guests: { where: { deletedAt: null } } } },
+  _count: { select: { guests: { where: { deletedAt: null } } } },
+  // Each function's date and venue: the counts tell set-up functions (date, time and venue) from placeholders.
+  functions: { where: { deletedAt: null }, select: { startsAt: true, venueId: true } },
   // The chosen website design, for the dashboard's event cards (none until the host picks one).
   templateSelections: { where: { output: 'WEBSITE' }, take: 1, select: { templateVersion: { select: { template: { select: { key: true, name: true, tier: true } } } } } },
 } satisfies Prisma.EventInclude;
@@ -48,7 +50,8 @@ export interface EventDto {
   startDate: Date | null;
   endDate: Date | null;
   details: unknown;
-  counts: { functions: number; guests: number };
+  /** readyFunctions: functions with a date, time and venue (the others are placeholders guests do not see yet). */
+  counts: { functions: number; readyFunctions: number; guests: number };
   /** The website design the host chose; null while the type's default stands in. */
   design: { templateKey: string; templateName: string; tier: string } | null;
   /** The host's shareable, watermarked preview link token (members only see this DTO). */
@@ -79,7 +82,7 @@ function toDto(event: EventWithPolicy, role?: string): EventDto {
     startDate: event.startDate,
     endDate: event.endDate,
     details: event.details,
-    counts: { functions: event._count.functions, guests: event._count.guests },
+    counts: { functions: event.functions.length, readyFunctions: event.functions.filter((f) => f.startsAt && f.venueId).length, guests: event._count.guests },
     design: designOf(event),
     previewToken: event.previewToken,
     source: event.source,

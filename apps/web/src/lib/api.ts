@@ -39,11 +39,12 @@ async function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-export async function api<T>(path: string, options: { method?: Method; body?: unknown } = {}, retry = true): Promise<T> {
+export async function api<T>(path: string, options: { method?: Method; body?: unknown; headers?: Record<string, string> } = {}, retry = true): Promise<T> {
   const method = options.method ?? 'GET';
   const response = await fetch(`/api/v1${path}`, {
     method,
     headers: {
+      ...options.headers,
       ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
       'x-bulava-csrf': '1',
     },

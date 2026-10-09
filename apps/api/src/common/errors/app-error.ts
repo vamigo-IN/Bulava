@@ -17,6 +17,12 @@ export const ErrorCode = {
   ACCOUNT_UNVERIFIED: HttpStatus.FORBIDDEN,
   /** WhatsApp codes need the WhatsApp Business integration and an approved authentication template. */
   PHONE_OTP_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  /** A WhatsApp code for a number saved, but never confirmed, on an account that signs in another way. */
+  PHONE_UNCONFIRMED: HttpStatus.CONFLICT,
+  /** Signing up, adding an email or resetting a password needs email set up under Integrations. */
+  EMAIL_CODES_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  /** A code step that expired, was used, or ran out of attempts: start again. */
+  VERIFICATION_EXPIRED: HttpStatus.GONE,
   RATE_LIMITED: HttpStatus.TOO_MANY_REQUESTS,
   INVALID_EVENT_TYPE: HttpStatus.BAD_REQUEST,
   UNSUPPORTED_LANGUAGE: HttpStatus.BAD_REQUEST,
@@ -42,6 +48,7 @@ export const ErrorCode = {
   OTP_INVALID: HttpStatus.UNAUTHORIZED,
   UPLOAD_REJECTED: HttpStatus.BAD_REQUEST,
   UPLOADS_CLOSED: HttpStatus.FORBIDDEN,
+  UPLOAD_NEEDS_INVITATION: HttpStatus.FORBIDDEN,
   MEDIA_NOT_READY: HttpStatus.CONFLICT,
   PAYMENTS_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   PAYMENT_VERIFICATION_FAILED: HttpStatus.BAD_REQUEST,

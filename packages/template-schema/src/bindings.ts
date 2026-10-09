@@ -104,6 +104,11 @@ function format(value: unknown, fmt: string | undefined, opts: ResolveOptions): 
       return String(value).toLocaleUpperCase(opts.language);
     case 'lower':
       return String(value).toLocaleLowerCase(opts.language);
+    case 'initial': {
+      // The first letter (a whole code point, so Devanagari and emoji stay intact).
+      const first = Array.from(String(value).trim())[0];
+      return first ? first.toLocaleUpperCase(opts.language) : undefined;
+    }
     default:
       return value;
   }

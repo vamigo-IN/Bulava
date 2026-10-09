@@ -1,5 +1,6 @@
-import { Controller, Get, Header, Param, Post, SetMetadata } from '@nestjs/common';
+import { Controller, Get, Header, Param, Post, Put, SetMetadata } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { CheckInSettingsSchema, type CheckInSettingsInput } from '@bulava/validation';
 import { EventAccess, Public, ReqMeta, RequireEventPermission, type RequestMeta } from '../../common/decorators/auth.decorators';
 import { ApiZodBody, ZodBody } from '../../common/decorators/zod.decorators';
 import { AppError } from '../../common/errors/app-error';
@@ -43,6 +44,20 @@ export class CheckInController {
   @RequireEventPermission('guest.read')
   summary(@EventAccess() access: EventAccessContext) {
     return this.checkIns.summary(access);
+  }
+
+  /** Whether entry uses QR passes (off until the host turns it on). */
+  @Get('events/:eventId/check-ins/settings')
+  @RequireEventPermission('guest.read')
+  settings(@EventAccess() access: EventAccessContext) {
+    return this.checkIns.settings(access);
+  }
+
+  @Put('events/:eventId/check-ins/settings')
+  @RequireEventPermission('event.update')
+  @ApiZodBody(CheckInSettingsSchema)
+  updateSettings(@EventAccess() access: EventAccessContext, @ZodBody(CheckInSettingsSchema) body: CheckInSettingsInput, @ReqMeta() meta: RequestMeta) {
+    return this.checkIns.updateSettings(access, body, meta);
   }
 }
 

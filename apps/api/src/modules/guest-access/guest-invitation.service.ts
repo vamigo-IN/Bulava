@@ -383,7 +383,8 @@ export class GuestInvitationService {
       this.entitlements.forEvent(ctx.event.id),
       this.media.roomsForGuest(ctx.event.id, ctx.guestFacts, ctx.eventFacts),
       this.media.galleryForTemplate(ctx.event.id, guestViewer),
-      this.checkIns.codeForGuest(ctx.event.id, ctx.guest.id),
+      // A pass only when the host chose QR entry; no code is made otherwise.
+      ctx.event.entryPasses ? this.checkIns.codeForGuest(ctx.event.id, ctx.guest.id) : Promise.resolve(null),
     ]);
     // Seats only for functions this guest may see (ctx.functions is already access-filtered).
     const { seats, ...logistics } = await this.logistics.forGuest(
@@ -420,7 +421,8 @@ export class GuestInvitationService {
       },
       guest: { name: ctx.guest.name, preferredLanguage: ctx.guest.preferredLanguage },
       scope: { functionId: ctx.invitation.functionId },
-      functions: ctx.functions.map((fn) => {
+      // Placeholders (no date yet) stay out of the invitation, as they do from the template.
+      functions: ctx.functions.filter((fn) => fn.startsAt !== null).map((fn) => {
         const rsvp = rsvpByFunction.get(fn.id);
         return {
           id: fn.id,

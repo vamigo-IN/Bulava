@@ -2,9 +2,10 @@
 
 import { Check, Crown, Lock, Search, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TemplateRenderer, TemplateThumbnail } from '@bulava/template-engine';
+import { TemplateRenderer } from '@bulava/template-engine';
 import type { Customization, RenderContext } from '@bulava/template-schema';
 import { useT } from '@/lib/i18n';
+import { useTemplateDefinition } from '@/lib/queries';
 import { cardPreview } from '@/lib/template-previews';
 import type { TemplateSummaryLite } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -81,6 +82,8 @@ export function TemplatePicker({
     );
   }, [templates, tier, inPlan, query, maxTier]);
   const focused = templates.find((tpl) => tpl.key === focusKey) ?? null;
+  // Only the focused design is drawn live (wide screens), so only its definition is fetched.
+  const focusedDefinition = useTemplateDefinition(wide ? focusKey : null).data?.definition;
 
   const choose = (key: string) => {
     onChoose(key);
@@ -161,12 +164,12 @@ export function TemplatePicker({
                           {preview ? (
                             // The gallery's pre-rendered preview (a plain image, as on the marketing cards).
                             <img src={preview} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]" />
-                          ) : tpl.definition ? (
-                            <div className="absolute inset-0 grid place-items-start justify-center overflow-hidden">
-                              <TemplateThumbnail definition={tpl.definition} context={context} width={200} height={334} sections={2} />
-                            </div>
                           ) : (
-                            <div className="skeleton absolute inset-0" />
+                            // Not photographed yet: the design's own colours stand in.
+                            <div
+                              className="absolute inset-0"
+                              style={{ background: tpl.preview?.colors ? `linear-gradient(160deg, ${tpl.preview.colors.background}, ${tpl.preview.colors.accent})` : undefined }}
+                            />
                           )}
                           <span className="absolute top-2 left-2 flex flex-wrap gap-1">
                             {tpl.key === currentKey ? (
@@ -210,7 +213,7 @@ export function TemplatePicker({
             )}
           </div>
 
-          {wide && focused?.definition ? (
+          {wide && focused && focusedDefinition ? (
             <aside className="flex w-[400px] shrink-0 flex-col border-l border-gold-200/70 bg-sand/40 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -221,7 +224,7 @@ export function TemplatePicker({
               </div>
               <div className="relative mx-auto mt-4 min-h-0 w-full max-w-[330px] flex-1 overflow-hidden rounded-[2rem] border-[7px] border-ink bg-white shadow-xl">
                 <div className="absolute inset-0 overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-brand-600" tabIndex={0} role="region" aria-label={t('picker.preview')}>
-                  <TemplateRenderer definition={focused.definition} context={context} customization={customization} mode="preview" language={language} slots={{ watermark: watermark || TIER_RANK[focused.tier] > maxTier }} />
+                  <TemplateRenderer definition={focusedDefinition} context={context} customization={customization} mode="preview" language={language} slots={{ watermark: watermark || TIER_RANK[focused.tier] > maxTier }} />
                 </div>
               </div>
               {TIER_RANK[focused.tier] > maxTier ? (

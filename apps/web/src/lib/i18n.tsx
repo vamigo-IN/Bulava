@@ -30,6 +30,13 @@ export function useT(): Translator {
   return useI18n().t;
 }
 
+const ENGLISH = createTranslator('en');
+
+/** The surrounding I18nProvider's translator, or English where there is none (marketing pages share some form fields). */
+export function useOptionalT(): Translator {
+  return useContext(I18nContext)?.t ?? ENGLISH;
+}
+
 /** Map an API error code to a translated message, falling back to the generic error. */
 export function errorMessage(t: Translator, error: unknown): string {
   if (error instanceof ApiError) {

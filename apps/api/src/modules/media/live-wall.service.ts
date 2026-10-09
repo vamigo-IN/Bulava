@@ -88,11 +88,12 @@ export class LiveWallService {
     return room;
   }
 
-  /** What the wall screen polls: event heading, the upload QR and the latest approved photos. */
+  /** What the wall screen polls: event heading, the gallery QR and the latest approved photos. */
   async publicWall(token: string) {
     const room = await this.roomByToken(token);
     const [qr, items] = await Promise.all([
-      room.uploadsEnabled ? this.prisma.qRCode.findFirst({ where: { targetId: room.id, type: 'PHOTO_UPLOAD', active: true }, select: { code: true } }) : null,
+      // The wall points at the gallery (view and download) when anyone may open it; uploading is never public.
+      room.galleryVisibility === 'PUBLIC' ? this.prisma.qRCode.findFirst({ where: { targetId: room.id, type: 'PHOTO_UPLOAD', active: true }, select: { code: true } }) : null,
       this.prisma.mediaItem.findMany({
         // Only the sub-albums the host shows on the wall.
         where: { roomId: room.id, status: 'APPROVED', kind: 'image', privacy: { in: ['PUBLIC', 'EVENT_ONLY'] }, deletedAt: null, OR: [{ albumId: null }, { album: { showOnWall: true } }] },
@@ -112,7 +113,7 @@ export class LiveWallService {
         partnerTwo: text(details.partnerTwo),
       },
       room: { name: room.name },
-      uploadUrl: qr ? `${await this.links.guestOrigin(room.eventId)}/p/${qr.code}` : null,
+      galleryUrl: qr ? `${await this.links.guestOrigin(room.eventId)}/p/${qr.code}/gallery` : null,
       pollSeconds: 8,
       items: await Promise.all(
         items.map(async (i) => ({
@@ -128,12 +129,12 @@ export class LiveWallService {
     };
   }
 
-  /** QR code for guests to add photos, drawn on the wall. */
-  async uploadQrSvg(token: string): Promise<string> {
+  /** QR code to the album's gallery (see and download the photos), drawn on the wall when the gallery is public. */
+  async galleryQrSvg(token: string): Promise<string> {
     const room = await this.roomByToken(token);
-    if (!room.uploadsEnabled) throw AppError.notFound('QR code');
+    if (room.galleryVisibility !== 'PUBLIC') throw AppError.notFound('QR code');
     const qr = await this.prisma.qRCode.findFirst({ where: { targetId: room.id, type: 'PHOTO_UPLOAD', active: true } });
     if (!qr) throw AppError.notFound('QR code');
-    return QRCode.toString(`${await this.links.guestOrigin(room.eventId)}/p/${qr.code}`, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    return QRCode.toString(`${await this.links.guestOrigin(room.eventId)}/p/${qr.code}/gallery`, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, KeyRound, ShieldAlert, ShieldCheck, Smartphone, type LucideIcon } from 'lucide-react';
+import { Check, KeyRound, MessageCircle, ShieldAlert, ShieldCheck, Smartphone, type LucideIcon } from 'lucide-react';
 import { Suspense } from 'react';
 import { useT } from '@/lib/i18n';
 import { useMe } from '@/lib/queries';
@@ -8,15 +8,16 @@ import { cn } from '@/lib/utils';
 import { SignInMethods } from '@/components/account/sign-in-methods';
 import { TwoStepCard } from '@/components/account/two-step-card';
 
-/** Sign-in and security: how protected the account is, the ways to sign in, and two-step sign-in. */
+/** Sign-in and security: how protected the account is (password, Google, WhatsApp, two-step), the ways to sign in, and two-step sign-in. */
 export default function SecurityPage() {
   const t = useT();
   const me = useMe();
   const user = me.data;
   const checks: Array<{ ok: boolean; icon: LucideIcon; label: string; hint: string }> = user
     ? [
-        { ok: user.hasPassword, icon: KeyRound, label: t('security.check.password'), hint: user.hasPassword ? t('security.check.passwordOn') : t('security.check.passwordOff') },
+        { ok: user.hasPassword, icon: KeyRound, label: t('security.check.password'), hint: user.hasPassword ? t('security.check.passwordOn') : user.email ? t('security.check.passwordOff') : t('security.check.passwordNoEmail') },
         { ok: user.googleLinked, icon: ShieldCheck, label: t('security.check.google'), hint: user.googleLinked ? t('security.check.googleOn') : t('security.check.googleOff') },
+        { ok: user.phoneVerified, icon: MessageCircle, label: t('security.check.whatsapp'), hint: user.phoneVerified ? t('security.check.whatsappOn') : t('security.check.whatsappOff') },
         { ok: user.mfaEnabled, icon: Smartphone, label: t('security.check.twoStep'), hint: user.mfaEnabled ? t('security.check.twoStepOn') : t('security.check.twoStepOff') },
       ]
     : [];
@@ -36,7 +37,7 @@ export default function SecurityPage() {
             <p className="mt-0.5 text-sm text-stone-600">{t('security.score', { count: score, total: checks.length })}</p>
           </div>
         </div>
-        <ul className="mt-5 grid gap-3 sm:grid-cols-3">
+        <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {checks.map(({ ok, icon: Icon, label, hint }) => (
             <li key={label} className={cn('rounded-2xl border p-4', ok ? 'border-emerald-200 bg-emerald-50/60' : 'border-gold-200 bg-white/60')}>
               <span className="flex items-center justify-between">

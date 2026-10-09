@@ -2,10 +2,11 @@
 
 import { Camera, ImagePlus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { errorMessage, I18nProvider, useT } from '@/lib/i18n';
-import { Alert, Button, Input } from '@/components/ui/primitives';
+import { Alert, Button, Input, Spinner } from '@/components/ui/primitives';
 
 export interface RoomInfo {
   event: { title: string; language: string; typeKey: string; partnerOne: string | null; partnerTwo: string | null };
@@ -14,6 +15,8 @@ export interface RoomInfo {
   albums: Array<{ id: string; kind: 'GENERAL' | 'FUNCTION' | 'CUSTOM'; name: string }>;
   /** Today's function, else General. */
   defaultAlbumId: string | null;
+  /** This visitor may add photos: an invited guest (from their invitation) when the host allows guest uploads. */
+  canUpload: boolean;
   canViewGallery: boolean;
   accept: string[];
 }
@@ -54,9 +57,42 @@ export function putWithProgress(url: string, file: File, onProgress: (p: number)
   });
 }
 
-function Room({ code, room }: { code: string; room: RoomInfo }) {
+/**
+ * The album link is for viewing: it opens the gallery. Invited guests whose
+ * hosts allow guest uploads arrive with their invitation token and get the
+ * upload form; the team adds photos from the dashboard.
+ */
+function Room({ code, initial }: { code: string; initial: RoomInfo }) {
   const t = useT();
+  const router = useRouter();
   const token = useInviteToken();
+  const [room, setRoom] = useState<RoomInfo | null>(null);
+
+  // The server rendered the album for an anonymous visitor; the invitation token (in the URL fragment) can change that.
+  useEffect(() => {
+    if (token === undefined) return;
+    if (!token) return setRoom(initial);
+    api<RoomInfo>(`/public/media-rooms/${code}`, { headers: { 'x-bulava-invite': token } })
+      .then(setRoom)
+      .catch(() => setRoom(initial));
+  }, [code, token, initial]);
+
+  useEffect(() => {
+    if (room && !room.canUpload && room.canViewGallery) router.replace(`/p/${code}/gallery`);
+  }, [room, code, router]);
+
+  if (!room || (!room.canUpload && room.canViewGallery)) {
+    return (
+      <main className="paper flex min-h-dvh items-center justify-center px-4">
+        <Spinner label={t('common.loading')} />
+      </main>
+    );
+  }
+  return <UploadForm code={code} room={room} token={token ?? null} />;
+}
+
+function UploadForm({ code, room, token }: { code: string; room: RoomInfo; token: string | null }) {
+  const t = useT();
   const [name, setName] = useState('');
   const [albumId, setAlbumId] = useState(room.defaultAlbumId ?? room.albums[0]?.id ?? '');
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -85,6 +121,7 @@ function Room({ code, room }: { code: string; room: RoomInfo }) {
         const ticket = await api<{ itemId: string; uploadUrl: string }>(`/public/media-rooms/${code}/uploads`, {
           method: 'POST',
           body: { fileName: u.file.name.slice(0, 200), contentType: u.file.type, sizeBytes: u.file.size, uploaderName: name.trim() || undefined, ...(albumId ? { albumId } : {}) },
+          headers: token ? { 'x-bulava-invite': token } : undefined,
         });
         await putWithProgress(ticket.uploadUrl, u.file, (p) => update(i, { progress: p }));
         await api(`/public/media-rooms/${code}/uploads/${ticket.itemId}/complete`, { method: 'POST', body: {} });
@@ -109,9 +146,9 @@ function Room({ code, room }: { code: string; room: RoomInfo }) {
           <p className="mt-3 text-stone-600">{t('upload.subtitle', { event: room.event.title })}</p>
         </header>
 
-        {!room.room.uploadsEnabled ? (
+        {!room.canUpload ? (
           <div className="mt-8">
-            <Alert tone="info">{t('upload.closed')}</Alert>
+            <Alert tone="info">{room.room.uploadsEnabled ? t('upload.fromInvitation') : t('upload.teamOnly')}</Alert>
           </div>
         ) : (
           <section className="mt-8 rounded-3xl border border-gold-200 bg-white p-5 shadow-sm">
@@ -204,7 +241,7 @@ function Room({ code, room }: { code: string; room: RoomInfo }) {
 export function UploadRoom({ code, room }: { code: string; room: RoomInfo }) {
   return (
     <I18nProvider language={room.event.language}>
-      <Room code={code} room={room} />
+      <Room code={code} initial={room} />
     </I18nProvider>
   );
 }

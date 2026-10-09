@@ -4,9 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CheckCircle2, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { CONTACT_TOPICS, ContactMessageSchema, type z } from '@bulava/validation';
 import { Alert, Button, Field, Input, Select, Textarea } from '@/components/ui/primitives';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { apiPost } from '@/lib/api';
 import { errorMessage, I18nProvider, useT } from '@/lib/i18n';
 
@@ -72,7 +73,13 @@ function ContactFormInner({ supportEmail }: { supportEmail: string }) {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('contact.form.phone')} hint={t('contact.form.phoneHint')} error={errors.phone?.message}>
-          {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" maxLength={20} {...form.register('phone')} />}
+          {(p) => (
+            <Controller
+              control={form.control}
+              name="phone"
+              render={({ field }) => <PhoneInput {...p} name={field.name} maxLength={20} value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} />}
+            />
+          )}
         </Field>
         <Field label={t('contact.form.topic')} error={errors.topic?.message}>
           {(p) => (

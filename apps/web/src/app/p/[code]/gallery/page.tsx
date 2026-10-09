@@ -23,6 +23,8 @@ interface GalleryItem {
 
 interface GalleryData {
   event: { title: string; language: string };
+  /** This visitor may add photos (an invited guest, when the hosts allow it). */
+  canUpload: boolean;
   /** Folders the host shows in the gallery that have photos. */
   albums: Array<{ id: string; name: string; count: number }>;
   items: GalleryItem[];
@@ -43,9 +45,11 @@ function Gallery({ code, data }: { code: string; data: GalleryData }) {
             <p className="truncate text-xs tracking-[0.25em] text-gold-300 uppercase">{data.event.title}</p>
             <h1 className="font-display text-3xl">{t('gallery.title')}</h1>
           </div>
-          <Link href={`/p/${code}`} className="shrink-0 text-sm text-gold-300 underline">
-            {t('invite.photos.upload')}
-          </Link>
+          {data.canUpload ? (
+            <Link href={`/p/${code}`} className="shrink-0 text-sm text-gold-300 underline">
+              {t('invite.photos.upload')}
+            </Link>
+          ) : null}
         </div>
         {data.albums.length > 1 ? (
           <nav aria-label={t('gallery.title')} className="-mx-3 mb-5 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">
@@ -64,7 +68,17 @@ function Gallery({ code, data }: { code: string; data: GalleryData }) {
         ) : (
           <ul className="columns-2 gap-2 sm:columns-3 lg:columns-4 [&>li]:mb-2">
             {items.map((item) => (
-              <li key={item.id} className="break-inside-avoid">
+              <li key={item.id} className="relative break-inside-avoid">
+                {item.downloadUrl ? (
+                  <a
+                    href={item.downloadUrl}
+                    aria-label={t('gallery.downloadPhoto')}
+                    title={t('gallery.downloadPhoto')}
+                    className="absolute top-2 right-2 z-10 grid size-9 place-items-center rounded-full bg-black/55 text-ivory backdrop-blur-sm transition-colors hover:bg-black/75 focus-visible:outline-2 focus-visible:outline-gold-300"
+                  >
+                    <Download aria-hidden className="size-4" />
+                  </a>
+                ) : null}
                 <button type="button" onClick={() => setOpen(item)} className="block w-full overflow-hidden rounded-lg">
                   {item.kind === 'video' ? (
                     <video src={item.viewUrl} preload="metadata" muted className="w-full" />

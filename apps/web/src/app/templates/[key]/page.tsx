@@ -8,7 +8,7 @@ import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { TemplateCard } from '@/components/marketing/template-card';
 import { TemplatePreviewSwitcher } from '@/components/marketing/template-preview-switcher';
 import { UseTemplateButton } from '@/components/marketing/quick-start';
-import { getPlans, getTemplate, getTemplates, tierPrice } from '@/lib/server-api';
+import { getGalleryTemplates, getPlans, getTemplate, tierPrice } from '@/lib/server-api';
 
 export const revalidate = 60;
 
@@ -27,10 +27,10 @@ export async function generateMetadata({ params }: { params: Promise<{ key: stri
 
 export default async function TemplateDetailPage({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
-  const [tpl, plans, all] = await Promise.all([getTemplate(key), getPlans(), getTemplates()]);
+  const [tpl, plans, all] = await Promise.all([getTemplate(key), getPlans(), getGalleryTemplates()]);
   if (!tpl?.definition) notFound();
   const price = tierPrice(tpl.tier, plans);
-  const related = all.filter((x) => x.key !== tpl.key && x.definition && x.outputs.some((o) => tpl.outputs.includes(o)) && x.tags.some((g) => tpl.tags.includes(g))).slice(0, 4);
+  const related = all.filter((x) => x.key !== tpl.key && x.outputs.some((o) => tpl.outputs.includes(o)) && x.tags.some((g) => tpl.tags.includes(g))).slice(0, 4);
   const chip = 'inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 font-medium text-brand-700 shadow-clay-sm';
 
   return (
@@ -47,6 +47,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
             <TemplatePreviewSwitcher
               definition={tpl.definition}
               eventType={tpl.eventTypes[0] ?? 'WEDDING'}
+              tags={tpl.tags}
               labels={{ mobile: t('templates.detail.mobile'), desktop: t('templates.detail.desktop'), note: t('templates.detail.previewNote'), playOpening: t('signature.play') }}
             />
             <aside className="lg:sticky lg:top-24 lg:self-start">

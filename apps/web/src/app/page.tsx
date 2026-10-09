@@ -51,7 +51,7 @@ import { TemplateCard, TemplatePhone } from '@/components/marketing/template-car
 import { TemplateExplorer, type ExplorerItem } from '@/components/marketing/template-explorer';
 import { VideoShowcase } from '@/components/marketing/video-showcase';
 import { MagneticButton } from '@/lib/motion/magnetic-button';
-import { getPlans, getStats, getTemplates, getTestimonials, tierPrice, type TemplateSummary } from '@/lib/server-api';
+import { getGalleryTemplates, getPlans, getStats, getTemplate, getTemplateDefinitions, getTestimonials, tierPrice, type TemplateSummary } from '@/lib/server-api';
 import { getSiteConfig } from '@/lib/site-config';
 import { fullPreview } from '@/lib/template-previews';
 import { cn } from '@/lib/utils';
@@ -179,18 +179,23 @@ function RisingWords({ text, start = 0.15, accent = 0 }: { text: string; start?:
 }
 
 export default async function HomePage() {
-  const [templates, plans, stats, testimonials, siteConfig] = await Promise.all([getTemplates(), getPlans(), getStats(), getTestimonials(), getSiteConfig()]);
-  const websites = templates.filter((x) => x.outputs.includes('WEBSITE') && x.definition);
-  const videos = templates.filter((x) => x.outputs.includes('VIDEO') && x.definition);
+  const [templates, plans, stats, testimonials, siteConfig] = await Promise.all([getGalleryTemplates(), getPlans(), getStats(), getTestimonials(), getSiteConfig()]);
+  const websites = templates.filter((x) => x.outputs.includes('WEBSITE'));
+  const videos = templates.filter((x) => x.outputs.includes('VIDEO'));
   const byKey = new Map(websites.map((w) => [w.key, w]));
   // The stage plays a flagship scene live; two more designs sit behind it.
   const heroLive = byKey.get('marigold-mahal') ?? websites.find((w) => w.featured) ?? websites[0];
   const heroBack = ['rajwada-royale', 'kanjeevaram-gold'].map((k) => byKey.get(k)).filter((x): x is TemplateSummary => !!x);
   const heroImage = heroLive ? fullPreview(heroLive.key) : null;
+  // Definitions only where the live renderer draws: the hero phone without its image, and the films.
+  const [heroDefinition, videoDefinitions] = await Promise.all([
+    heroLive && !heroImage ? (heroLive.definition ?? getTemplate(heroLive.key).then((t) => t?.definition ?? null)) : null,
+    getTemplateDefinitions(videos.slice(0, 3).map((v) => v.key)),
+  ]);
   // Illustrated 3D scene templates, found from their data (the hero section's variant), flagships first.
   const sceneNames = new Set<string>(SCENES);
   const scenes: CoverflowItem[] = websites
-    .filter((w) => sceneNames.has(w.definition?.website?.pages[0]?.sections[0]?.variant ?? ''))
+    .filter((w) => sceneNames.has(w.preview?.heroVariant ?? w.definition?.website?.pages[0]?.sections[0]?.variant ?? ''))
     .sort((a, b) => Number(b.featured) - Number(a.featured))
     .slice(0, 12)
     .map((w) => ({ key: w.key, name: w.name, blurb: w.description ?? '', node: <TemplatePhone template={w} width={250} height={470} sections={1} /> }));
@@ -254,12 +259,12 @@ export default async function HomePage() {
               <Proof stats={stats} />
             </div>
             <div className="lg:col-span-6">
-              {heroLive?.definition ? (
+              {heroLive && (heroImage || heroDefinition) ? (
                 <HeroStage
                   name={heroLive.name}
                   image={heroImage}
                   // The definition is sent to the browser only when the live renderer has to draw it.
-                  definition={heroImage ? null : heroLive.definition}
+                  definition={heroImage ? null : heroDefinition}
                   eventType={heroLive.eventTypes[0] ?? 'WEDDING'}
                   liveLabel={t('home.hero.live')}
                   chips={{ opened: t('home.hero.chip.opened'), rsvp: t('home.hero.chip.rsvp'), event: t('home.hero.chip.event') }}
@@ -419,7 +424,7 @@ export default async function HomePage() {
             <Mandala className="w-full animate-spin-slow" />
           </Parallax>
 
-          {videos.length ? (
+          {videoDefinitions.size ? (
             <section className="mx-auto max-w-7xl px-4 pt-28 pb-24 sm:px-6" aria-labelledby="video-title">
               <Reveal>
                 <SectionHeading id="video-title" eyebrow={t('home.video.eyebrow')} title={t('home.video.title')} subtitle={t('home.video.subtitle')} />
@@ -427,13 +432,16 @@ export default async function HomePage() {
               <div className="mt-16">
                 <VideoShowcase
                   playLabel={t('home.video.play')}
-                  templates={videos.slice(0, 3).map((v) => ({ key: v.key, name: v.name, eventType: v.eventTypes[0] ?? 'WEDDING', definition: v.definition! }))}
+                  templates={videos
+                    .slice(0, 3)
+                    .filter((v) => videoDefinitions.has(v.key))
+                    .map((v) => ({ key: v.key, name: v.name, eventType: v.eventTypes[0] ?? 'WEDDING', definition: videoDefinitions.get(v.key)! }))}
                 />
               </div>
             </section>
           ) : null}
 
-          <section id="features" className={cn('mx-auto max-w-7xl scroll-mt-24 px-4 pb-28 sm:px-6', videos.length ? 'pt-8' : 'pt-28')} aria-labelledby="features-title">
+          <section id="features" className={cn('mx-auto max-w-7xl scroll-mt-24 px-4 pb-28 sm:px-6', videoDefinitions.size ? 'pt-8' : 'pt-28')} aria-labelledby="features-title">
             <Reveal>
               <SectionHeading id="features-title" eyebrow={t('home.features.eyebrow')} title={t('home.features.title')} subtitle={t('home.features.subtitle')} />
             </Reveal>

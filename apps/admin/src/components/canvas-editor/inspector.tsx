@@ -3,22 +3,27 @@
 import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowDownToLine, ArrowUpToLine, ChevronDown, ChevronUp, Copy, Maximize2, Trash2 } from 'lucide-react';
 import {
   BINDINGS,
+  BLEND_MODES,
   BUTTON_ACTIONS,
+  CANVAS_SCENES,
   EFFECTS,
   ICONS,
   IMAGE_MASKS,
   LAYER_ENTRANCES,
   LAYER_MOTIONS,
   ORNAMENT_LAYERS,
+  ORNAMENT_SHADOWS,
   SHAPES,
   TEXT_SHADOWS,
   TEXT_TRANSFORMS,
+  TEXTURES,
   type Artboard,
   type CanvasSection,
   type IconLayer,
   type ImageLayer,
   type Layer,
   type OrnamentLayer,
+  type SceneLayer,
   type ShapeLayer,
   type TextLayer,
   type ThemeColors,
@@ -27,7 +32,7 @@ import {
 import { t } from '@/lib/i18n';
 import { Badge, Button, Input } from '../ui';
 import { ColorField, FillField, FontField, Group, NumberField, Row, SelectField, TextField, ToggleField, ValueField } from './fields';
-import { desktopFromMobile } from './presets';
+import { desktopFromMobile, isIllustration } from './presets';
 
 const IMAGE_BINDINGS = [...new Set([...Object.entries(BINDINGS).filter(([, b]) => b.type === 'image').map(([k]) => k), 'photos[0]', 'photos[1]', 'photos[2]', 'photos[3]'])];
 const WEIGHTS = ['100', '200', '300', '400', '500', '600', '700', '800', '900'] as const;
@@ -66,6 +71,8 @@ function BoardInspector({ canvas, device, board, colors, onBoard, onCanvas, onPi
         <NumberField label={t('canvas.height')} value={board.height} min={100} max={8000} onChange={(height) => onBoard((b) => void (b.height = Math.round(height)))} />
         <FillField value={board.background} onChange={(background) => onBoard((b) => void (b.background = background))} colors={colors} onPickAsset={onPickAsset} />
         <SelectField label={t('canvas.effect')} value={board.effect} onChange={(effect) => onBoard((b) => void (b.effect = effect))} options={EFFECTS} />
+        <SelectField label={t('canvas.texture')} value={board.texture} onChange={(texture) => onBoard((b) => void (b.texture = texture))} options={TEXTURES.map((x) => ({ value: x, label: t(`canvas.texture.${x}`) }))} />
+        {board.texture !== 'none' ? <NumberField label={t('canvas.textureStrength')} value={board.textureStrength} min={0} max={1} step={0.05} onChange={(n) => onBoard((b) => void (b.textureStrength = n))} /> : null}
       </Group>
       <Group title={t('canvas.canvasSettings')}>
         <ToggleField label={t('canvas.repeat')} checked={canvas.repeatPerFunction} onChange={(v) => onCanvas((c) => void (c.repeatPerFunction = v))} />
@@ -140,6 +147,7 @@ function LayerInspector({ layer, board, colors, textSlots, onLayer, onPickAsset,
           <NumberField compact label={t('canvas.rotate')} value={f.rotate} min={-360} max={360} suffix="°" onChange={(rotate) => setFrame({ rotate })} />
           <NumberField compact label={t('canvas.opacity')} value={layer.opacity} min={0} max={1} step={0.05} onChange={(opacity) => onLayer((l) => void (l.opacity = opacity))} />
         </div>
+        <SelectField label={t('canvas.blend')} value={layer.blend} onChange={(blend) => onLayer((l) => void (l.blend = blend))} options={BLEND_MODES.map((m) => ({ value: m, label: t(`canvas.blend.${m}`) }))} />
         <Row label={t('canvas.align')}>
           <div className="flex flex-wrap gap-0.5">
             {alignButtons.map((a) => (
@@ -164,6 +172,7 @@ function LayerInspector({ layer, board, colors, textSlots, onLayer, onPickAsset,
       {layer.kind === 'ornament' ? <OrnamentProps layer={layer} colors={colors} onLayer={onLayer} /> : null}
       {layer.kind === 'icon' ? <IconProps layer={layer} colors={colors} onLayer={onLayer} /> : null}
       {layer.kind === 'widget' ? <WidgetProps layer={layer} colors={colors} textSlots={textSlots} onLayer={onLayer} /> : null}
+      {layer.kind === 'scene' ? <SceneProps layer={layer} onLayer={onLayer} /> : null}
 
       <Group title={t('canvas.visibility')} open={!!layer.visibleWhen}>
         <TextField
@@ -247,6 +256,7 @@ function TextProps({ layer, colors, textSlots, onLayer }: { layer: TextLayer; co
         ]}
       />
       <ToggleField label={t('canvas.italic')} checked={s.italic} onChange={(italic) => edit((l) => void (l.style.italic = italic))} />
+      <ToggleField label={t('canvas.foil')} checked={s.foil} onChange={(foil) => edit((l) => void (l.style.foil = foil))} />
       <ToggleField label={t('canvas.contrast')} checked={s.contrast} onChange={(contrast) => edit((l) => void (l.style.contrast = contrast))} />
     </Group>
   );
@@ -321,10 +331,24 @@ function OrnamentProps({ layer, colors, onLayer }: { layer: OrnamentLayer; color
     <Group title={t('canvas.ornament')}>
       <SelectField label={t('canvas.ornament')} value={layer.ornament} onChange={(ornament) => edit((l) => void (l.ornament = ornament))} options={ORNAMENT_LAYERS} />
       <ColorField label={t('canvas.color')} value={layer.color} onChange={(color) => edit((l) => void (l.color = color ?? 'secondary'))} colors={colors} />
-      <div className="flex gap-3">
+      {isIllustration(layer.ornament) ? <p className="text-[11px] text-stone-500">{t('canvas.illustrationHint')}</p> : null}
+      <SelectField label={t('canvas.shadow')} value={layer.shadow} onChange={(shadow) => edit((l) => void (l.shadow = shadow))} options={ORNAMENT_SHADOWS.map((x) => ({ value: x, label: t(`canvas.ornamentShadow.${x}`) }))} />
+      <div className="flex flex-wrap gap-x-3">
+        <ToggleField label={t('canvas.foil')} checked={layer.foil} onChange={(foil) => edit((l) => void (l.foil = foil))} />
         <ToggleField label={t('canvas.flipX')} checked={layer.flipX} onChange={(flipX) => edit((l) => void (l.flipX = flipX))} />
         <ToggleField label={t('canvas.flipY')} checked={layer.flipY} onChange={(flipY) => edit((l) => void (l.flipY = flipY))} />
       </div>
+    </Group>
+  );
+}
+
+function SceneProps({ layer, onLayer }: { layer: SceneLayer; onLayer: InspectorProps['onLayer'] }) {
+  const edit = narrow<SceneLayer>(onLayer, 'scene');
+  return (
+    <Group title={t('canvas.scene')}>
+      <SelectField label={t('canvas.scene')} value={layer.scene} onChange={(scene) => edit((l) => void (l.scene = scene))} options={CANVAS_SCENES} />
+      <ToggleField label={t('canvas.sky')} checked={layer.sky} onChange={(sky) => edit((l) => void (l.sky = sky))} />
+      <p className="text-[11px] text-stone-500">{t('canvas.sceneHint')}</p>
     </Group>
   );
 }

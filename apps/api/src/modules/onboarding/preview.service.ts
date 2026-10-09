@@ -6,8 +6,11 @@ import { RenderContextService } from '../templates/render-context.service';
 
 /**
  * The host's preview link (/preview/<token>): the invitation exactly as guests
- * will see it, with a watermark, whatever the event's status and access mode.
- * Hosts share it with family before publishing; nobody can RSVP from it.
+ * will see it, with a watermark, whatever the event's access mode. Hosts share
+ * it with family before publishing; nobody can RSVP from it. Once the event is
+ * published the preview ends: the link only names the public page (the web app
+ * redirects there), so a preview link can never bypass the access mode chosen
+ * at publishing.
  */
 @Injectable()
 export class PreviewService {
@@ -26,6 +29,7 @@ export class PreviewService {
       },
     });
     if (!event) throw AppError.notFound('Preview');
+    if (event.status !== 'DRAFT') return { published: true as const, event: { slug: event.slug, status: event.status } };
 
     const [template, announcements] = await Promise.all([
       this.renderContext.resolveTemplate(event.id, event.typeKey, 'WEBSITE'),

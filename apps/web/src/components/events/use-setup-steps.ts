@@ -19,7 +19,7 @@ export function useSetupSteps(event: EventSummary | undefined): SetupStep[] | nu
     status: event.status,
     accessMode: event.accessMode,
     designChosen: event.design !== null,
-    functions: event.counts.functions,
+    readyFunctions: event.counts.readyFunctions,
     guests: event.counts.guests,
     invitationsSent: invitations.data?.some((i) => i.sentAt) ?? false,
     responses: summary.data?.functions.reduce((sum, f) => sum + f.attending + f.declined + f.maybe, 0) ?? 0,

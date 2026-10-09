@@ -28,7 +28,8 @@ export interface SetupFacts {
   status: EventSummary['status'];
   accessMode: AccessMode;
   designChosen: boolean;
-  functions: number;
+  /** Functions with a date, time and venue; suggested ones not set up yet do not count. */
+  readyFunctions: number;
   guests: number;
   /** Any invitation sent or shared (email, WhatsApp, the host's own link). */
   invitationsSent: boolean;
@@ -44,7 +45,7 @@ export function setupSteps(f: SetupFacts): SetupStep[] {
   const published = f.status !== 'DRAFT';
   return [
     { key: 'design', section: '/design', title: 'dash.step.design', short: 'dash.step.design.short', body: 'dash.step.design.body', action: 'dash.step.design.action', done: f.designChosen, optional: false },
-    { key: 'functions', section: '/functions', title: 'dash.step.functions', short: 'dash.step.functions.short', body: 'dash.step.functions.body', action: 'dash.step.functions.action', done: f.functions > 0, optional: false },
+    { key: 'functions', section: '/functions', title: 'dash.step.functions', short: 'dash.step.functions.short', body: 'dash.step.functions.body', action: 'dash.step.functions.action', done: f.readyFunctions > 0, optional: false },
     {
       key: 'guests',
       section: '/guests',
@@ -87,7 +88,7 @@ export function summaryFacts(event: EventSummary): SetupFacts {
     status: event.status,
     accessMode: event.accessMode,
     designChosen: event.design !== null,
-    functions: event.counts.functions,
+    readyFunctions: event.counts.readyFunctions,
     guests: event.counts.guests,
     invitationsSent: false,
     responses: 0,

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, ValueSchema } from './base';
+import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, SCENE_NAMES, ValueSchema } from './base';
 import { CanvasSectionSchema } from './canvas';
 
-export { ConditionSchema, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, VALUE_FORMATS, ValueSchema } from './base';
+export { ConditionSchema, DARK_SCENE_NAMES, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, SCENE_NAMES, VALUE_FORMATS, ValueSchema, type SceneNameValue } from './base';
 export type { Condition, EffectName, FontFamily, Value } from './base';
 
 /**
@@ -41,14 +41,6 @@ export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
  */
 export const LOOKS = ['classic', 'heritage', 'noir', 'royal', 'garden', 'celebration', 'modern'] as const;
 export type LookName = (typeof LOOKS)[number];
-/**
- * Illustrated scenes (template-engine art/scenes.tsx): website heroes use them
- * as layered 3D headers, videos as backdrops the camera moves through.
- */
-export const SCENE_NAMES = ['gopuram', 'palace', 'toran', 'arches', 'lotus', 'mandap', 'noir', 'floral', 'balloons', 'backwaters', 'sarovar', 'vrindavan'] as const;
-export type SceneNameValue = (typeof SCENE_NAMES)[number];
-/** Scenes drawn on the primary colour: text over them uses light inks. */
-export const DARK_SCENE_NAMES: readonly SceneNameValue[] = ['palace', 'toran', 'arches', 'noir', 'sarovar', 'vrindavan'];
 /** Camera moves through a video backdrop; near layers move more than far ones. */
 export const CAMERA_MOVES = ['still', 'push', 'pull', 'panLeft', 'panRight', 'rise', 'descend'] as const;
 export type CameraMove = (typeof CAMERA_MOVES)[number];

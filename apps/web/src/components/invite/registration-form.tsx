@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { formatEventDateWithWeekday } from '@bulava/localization';
 import { Alert, Button, Input } from '@/components/ui/primitives';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { apiPost } from '@/lib/api';
 import { errorMessage, I18nProvider, useI18n } from '@/lib/i18n';
 import type { PublicRegistrationInfo } from '@/lib/types';
@@ -112,7 +113,7 @@ function RegistrationInner({ slug, info, timeZone }: { slug: string; info: Publi
       </label>
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-stone-700">{t('register.phone')}</span>
-        <Input type="tel" autoComplete="tel" inputMode="tel" maxLength={20} value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <PhoneInput maxLength={20} value={phone} onChange={setPhone} placeholder="98765 43210" />
         <span className="mt-1 block text-xs text-stone-500">{t('register.contactHint')}</span>
       </label>
 

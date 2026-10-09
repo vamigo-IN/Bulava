@@ -73,7 +73,8 @@ export default function EventOverviewPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
           {steps ? <SetupChecklist eventId={eventId} steps={steps} /> : null}
-          {canEdit ? <PreviewLinkCard event={event.data} /> : null}
+          {/* The preview link is for before publishing; afterwards it leads to the public page. */}
+          {canEdit && draft ? <PreviewLinkCard event={event.data} /> : null}
           {canInvites ? <ShareCard event={event.data} /> : null}
         </div>
 

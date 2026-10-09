@@ -1,5 +1,6 @@
 import {
   Alex_Brush,
+  Baloo_2,
   Cinzel,
   Cormorant_Garamond,
   Great_Vibes,
@@ -10,6 +11,7 @@ import {
   Noto_Sans_Devanagari,
   Noto_Serif,
   Noto_Serif_Devanagari,
+  Pacifico,
   Parisienne,
   Pinyon_Script,
   Playfair_Display,
@@ -49,6 +51,8 @@ const italiana = Italiana({ subsets: ['latin'], weight: '400', variable: '--font
 const yeseva = Yeseva_One({ subsets: ['latin'], weight: '400', variable: '--font-yeseva', display: 'swap', preload: false });
 const rozha = Rozha_One({ subsets: ['latin', 'devanagari'], weight: '400', variable: '--font-rozha', display: 'swap', preload: false });
 const yatra = Yatra_One({ subsets: ['latin', 'devanagari'], weight: '400', variable: '--font-yatra', display: 'swap', preload: false });
+const baloo = Baloo_2({ subsets: ['latin', 'devanagari'], variable: '--font-baloo', display: 'swap', preload: false });
+const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font-pacifico', display: 'swap', preload: false });
 
 export const fontVariables = [
   notoSans,
@@ -70,6 +74,8 @@ export const fontVariables = [
   yeseva,
   rozha,
   yatra,
+  baloo,
+  pacifico,
 ]
   .map((f) => f.variable)
   .join(' ');

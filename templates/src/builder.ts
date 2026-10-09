@@ -59,7 +59,7 @@ export const FONTS: Record<'royal' | 'classic' | 'heritage' | 'modern' | 'editor
   },
 };
 /** A builder preset, or any FONT_PAIRINGS key (regal, romantic, elegant, grand, desi…). */
-export type FontPreset = keyof typeof FONTS | 'regal' | 'romantic' | 'elegant' | 'grand' | 'desi';
+export type FontPreset = keyof typeof FONTS | 'regal' | 'romantic' | 'elegant' | 'grand' | 'desi' | 'playful';
 
 export function fontsFor(preset: FontPreset): Fonts {
   const fonts = (FONTS as Record<string, Fonts>)[preset] ?? fontPairing(preset)?.fonts;

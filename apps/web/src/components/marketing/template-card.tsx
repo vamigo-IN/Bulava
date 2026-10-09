@@ -38,7 +38,7 @@ export function TemplatePhone({
   sections?: number;
   priority?: boolean;
 }) {
-  if (!template.definition || template.definition.type !== 'WEBSITE') {
+  if (!template.outputs.includes('WEBSITE')) {
     return <VideoPoster template={template} width={width} height={height} priority={priority} />;
   }
   const preview = cardPreview(template.key);
@@ -57,12 +57,30 @@ export function TemplatePhone({
           className="block object-cover object-top"
           style={{ width, height }}
         />
+      ) : template.definition ? (
+        <LiveThumbnail definition={template.definition} eventType={template.eventTypes[0] ?? 'WEDDING'} tags={template.tags} width={width} height={height} sections={sections} />
       ) : (
-        <LiveThumbnail definition={template.definition} eventType={template.eventTypes[0] ?? 'WEDDING'} width={width} height={height} sections={sections} />
+        <PlainScreen template={template} width={width} height={height} />
       )}
     </div>
   );
 }
+
+/** The template's colours and name, for a template with neither an image nor a definition at hand. */
+function PlainScreen({ template, width, height }: { template: TemplateSummary; width: number; height: number }) {
+  const c = colorsOf(template);
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-2 px-6 text-center"
+      style={{ width, height, background: c ? `linear-gradient(160deg, ${c.background}, ${c.accent})` : '#f7ead2', color: c?.primary ?? '#5b0e1b' }}
+    >
+      <span className="text-[10px] tracking-[0.3em] uppercase opacity-80">{template.category}</span>
+      <span className="font-display text-2xl leading-tight">{template.name}</span>
+    </div>
+  );
+}
+
+const colorsOf = (template: TemplateSummary) => template.preview?.colors ?? template.definition?.theme.colors ?? null;
 
 /** The scene a video or card template opens on (drawn or painted), if it has one. */
 function posterScene(template: TemplateSummary) {
@@ -122,7 +140,7 @@ function VideoPoster({ template, width, height, priority }: { template: Template
       </div>
     );
   }
-  const c = template.definition?.theme.colors;
+  const c = colorsOf(template);
   return (
     <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
       <div
@@ -176,7 +194,7 @@ export function TemplateCard({
 }) {
   const link = href ?? `/templates/${template.key}`;
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
-  const c = template.definition?.theme.colors;
+  const c = colorsOf(template);
   const palette = c ? [c.primary, c.secondary, c.accent, c.background] : [];
   const tradition = template.tags.find((tag) => TRADITION_TAGS.has(tag));
   const stage = `radial-gradient(70% 55% at 50% 38%, rgba(255,255,255,0.9), transparent 70%), linear-gradient(160deg, ${tint(c?.accent, 0.78, '#f7ead2')}, ${tint(c?.primary, 0.86, '#f3dcd8')})`;

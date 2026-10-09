@@ -9,7 +9,11 @@ import { seedSitePages } from './site-pages';
  * and ADMIN_PASSWORD are set) the platform owner account, which becomes the
  * Super Admin while the platform has none.
  *
- *   node dist/seed.js [--update-templates]
+ *   node dist/seed.js [--update-templates] [--templates-only] [--dry-run]
+ *
+ * --templates-only runs just the template catalog's migration (seedTemplates);
+ * --dry-run (templates only) lists what it would create, update, sync or retire
+ * and writes nothing. The deploy's migrate job runs the full seed.
  *
  * Admin variables: ADMIN_EMAIL, ADMIN_PASSWORD, optional ADMIN_NAME, and
  * ADMIN_RESET_PASSWORD=true to overwrite an existing admin's password.
@@ -18,13 +22,22 @@ import { seedSitePages } from './site-pages';
  * storage variables) also uploads Bulava's original tracks and adds them to the
  * music library. Off by default so local seeds never write to a real bucket.
  */
+const flag = (name: string) => process.argv.includes(name);
+
 async function main(): Promise<void> {
   const prisma = createPrismaClient();
   try {
+    const dryRun = flag('--dry-run');
+    if (flag('--templates-only') || dryRun) {
+      const result = await seedTemplates(prisma, { updateChanged: flag('--update-templates'), dryRun });
+      for (const c of result.changes) console.log(`  ${c.change.padEnd(6)} ${c.key}`);
+      console.log(`${dryRun ? 'Dry run (nothing written). Would change' : 'Templates'}: ${templateSummary(result)}.`);
+      return;
+    }
     await seedReferenceData(prisma);
-    const result = await seedTemplates(prisma, { updateChanged: process.argv.includes('--update-templates') });
+    const result = await seedTemplates(prisma, { updateChanged: flag('--update-templates') });
     const pages = await seedSitePages(prisma);
-    console.log(`Reference data seeded. Templates: ${result.created} created, ${result.updated} updated, ${result.retired} retired. Site pages: ${pages} created.`);
+    console.log(`Reference data seeded. Templates: ${templateSummary(result)}. Site pages: ${pages} created.`);
 
     const email = process.env.ADMIN_EMAIL?.trim();
     const password = process.env.ADMIN_PASSWORD;
@@ -60,6 +73,10 @@ async function main(): Promise<void> {
   } finally {
     await prisma.$disconnect();
   }
+}
+
+function templateSummary(r: { created: number; updated: number; synced: number; retired: number }): string {
+  return `${r.created} created, ${r.updated} updated, ${r.synced} listings synced, ${r.retired} retired`;
 }
 
 main().catch((error: unknown) => {

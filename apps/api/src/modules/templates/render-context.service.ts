@@ -84,7 +84,8 @@ export class RenderContextService {
     language?: string;
     music?: RenderContext['music'];
   }): Promise<RenderContext> {
-    const visible = input.functions.filter((f) => f.status !== 'DRAFT');
+    // A function without a date is a placeholder (a suggested ceremony not set up yet): templates never show it.
+    const visible = input.functions.filter((f) => f.status !== 'DRAFT' && f.startsAt !== null);
     const starts = visible.map((f) => f.startsAt).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime());
     const context = buildRenderContext({
       event: {

@@ -252,11 +252,12 @@ export class AlbumService {
     return this.get(access);
   }
 
+  /** The album's printable QR code: the gallery, where anyone with it sees (and may download) the photos. */
   async qrSvg(eventId: string): Promise<string> {
     const main = await this.ensure(eventId);
     const code = await this.qrCodeFor(eventId, main.id);
     if (!code) throw AppError.notFound('QR code');
-    return QRCode.toString(`${await this.links.guestOrigin(eventId)}/p/${code}`, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    return QRCode.toString(`${await this.links.guestOrigin(eventId)}/p/${code}/gallery`, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
   }
 
   async rotateWall(access: EventAccessContext, meta: RequestMeta) {

@@ -5,7 +5,7 @@ import { SectionHeading, SiteFooter, SiteHeader } from '@/components/marketing/s
 import { TemplateCard } from '@/components/marketing/template-card';
 import { type ExplorerItem } from '@/components/marketing/template-explorer';
 import { TemplateGallery, type FilterGroup } from '@/components/marketing/template-gallery';
-import { getPlans, getTemplates, serverApi, tierPrice } from '@/lib/server-api';
+import { getGalleryTemplates, getPlans, serverApi, tierPrice } from '@/lib/server-api';
 
 export const revalidate = 60;
 
@@ -25,13 +25,11 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
   const [templates, plans, eventTypes] = await Promise.all([
-    getTemplates(),
+    getGalleryTemplates(),
     getPlans(),
     serverApi<Array<{ key: string; name: string }>>('/meta/event-types', { revalidate: 300 }).then((e) => e ?? []),
   ]);
-  const items: ExplorerItem[] = templates
-    .filter((x) => x.definition)
-    .map((tpl) => ({
+  const items: ExplorerItem[] = templates.map((tpl) => ({
       key: tpl.key,
       tier: tpl.tier,
       tags: tpl.tags,

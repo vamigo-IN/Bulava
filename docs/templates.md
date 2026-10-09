@@ -20,13 +20,17 @@ Template (catalog entry: name, category, style, tier, badge, tags, event types, 
 
 ## The catalog
 
-73 templates: 53 websites, 17 videos and 3 image cards, across every event type and the major traditions (Hindu, Sikh, Muslim, South Indian, Kerala, Christian, Bengali, Marathi, Gujarati, Punjabi, Rajasthani), in Free, Standard and Premium tiers.
+597 templates: 577 websites, 17 videos and 3 image cards, across every event type and the major traditions (Hindu, Sikh, Muslim, South Indian, Kerala, Christian, Bengali, Marathi, Gujarati, Punjabi, Rajasthani), in Free, Standard and Premium tiers. 513 of the websites come from the [template factory](#template-factory): 194 weddings, 103 for the other wedding functions and anniversaries, 96 birthdays and 120 for baby showers, naming ceremonies, mundans, housewarmings, pujas and festivals.
 
 - **Flagship websites** open on an illustrated 3D scene: *Marigold Mahal* (toran), *Divine Gopuram* (temple at sunrise), *Rajwada Royale* (palace on the lake), *Noor-e-Nikah* (receding arches), *Anand Karaj* (golden sarovar), *Mangal Mandap*, *Midnight Gold* (noir medallion), *Blush & Bloom* (flower arch), *Shubho Bibaho* (lotus pond), *Kerala Kasavu* (backwaters) and *Bansuri* (moonlit Vrindavan).
 - **Illustrated films** are filmed inside the same scenes: *The Divine Flute*, *Temple Dawn*, *Royal Reveal*, *Noor Arches*, *Golden Sarovar*, *Marigold Mahal Film*, *Kasavu Backwaters*, *Blush & Bloom Film*, *Birthday Bash*, *Griha Pravesh Blessings* and *Lotus Blessings Film*. Each uses a different scene, so no two films look alike.
 - **The Signature collection** (tag `signature`) are "experience" websites with their own opening animation, the host's music, a verse, the menu, a countdown and RSVP.
+- **The card collection** (`templates/src/canvas-cards.ts`) are [canvas](#canvas-sections) invitations composed like printed cards, with full-colour illustrations, foil lettering and paper textures: *Shahi Gajraj* (a gilded jharokha guarded by elephants), *Mor Pankh* (a peacock garden), *Kovil Mani* (temple bells and a gopuram at dusk), *Noor Mahal* (lanterns and domes), *Eternal Bloom* (roses and doves), *Mehendi Rang* (a hand painted with henna), *Cake & Candles* (birthdays), *Twinkle Star* (baby showers and naming ceremonies) and *Shubh Griha* (housewarmings). Each has phone and desktop heroes, a card for every function and three colour presets.
+- **The illustrated collection** ([template factory](#template-factory)): 79 art-directed themes, each laid out in the compositions that suit it. *Rajwada*, *Mayur*, *Kanchi*, *Mehtab* and *Laavan* for weddings; *Heena* and *Dholki* for the mehendi and sangeet; *Unicorn*, *Dino*, *Galaxy*, *Gudiya* and *Raja* for children's birthdays; *Godh* and *Valaikappu* for baby showers; *Vastu* for griha pravesh; *Jyoti*, *Chand*, *Gulal* and *Noel* for festivals; and so on.
 
-`pnpm db:seed` loads new templates and republishes catalog-owned templates whose definition changed (a version whose changelog is *Catalog seed* or *Catalog update*). Templates edited in Template Studio are left alone unless you run `pnpm --filter @bulava/database seed:templates`. Definitions are compared key-order-insensitively, so unchanged templates keep their version.
+`pnpm db:seed` is the catalog's migration, and the deploy's `migrate` job runs it on every release (`seedTemplates`). It loads new templates; republishes catalog-owned templates whose definition changed (a version whose changelog is *Catalog seed* or *Catalog update*) as a new version; and updates a catalog-owned template's listing (tier, tags, order, featured…) in place when only that changed, unless staff edited the listing in the console (an audited `template.meta_updated`). Templates edited in Template Studio are left alone unless you run `pnpm --filter @bulava/database seed:templates`. Definitions are compared key-order-insensitively, so unchanged templates keep their version. `node dist/seed.js --templates-only --dry-run` lists what a release would change and writes nothing ([deployment.md](deployment.md#template-releases)).
+
+Templates need nothing besides the database: the art is drawn in code, the gallery images ship inside the web image, and fonts are bundled at build time. Only commissioned paintings ([Painted artwork](#painted-artwork)) are files in storage, uploaded through the console's asset library.
 
 ### Retiring templates
 
@@ -209,16 +213,66 @@ An artboard has a background fill (a colour, gradient, pattern or licensed image
 
 | Kind | What it draws |
 |---|---|
-| `text` | a `Value` (fixed text, a binding with a format and fallback, a translation, or a `{{template}}`) in a theme font role or a fixed family, with size, weight, colour, alignment, spacing, case and shadow. `overflow: shrink` fits long names into the box in the browser; `wrap` and `clip` keep the size. |
+| `text` | a `Value` (fixed text, a binding with a format and fallback, a translation, or a `{{template}}`) in a theme font role or a fixed family, with size, weight, colour, alignment, spacing, case and shadow. `foil` stamps the letters in a metallic foil made from their colour. `overflow: shrink` fits long names into the box in the browser; static renders (thumbnails, gallery images) have nothing to measure with, so they scale the text by an estimate from its length and font role. `wrap` and `clip` keep the size. |
 | `image` | a licensed asset (listed in `assets`, loaded through `/api/v1/public/template-assets/:id`) or a host photo binding (`photo.cover`, `photos[0]`…), with fit, mask (rounded, circle, ellipse, arch, diamond, leaf), border, shadow, flips, brightness and saturation. A missing bound photo hides the layer, so designs put a shape or ornament behind it. |
 | `shape` | rect, ellipse, line, arch, diamond, triangle, star, heart, scallop, with a fill and an outline |
-| `ornament` | the engine's drawn motifs (mandala, paisley, floral, toran, marigold strand, diya, kalash, lantern, peacock feather, rose window, temple border…), tinted with a colour |
+| `ornament` | the engine's drawn motifs (mandala, paisley, floral, toran, marigold strand, diya, kalash, lantern, peacock feather, rose window, temple border…) and full-colour [illustrations](#illustrations), tinted with a colour. `foil` turns line motifs and an illustration's metal into stamped foil; `shadow` adds a soft drop shadow or a glow in the layer's colour. |
+| `scene` | one of the [illustrated scenes](#illustrated-scenes) (all but `noir`) inside the frame, anchored at its bottom centre like a hero. With `sky: false` only the scenery shows, over the layers below. |
 | `icon` | a line icon (calendar, clock, pin, heart, rings, music…), optionally on a circle |
 | `widget` | `countdown` (boxes, flip or inline), `button` (get directions, add to Google Calendar, scroll to RSVP, open a link, back to top) and `details` (date, time, venue, address and city rows with icons) |
 
 Colours are palette roles (`primary`, `accent`, `text`…) or fixed hex values; roles follow the host's colour preset, so one design restyles itself. The renderer scales an artboard to its container with CSS alone: positions are percentages, sizes are container-width units (`cqw`) and the section is a container query, so a phone design keeps its proportions on every screen and the Studio's phone frame stays a phone. Text colours are nudged to WCAG AA against the artboard's fill unless the designer switches `contrast` off for a decorative layer; the test matrix lists such layers under `contrast`. Entrances and motions stop for reduced motion, and buttons only open `https:`, `mailto:`, `tel:` and same-page addresses.
 
-Two catalog templates are built this way (`templates/src/canvas.ts`): **Rose Arch** (weddings and engagements) and **Confetti Pop** (birthdays and family celebrations), each with phone and desktop hero artboards and a per-function card. They use only drawn ornaments and host photos; designers add painted or photographic layers from the asset library.
+Every layer also has a `blend` mode (normal, multiply, screen, overlay, soft light). Gradients are linear or radial, with an optional middle colour (`via`). An artboard can be printed on a `texture` (paper, linen, grain or a watercolour wash, at `textureStrength`), an SVG noise overlay that costs no image. The `shimmer` motion sweeps light across foil text and glints other layers; like every motion it stops for reduced motion.
+
+Rose Arch and Confetti Pop (`templates/src/canvas.ts`), the card collection (`templates/src/canvas-cards.ts`) and the [template factory](#template-factory)'s 513 invitations are built this way. Each has phone and desktop hero artboards and a per-function card. They use only drawn art and host photos, with a shape, icon or illustration behind every photo for invitations without one; designers add painted or photographic layers from the asset library. `templates/src/canvas-kit.ts` holds the shorthands they are written with (`at`, `text`, `orn`, `scene`, `photo`, `cardButtons`…) and `canvasWebsite`, which turns a design into the website: the hero, the function cards, standard sections, RSVP and footer.
+
+#### Illustrations
+
+`template-engine/src/art/illustrations-*.tsx` draws 52 full-colour illustrations in code (`ILLUSTRATIONS` in the schema):
+
+- **Royal and floral**: a caparisoned elephant, a royal peacock with a tiered train, a jharokha (`JHAROKHA_OPENING` says where a photo sits behind it), rose clusters, floral garlands and doves.
+- **Ornament**: an ornate frame, filigree corners, a flourish, a medallion, a paisley, an arabesque and domes.
+- **Ritual and region**: temple bells, jasmine strings, banana leaves, a kolam, a rangoli and a hand painted with mehendi.
+- **Celebration**: wedding rings, a cake, balloons, bunting, a gift box, fairy lights, a moon on a cloud, a house and a row of diyas.
+- **People** (`illustrations-people.tsx`, `illustrations-family.tsx`): eight couples (a Hindu bride in lehenga and her groom in safa, after the varmala, Sikh, nikah, South Indian, Christian, Bengali in topor and mukut, and a couple who have shared a lifetime), the bride and the groom as portrait busts, a girl and a boy in party hats, a baby in a cradle and a mother-to-be in a silk saree. The tint is the outfit.
+- **Props** (`illustrations-props.tsx`): a stork with a bundle, a teddy bear, a unicorn, a little dinosaur, a rocket, a cupcake, a bridal doli, a dhol, an urli of haldi and a champagne toast.
+
+The layer's colour is the illustration's main colour (the elephant, the train, the leaves, the henna) and the palette colours the rest, so a colour preset restyles the art like the text. Real flowers and flames keep their own colours (`NATURE` in `art/kit.tsx`). Garlands, strings and frames are drawn to the layer's size (`FRAME_SIZED`); the others keep their proportions (`ILLUSTRATION_ASPECT`, which also sizes new layers in the editor).
+
+Illustrations follow the rules for scene art. `art/kit.tsx` has the shared pieces:
+
+- `taper` (a filled stroke that narrows along Bézier curves);
+- `onCubic` and `frameAt` (a point on a curve and an SVG transform aligned to it, for patterns that follow a finger or a feather);
+- `Metal` (a foil gradient in the illustration's own coordinates, so straight lines and dots take it too) and `Lit` (a colour lit from one side).
+
+The curve helpers use only arithmetic and square roots, so the server and every browser draw the same picture. To add one:
+
+1. Add it to `ILLUSTRATIONS`.
+2. Add it to the component map in `art/illustrations.tsx` and to `ILLUSTRATION_ASPECT`.
+3. Check it in the editor's add menu, which shows a preview of each.
+
+### Template factory
+
+Most of the catalog is made by `templates/src/factory/`, the way a design studio works: an art director picks a theme's art and colours, and the theme is laid out in several compositions.
+
+| File | What it holds |
+|---|---|
+| `kit.ts` | A **kit**, the theme's art direction: dark or light stock, paper texture, foil, the name font, and which illustration sits where (`hero`, a flanking `pair`, a `top` band, mirrored `corner`s, a turning round `centre` motif, `hang`ing strings or lanterns, a `scene`, a `skyline`, the `motif` under the names, `float` art over a dream sky, a `crest`). Also the **occasions** (wedding, engagement, haldi, mehendi, sangeet, reception, anniversary, birthday, baby shower, naming, housewarming, puja, festival): category, event types, eyebrow lines, sections and a default crest. |
+| `compositions.ts` | 14 **compositions** (arch, jharokha, couple, split, night, floral, temple, portrait, party, dream, home, minimal, mandap, photo), each a phone and a desktop artboard plus a function card (framed, banded, garland, header, sky or minimal). Zones are fixed (art along the top, words in the middle, art along the bottom), so any kit fits without overlaps; a piece a kit leaves out is left out. |
+| `theme.ts` | A **theme**: a name word, a palette and presets, fonts, look, effect, opening, the kit, and its layouts. Each layout becomes one template named "<theme word> <layout word>", keyed `<slug>-invite`, with its tier from the composition unless the layout sets one. |
+| `themes-*.ts` | The themes, by occasion. `collection.ts` gathers them and orders the templates so a gallery shows one design from every theme before the second of any. |
+
+Rules the compositions keep, so a new theme only chooses art:
+
+- Only round motifs turn (`isRound`: medallion, mandala, rangoli, kolam, arabesque, geometric, rose window); other art floats or sways.
+- A photo frame shows its art (or the couple's monogram, `{{couple.partnerOne|initial}} & …`) until the host adds a photo, so no frame is ever empty.
+- The crest never repeats the art at the foot, and rings appear only for couples.
+- Party themes (bunting or presents) end the split layout in balloons and presents, garden themes in roses, the rest in a turning rangoli.
+- Occasions whose title is the event's own (housewarming, puja, festival) set it smaller, on two lines.
+- A theme may reorder its occasion's event types (`eventTypes`); the first decides the sample content of its previews (a mundan theme shows a mundan). Festival themes are tagged (`eid`, `holi`, `christmas`, `navratri`, `pongal`) so previews use that festival's sample title (`SAMPLE_VARIANTS`).
+
+To add a theme: write it in the occasion's `themes-*.ts` (a unique word, a palette with light accents for dark stock, a kit, and layouts with distinct words), run the catalog tests (unique names and themes, no two layouts of a theme with the same composition and art, the test matrix), seed, and generate its previews. Children's themes use the *Playful* font pairing (Baloo 2 and Pacifico).
 
 ### Openings, effects and music
 
@@ -267,6 +321,8 @@ A binding is a dotted path resolved from a **RenderContext** the API builds afte
 | `guest.name` | personal invitations only (never public pages or link previews) |
 | `custom.<key>` | a declared text slot |
 
+A `{{template}}` can pipe a binding through a format, as a binding's `format` does: `{{event.startDate|date}}`, `|dateWithWeekday`, `|time`, `|upper`, `|lower`, and `|initial` (a name's first letter, capitalised, for monograms: `{{couple.partnerOne|initial}} & {{couple.partnerTwo|initial}}`).
+
 Unknown bindings and translation keys fail validation when a draft is saved or published, not at render time. Dates format through `@bulava/localization` in the event's time zone and language.
 
 ## Customization
@@ -276,7 +332,7 @@ Unknown bindings and translation keys fail validation when a draft is saved or p
 | Field | Needs | Effect |
 |---|---|---|
 | `colorPreset`, `colors` | `editable.colors` | a preset, then any of the four main colours on top of it (`effectiveColors`); inks are recomputed, so text stays readable |
-| `fontPairing` | `editable.fonts` | one of `FONT_PAIRINGS` (royal, regal, romantic, classic, elegant, editorial, grand, desi, modern) |
+| `fontPairing` | `editable.fonts` | one of `FONT_PAIRINGS` (royal, regal, romantic, classic, elegant, editorial, grand, desi, modern, playful) |
 | `photoSlots`, `photoIds` | `editable.photos` | photos placed in the template's `photoSlots`, and extra photos up to `maxPhotos` |
 | `custom` | `editable.text` | text slot values |
 | `intro`, `effect` | `editable.animation` | opening animation and ambient particles |
@@ -295,7 +351,9 @@ The home page and `/templates` show templates as pre-rendered WebP images, not l
 - `<key>-full.webp`: the first 2600 px of the full preview, for the hero phone;
 - `<key>-poster.webp`: a film's or card's scene with its title, at the gallery card's 220 × 400 CSS px, 2×. Films and cards without a scene keep their light gradient poster.
 
-`apps/web/src/lib/template-previews.json` lists them with content hashes, which become `?v=` in the URL so a changed image is never served from an old cache. A template without an image is still shown, drawn live as before (a website card loads the template engine on demand through `LiveThumbnail`). Every `TemplateCard` and `TemplatePhone` uses the images (including "more like this" on template pages); a template page's own preview, the demo and the dashboard's design picker keep rendering live.
+`apps/web/src/lib/template-previews.json` lists them with content hashes, which become `?v=` in the URL so a changed image is never served from an old cache. A template without an image is still shown, drawn live as before (a website card loads the template engine on demand through `LiveThumbnail`).
+
+Galleries never load the whole catalog's definitions (with the factory they run to megabytes). `GET /public/templates` lists templates without them, with a `preview` (the theme's colours and the hero section's variant) for cards; `getGalleryTemplates` fetches definitions only for the templates that have no image yet (`?include=definition&keys=…`, at most 60 a request), and a template page or demo fetches its own. The dashboard's design picker lists summaries too and fetches the definition of the design being edited and the one focused in the picker. Every `TemplateCard` and `TemplatePhone` uses the images (including "more like this" on template pages); a template page's own preview, the demo and the dashboard's design picker keep rendering live.
 
 After adding or changing a template, regenerate them and commit the images and the manifest:
 

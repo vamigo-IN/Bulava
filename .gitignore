@@ -41,6 +41,7 @@ a11y/
 # published with the repository (how to run them: docs/testing.md).
 apps/api/test/
 apps/api/jest.config.js
+apps/api/tsconfig.spec.json
 **/*.test.ts
 **/*.spec.ts
 apps/media-worker/src/testing.ts

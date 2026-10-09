@@ -78,36 +78,25 @@ function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-display text-2xl">{album.name}</h3>
             <Badge>{t(album.itemCount === 1 ? 'album.countOne' : 'album.count', { count: album.itemCount })}</Badge>
-            <Badge tone={album.uploadsEnabled ? 'success' : 'neutral'}>{t('photos.uploadsOpen')}</Badge>
+            <Badge tone={album.uploadsEnabled ? 'success' : 'neutral'}>{album.uploadsEnabled ? t('photos.guestUploadsOn') : t('photos.teamUploads')}</Badge>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {album.uploadUrl ? (
-              <div className="min-w-0 rounded-2xl border border-gold-200/80 bg-ivory/60 p-3">
-                <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">{t('album.uploadLink')}</p>
-                <p className="mt-1 font-mono text-sm break-all" title={album.uploadUrl}>
-                  {album.uploadUrl}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <CopyButton text={album.uploadUrl} label={t('album.copyUpload')} />
-                  <Button size="sm" variant="ghost" onClick={() => window.open(`/api/v1/events/${eventId}/album/qr.svg`, '_blank', 'noopener')?.focus()}>
-                    <Printer aria-hidden className="size-4" />
-                    {t('photos.printQr')}
-                  </Button>
-                </div>
+          {/* The album's link and QR code open the gallery (see and download); nobody uploads with them alone. */}
+          {album.galleryUrl ? (
+            <div className="min-w-0 rounded-2xl border border-gold-200/80 bg-ivory/60 p-3 sm:max-w-xl">
+              <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">{t('album.galleryLink')}</p>
+              <p className="mt-1 font-mono text-sm break-all" title={album.galleryUrl}>
+                {album.galleryUrl}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <CopyButton text={album.galleryUrl} label={t('album.copyGallery')} />
+                <Button size="sm" variant="ghost" onClick={() => window.open(`/api/v1/events/${eventId}/album/qr.svg`, '_blank', 'noopener')?.focus()}>
+                  <Printer aria-hidden className="size-4" />
+                  {t('photos.printQr')}
+                </Button>
               </div>
-            ) : null}
-            {album.galleryUrl ? (
-              <div className="min-w-0 rounded-2xl border border-gold-200/80 bg-ivory/60 p-3">
-                <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">{t('album.galleryLink')}</p>
-                <p className="mt-1 font-mono text-sm break-all" title={album.galleryUrl}>
-                  {album.galleryUrl}
-                </p>
-                <div className="mt-2">
-                  <CopyButton text={album.galleryUrl} label={t('album.copyGallery')} />
-                </div>
-              </div>
-            ) : null}
-          </div>
+              <p className="mt-2 text-xs leading-relaxed text-stone-600">{t('photos.galleryLinkHint')}</p>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -139,8 +128,9 @@ function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string
                 )}
               </Field>
             </div>
+            <p className="text-sm leading-relaxed text-stone-600">{t('photos.uploadsHint')}</p>
             <div className="flex flex-wrap gap-x-6">
-              <Checkbox label={t('photos.uploadsOpen')} checked={album.uploadsEnabled} onChange={(e) => void save({ uploadsEnabled: e.target.checked })} />
+              <Checkbox label={t('photos.guestUploads')} checked={album.uploadsEnabled} onChange={(e) => void save({ uploadsEnabled: e.target.checked })} />
               <Checkbox label={t('photos.downloads')} checked={album.downloadPolicy.guestsCanDownload} onChange={(e) => void save({ guestsCanDownload: e.target.checked })} />
               <Checkbox label={t('photos.original')} checked={album.downloadPolicy.originalQuality} onChange={(e) => void save({ originalQuality: e.target.checked })} />
             </div>

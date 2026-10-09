@@ -1,9 +1,11 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { ScanLine } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, apiGet } from '@/lib/api';
 import { errorMessage, I18nProvider, useT } from '@/lib/i18n';
+import { QrScanner } from '@/components/checkin/qr-scanner';
 import { Alert, Badge, Button, Checkbox, Spinner } from '@/components/ui/primitives';
 
 interface Lookup {
@@ -24,7 +26,9 @@ interface Lookup {
 
 function CheckIn() {
   const t = useT();
+  const router = useRouter();
   const { code } = useParams<{ code: string }>();
+  const [scanning, setScanning] = useState(false);
   const [eventId, setEventId] = useState<string | null>(null);
   const [data, setData] = useState<Lookup | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +44,11 @@ function CheckIn() {
   }, [code]);
 
   useEffect(() => {
+    // A new pass (scanned from this page) starts clean.
+    setData(null);
+    setError(null);
+    setMessage(null);
+    setReentry(false);
     apiGet<{ eventId: string }>(`/check-in-codes/${code}`)
       .then(async ({ eventId: id }) => {
         setEventId(id);
@@ -139,7 +148,20 @@ function CheckIn() {
             <Checkbox className="mt-3" label={t('checkin.reentry')} checked={reentry} onChange={(e) => setReentry(e.target.checked)} />
           </div>
         ) : null}
+        <Button variant="secondary" size="lg" className="mt-5 w-full rounded-full" onClick={() => setScanning(true)}>
+          <ScanLine aria-hidden className="size-5" />
+          {t('checkin.scan.next')}
+        </Button>
       </div>
+      {scanning ? (
+        <QrScanner
+          onClose={() => setScanning(false)}
+          onCode={(next) => {
+            setScanning(false);
+            router.push(`/checkin/${next}`);
+          }}
+        />
+      ) : null}
     </main>
   );
 }

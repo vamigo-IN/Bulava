@@ -96,6 +96,15 @@ export const FONT_PAIRINGS: readonly FontPairing[] = [
       body: { family: 'Poppins', scripts: ['Latn', 'Deva'], fallbacks: {} },
     },
   },
+  {
+    key: 'playful',
+    label: 'Playful',
+    fonts: {
+      heading: { family: 'Baloo 2', scripts: ['Latn', 'Deva'], fallbacks: {} },
+      body: { family: 'Poppins', scripts: ['Latn', 'Deva'], fallbacks: {} },
+      script: { family: 'Pacifico', scripts: ['Latn'], fallbacks: { Deva: 'Baloo 2' } },
+    },
+  },
 ];
 
 export function fontPairing(key: string | undefined): FontPairing | undefined {

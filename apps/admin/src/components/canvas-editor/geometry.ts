@@ -171,6 +171,8 @@ export function layerLabel(layer: Layer): string {
       return layer.icon;
     case 'widget':
       return layer.widget.type;
+    case 'scene':
+      return `scene · ${layer.scene}`;
     default:
       return 'Layer';
   }

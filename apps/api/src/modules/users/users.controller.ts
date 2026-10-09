@@ -1,8 +1,8 @@
-import { Controller, Delete, Get, HttpCode, Inject, Patch, Res } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Inject, Patch, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
-import { DeleteAccountSchema, UpdateProfileSchema, type DeleteAccountInput, type UpdateProfileInput } from '@bulava/validation';
+import { DeleteAccountSchema, PhoneConfirmSchema, UpdateProfileSchema, type DeleteAccountInput, type PhoneConfirmInput, type UpdateProfileInput } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { CurrentUser, ReqMeta, type RequestMeta } from '../../common/decorators/auth.decorators';
@@ -36,6 +36,8 @@ export class UsersController {
       mfaEnabled: Boolean(row.totpEnabledAt),
       hasPassword: Boolean(row.passwordHash),
       googleLinked: Boolean(row.googleSub),
+      emailVerified: Boolean(row.emailVerifiedAt),
+      phoneVerified: Boolean(row.phoneVerifiedAt),
       mfaVerified: user.mfa,
       mfaRequired: this.config.staffMfaRequired && row.platformRole !== 'USER',
     };
@@ -46,6 +48,23 @@ export class UsersController {
   @ApiZodBody(UpdateProfileSchema)
   update(@CurrentUser() user: AuthUser, @ZodBody(UpdateProfileSchema) body: UpdateProfileInput, @ReqMeta() meta: RequestMeta) {
     return this.account.updateProfile(user.id, body, meta);
+  }
+
+  /** A code on WhatsApp to confirm the account's number (`sendId` tells whether the message got through). */
+  @Post('me/phone/code')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  sendPhoneCode(@CurrentUser() user: AuthUser, @ReqMeta() meta: RequestMeta) {
+    return this.account.sendPhoneConfirmation(user.id, meta);
+  }
+
+  /** The code confirms the number: it then signs in with WhatsApp too. */
+  @Post('me/phone/confirm')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiZodBody(PhoneConfirmSchema)
+  confirmPhone(@CurrentUser() user: AuthUser, @ZodBody(PhoneConfirmSchema) body: PhoneConfirmInput, @ReqMeta() meta: RequestMeta) {
+    return this.account.confirmPhone(user.id, body.code, meta);
   }
 
   /** Personal data export (privacy): profile, events owned, orders and consents. */

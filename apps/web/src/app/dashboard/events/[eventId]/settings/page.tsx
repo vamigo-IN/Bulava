@@ -76,7 +76,10 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : null}
-        {e.accessMode === 'PUBLIC' || e.accessMode === 'PRIVATE_LINK' ? (
+        {/* The public page exists only once the event is published; until then the preview link stands in. */}
+        {e.status === 'DRAFT' ? (
+          <p className="text-sm text-stone-600">{t('settings.publicLinkAfterPublish')}</p>
+        ) : e.accessMode === 'PUBLIC' || e.accessMode === 'PRIVATE_LINK' ? (
           <p className="text-sm">
             {t('settings.publicLink')}:{' '}
             <a className="font-medium text-brand-700 underline" href={`/e/${e.slug}`} target="_blank" rel="noreferrer">

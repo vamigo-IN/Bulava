@@ -28,6 +28,7 @@ export type { RenderSlots, RenderMode, SectionProps } from './types';
 export { CanvasArtboard, type ArtboardMode, type CanvasArtboardProps } from './canvas/artboard';
 export { fillBackdrop, fillStyle, fontFamilyFor, resolveColor, solidHex, textInk } from './canvas/colors';
 export { Icon as CanvasIcon } from './canvas/icons';
+export { Illustration, ILLUSTRATION_ASPECT, FRAME_SIZED, JHAROKHA_OPENING } from './art/illustrations';
 
 /**
  * Layout variants each section understands (Template Studio offers these).

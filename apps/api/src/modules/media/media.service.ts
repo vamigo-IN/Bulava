@@ -29,13 +29,15 @@ export const ModerateSchema = z.object({ decision: z.enum(['APPROVE', 'REJECT'])
 
 const SIGNED_TTL = 3600;
 
-type Viewer = { kind: 'host' } | { kind: 'guest'; guest: GuestAudienceFacts; event: EventAudienceFacts } | { kind: 'anonymous' };
+type Viewer = { kind: 'host' } | { kind: 'guest'; guest: GuestAudienceFacts; event: EventAudienceFacts; name?: string } | { kind: 'anonymous' };
 
 /**
  * Photo uploads, moderation and galleries around each event's one album
  * (AlbumService keeps it and its sub-albums ready). Originals never leave
  * private storage except through short-lived signed URLs, and gallery
- * visibility is enforced on every request.
+ * visibility is enforced on every request. The album link is for viewing:
+ * the team uploads from the dashboard, and invited guests only from their own
+ * invitation link, when the host allows it (`uploadsEnabled`).
  */
 @Injectable()
 export class MediaService {
@@ -131,13 +133,18 @@ export class MediaService {
     if (!inviteToken || !/^[A-Za-z0-9_-]{43}$/.test(inviteToken)) return { kind: 'anonymous' };
     const row = await this.prisma.invitationToken.findUnique({
       where: { tokenHash: InvitationTokenService.hash(inviteToken) },
-      include: { invitation: { include: { guest: { select: { deletedAt: true } } } } },
+      include: { invitation: { include: { guest: { select: { deletedAt: true, name: true } } } } },
     });
     if (!row || row.eventId !== eventId || row.invitation.guest.deletedAt || !validateInvitationToken(row, row.invitation).ok) {
       return { kind: 'anonymous' };
     }
     const [event, [guest]] = await Promise.all([this.audience.loadEventFacts(eventId), this.audience.loadGuestFacts(eventId, [row.invitation.guestId])]);
-    return guest ? { kind: 'guest', guest, event } : { kind: 'anonymous' };
+    return guest ? { kind: 'guest', guest, event, name: row.invitation.guest.name } : { kind: 'anonymous' };
+  }
+
+  /** Uploads through the album link: invited guests (from their invitation), when the host allows it. */
+  private canUpload(room: Pick<MediaRoom, 'uploadsEnabled'>, viewer: Viewer): boolean {
+    return room.uploadsEnabled && viewer.kind === 'guest';
   }
 
   private canViewGallery(room: Pick<MediaRoom, 'galleryVisibility'>, viewer: Viewer): boolean {
@@ -191,22 +198,27 @@ export class MediaService {
       room: { name: room.name, functionName: null, uploadsEnabled: room.uploadsEnabled, moderated: room.moderationMode !== 'AUTO_APPROVE' },
       albums: uploadable.map((a) => ({ id: a.id, kind: a.kind, name: a.name })),
       defaultAlbumId: suggestedAlbumId(uploadable, functions),
+      /** This visitor may add photos: an invited guest (from their invitation) when the host allows guest uploads. */
+      canUpload: this.canUpload(room, viewer),
       canViewGallery: this.canViewGallery(room, viewer),
       accept: Object.keys(ALLOWED_UPLOAD_TYPES).filter((t) => ['image', 'video'].includes(ALLOWED_UPLOAD_TYPES[t]!.kind)),
     };
   }
 
-  async requestUpload(roomCode: string, input: MediaUploadRequestInput, _meta: RequestMeta) {
+  async requestUpload(roomCode: string, input: MediaUploadRequestInput, _meta: RequestMeta, inviteToken?: string) {
     const { qr, room } = await this.roomByCode(roomCode);
-    if (!room.uploadsEnabled) throw new AppError('UPLOADS_CLOSED', 'Uploads are closed for this album.');
+    // The album link alone never uploads: the team uses the dashboard, invited guests their invitation.
+    if (!room.uploadsEnabled) throw new AppError('UPLOADS_CLOSED', 'Only the hosts and their team add photos to this album.');
+    const viewer = await this.viewerFromInvite(room.eventId, inviteToken);
+    if (viewer.kind !== 'guest') throw new AppError('UPLOAD_NEEDS_INVITATION', 'Open the album from your invitation to add photos.');
     const type = ALLOWED_UPLOAD_TYPES[input.contentType];
     if (!type || (type.kind !== 'image' && type.kind !== 'video')) throw new AppError('UPLOAD_REJECTED', 'Only photos and videos can be uploaded.');
     if (input.sizeBytes > type.maxBytes) throw new AppError('UPLOAD_REJECTED', `Files must be under ${Math.round(type.maxBytes / 1024 / 1024)} MB.`);
 
-    // The chosen sub-album, or General.
-    const album = input.albumId
-      ? await this.prisma.mediaAlbum.findFirst({ where: { id: input.albumId, roomId: room.id } })
-      : await this.prisma.mediaAlbum.findFirst({ where: { roomId: room.id, kind: 'GENERAL' } });
+    // The chosen sub-album (one this guest may upload into), or General.
+    const { albums, visibleFns } = await this.albumContext(room, viewer);
+    const uploadable = this.uploadableAlbums(albums, visibleFns);
+    const album = input.albumId ? uploadable.find((a) => a.id === input.albumId) : uploadable.find((a) => a.kind === 'GENERAL');
     if (!album) throw new AppError('INVALID_REFERENCE', 'Choose one of this event’s albums.');
 
     const features = await this.entitlements.forEvent(room.eventId);
@@ -218,7 +230,7 @@ export class MediaService {
         roomId: room.id,
         albumId: album.id,
         eventId: room.eventId,
-        uploaderName: input.uploaderName || null,
+        uploaderName: input.uploaderName || viewer.name || null,
         kind: type.kind,
         originalKey: `pending-${randomBytes(12).toString('hex')}`,
         mimeType: input.contentType,
@@ -339,6 +351,7 @@ export class MediaService {
     for (const i of items) counts.set(i.albumId!, (counts.get(i.albumId!) ?? 0) + 1);
     return {
       event: { title: room.event.title, language: room.event.language },
+      canUpload: this.canUpload(room, viewer),
       albums: shown.filter((a) => counts.get(a.id)).map((a) => ({ id: a.id, name: a.name, count: counts.get(a.id)! })),
       items: await Promise.all(
         items.map(async (i) => {
@@ -367,7 +380,7 @@ export class MediaService {
     const qr = await this.prisma.qRCode.findFirst({ where: { eventId, targetId: main.id, type: 'PHOTO_UPLOAD', active: true }, orderBy: { createdAt: 'asc' } });
     if (!qr) return [];
     const viewer: Viewer = { kind: 'guest', guest, event };
-    const entry = { name: main.name, code: qr.code, uploadsEnabled: main.uploadsEnabled, canViewGallery: this.canViewGallery(main, viewer) };
+    const entry = { name: main.name, code: qr.code, uploadsEnabled: this.canUpload(main, viewer), canViewGallery: this.canViewGallery(main, viewer) };
     return entry.uploadsEnabled || entry.canViewGallery ? [entry] : [];
   }
 

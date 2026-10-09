@@ -7,7 +7,7 @@ Bulava is an event platform with a template engine, invitation engine, media pla
 | Area | Status |
 |---|---|
 | Monorepo, PostgreSQL, Prisma schema and migrations, Redis | Done |
-| Authentication (email + password, Google sign-in, rotating refresh sessions, two-step sign-in required for staff), account export and deletion | Done |
+| Authentication (email + password with emailed codes at sign-up and sign-in, password reset, Google sign-in, WhatsApp codes that sign in or make an account, rotating refresh sessions, two-step sign-in required for staff), account export and deletion | Done |
 | Events, functions, guest groups, guests, assignments, access policies; event team roles with invitations by email and code, and a dashboard that shows each role only its sections | Done |
 | Invitations with secure tokens, one shareable link for public, private-link and expiring secret-link events, RSVP with custom questions, OTP and PIN verification | Done |
 | Templates as data, website renderer, 53 website + 20 video/card templates (including illustrated 3D scenes, films and the Signature collection) | Done |
@@ -90,7 +90,7 @@ All routes live under `/api/v1`, except health (`/health`, `/health/db`, `/healt
 
 | Module | Main routes | Access |
 |---|---|---|
-| auth, users | `/auth/*` (including `/auth/login/mfa`, `/auth/mfa/*`, `/auth/google/*`, `/auth/password`), `/users/me`, `/users/me/export`, `DELETE /users/me` | public (rate limited) / signed in |
+| auth, users | `/auth/*` (including `/auth/signup/verify`, `/auth/login/email`, `/auth/login/mfa`, `/auth/email-code/resend`, `/auth/password/*`, `/auth/phone/*`, `/auth/mfa/*`, `/auth/google/*`, `/auth/claim/*`), `/users/me`, `/users/me/phone/*`, `/users/me/export`, `DELETE /users/me` | public (rate limited) / signed in |
 | members | `/events/:id/members` | `event.read` / `member.manage` |
 | events, functions, groups, guests | `/events`, `/events/:id/{functions,groups,guests}` | event permissions |
 | invitations, rsvp | `/events/:id/invitations`, `/rsvps`, `/rsvp-questions` | event permissions |
@@ -151,6 +151,6 @@ Failures retry with exponential backoff (`DEFAULT_JOB_OPTIONS`). Failed renders 
 4. **Event assistant** (spec §85–86), after the core product settles.
 5. **Phone sign-in over SMS**, once an SMS provider exists (WhatsApp codes are done).
 
-Done from the earlier roadmap: Google sign-in ([authentication.md](authentication.md#google-sign-in)), WhatsApp-number sign-in and the quick start with provisional accounts ([authentication.md](authentication.md#quick-start-whatsapp-codes-and-provisional-accounts)), custom domains ([custom-domains.md](custom-domains.md)) and the nonce-based CSP ([security.md](security.md)).
+Done from the earlier roadmap: Google sign-in ([authentication.md](authentication.md#google-sign-in)), emailed codes at sign-up and sign-in with password reset ([authentication.md](authentication.md#hosts-users)), WhatsApp-number sign-in and sign-up and the quick start with provisional accounts ([authentication.md](authentication.md#quick-start-whatsapp-codes-and-provisional-accounts)), custom domains ([custom-domains.md](custom-domains.md)) and the nonce-based CSP ([security.md](security.md)).
 
 Architectural decisions are recorded in [decisions.md](decisions.md).

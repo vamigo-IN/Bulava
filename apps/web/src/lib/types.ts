@@ -15,6 +15,10 @@ export interface User {
   hasPassword: boolean;
   googleLinked: boolean;
   mfaEnabled: boolean;
+  /** The email was confirmed with a code (or by Google). */
+  emailVerified: boolean;
+  /** The WhatsApp number was confirmed with a code: it signs in with WhatsApp. */
+  phoneVerified: boolean;
   /** Made from a WhatsApp number alone (the quick start) and not yet secured: cannot publish, pay or invite. */
   provisional: boolean;
   /** Agreed to updates on WhatsApp. */
@@ -53,7 +57,8 @@ export interface EventSummary {
   startDate: string | null;
   endDate: string | null;
   details: Record<string, string>;
-  counts: { functions: number; guests: number };
+  /** readyFunctions: functions with a date, time and venue. */
+  counts: { functions: number; readyFunctions: number; guests: number };
   /** The website design the host chose; null while the event type's default stands in. */
   design: { templateKey: string; templateName: string; tier: 'FREE' | 'STANDARD' | 'PREMIUM' } | null;
   /** The host's shareable, watermarked preview link: /preview/<token>. */
@@ -363,6 +368,8 @@ export interface TemplateSummaryLite {
   tags: string[];
   eventTypes: string[];
   outputs: Array<'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD'>;
+  /** What a card shows without the definition: the theme's colours and the hero section's variant. */
+  preview?: { colors: import('@bulava/template-schema').ThemeColors | null; heroVariant: string | null };
   definition?: import('@bulava/template-schema').TemplateDefinition;
 }
 

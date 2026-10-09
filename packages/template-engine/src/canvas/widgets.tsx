@@ -13,7 +13,7 @@ export interface CanvasCountdownProps {
   target: string | null;
   /** Static renders (thumbnails, the editor) show fixed illustrative numbers, so server and client agree. */
   isStatic: boolean;
-  /** Days, hours, minutes, seconds. */
+  /** Days, hours, minutes, seconds (short forms for the inline variant). */
   labels: [string, string, string, string];
   /** Styles are computed by the server renderer in design units, so no functions cross into this client component. */
   numberStyle: CSSProperties;
@@ -47,7 +47,7 @@ export function CanvasCountdown({ variant, target, isStatic, labels, numberStyle
         {cells.map(([label, n], i) => (
           <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap }}>
             <span style={numberStyle}>{digit(n)}</span>
-            <span style={{ ...labelStyle, marginTop: 0 }}>{label.slice(0, 3)}</span>
+            <span style={{ ...labelStyle, marginTop: 0 }}>{label}</span>
             {i < 3 ? <span style={{ ...numberStyle, opacity: 0.4 }}>:</span> : null}
           </div>
         ))}

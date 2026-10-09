@@ -63,6 +63,8 @@ pnpm --filter @bulava/database migrate:create  # create a migration without appl
 pnpm db:deploy                                 # apply migrations (CI / production)
 pnpm db:seed                                   # reference data, template catalog, platform admin (ADMIN_EMAIL/ADMIN_PASSWORD)
 pnpm --filter @bulava/database seed:templates  # also publish changed catalog definitions as new versions
+pnpm --filter @bulava/database seed -- --templates-only            # just the template catalog's migration
+pnpm --filter @bulava/database seed -- --templates-only --dry-run  # list what it would create, update, sync or retire
 pnpm admin:set-role <email> <ROLE> [--replace] # set a platform role; SUPER_ADMIN needs --replace while someone holds it
 ```
 

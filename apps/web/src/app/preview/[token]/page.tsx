@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { createTranslator } from '@bulava/localization';
 import { TemplateRenderer } from '@bulava/template-engine';
 import type { Customization, RenderContext, TemplateDefinition } from '@bulava/template-schema';
@@ -13,19 +14,26 @@ export const metadata: Metadata = {
   referrer: 'no-referrer',
 };
 
+/** After publishing, the preview only names the public page. */
+interface PublishedPreview {
+  published: true;
+  event: { slug: string; status: string };
+}
+
 interface PreviewView {
+  published?: undefined;
   event: { id: string; title: string; slug: string; typeKey: string; language: string; timezone: string; status: string; accessMode: string };
   template: { key: string; name: string; tier: 'FREE' | 'STANDARD' | 'PREMIUM'; definition: TemplateDefinition; customization: Customization | null };
   context: RenderContext;
   watermark: boolean;
 }
 
-async function load(token: string): Promise<PreviewView | null> {
+async function load(token: string): Promise<PreviewView | PublishedPreview | null> {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
   const apiBase = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
   try {
     const res = await fetch(`${apiBase}/api/v1/public/preview/${encodeURIComponent(token)}`, { cache: 'no-store', headers: { accept: 'application/json' } });
-    const body = (await res.json().catch(() => null)) as { success: true; data: PreviewView } | { success: false } | null;
+    const body = (await res.json().catch(() => null)) as { success: true; data: PreviewView | PublishedPreview } | { success: false } | null;
     return body?.success ? body.data : null;
   } catch {
     return null;
@@ -35,7 +43,8 @@ async function load(token: string): Promise<PreviewView | null> {
 /**
  * The host's preview link: the invitation exactly as guests will see it, with
  * a "Preview" mark, before publishing and whatever the access mode. Family
- * can look and share; nobody can RSVP from here.
+ * can look and share; nobody can RSVP from here. Once published, the link
+ * leads to the public page instead.
  */
 export default async function PreviewPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -51,6 +60,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ token:
       </main>
     );
   }
+  if (view.published) redirect(`/e/${view.event.slug}`);
   return (
     <>
       <div className="pb-28">

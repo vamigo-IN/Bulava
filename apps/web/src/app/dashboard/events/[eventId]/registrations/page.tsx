@@ -78,7 +78,7 @@ export default function RegistrationsPage() {
             </Link>
           </Alert>
         ) : null}
-        <SettingsForm key={JSON.stringify(state.data.settings)} eventId={eventId} state={state.data} timeZone={timeZone} />
+        <SettingsForm key={JSON.stringify(state.data.settings)} eventId={eventId} state={state.data} timeZone={timeZone} published={event.data.status !== 'DRAFT'} />
       </section>
 
       <section className="space-y-4">
@@ -113,7 +113,7 @@ export default function RegistrationsPage() {
   );
 }
 
-function SettingsForm({ eventId, state, timeZone }: { eventId: string; state: RegistrationState; timeZone: string }) {
+function SettingsForm({ eventId, state, timeZone, published }: { eventId: string; state: RegistrationState; timeZone: string; published: boolean }) {
   const t = useT();
   const invalidate = useInvalidateEvent(eventId);
   const s = state.settings;
@@ -157,7 +157,8 @@ function SettingsForm({ eventId, state, timeZone }: { eventId: string; state: Re
         <h3 className="font-semibold">{t('reg.settings')}</h3>
         {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
         <Checkbox label={t('reg.enabled')} checked={enabled} disabled={!state.available && !enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        {enabled ? (
+        {enabled && !published ? <p className="rounded-xl bg-gold-100/60 p-3 text-sm text-stone-700">{t('reg.linkAfterPublish')}</p> : null}
+        {enabled && published ? (
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-gold-100/60 p-3 text-sm">
             <span className="font-medium">{t('reg.pageLink')}:</span>
             <a href={pageUrl} target="_blank" rel="noreferrer" className="break-all text-brand-700 underline">

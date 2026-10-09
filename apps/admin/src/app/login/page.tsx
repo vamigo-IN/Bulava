@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState, type FormEvent } from 'react';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { Alert, Button, Field, Input } from '@/components/ui';
 import { ApiError, apiGet, apiPost } from '@/lib/api';
 import { t } from '@/lib/i18n';
@@ -13,6 +13,9 @@ function safeNext(value: string | null): string {
   return value && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') ? value : '/';
 }
 
+/** What a sign-in step answers: the next step, or nothing more to do (signed in). */
+type Step = { mfaRequired?: boolean; emailCodeRequired?: boolean; challengeToken?: string; target?: string; resendAfter?: number; restoreRequired?: boolean };
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -20,22 +23,67 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [noAccess, setNoAccess] = useState(false);
   const [busy, setBusy] = useState(false);
-  /** Set when the password was right and the account asks for a second factor. */
+  /** Set when the password was right and the account asks for its authenticator code. */
   const [challenge, setChallenge] = useState<string | null>(null);
+  /** Set when the password was right and a code went to the account's email. */
+  const [emailStep, setEmailStep] = useState<{ token: string; target: string } | null>(null);
+  const [resendIn, setResendIn] = useState(0);
   const [useRecovery, setUseRecovery] = useState(false);
   const [code, setCode] = useState('');
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
 
   async function enter() {
     const me = await apiGet<Me>('/users/me');
     if (!me.platformPermissions.length) {
       await apiPost('/auth/logout').catch(() => undefined);
+      // Back to the first form, which says why.
+      setEmailStep(null);
+      setChallenge(null);
+      setCode('');
       setNoAccess(true);
       return;
     }
     qc.setQueryData(['me'], me);
     router.replace(safeNext(params.get('next')));
+  }
+
+  function restart(message: string | null) {
+    setChallenge(null);
+    setEmailStep(null);
+    setCode('');
+    setNotice(null);
+    setError(message);
+  }
+
+  /** After the password or the emailed code: the authenticator step, or in. */
+  async function next(result: Step) {
+    if (result.emailCodeRequired && result.challengeToken) {
+      setEmailStep({ token: result.challengeToken, target: result.target ?? '' });
+      setResendIn(result.resendAfter ?? 30);
+      setPassword('');
+      return;
+    }
+    if (result.mfaRequired && result.challengeToken) {
+      setEmailStep(null);
+      setCode('');
+      setChallenge(result.challengeToken);
+      setPassword('');
+      return;
+    }
+    // An account waiting to be deleted is restored from the main site, not the console.
+    if (result.restoreRequired) {
+      restart(t('login.restoreElsewhere'));
+      return;
+    }
+    await enter();
   }
 
   async function submit(e: FormEvent) {
@@ -44,17 +92,40 @@ function LoginForm() {
     setError(null);
     setNoAccess(false);
     try {
-      const result = await apiPost<{ mfaRequired?: boolean; challengeToken?: string }>('/auth/login', { email, password });
-      if (result.mfaRequired && result.challengeToken) {
-        setChallenge(result.challengeToken);
-        setPassword('');
-        return;
-      }
-      await enter();
+      await next(await apiPost<Step>('/auth/login', { email, password }));
     } catch (err) {
       setError(err instanceof ApiError && err.code === 'INVALID_CREDENTIALS' ? t('login.invalid') : err instanceof ApiError ? err.message : t('common.error'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitEmailCode(e: FormEvent) {
+    e.preventDefault();
+    if (!emailStep) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await next(await apiPost<Step>('/auth/login/email', { challengeToken: emailStep.token, code }));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'VERIFICATION_EXPIRED') restart(err.message);
+      else setError(err instanceof ApiError ? err.message : t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    if (!emailStep) return;
+    setError(null);
+    try {
+      const r = await apiPost<{ resendAfter: number }>('/auth/email-code/resend', { challengeToken: emailStep.token });
+      setResendIn(r.resendAfter);
+      setNotice(t('login.codeSent'));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'VERIFICATION_EXPIRED') restart(err.message);
+      else setError(err instanceof ApiError ? err.message : t('common.error'));
     }
   }
 
@@ -74,6 +145,45 @@ function LoginForm() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (emailStep) {
+    return (
+      <form onSubmit={submitEmailCode} className="space-y-4">
+        <div className="text-center">
+          <p className="font-medium">{t('login.codeTitle')}</p>
+          <p className="mt-1 text-sm text-stone-500">{t('login.codeBody', { target: emailStep.target })}</p>
+        </div>
+        {error ? <Alert>{error}</Alert> : null}
+        {notice ? <Alert tone="success">{notice}</Alert> : null}
+        <Field label={t('login.code')}>
+          {(p) => (
+            <Input
+              {...p}
+              autoFocus
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              maxLength={6}
+              className="text-center font-mono text-xl tracking-[0.4em]"
+            />
+          )}
+        </Field>
+        <Button type="submit" className="w-full" disabled={busy || code.length !== 6}>
+          {busy ? t('common.loading') : t('login.codeVerify')}
+        </Button>
+        <div className="flex justify-between text-xs">
+          <button type="button" className="text-brand-700 underline disabled:text-stone-400 disabled:no-underline" disabled={resendIn > 0} onClick={() => void resend()}>
+            {resendIn > 0 ? t('login.codeResendIn', { seconds: resendIn }) : t('login.codeResend')}
+          </button>
+          <button type="button" className="text-stone-500 underline" onClick={() => restart(null)}>
+            {t('login.mfaBack')}
+          </button>
+        </div>
+      </form>
+    );
   }
 
   if (challenge) {
@@ -115,15 +225,7 @@ function LoginForm() {
           >
             {t(useRecovery ? 'login.mfaUseCode' : 'login.mfaUseRecovery')}
           </button>
-          <button
-            type="button"
-            className="text-stone-500 underline"
-            onClick={() => {
-              setChallenge(null);
-              setCode('');
-              setError(null);
-            }}
-          >
+          <button type="button" className="text-stone-500 underline" onClick={() => restart(null)}>
             {t('login.mfaBack')}
           </button>
         </div>

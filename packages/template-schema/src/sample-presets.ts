@@ -149,3 +149,57 @@ export const SAMPLE_PRESETS: Record<string, SamplePreset> = {
     functions: ['Celebration'],
   },
 };
+
+/**
+ * Preview content for templates made for one festival (by tag), so a gallery's
+ * Eid or Christmas design is not shown with a Diwali title.
+ */
+export const SAMPLE_VARIANTS: Record<string, Partial<SamplePreset>> = {
+  eid: {
+    title: 'Eid Milan 2026',
+    longTitle: 'Eid ul-Fitr Dawat: An Evening with Family and Friends',
+    description: 'Sheer khurma, biryani and good company. Join us!',
+    tagline: 'Eid Mubarak',
+    hashtag: '#EidMubarak',
+    functions: ['Eid Namaz', 'Dawat'],
+  },
+  holi: {
+    title: 'Holi Hai 2026',
+    longTitle: 'Rang Barse: Holi Celebration at Green Park Society',
+    description: 'Colours, thandai and gujiya. Wear white!',
+    tagline: 'Bura na mano, Holi hai',
+    hashtag: '#HoliHai',
+    functions: ['Holika Dahan', 'Rangwali Holi'],
+  },
+  christmas: {
+    title: 'Christmas Eve 2026',
+    longTitle: 'Christmas Eve Dinner and Carol Night with the D’Souzas',
+    description: 'Carols, plum cake and a dinner to remember.',
+    tagline: 'Merry Christmas',
+    hashtag: '#MerryChristmas',
+    functions: ['Carol Service', 'Christmas Dinner'],
+  },
+  navratri: {
+    title: 'Garba Night 2026',
+    longTitle: 'Navratri Garba and Dandiya Raas: Nine Nights of Celebration',
+    description: 'Nine nights of garba, dandiya and aarti. Come in chaniya choli!',
+    tagline: 'Jai Mata Di',
+    hashtag: '#GarbaNight',
+    functions: ['Aarti', 'Garba & Dandiya'],
+  },
+  pongal: {
+    title: 'Pongal 2026',
+    longTitle: 'Thai Pongal: A Harvest Celebration with Family and Friends',
+    description: 'Sweet pongal, sugarcane and a kolam at the door. Join us!',
+    tagline: 'Pongalo Pongal',
+    hashtag: '#HappyPongal',
+    functions: ['Pongal Puja', 'Lunch'],
+  },
+};
+
+/** The preset for an event type, adjusted for a festival a template is tagged with. */
+export function samplePreset(typeKey: string, tags: readonly string[] = []): SamplePreset {
+  const base = SAMPLE_PRESETS[typeKey] ?? SAMPLE_PRESETS.CUSTOM!;
+  const variant = tags.map((t) => SAMPLE_VARIANTS[t]).find(Boolean);
+  return variant ? { ...base, ...variant } : base;
+}

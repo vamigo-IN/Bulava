@@ -6,11 +6,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createTranslator } from '@bulava/localization';
 import { CanvasArtboard, CanvasIcon, themeStyle } from '@bulava/template-engine';
 import {
+  ArtboardSchema,
   BINDINGS,
+  CANVAS_SCENES,
   canvasAssetIds,
   effectiveColors,
   effectiveFonts,
   ICONS,
+  ILLUSTRATIONS,
   ORNAMENT_LAYERS,
   sampleRenderContext,
   SAMPLE_PRESETS,
@@ -19,6 +22,7 @@ import {
   type Artboard,
   type CanvasSection,
   type Layer,
+  type LayerInput,
   type TemplateDefinition,
 } from '@bulava/template-schema';
 import { apiPost } from '@/lib/api';
@@ -30,7 +34,7 @@ import { AssetPicker } from './asset-picker';
 import { useHistory } from './history';
 import { Inspector } from './inspector';
 import { LayersPanel } from './layers-panel';
-import { layerId, newLayer, type LayerPreset } from './presets';
+import { illustrationTint, isIllustration, layerId, newLayer, type LayerPreset } from './presets';
 import { Stage } from './stage';
 
 const ROLE = 'canvas';
@@ -257,6 +261,17 @@ export function CanvasEditor({ definition, sectionId, edit, onClose, onSave, sav
 
   if (!located || !canvas || !board) return null;
 
+  // Add-menu previews: one layer on a small transparent board (artboards are at least 200 units wide), drawn by the engine like the real thing.
+  const renderThumb = (layer: LayerInput, width: number, height: number): ReactNode => {
+    const parsed = ArtboardSchema.safeParse({ width, height, background: { type: 'none' }, layers: [layer] });
+    if (!parsed.success) return null;
+    return (
+      <div className="bulava-template pointer-events-none" style={{ ...theme, width: '100%', height: '100%', background: 'transparent' }}>
+        <CanvasArtboard board={parsed.data} ctx={ctx} colors={colors} fonts={fonts} t={translator} language={effectiveLanguage} timeZone={ctx.event.timezone} mode="thumbnail" />
+      </div>
+    );
+  };
+
   const renderBoard = (b: Artboard): ReactNode => (
     <div lang={effectiveLanguage} className="bulava-template" style={{ ...theme, width: '100%', height: '100%', background: 'transparent' }}>
       <CanvasArtboard board={b} ctx={ctx} colors={colors} fonts={fonts} t={translator} language={effectiveLanguage} timeZone={ctx.event.timezone} mode="edit" />
@@ -392,6 +407,7 @@ export function CanvasEditor({ definition, sectionId, edit, onClose, onSave, sav
 
       <AddLayerModal
         open={adding}
+        thumb={renderThumb}
         onClose={() => setAdding(false)}
         onAdd={(preset) => {
           if (preset.group === 'image' && preset.key === 'library') {
@@ -412,7 +428,7 @@ export function CanvasEditor({ definition, sectionId, edit, onClose, onSave, sav
   );
 }
 
-function AddLayerModal({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (preset: LayerPreset) => void }) {
+function AddLayerModal({ open, onClose, onAdd, thumb }: { open: boolean; onClose: () => void; onAdd: (preset: LayerPreset) => void; thumb: (layer: LayerInput, width: number, height: number) => ReactNode }) {
   const tile = 'flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-2 text-center text-xs text-stone-700 hover:border-brand-400 hover:bg-brand-50 focus:ring-2 focus:ring-brand-200 focus:outline-none';
   const section = (title: string, children: ReactNode) => (
     <section>
@@ -422,6 +438,8 @@ function AddLayerModal({ open, onClose, onAdd }: { open: boolean; onClose: () =>
   );
   return (
     <Modal open={open} onClose={onClose} title={t('canvas.addLayer')} wide>
+      {/* Only while open: the previews are real engine drawings. */}
+      {open ? (
       <div className="max-h-[70vh] space-y-5 overflow-auto p-0.5">
         {section(
           t('canvas.add.text'),
@@ -459,9 +477,34 @@ function AddLayerModal({ open, onClose, onAdd }: { open: boolean; onClose: () =>
           )),
         )}
         {section(
-          t('canvas.add.ornament'),
-          ORNAMENT_LAYERS.map((key) => (
+          t('canvas.add.illustration'),
+          ILLUSTRATIONS.map((key) => (
             <button key={key} type="button" className={tile} onClick={() => onAdd({ group: 'ornament', key })}>
+              <span aria-hidden className="block size-14">
+                {thumb({ id: 'preview', kind: 'ornament', ornament: key, frame: { x: 8, y: 8, w: 224, h: 224 }, color: illustrationTint(key) }, 240, 240)}
+              </span>
+              <span className="font-sans text-[11px]">{key}</span>
+            </button>
+          )),
+        )}
+        {section(
+          t('canvas.add.ornament'),
+          ORNAMENT_LAYERS.filter((key) => !isIllustration(key)).map((key) => (
+            <button key={key} type="button" className={tile} onClick={() => onAdd({ group: 'ornament', key })}>
+              <span aria-hidden className="block size-10">
+                {thumb({ id: 'preview', kind: 'ornament', ornament: key, frame: { x: 12, y: 12, w: 216, h: 216 }, color: 'secondary' }, 240, 240)}
+              </span>
+              <span className="font-sans text-[11px]">{key}</span>
+            </button>
+          )),
+        )}
+        {section(
+          t('canvas.add.scene'),
+          CANVAS_SCENES.map((key) => (
+            <button key={key} type="button" className={tile} onClick={() => onAdd({ group: 'scene', key })}>
+              <span aria-hidden className="block h-12 w-[72px] overflow-hidden rounded">
+                {thumb({ id: 'preview', kind: 'scene', scene: key, frame: { x: 0, y: 0, w: 300, h: 200 } }, 300, 200)}
+              </span>
               <span className="font-sans text-[11px]">{key}</span>
             </button>
           )),
@@ -476,6 +519,7 @@ function AddLayerModal({ open, onClose, onAdd }: { open: boolean; onClose: () =>
           )),
         )}
       </div>
+      ) : null}
     </Modal>
   );
 }

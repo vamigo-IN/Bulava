@@ -191,7 +191,7 @@ export function FillField({ value, onChange, colors, onPickAsset }: { value: Fil
       case 'color':
         return onChange({ type: 'color', color: value.type === 'gradient' ? value.gradient.from : 'surface' });
       case 'gradient':
-        return onChange({ type: 'gradient', gradient: { from: value.type === 'color' ? value.color : 'background', to: 'accent', angle: 180 } });
+        return onChange({ type: 'gradient', gradient: { kind: 'linear', from: value.type === 'color' ? value.color : 'background', to: 'accent', angle: 180 } });
       case 'pattern':
         return onChange({ type: 'pattern', pattern: 'jaali', color: 'secondary', base: 'background', strength: 0.25 });
       case 'image':
@@ -206,9 +206,29 @@ export function FillField({ value, onChange, colors, onPickAsset }: { value: Fil
       {value.type === 'color' ? <ColorField label={t('canvas.color')} value={value.color} onChange={(c) => onChange({ type: 'color', color: c ?? 'surface' })} colors={colors} allowTransparent /> : null}
       {value.type === 'gradient' ? (
         <>
+          <SelectField
+            label={t('canvas.fill.kind')}
+            value={value.gradient.kind}
+            onChange={(kind) => onChange({ ...value, gradient: { ...value.gradient, kind } })}
+            options={[
+              { value: 'linear', label: t('canvas.fill.kind.linear') },
+              { value: 'radial', label: t('canvas.fill.kind.radial') },
+            ]}
+          />
           <ColorField label={t('canvas.fill.from')} value={value.gradient.from} onChange={(c) => onChange({ ...value, gradient: { ...value.gradient, from: c ?? 'background' } })} colors={colors} allowTransparent />
+          <ColorField
+            label={t('canvas.fill.via')}
+            value={value.gradient.via}
+            onChange={(c) => {
+              const { via: _old, ...rest } = value.gradient;
+              onChange({ ...value, gradient: c ? { ...rest, via: c } : rest });
+            }}
+            colors={colors}
+            allowNone
+            allowTransparent
+          />
           <ColorField label={t('canvas.fill.to')} value={value.gradient.to} onChange={(c) => onChange({ ...value, gradient: { ...value.gradient, to: c ?? 'accent' } })} colors={colors} allowTransparent />
-          <NumberField label={t('canvas.fill.angle')} value={value.gradient.angle} min={0} max={360} suffix="°" onChange={(angle) => onChange({ ...value, gradient: { ...value.gradient, angle } })} />
+          {value.gradient.kind === 'linear' ? <NumberField label={t('canvas.fill.angle')} value={value.gradient.angle} min={0} max={360} suffix="°" onChange={(angle) => onChange({ ...value, gradient: { ...value.gradient, angle } })} /> : null}
         </>
       ) : null}
       {value.type === 'pattern' ? (
@@ -328,7 +348,7 @@ export function ValueField({ label, value, onChange, textSlots, multiline }: { l
               label={t('canvas.value.format')}
               value={value.format ?? 'dateWithWeekday'}
               onChange={(format) => onChange({ ...value, format })}
-              options={VALUE_FORMATS.filter((f) => f !== 'upper' && f !== 'lower')}
+              options={VALUE_FORMATS.filter((f) => f !== 'upper' && f !== 'lower' && f !== 'initial')}
             />
           ) : null}
           <TextField label={t('canvas.value.fallback')} value={fallbackText} onChange={(text) => onChange({ ...value, fallback: text ? { literal: text } : undefined })} />

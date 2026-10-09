@@ -6,9 +6,12 @@ export interface Providers {
   google: boolean;
   /** Sign-in codes on WhatsApp (needs the WhatsApp Business integration and its authentication template). */
   phoneOtp: boolean;
+  /** Codes by email can be sent: signing up with an email and resetting a password need them. */
+  emailCodes: boolean;
 }
 
-const NONE: Providers = { google: false, phoneOtp: false };
+// Until the API answers, the email form shows (it is nearly always available) and the buttons wait.
+const NONE: Providers = { google: false, phoneOtp: false, emailCodes: true };
 let providers: Promise<Providers> | null = null;
 
 /** Which sign-in methods the API offers (cached for the page). */
@@ -30,10 +33,6 @@ export function useProviders(): Providers {
     };
   }, []);
   return state;
-}
-
-export function useGoogleEnabled(): boolean {
-  return useProviders().google;
 }
 
 /** Google's "G" mark, as Google's sign-in branding guidelines require. */

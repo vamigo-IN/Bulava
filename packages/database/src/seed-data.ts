@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient, TemplateType } from '../generated/client';
 import { LANGUAGES } from '@bulava/localization';
-import { RETIRED_TEMPLATE_KEYS, TEMPLATE_CATALOG } from '@bulava/template-catalog';
+import { RETIRED_TEMPLATE_KEYS, TEMPLATE_CATALOG, type CatalogEntry } from '@bulava/template-catalog';
 import { validateTemplateDefinition } from '@bulava/template-schema';
 import { FEATURE_KEYS } from '@bulava/validation';
 
@@ -206,43 +206,71 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
   }
 }
 
-/**
- * Seed catalog templates. New templates are created as published version 1.
- * With `updateChanged`, a catalog definition that differs from the current
- * published version is published as a new version (history is kept).
- */
 /** JSON with object keys sorted: jsonb reorders keys, so plain stringify would see every stored definition as changed. */
 export function canonicalJson(value: unknown): string {
+  // Numbers compare to 15 significant digits: a stored definition comes back with float noise
+  // rounded away (0.35 + 0.1 is saved as 0.45), which must not count as a change.
   const sort = (v: unknown): unknown =>
-    Array.isArray(v) ? v.map(sort) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, sort((v as Record<string, unknown>)[k])])) : v;
+    Array.isArray(v)
+      ? v.map(sort)
+      : v && typeof v === 'object'
+        ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, sort((v as Record<string, unknown>)[k])]))
+        : typeof v === 'number' && Number.isFinite(v)
+          ? Number(v.toPrecision(15))
+          : v;
   return JSON.stringify(sort(value));
 }
 
 /** Versions the catalog itself published (staff edits in Template Studio use other changelogs). */
 const CATALOG_CHANGELOGS = new Set(['Catalog seed', 'Catalog update']);
 
+export interface TemplateSeedResult {
+  created: number;
+  /** New published versions of catalog templates whose design changed. */
+  updated: number;
+  /** Catalog templates whose listing (tier, tags, order, featured…) changed without a new design. */
+  synced: number;
+  retired: number;
+  /** What changed (or, in a dry run, what would), template by template. */
+  changes: Array<{ key: string; change: 'create' | 'update' | 'sync' | 'retire' }>;
+}
+
 /**
- * The template catalog is code (templates/src). On every deploy:
+ * The template catalog is code (templates/src); this is its migration, run by
+ * the deploy's migrate job on every release. It is idempotent:
  *  - new catalog templates are created and published;
  *  - catalog-owned templates whose definition changed get a new published
- *    version (events keep the version they chose), with their name,
- *    description and filters refreshed. Templates staff edited in Template
- *    Studio are left alone unless `updateChanged` (--update-templates) forces it;
+ *    version (events keep the version they chose). Templates staff edited in
+ *    Template Studio are left alone unless `updateChanged` (--update-templates) forces it;
+ *  - catalog-owned templates whose listing changed (tier, tags, order…) are
+ *    updated in place, unless staff edited that listing in the console;
  *  - templates staff deleted are never recreated or touched;
  *  - retired catalog keys (lookalikes removed from the catalog) are soft-deleted.
+ * `dryRun` reports the changes without writing anything.
  */
 export async function seedTemplates(
   prisma: PrismaClient,
-  options: { updateChanged?: boolean } = {},
-): Promise<{ created: number; updated: number; retired: number }> {
-  let created = 0;
-  let updated = 0;
-  for (const { meta, definition } of TEMPLATE_CATALOG) {
+  options: { updateChanged?: boolean; dryRun?: boolean; catalog?: CatalogEntry[]; retiredKeys?: readonly string[] } = {},
+): Promise<TemplateSeedResult> {
+  const catalog = options.catalog ?? TEMPLATE_CATALOG;
+  const retiredKeys = [...(options.retiredKeys ?? RETIRED_TEMPLATE_KEYS)];
+  const result: TemplateSeedResult = { created: 0, updated: 0, synced: 0, retired: 0, changes: [] };
+  // Everything the comparison needs in two queries, not one per template.
+  const rows = await prisma.template.findMany({
+    where: { key: { in: catalog.map((e) => e.meta.key) } },
+    include: { currentVersion: { select: { definition: true, changelog: true } }, versions: { select: { version: true }, orderBy: { version: 'desc' }, take: 1 } },
+  });
+  const existingByKey = new Map(rows.map((r) => [r.key, r]));
+  const staffListed = new Set(
+    (await prisma.auditLog.findMany({ where: { action: 'template.meta_updated', targetId: { in: rows.map((r) => r.id) } }, select: { targetId: true } })).map((a) => a.targetId),
+  );
+
+  for (const { meta, definition } of catalog) {
     const validated = validateTemplateDefinition(definition);
     if (!validated.ok) throw new Error(`Catalog template ${meta.key} is invalid: ${JSON.stringify(validated.issues)}`);
     const json = validated.definition as unknown as Prisma.InputJsonValue;
     const type = validated.definition.type as TemplateType;
-    const metaData = {
+    const listing = {
       name: meta.name,
       description: meta.description,
       category: meta.category,
@@ -258,35 +286,51 @@ export async function seedTemplates(
       tags: meta.tags,
     };
 
-    const existing = await prisma.template.findUnique({ where: { key: meta.key }, include: { currentVersion: true, versions: { select: { version: true } } } });
+    const existing = existingByKey.get(meta.key);
     if (!existing) {
+      result.created++;
+      result.changes.push({ key: meta.key, change: 'create' });
+      if (options.dryRun) continue;
       await prisma.$transaction(async (tx) => {
-        const template = await tx.template.create({ data: { key: meta.key, ...metaData, status: 'PUBLISHED' } });
+        const template = await tx.template.create({ data: { key: meta.key, ...listing, status: 'PUBLISHED' } });
         const version = await tx.templateVersion.create({
           data: { templateId: template.id, version: 1, type, definition: json, status: 'PUBLISHED', publishedAt: new Date(), changelog: 'Catalog seed' },
         });
         await tx.template.update({ where: { id: template.id }, data: { currentVersionId: version.id } });
       });
-      created++;
       continue;
     }
     if (existing.deletedAt) continue;
     const catalogOwned = !existing.currentVersion || CATALOG_CHANGELOGS.has(existing.currentVersion.changelog ?? '');
+    // A listing staff changed in the console stays theirs; the design still follows the catalog.
+    const ownListing: Partial<typeof listing> = staffListed.has(existing.id) ? { languages: listing.languages, outputs: listing.outputs } : listing;
     const changed = canonicalJson(existing.currentVersion?.definition) !== canonicalJson(validated.definition);
     if (changed && (catalogOwned || options.updateChanged)) {
-      const next = Math.max(0, ...existing.versions.map((v) => v.version)) + 1;
+      result.updated++;
+      result.changes.push({ key: meta.key, change: 'update' });
+      if (options.dryRun) continue;
+      const next = (existing.versions[0]?.version ?? 0) + 1;
       await prisma.$transaction(async (tx) => {
         const version = await tx.templateVersion.create({
           data: { templateId: existing.id, version: next, type, definition: json, status: 'PUBLISHED', publishedAt: new Date(), changelog: 'Catalog update' },
         });
-        await tx.template.update({ where: { id: existing.id }, data: { ...metaData, currentVersionId: version.id } });
+        await tx.template.update({ where: { id: existing.id }, data: { ...ownListing, currentVersionId: version.id } });
       });
-      updated++;
+      continue;
+    }
+    const stored = Object.fromEntries(Object.keys(ownListing).map((k) => [k, existing[k as keyof typeof listing]]));
+    if (catalogOwned && canonicalJson(stored) !== canonicalJson(ownListing)) {
+      result.synced++;
+      result.changes.push({ key: meta.key, change: 'sync' });
+      if (!options.dryRun) await prisma.template.update({ where: { id: existing.id }, data: ownListing });
     }
   }
-  const retired = await prisma.template.updateMany({
-    where: { key: { in: [...RETIRED_TEMPLATE_KEYS] }, deletedAt: null },
-    data: { status: 'ARCHIVED', deletedAt: new Date() },
-  });
-  return { created, updated, retired: retired.count };
+
+  const retire = await prisma.template.findMany({ where: { key: { in: retiredKeys }, deletedAt: null }, select: { key: true } });
+  result.retired = retire.length;
+  result.changes.push(...retire.map((r) => ({ key: r.key, change: 'retire' as const })));
+  if (retire.length && !options.dryRun) {
+    await prisma.template.updateMany({ where: { key: { in: retire.map((r) => r.key) }, deletedAt: null }, data: { status: 'ARCHIVED', deletedAt: new Date() } });
+  }
+  return result;
 }

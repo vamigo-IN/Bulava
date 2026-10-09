@@ -4,22 +4,43 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CalendarHeart, CheckCircle2, Eye, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { LoginSchema, SignupSchema, z } from '@bulava/validation';
 import { ApiError, apiPost } from '@/lib/api';
 import { loadSession } from '@/lib/session';
 import type { MessageKey } from '@bulava/localization';
+import { ConsentBox } from './consent-box';
+import { EmailCodeStep, type EmailChallenge } from './email-code-step';
+import { ForgotPassword } from './forgot-password';
 import { GoogleButton, useProviders } from './google-button';
-import { PhoneSignIn } from './phone-sign-in';
+import { WhatsAppSignIn } from './whatsapp-sign-in';
 import { errorMessage, I18nProvider, useT } from '@/lib/i18n';
 // The single module: the package entry would bring the whole template engine (and Zod) to sign-in.
 import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { Alert, Button, Checkbox, Field, Input } from '@/components/ui/primitives';
+import { WhatsAppMark } from '@/components/ui/whatsapp-mark';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { BrandLogo } from '@/components/marketing/brand-logo';
 
 type Mode = 'login' | 'signup';
 type FormInput = z.input<typeof SignupSchema>;
+
+/** What a sign-in or sign-up step answers: a next step, or nothing more to do (signed in). */
+type StepResult = {
+  mfaRequired?: boolean;
+  challengeToken?: string;
+  restoreRequired?: boolean;
+  restoreToken?: string;
+  deleteAt?: string;
+  emailCodeRequired?: boolean;
+  verificationRequired?: boolean;
+  target?: string;
+  resendAfter?: number;
+};
+
+/** Which panel the card shows: the ways in, the WhatsApp flow, an emailed code, or a password reset. */
+type View = { kind: 'main' } | { kind: 'whatsapp' } | { kind: 'forgot' } | { kind: 'code'; purpose: Mode; challenge: EmailChallenge };
 
 const LoginFormSchema = LoginSchema.extend({ name: z.string().optional(), acceptTerms: z.boolean().optional(), phone: z.string().optional(), whatsappUpdates: z.boolean().optional() });
 
@@ -33,12 +54,15 @@ function safeNext(next: string | null): string {
   return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/dashboard';
 }
 
+const linkClass = 'font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700';
+
 function AuthFormInner({ mode }: { mode: Mode }) {
   const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
-  /** Set when the password was right and the account asks for a second factor. */
+  const [view, setView] = useState<View>({ kind: 'main' });
+  /** Set when the account asks for its authenticator code. */
   const [challenge, setChallenge] = useState<string | null>(null);
   /** Set when the sign-in reached an account waiting to be deleted: the one-use restore token. */
   const [restore, setRestore] = useState<{ token: string; until: string | null } | null>(null);
@@ -48,11 +72,10 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   });
   const { errors, isSubmitting } = form.formState;
   const providers = useProviders();
-  const google = providers.google;
-  /** Sign-in page: the WhatsApp-number form instead of email and password. */
-  const [byPhone, setByPhone] = useState(false);
   const accepted = form.watch('acceptTerms') === true;
   const deletedOn = mode === 'login' && params.get('deleted') ? longDate(params.get('deleted')!) : null;
+  /** Signing up with an email needs codes that can reach it (email set up on the server). */
+  const emailForm = mode === 'login' || providers.emailCodes;
 
   const template = params.get('template');
   const fallback = template && /^[a-z0-9-]{1,80}$/.test(template) ? `/dashboard/events/new?template=${template}` : undefined;
@@ -60,6 +83,19 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   const finish = () => {
     router.replace(target);
     router.refresh();
+  };
+
+  /** After any step: the restore offer, the authenticator step, or in. */
+  const next = (result: StepResult) => {
+    if (result.restoreRequired && result.restoreToken) return setRestore({ token: result.restoreToken, until: result.deleteAt ?? null });
+    if (result.mfaRequired && result.challengeToken) return setChallenge(result.challengeToken);
+    finish();
+  };
+
+  /** Back to the ways in, with a message (a step that expired) or without. */
+  const backToMain = (message: string | null) => {
+    setView({ kind: 'main' });
+    setServerError(message);
   };
 
   // Coming back from Google: an error to show, or a two-step challenge in the fragment.
@@ -91,172 +127,199 @@ function AuthFormInner({ mode }: { mode: Mode }) {
   const onSubmit = form.handleSubmit(async (values) => {
     setServerError(null);
     try {
-      const result = await apiPost<{ mfaRequired?: boolean; challengeToken?: string; restoreRequired?: boolean; restoreToken?: string; deleteAt?: string }>(
-        `/auth/${mode}`,
-        mode === 'signup' ? values : { email: values.email, password: values.password },
-      );
-      if (result.restoreRequired && result.restoreToken) {
-        setRestore({ token: result.restoreToken, until: result.deleteAt ?? null });
+      const result = await apiPost<StepResult>(`/auth/${mode}`, mode === 'signup' ? values : { email: values.email, password: values.password });
+      // A code went to the address: signing up waits for it to make the account, signing in to finish.
+      if ((result.verificationRequired || result.emailCodeRequired) && result.challengeToken) {
+        setView({ kind: 'code', purpose: mode, challenge: { challengeToken: result.challengeToken, target: result.target ?? '', resendAfter: result.resendAfter ?? 30 } });
         return;
       }
-      if (result.mfaRequired && result.challengeToken) {
-        setChallenge(result.challengeToken);
-        return;
-      }
-      finish();
+      next(result);
     } catch (error) {
       setServerError(errorMessage(t, error));
     }
   });
+
+  /** On the sign-up page, WhatsApp and Google make an account: the Terms box comes first. */
+  const blocked = (message: MessageKey) => {
+    setServerError(t(message));
+    void form.trigger('acceptTerms');
+    form.setFocus('acceptTerms');
+  };
+
+  const openWhatsApp = () => {
+    if (mode === 'signup' && !accepted) return blocked('auth.consent.whatsapp');
+    setServerError(null);
+    setView({ kind: 'whatsapp' });
+  };
+
+  let panel: ReactNode;
+  if (challenge) {
+    panel = (
+      <SecondFactorStep
+        challengeToken={challenge}
+        onDone={finish}
+        onRestart={(message) => {
+          setChallenge(null);
+          backToMain(message);
+        }}
+      />
+    );
+  } else if (restore) {
+    panel = (
+      <RestoreStep
+        token={restore.token}
+        until={restore.until}
+        onRestored={(mfaChallenge) => {
+          setRestore(null);
+          if (mfaChallenge) setChallenge(mfaChallenge);
+          else finish();
+        }}
+        onCancel={(message) => {
+          setRestore(null);
+          backToMain(message);
+        }}
+      />
+    );
+  } else if (view.kind === 'code') {
+    panel = (
+      <div className="clay rounded-[2rem] p-6 sm:p-8">
+        <EmailCodeStep<StepResult> purpose={view.purpose} challenge={view.challenge} onVerified={next} onRestart={backToMain} />
+      </div>
+    );
+  } else if (view.kind === 'forgot') {
+    panel = (
+      <div className="clay rounded-[2rem] p-6 sm:p-8">
+        <ForgotPassword initialEmail={form.getValues('email')} onResult={next} onBack={() => backToMain(null)} />
+      </div>
+    );
+  } else if (view.kind === 'whatsapp') {
+    panel = (
+      <div className="clay rounded-[2rem] p-6 sm:p-8">
+        <WhatsAppSignIn
+          consented={mode === 'signup' && accepted}
+          google={providers.google}
+          next={target}
+          onDone={finish}
+          onChallenge={(token) => setChallenge(token)}
+          onRestore={(token, until) => setRestore({ token, until })}
+          onBack={() => backToMain(null)}
+        />
+      </div>
+    );
+  } else {
+    const otherWays = providers.phoneOtp || providers.google;
+    panel = (
+      <>
+        <h1 className="font-display text-5xl leading-[1.05] tracking-[-0.02em]">{t(mode === 'signup' ? 'auth.signup.title' : 'auth.login.title')}</h1>
+        <p className="mt-3 text-lg leading-relaxed text-stone-600">{t(mode === 'signup' ? 'auth.signup.lead' : 'auth.login.lead')}</p>
+        {deletedOn ? (
+          <div className="mt-6">
+            <Alert tone="info">{t('auth.deleted.notice', { date: deletedOn })}</Alert>
+          </div>
+        ) : null}
+        <div className="clay mt-8 rounded-[2rem] p-6 sm:p-8">
+          {serverError ? (
+            <div className="mb-5">
+              <Alert>{serverError}</Alert>
+            </div>
+          ) : null}
+          {otherWays ? (
+            <div className="mb-6 space-y-3">
+              {providers.phoneOtp ? (
+                <button type="button" className="btn-3d btn-3d-green min-h-12 w-full gap-3 rounded-2xl px-5 font-medium" onClick={openWhatsApp}>
+                  <WhatsAppMark className="size-5" />
+                  {t('auth.whatsapp')}
+                </button>
+              ) : null}
+              {providers.google ? (
+                mode === 'signup' ? (
+                  // A new account needs the ticked box below, whichever way it is made.
+                  <GoogleButton next={target} label={t('auth.google')} consent={accepted} onBlocked={() => blocked('auth.consent.google')} />
+                ) : (
+                  <GoogleButton next={target} label={t('auth.google')} />
+                )
+              ) : null}
+              {emailForm ? (
+                <div className="flex items-center gap-3 pt-3 text-xs tracking-widest text-stone-500 uppercase">
+                  <span className="h-px flex-1 bg-gold-200" />
+                  {t('auth.orEmail')}
+                  <span className="h-px flex-1 bg-gold-200" />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <form onSubmit={onSubmit} className="space-y-4" noValidate>
+            {emailForm ? (
+              <>
+                {mode === 'signup' ? (
+                  <Field label={t('auth.field.name')} error={errors.name?.message}>
+                    {(p) => <Input {...p} autoComplete="name" {...form.register('name')} />}
+                  </Field>
+                ) : null}
+                <Field label={t('auth.field.email')} error={errors.email?.message}>
+                  {(p) => <Input {...p} type="email" inputMode="email" autoComplete="email" {...form.register('email')} />}
+                </Field>
+                <Field label={t('auth.field.password')} hint={mode === 'signup' ? t('auth.field.passwordHint') : undefined} error={errors.password?.message}>
+                  {(p) => <Input {...p} type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} {...form.register('password')} />}
+                </Field>
+                {mode === 'login' && providers.emailCodes ? (
+                  <div className="-mt-1 flex justify-end">
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700"
+                      onClick={() => {
+                        setServerError(null);
+                        setView({ kind: 'forgot' });
+                      }}
+                    >
+                      {t('auth.forgot')}
+                    </button>
+                  </div>
+                ) : null}
+                {mode === 'signup' ? (
+                  <>
+                    <Field label={t('auth.field.phone')} hint={t('auth.field.phoneHint')} error={errors.phone?.message}>
+                      {(p) => (
+                        <Controller
+                          control={form.control}
+                          name="phone"
+                          render={({ field }) => <PhoneInput {...p} name={field.name} placeholder="98765 43210" value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} />}
+                        />
+                      )}
+                    </Field>
+                    {/* A separate, optional consent: never bundled with the Terms below. */}
+                    <Checkbox label={t('auth.field.whatsappUpdates')} {...form.register('whatsappUpdates')} />
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <Alert tone="info">{t('auth.signup.emailOff')}</Alert>
+            )}
+            {/* Never pre-ticked: consent has to be an explicit action (DPDP Act, e-commerce rules). */}
+            {mode === 'signup' ? <ConsentBox error={errors.acceptTerms?.message} {...form.register('acceptTerms')} /> : null}
+            {emailForm ? (
+              <Button type="submit" size="lg" className="mt-2 min-h-13 w-full rounded-2xl" disabled={isSubmitting}>
+                {isSubmitting ? t('common.loading') : t(mode === 'signup' ? 'auth.signup.submit' : 'auth.login.submit')}
+              </Button>
+            ) : null}
+          </form>
+        </div>
+        <p className="mt-6 text-center text-sm text-stone-600">
+          {mode === 'signup' ? t('auth.signup.haveAccount') : t('auth.login.noAccount')}{' '}
+          <Link className={linkClass} href={`${mode === 'signup' ? '/login' : '/signup'}${params.toString() ? `?${params.toString()}` : ''}`}>
+            {t(mode === 'signup' ? 'auth.login.submit' : 'auth.signup.submit')}
+          </Link>
+        </p>
+      </>
+    );
+  }
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       <section className="relative isolate flex flex-col px-4 py-8 sm:px-10">
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(ellipse_70%_80%_at_20%_0%,rgba(233,200,127,0.38),transparent_70%)]" />
         <BrandLogo />
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">
-          {challenge ? (
-            <SecondFactorStep
-              challengeToken={challenge}
-              onDone={finish}
-              onRestart={(message) => {
-                setChallenge(null);
-                setServerError(message);
-              }}
-            />
-          ) : restore ? (
-            <RestoreStep
-              token={restore.token}
-              until={restore.until}
-              onRestored={(mfaChallenge) => {
-                setRestore(null);
-                if (mfaChallenge) setChallenge(mfaChallenge);
-                else finish();
-              }}
-              onCancel={(message) => {
-                setRestore(null);
-                setServerError(message);
-              }}
-            />
-          ) : (
-            <>
-              <h1 className="font-display text-5xl leading-[1.05] tracking-[-0.02em]">{t(mode === 'signup' ? 'auth.signup.title' : 'auth.login.title')}</h1>
-              {deletedOn ? (
-                <div className="mt-6">
-                  <Alert tone="info">{t('auth.deleted.notice', { date: deletedOn })}</Alert>
-                </div>
-              ) : null}
-              <div className="clay mt-8 rounded-[2rem] p-6 sm:p-8">
-                {mode === 'login' && byPhone ? (
-                  <PhoneSignIn
-                    onDone={finish}
-                    onChallenge={(token) => setChallenge(token)}
-                    onRestore={(token, until) => setRestore({ token, until })}
-                    onBack={() => setByPhone(false)}
-                  />
-                ) : null}
-                {mode === 'login' && byPhone ? null : (
-                <>
-                {google ? (
-                  <div className="mb-6 space-y-5">
-                    {mode === 'signup' ? (
-                      // A new account needs the ticked box below, whichever way it is created.
-                      <GoogleButton
-                        next={target}
-                        label={t('auth.google')}
-                        consent={accepted}
-                        onBlocked={() => {
-                          setServerError(t('auth.consent.google'));
-                          void form.trigger('acceptTerms');
-                          form.setFocus('acceptTerms');
-                        }}
-                      />
-                    ) : (
-                      <GoogleButton next={target} label={t('auth.google')} />
-                    )}
-                    <div className="flex items-center gap-3 text-xs tracking-widest text-stone-500 uppercase">
-                      <span className="h-px flex-1 bg-gold-200" />
-                      {t('auth.or')}
-                      <span className="h-px flex-1 bg-gold-200" />
-                    </div>
-                  </div>
-                ) : null}
-                <form onSubmit={onSubmit} className="space-y-4" noValidate>
-                  {serverError ? <Alert>{serverError}</Alert> : null}
-                  {mode === 'signup' ? (
-                    <Field label={t('auth.field.name')} error={errors.name?.message}>
-                      {(p) => <Input {...p} autoComplete="name" {...form.register('name')} />}
-                    </Field>
-                  ) : null}
-                  <Field label={t('auth.field.email')} error={errors.email?.message}>
-                    {(p) => <Input {...p} type="email" inputMode="email" autoComplete="email" {...form.register('email')} />}
-                  </Field>
-                  <Field label={t('auth.field.password')} hint={mode === 'signup' ? t('auth.field.passwordHint') : undefined} error={errors.password?.message}>
-                    {(p) => <Input {...p} type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} {...form.register('password')} />}
-                  </Field>
-                  {mode === 'signup' ? (
-                    <>
-                      <Field label={t('auth.field.phone')} hint={t('auth.field.phoneHint')} error={errors.phone?.message}>
-                        {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" placeholder="98765 43210" {...form.register('phone')} />}
-                      </Field>
-                      {/* A separate, optional consent: never bundled with the Terms below. */}
-                      <Checkbox label={t('auth.field.whatsappUpdates')} {...form.register('whatsappUpdates')} />
-                    </>
-                  ) : null}
-                  {mode === 'signup' ? (
-                    <div className="rounded-2xl bg-[#f8f2ea] p-4 shadow-clay-inset">
-                      {/* Never pre-ticked: consent has to be an explicit action (DPDP Act, e-commerce rules). */}
-                      <label className="flex cursor-pointer items-start gap-3 text-[0.9375rem] leading-relaxed text-stone-800">
-                        <input
-                          type="checkbox"
-                          className="mt-1 size-5 shrink-0 rounded border-stone-300 accent-brand-700"
-                          aria-invalid={errors.acceptTerms ? true : undefined}
-                          aria-describedby="consent-notice"
-                          {...form.register('acceptTerms')}
-                        />
-                        <span>
-                          {t('auth.consent.before')}{' '}
-                          <Link href="/terms" target="_blank" className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700">
-                            {t('auth.consent.terms')}
-                          </Link>{' '}
-                          {t('auth.consent.and')}{' '}
-                          <Link href="/privacy" target="_blank" className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700">
-                            {t('auth.consent.privacy')}
-                          </Link>
-                          .
-                        </span>
-                      </label>
-                      {errors.acceptTerms?.message ? (
-                        <p role="alert" className="mt-2 pl-8 text-sm text-red-700">
-                          {errors.acceptTerms.message}
-                        </p>
-                      ) : null}
-                      <p id="consent-notice" className="mt-2.5 pl-8 text-xs leading-relaxed text-stone-600">
-                        {t('auth.consent.notice')}
-                      </p>
-                    </div>
-                  ) : null}
-                  <Button type="submit" size="lg" className="mt-2 min-h-13 w-full rounded-2xl" disabled={isSubmitting}>
-                    {isSubmitting ? t('common.loading') : t(mode === 'signup' ? 'auth.signup.submit' : 'auth.login.submit')}
-                  </Button>
-                </form>
-                {mode === 'login' && providers.phoneOtp ? (
-                  <button type="button" className="mt-4 w-full text-center text-sm font-medium text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700" onClick={() => setByPhone(true)}>
-                    {t('auth.phone.usePhone')}
-                  </button>
-                ) : null}
-                </>
-                )}
-              </div>
-              <p className="mt-6 text-center text-sm text-stone-600">
-                {mode === 'signup' ? t('auth.signup.haveAccount') : t('auth.login.noAccount')}{' '}
-                <Link className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700" href={`${mode === 'signup' ? '/login' : '/signup'}${params.toString() ? `?${params.toString()}` : ''}`}>
-                  {t(mode === 'signup' ? 'auth.login.submit' : 'auth.signup.submit')}
-                </Link>
-              </p>
-            </>
-          )}
-        </div>
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">{panel}</div>
       </section>
       {/* A maroon clay slab beside the form, lit from the top left like the buttons. */}
       <aside className="relative isolate m-4 hidden overflow-hidden rounded-[2.5rem] bg-[linear-gradient(160deg,#a33441,#7a1d27_48%,#4a0b16)] text-ivory shadow-[inset_0_3px_2px_rgba(255,255,255,0.2),inset_5px_0_4px_rgba(255,255,255,0.08),inset_0_-8px_14px_rgba(30,2,8,0.45),inset_-6px_0_10px_rgba(30,2,8,0.3),8px_30px_60px_-22px_rgba(74,11,22,0.55)] lg:flex lg:items-center lg:justify-center">

@@ -11,9 +11,23 @@ import { createTranslator } from '@bulava/localization';
 const t = createTranslator('en');
 
 /** Full-page live demo of a website template with sample content and a floating action bar. */
-export function TemplateDemo({ definition, templateKey, name, eventType, eventTypes }: { definition: TemplateDefinition; templateKey: string; name: string; eventType: string; eventTypes: string[] }) {
+export function TemplateDemo({
+  definition,
+  templateKey,
+  name,
+  eventType,
+  eventTypes,
+  tags,
+}: {
+  definition: TemplateDefinition;
+  templateKey: string;
+  name: string;
+  eventType: string;
+  eventTypes: string[];
+  tags?: string[];
+}) {
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
-  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, language }), [eventType, language]);
+  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, language, tags }), [eventType, language, tags]);
   return (
     <div className="pb-28" style={{ background: definition.theme.colors.background }}>
       <TemplateRenderer key={language} definition={definition} context={ctx} mode="live" language={language} introKey={`demo-${templateKey}`} />

@@ -22,5 +22,5 @@ export default async function TemplateDemoPage({ params }: { params: Promise<{ k
   const tpl = await getTemplate(key);
   if (!tpl?.definition) notFound();
   if (tpl.definition.type !== 'WEBSITE') redirect(`/templates/${tpl.key}`);
-  return <TemplateDemo definition={tpl.definition} templateKey={tpl.key} name={tpl.name} eventType={tpl.eventTypes[0] ?? 'WEDDING'} eventTypes={tpl.eventTypes} />;
+  return <TemplateDemo definition={tpl.definition} templateKey={tpl.key} name={tpl.name} eventType={tpl.eventTypes[0] ?? 'WEDDING'} eventTypes={tpl.eventTypes} tags={tpl.tags} />;
 }

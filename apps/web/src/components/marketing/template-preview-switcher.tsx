@@ -19,15 +19,17 @@ const VideoPlayer = dynamic(() => import('./video-player').then((m) => m.VideoPl
 export function TemplatePreviewSwitcher({
   definition,
   eventType,
+  tags,
   labels,
 }: {
   definition: TemplateDefinition;
   eventType: string;
+  tags?: string[];
   labels: { mobile: string; desktop: string; note: string; playOpening?: string };
 }) {
   const [view, setView] = useState<'mobile' | 'desktop'>('mobile');
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
-  const ctx = sampleRenderContext({ typeKey: eventType, language });
+  const ctx = sampleRenderContext({ typeKey: eventType, language, tags });
   const isWebsite = definition.type === 'WEBSITE';
   const intro = definition.website?.intro ?? 'none';
   const [opening, setOpening] = useState<number | null>(null);
