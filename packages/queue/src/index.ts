@@ -14,16 +14,21 @@ export const QueueName = {
   ANALYTICS: 'analytics',
   EXPORTS: 'exports',
   CLEANUP: 'cleanup',
+  /** Digital cards rendered to images in a headless browser (media worker). */
+  CARD_RENDER: 'card-render',
 } as const;
 export type QueueName = (typeof QueueName)[keyof typeof QueueName];
 
 export interface JobPayloads {
-  /** A guest or host photo, or a template design asset (web renditions of painted art). */
-  'media-processing': { mediaItemId: string } | { assetId: string };
+  /** A guest or host photo, a template design asset (web renditions of painted art), or a photo placed in a digital card. */
+  'media-processing': { mediaItemId: string } | { assetId: string } | { cardUploadId: string };
   'video-render': { videoJobId: string };
   notifications: { notificationId: string };
-  /** `replyTo`: where a reply goes (a contact-form message's sender), instead of the settings' address. */
-  email: { to: string; subject: string; html: string; text: string; notificationId?: string; replyTo?: string };
+  /**
+   * `replyTo`: where a reply goes (a contact-form message's sender), instead of the settings' address.
+   * `cardOrderId`: a paid digital card, sent with the image attached (the worker builds the message).
+   */
+  email: { to: string; subject: string; html: string; text: string; notificationId?: string; replyTo?: string } | { cardOrderId: string };
   /**
    * One approved WhatsApp template to a host's number: `template` names the kind
    * (the admin's settings map it to the approved template name), `params` fill
@@ -41,7 +46,8 @@ export interface JobPayloads {
     occurredAt: string;
   };
   exports: { exportType: 'GUESTS_CSV' | 'RSVPS_CSV'; eventId: string; requestedById: string };
-  cleanup: { task: 'expired-sessions' | 'stale-uploads' | 'deleted-events' | 'event-lifecycle' | 'reminders' | 'domains' | 'whatsapp-status' };
+  cleanup: { task: 'expired-sessions' | 'stale-uploads' | 'deleted-events' | 'event-lifecycle' | 'reminders' | 'domains' | 'whatsapp-status' | 'card-retention' };
+  'card-render': { exportId: string };
 }
 
 /** Sensible defaults per queue: retries with exponential backoff, bounded history. */
@@ -55,6 +61,7 @@ export const DEFAULT_JOB_OPTIONS: Record<QueueName, JobsOptions> = {
   analytics: { attempts: 3, backoff: { type: 'exponential', delay: 5_000 }, removeOnComplete: 10_000, removeOnFail: 1000 },
   exports: { attempts: 2, backoff: { type: 'fixed', delay: 10_000 }, removeOnComplete: 200, removeOnFail: 500 },
   cleanup: { attempts: 1, removeOnComplete: 100, removeOnFail: 100 },
+  'card-render': { attempts: 3, backoff: { type: 'exponential', delay: 15_000 }, removeOnComplete: 1000, removeOnFail: 2000 },
 };
 
 /** BullMQ connection options from a redis:// URL. */

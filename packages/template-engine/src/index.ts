@@ -26,8 +26,10 @@ export { Lotus, PeacockFeather, StarField, Laurel, Lantern, RoseWindow, GothicAr
 export { INTRO_OPEN_EVENT, IntroOverlay, type IntroLabels, type IntroVariant } from './intro';
 export type { RenderSlots, RenderMode, SectionProps } from './types';
 export { CanvasArtboard, type ArtboardMode, type CanvasArtboardProps } from './canvas/artboard';
+export { CardView, watermarkBandHeight, type CardViewProps } from './canvas/card';
 export { fillBackdrop, fillStyle, fontFamilyFor, resolveColor, solidHex, textInk } from './canvas/colors';
 export { Icon as CanvasIcon } from './canvas/icons';
+export { clampFrame, layerLabel, moveFrame, resizeFrame, rotationFor, snapLines, Stage, useHistory, type Guide, type HandleName } from './canvas/editing';
 export { Illustration, ILLUSTRATION_ASPECT, FRAME_SIZED, JHAROKHA_OPENING } from './art/illustrations';
 
 /**

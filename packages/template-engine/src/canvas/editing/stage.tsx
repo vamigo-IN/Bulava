@@ -1,9 +1,7 @@
 'use client';
 
-import { RotateCw } from 'lucide-react';
 import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import type { Artboard, Frame } from '@bulava/template-schema';
-import { cn } from '@/lib/utils';
+import type { Artboard, Frame, Layer } from '@bulava/template-schema';
 import { clampFrame, moveFrame, resizeFrame, rotationFor, snapLines, type Guide, type HandleName } from './geometry';
 
 interface Drag {
@@ -29,11 +27,25 @@ const HANDLES: Array<{ name: HandleName; style: CSSProperties; cursor: string }>
   { name: 'w', style: { left: 0, top: '50%' }, cursor: 'ew-resize' },
 ];
 
+const join = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(' ');
+
+/** The rotate handle's arrow (inline: the engine carries no icon library). */
+function RotateIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+    </svg>
+  );
+}
+
 /**
  * The artboard at a zoom, with a transparent overlay of layer boxes on top:
  * drag to move, handles to resize, the ring to rotate. Frames change live in
  * the overlay's own copy of the board and are committed once on release, so
- * every pointer move does not re-validate the whole definition.
+ * every pointer move does not re-validate the whole definition. Shared by the
+ * Studio's Canvas editor and the public card editor; pointer events work for
+ * mouse, pen and touch alike (`handleSize` grows the handles for fingers).
  */
 export function Stage({
   board,
@@ -44,6 +56,9 @@ export function Stage({
   snapping,
   renderBoard,
   label,
+  handleSize = 10,
+  onDoubleClick,
+  selectable,
 }: {
   board: Artboard;
   zoom: number;
@@ -53,6 +68,12 @@ export function Stage({
   snapping: boolean;
   renderBoard: (board: Artboard) => ReactNode;
   label: string;
+  /** CSS pixels: 10 for a mouse, larger on touch screens. */
+  handleSize?: number;
+  /** A double click (or double tap) on a layer: the card editor opens its text. */
+  onDoubleClick?: (id: string) => void;
+  /** Which layers can be picked on the canvas (all visible ones by default). */
+  selectable?: (layer: Layer) => boolean;
 }) {
   const [live, setLive] = useState<Artboard | null>(null);
   const [guides, setGuides] = useState<Guide[]>([]);
@@ -62,6 +83,7 @@ export function Stage({
   const H = board.height;
   const pct = (n: number, of: number) => `${(n / of) * 100}%`;
   const selected = shown.layers.find((l) => l.id === selectedId) ?? null;
+  const ring = Math.round(handleSize * 2.4);
 
   const begin = (e: ReactPointerEvent<HTMLElement>, kind: Drag['kind'], layerId: string, handle?: HandleName) => {
     const layer = board.layers.find((l) => l.id === layerId);
@@ -123,7 +145,7 @@ export function Stage({
         }}
       >
         {shown.layers.map((layer) => {
-          if (layer.hidden) return null;
+          if (layer.hidden || (selectable && !selectable(layer))) return null;
           const f = layer.frame;
           const isSelected = layer.id === selectedId;
           return (
@@ -134,9 +156,10 @@ export function Stage({
               tabIndex={-1}
               aria-label={layer.name ?? layer.id}
               aria-pressed={isSelected}
-              className={cn('group absolute touch-none', layer.locked ? 'cursor-default' : 'cursor-move', isSelected ? 'outline-2 outline-brand-600' : 'outline-1 outline-transparent hover:outline-brand-400')}
+              className={join('group absolute touch-none', layer.locked ? 'cursor-default' : 'cursor-move', isSelected ? 'outline-2 outline-brand-600' : 'outline-1 outline-transparent hover:outline-brand-600/40')}
               style={{ left: pct(f.x, W), top: pct(f.y, H), width: pct(f.w, W), height: pct(f.h, H), transform: f.rotate ? `rotate(${f.rotate}deg)` : undefined, outlineStyle: 'solid', zIndex: isSelected ? 2 : 1 }}
               onPointerDown={(e) => begin(e, 'move', layer.id)}
+              onDoubleClick={onDoubleClick ? () => onDoubleClick(layer.id) : undefined}
               {...handlers}
             >
               {isSelected && !layer.locked ? (
@@ -145,22 +168,22 @@ export function Stage({
                     <span
                       key={h.name}
                       role="presentation"
-                      className="absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-brand-600 bg-white shadow"
-                      style={{ ...h.style, cursor: h.cursor, zIndex: 3 }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-sm border border-brand-600 bg-white shadow"
+                      style={{ ...h.style, width: handleSize, height: handleSize, cursor: h.cursor, zIndex: 3 }}
                       onPointerDown={(e) => begin(e, 'resize', layer.id, h.name)}
                       {...handlers}
                     />
                   ))}
-                  <span className="absolute left-1/2 -top-7 h-5 w-px -translate-x-1/2 bg-brand-600" aria-hidden />
+                  <span className="absolute left-1/2 w-px -translate-x-1/2 bg-brand-600" style={{ top: -ring + 2, height: ring - 4 }} aria-hidden />
                   <span
                     role="presentation"
                     title="Rotate"
-                    className="absolute left-1/2 -top-10 grid size-6 -translate-x-1/2 cursor-grab place-items-center rounded-full border border-brand-600 bg-white text-brand-700 shadow"
-                    style={{ zIndex: 3 }}
+                    className="absolute left-1/2 grid -translate-x-1/2 cursor-grab place-items-center rounded-full border border-brand-600 bg-white text-brand-600 shadow"
+                    style={{ top: -ring - handleSize * 1.2, width: handleSize * 2.2, height: handleSize * 2.2, zIndex: 3 }}
                     onPointerDown={(e) => begin(e, 'rotate', layer.id)}
                     {...handlers}
                   >
-                    <RotateCw className="size-3.5" aria-hidden />
+                    <RotateIcon size={Math.round(handleSize * 1.3)} />
                   </span>
                 </>
               ) : null}

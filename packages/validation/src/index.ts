@@ -924,8 +924,164 @@ export const ContactReplySchema = z.object({
 });
 export type ContactReplyInput = z.infer<typeof ContactReplySchema>;
 
+// ───────────────────────────── Digital cards ─────────────────────────────
+
+/** Calling codes told apart when a number arrives without a space after its code (longest first). */
+const CALLING_CODES = ['+971', '+966', '+974', '+965', '+968', '+973', '+977', '+880', '+353', '+254', '+91', '+44', '+61', '+65', '+64', '+60', '+94', '+49', '+33', '+31', '+27', '+1'];
+
+/**
+ * A mobile number as the phone field reports it ("+91 98765 43210"): the E.164
+ * form, the calling code and the national number. Indian numbers must be ten
+ * digits starting 6–9. Null when it is not a number.
+ */
+export function splitPhoneNumber(input: string): { e164: string; countryCode: string; national: string } | null {
+  const e164 = normalizePhone(input);
+  if (!e164) return null;
+  const typed = /^\s*(\+\d{1,4})[\s-]/.exec(input)?.[1];
+  const countryCode = typed && e164.startsWith(typed) ? typed : (CALLING_CODES.find((c) => e164.startsWith(c)) ?? '');
+  const national = e164.slice(countryCode.length || 1);
+  if (countryCode === '+91' && !/^[6-9]\d{9}$/.test(national)) return null;
+  return { e164, countryCode, national };
+}
+
+const CardPhoneSchema = z
+  .string()
+  .trim()
+  .max(32)
+  .transform((value, ctx) => {
+    const phone = splitPhoneNumber(value);
+    if (!phone) {
+      ctx.addIssue({ code: 'custom', message: 'Enter a valid mobile number' });
+      return z.NEVER;
+    }
+    return phone;
+  });
+
+const templateKey = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(80);
+/** A card session's token: 32 random bytes, base64url. */
+export const CardTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+
+/** Funnel steps of the card flow (docs/cards.md#tracking). */
+export const CARD_EVENT_TYPES = [
+  'TEMPLATE_SELECTED',
+  'EDITOR_OPENED',
+  'CARD_CUSTOMIZED',
+  'DOWNLOAD_MODAL_OPENED',
+  'PHONE_SUBMITTED',
+  'FREE_DOWNLOAD_REQUESTED',
+  'FREE_CARD_GENERATED',
+  'FREE_DOWNLOAD_COMPLETED',
+  'PAID_OPTION_SELECTED',
+  'CUSTOMER_DETAILS_SUBMITTED',
+  'PAYMENT_INITIATED',
+  'PAYMENT_SUCCEEDED',
+  'PAYMENT_FAILED',
+  'PAYMENT_CANCELLED',
+  'PAID_CARD_GENERATED',
+  'PAID_DOWNLOAD_COMPLETED',
+  'EMAIL_SENT',
+  'EMAIL_FAILED',
+  'PLAN_DOWNLOAD_REQUESTED',
+  'PLAN_CARD_GENERATED',
+  'PLAN_DOWNLOAD_COMPLETED',
+  'EXPORT_FAILED',
+] as const;
+export type CardEventType = (typeof CARD_EVENT_TYPES)[number];
+
+/**
+ * Steps only the browser sees. Everything that is a conversion (a download,
+ * a payment, an email) is recorded by the server when it actually happens, so
+ * these can never fake one.
+ */
+export const CLIENT_CARD_EVENT_TYPES = ['TEMPLATE_SELECTED', 'EDITOR_OPENED', 'DOWNLOAD_MODAL_OPENED', 'PAID_OPTION_SELECTED'] as const;
+
+export const CardEventSchema = z.object({
+  type: z.enum(CLIENT_CARD_EVENT_TYPES),
+  templateKey: templateKey.optional(),
+  /** The card's session, once it has one. */
+  session: CardTokenSchema.optional(),
+  /** A few anonymous facts (the format, the gallery filter). */
+  meta: z
+    .record(z.string().max(40), z.union([z.string().max(80), z.number(), z.boolean()]))
+    .refine((m) => Object.keys(m).length <= 8, 'At most 8 facts')
+    .optional(),
+});
+export type CardEventInput = z.infer<typeof CardEventSchema>;
+
+/** A card design (validated in full by the API against its template: @bulava/template-schema CardDesignSchema). */
+export const CardDesignBodySchema = z.object({ design: z.record(z.string(), z.unknown()) });
+export type CardDesignBody = z.infer<typeof CardDesignBodySchema>;
+
+export const CARD_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const CARD_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+
+export const CardUploadSchema = z.object({
+  contentType: z.enum(CARD_UPLOAD_TYPES),
+  size: z.number().int().min(1).max(CARD_UPLOAD_MAX_BYTES, 'Photos up to 15 MB'),
+});
+export type CardUploadInput = z.infer<typeof CardUploadSchema>;
+
+/** The free download: a mobile number, nothing else. Offers on WhatsApp are a separate, unticked choice. */
+export const CardFreeDownloadSchema = z.object({
+  phone: CardPhoneSchema,
+  marketingConsent: z.boolean().default(false),
+});
+export type CardFreeDownloadInput = z.infer<typeof CardFreeDownloadSchema>;
+
+/** The watermark-free card: the number, a name and an email for the receipt and the card, and the ticked Terms. */
+export const CardOrderSchema = z.object({
+  phone: CardPhoneSchema,
+  name: z.string().trim().min(2, 'Enter your full name').max(80),
+  email: z.email('Enter a valid email address').max(254).transform((v) => v.toLowerCase()),
+  acceptTerms: agreed('Please accept the Terms of Service and the Refund and Cancellation Policy'),
+  marketingConsent: z.boolean().default(false),
+});
+export type CardOrderInput = z.infer<typeof CardOrderSchema>;
+
+/** How a checkout ended without a payment, as the browser saw it. */
+export const CardCheckoutEventSchema = z.object({
+  type: z.enum(['PAYMENT_FAILED', 'PAYMENT_CANCELLED']),
+  reason: z.string().trim().max(300).optional(),
+});
+export type CardCheckoutEventInput = z.infer<typeof CardCheckoutEventSchema>;
+
+/** "Find my card": the email and number given at checkout. */
+export const CardRecoverSchema = z.object({
+  email: z.email('Enter a valid email address').max(254).transform((v) => v.toLowerCase()),
+  phone: CardPhoneSchema,
+});
+export type CardRecoverInput = z.infer<typeof CardRecoverSchema>;
+
+export const CardStatsQuerySchema = z.object({
+  days: z.coerce
+    .number()
+    .int()
+    .refine((d) => [7, 30, 90, 365].includes(d), 'Choose 7, 30, 90 or 365 days')
+    .default(30),
+});
+
+export const CardLeadsQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  /** granted: agreed to offers on WhatsApp (and not withdrawn). */
+  consent: z.enum(['granted', 'none']).optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+});
+
+export const CARD_ORDER_STATUSES = ['PENDING', 'PAID', 'FAILED', 'EXPIRED', 'REFUNDED'] as const;
+
+export const CardOrdersQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  status: z.enum(CARD_ORDER_STATUSES).optional(),
+  /** Paid orders whose card could not be emailed. */
+  emailFailed: z.enum(['true']).optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+});
+
 // Site pages (About, Contact, policies and pages staff create).
 export * from './pages';
+
+// The templates each home page section shows (console: Home page).
+export * from './showcase';
 
 // Platform settings (admin console).
 export * from './settings';

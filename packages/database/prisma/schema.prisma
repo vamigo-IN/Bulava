@@ -84,6 +84,7 @@ model User {
   consents         Consent[]
   recoveryCodes    MfaRecoveryCode[]
   memberInvites    EventMemberInvite[]  @relation("MemberInvitesSent")
+  cardSessions     CardSession[]
 
   @@index([status, deletionScheduledAt])
   @@map("users")
@@ -144,20 +145,24 @@ model OtpChallenge {
 }
 
 model Consent {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  userId    String?  @db.Uuid
-  guestId   String?  @db.Uuid
-  kind      String
-  granted   Boolean
-  version   String
-  source    String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid(7)) @db.Uuid
+  userId     String?  @db.Uuid
+  guestId    String?  @db.Uuid
+  /// A contact from the digital card flow (no account): its purchase terms and offers on WhatsApp.
+  cardLeadId String?  @db.Uuid
+  kind       String
+  granted    Boolean
+  version    String
+  source     String?
+  createdAt  DateTime @default(now())
 
-  user  User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  guest Guest? @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guest    Guest?    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  cardLead CardLead? @relation(fields: [cardLeadId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([guestId])
+  @@index([cardLeadId])
   @@map("consents")
 }
 
@@ -1538,6 +1543,18 @@ model Testimonial {
   @@map("testimonials")
 }
 
+/// Templates staff chose for a home page section (and the first cards of the
+/// card gallery), by key and in order. A section without a row chooses its own.
+model ShowcaseSection {
+  /// hero | heroBack | scenes | collection | spotlight | videos | cards (SHOWCASE_SECTIONS in @bulava/validation).
+  section      String   @id
+  templateKeys String[]
+  updatedById  String?  @db.Uuid
+  updatedAt    DateTime @updatedAt
+
+  @@map("showcase_sections")
+}
+
 enum SitePageLayout {
   /// One reading column with an "On this page" index (policies).
   DOCUMENT
@@ -1832,4 +1849,252 @@ model EventDomain {
   @@index([hostname])
   @@index([status, lastCheckedAt])
   @@map("event_domains")
+}
+
+// ───────────────────────────── Digital cards ─────────────────────────────
+// Public card editor (docs/cards.md): no account needed. Free downloads carry a
+// watermark and need a mobile number; a paid order unlocks the card without it.
+
+enum CardOrderStatus {
+  /// Waiting for a payment Razorpay confirms (checkout open, failed attempts can be retried).
+  PENDING
+  PAID
+  /// The gateway order could not be created.
+  FAILED
+  /// Never paid within two days.
+  EXPIRED
+  REFUNDED
+}
+
+enum CardExportKind {
+  /// With the watermark, after a mobile number.
+  FREE
+  /// Without it, after a verified payment.
+  PAID
+  /// Without it, for a signed-in customer whose plan covers it.
+  PLAN
+}
+
+enum CardExportStatus {
+  QUEUED
+  RENDERING
+  READY
+  FAILED
+  /// The file was deleted by the retention rules (a new one can be made).
+  EXPIRED
+}
+
+enum CardEmailStatus {
+  NONE
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum CardUploadStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  REJECTED
+}
+
+/// A card being designed. The browser holds the token; only its hash is kept.
+model CardSession {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  tokenHash         String    @unique
+  templateKey       String
+  templateVersionId String?   @db.Uuid
+  /// The occasion (event type key), also the gallery category.
+  eventType         String
+  format            String
+  /// The card design (@bulava/template-schema CardDesignSchema).
+  design            Json
+  designHash        String
+  /// The signed-in customer who designed it, if any.
+  userId            String?   @db.Uuid
+  /// The contact who downloaded or bought it, once known.
+  leadId            String?   @db.Uuid
+  /// The first save that changed the template's design: a card made, not a template opened.
+  customizedAt      DateTime?
+  /// The download dialog was opened.
+  downloadOpenedAt  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastSeenAt        DateTime  @default(now())
+
+  user    User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lead    CardLead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  uploads CardUpload[]
+  orders  CardOrder[]
+  exports CardExport[]
+  events  CardEvent[]
+
+  @@index([lastSeenAt])
+  @@index([templateKey, createdAt])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("card_sessions")
+}
+
+/// A contact from the card flow: one per mobile number, shared by all its cards and orders.
+model CardLead {
+  id                   String    @id @default(uuid(7)) @db.Uuid
+  phoneE164            String    @unique
+  countryCode          String
+  nationalNumber       String
+  /// From the latest paid order (for receipts and disputes); free downloads never ask.
+  name                 String?
+  email                String?   @db.Citext
+  /// Offers on WhatsApp: a separate, optional tick (also kept as a Consent row).
+  marketingConsentAt   DateTime?
+  marketingWithdrawnAt DateTime?
+  /// FREE or PAID: the download option chosen last.
+  lastChoice           String?
+  firstSeenAt          DateTime  @default(now())
+  lastSeenAt           DateTime  @default(now())
+
+  sessions CardSession[]
+  orders   CardOrder[]
+  exports  CardExport[]
+  events   CardEvent[]
+  consents Consent[]
+
+  @@index([lastSeenAt])
+  @@index([email])
+  @@map("card_leads")
+}
+
+/// A watermark-free card bought for one design (frozen when the order was placed).
+model CardOrder {
+  id                String          @id @default(uuid(7)) @db.Uuid
+  /// SHA-256 of the order page's link token (an HMAC of the id: @bulava/auth cardOrderToken).
+  tokenHash         String          @unique
+  /// Shown on the receipt and quoted to support: BC-XXXXXXXX.
+  reference         String          @unique
+  sessionId         String?         @db.Uuid
+  leadId            String          @db.Uuid
+  userId            String?         @db.Uuid
+  status            CardOrderStatus @default(PENDING)
+  amountMinor       Int
+  currency          String          @default("INR")
+  provider          String          @default("RAZORPAY")
+  providerOrderId   String?         @unique
+  providerPaymentId String?         @unique
+  /// The design bought: later edits to the card need a new order.
+  design            Json
+  designHash        String
+  templateKey       String
+  format            String
+  name              String
+  email             String          @db.Citext
+  phoneE164         String
+  termsAcceptedAt   DateTime
+  emailStatus       CardEmailStatus @default(NONE)
+  emailAttempts     Int             @default(0)
+  emailError        String?
+  emailedAt         DateTime?
+  paidAt            DateTime?
+  /// The bank's or gateway's reason for the last failed attempt.
+  failureReason     String?
+  refundedAt        DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  session CardSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  lead    CardLead     @relation(fields: [leadId], references: [id])
+  exports CardExport[]
+  events  CardEvent[]
+
+  @@index([status, createdAt])
+  @@index([paidAt])
+  @@index([leadId])
+  @@index([email])
+  @@index([sessionId, designHash])
+  @@map("card_orders")
+}
+
+/// One rendered image of a design (free, paid or plan), stored privately.
+model CardExport {
+  id                String           @id @default(uuid(7)) @db.Uuid
+  kind              CardExportKind
+  status            CardExportStatus @default(QUEUED)
+  sessionId         String?          @db.Uuid
+  orderId           String?          @db.Uuid
+  leadId            String?          @db.Uuid
+  userId            String?          @db.Uuid
+  templateKey       String
+  format            String
+  /// The design rendered (a copy: the session may change afterwards).
+  design            Json
+  designHash        String
+  storageKey        String?
+  width             Int?
+  height            Int?
+  bytes             Int?
+  attempts          Int              @default(0)
+  error             String?
+  readyAt           DateTime?
+  downloads         Int              @default(0)
+  firstDownloadedAt DateTime?
+  lastDownloadedAt  DateTime?
+  /// When the file is deleted: free 7 days after it is made, plan 30 days, paid a year after payment.
+  expiresAt         DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  session CardSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  order   CardOrder?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lead    CardLead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, kind, designHash])
+  @@index([orderId])
+  @@index([status, expiresAt])
+  @@index([kind, createdAt])
+  @@map("card_exports")
+}
+
+/// A photo placed in a card, verified and re-encoded by the media worker.
+model CardUpload {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  sessionId   String           @db.Uuid
+  status      CardUploadStatus @default(UPLOADING)
+  contentType String
+  originalKey String
+  /// The cleaned rendition the card shows (no EXIF, at most 2400 px).
+  storageKey  String?
+  width       Int?
+  height      Int?
+  bytes       Int?
+  error       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  session CardSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([status, createdAt])
+  @@map("card_uploads")
+}
+
+/// A step in the card funnel (docs/cards.md#tracking). Conversions are recorded by the server.
+model CardEvent {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  type        String
+  sessionId   String?  @db.Uuid
+  leadId      String?  @db.Uuid
+  orderId     String?  @db.Uuid
+  userId      String?  @db.Uuid
+  templateKey String?
+  meta        Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  session CardSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  lead    CardLead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  order   CardOrder?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([type, createdAt])
+  @@index([templateKey, type])
+  @@index([sessionId])
+  @@index([orderId])
+  @@map("card_events")
 }

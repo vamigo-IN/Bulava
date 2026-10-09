@@ -365,7 +365,7 @@ node infrastructure/scripts/template-previews.mjs                   # every temp
 node infrastructure/scripts/template-previews.mjs --only key1,key2  # just these
 ```
 
-The script photographs `/preview-frame/<key>` (a bare page that only exists with `TEMPLATE_PREVIEW_FRAMES=1`; `?view=card`, `full` or `poster`) with reduced motion, so openings and entrances are already settled. `--full` picks the templates that also get a long image (default `marigold-mahal`, the hero). A full run deletes images of templates that are gone. Rebuild the web app afterwards: the manifest is compiled in.
+The script photographs `/preview-frame/<key>` (a bare page that only exists with `TEMPLATE_PREVIEW_FRAMES=1`; `?view=card`, `full` or `poster`) with reduced motion, so openings and entrances are already settled. `--full` picks the templates that also get a long image (default `marigold-mahal`, the hero); a hero chosen in the console's Home page screen plays live until it has one. A full run deletes images of templates that are gone. Rebuild the web app afterwards: the manifest is compiled in.
 
 ## Quality gates
 

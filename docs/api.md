@@ -141,9 +141,14 @@ The GET returns the event shell, the guest's name, and only the functions the gu
 | Payments | `POST /events/:id/orders` `{ planKey, couponCode?, acceptTerms: true }`, `POST /orders/:id/verify`, `GET /orders` (payment history), `GET /orders/:id` (status, the buyer's own orders), `POST /orders/:id/checkout` (retry or finish paying the same order), `POST /payments/razorpay/webhook` | [payments.md](payments.md#payment-status-page) |
 | Account | `POST /auth/signup` `{ name, email, password, acceptTerms: true }` then `POST /auth/signup/verify` `{ challengeToken, code }`; `POST /auth/login` answers `{ emailCodeRequired, challengeToken, target }` (then `POST /auth/login/email` `{ challengeToken, code }`) or `{ mfaRequired, challengeToken }`, and after the code may answer `{ restoreRequired, restoreToken, deleteAt }`; `POST /auth/email-code/resend` `{ challengeToken }`; `POST /auth/password/forgot` `{ email }` and `/auth/password/reset` `{ challengeToken, code, newPassword }`; `DELETE /users/me` `{ password }` or `{ confirm: "DELETE" }` (schedules erasure in 30 days); `POST /auth/restore` `{ token }` | [authentication.md](authentication.md#hosts-users) |
 | Site pages and contact | public `GET /public/pages`, `GET /public/pages/:slug`, `POST /public/contact` (4 per 10 minutes per IP); staff `/admin/pages` (`page.manage`), `/admin/contact-messages` (`contact.manage`) | [below](#site-pages-and-the-contact-inbox) |
+| Home page showcase | public `GET /public/showcase`; staff `GET /admin/showcase`, `PUT /admin/showcase/:section` (`showcase.manage`) | [below](#home-page-showcase) |
 | Admin | `/admin/*` (see below for staff, settings and orders) | [template-studio.md](template-studio.md), [authorization.md](authorization.md#platform-roles) |
 | Privacy | `GET /users/me/export`, `DELETE /users/me` | [security.md](security.md) |
 
+
+## Digital cards
+
+The public card editor's routes (no account; the card's token in `x-card-session`, an order's in `x-card-order`), the plan download and the console's routes are in [cards.md](cards.md#api).
 
 ## Added in this release
 
@@ -198,6 +203,16 @@ Staff routes answer 404 to anyone whose role lacks the permission, so the admin 
 | `PATCH /admin/contact-messages/:id` `{ status?, note? }` | `contact.manage` | the note is internal and stays out of the audit log |
 | `POST /admin/contact-messages/:id/replies` `{ body, resolve }` | `contact.manage` | emails the sender with their message quoted (reply-to: the support address) and keeps the reply; `EMAIL_UNAVAILABLE` until email is set up |
 | `DELETE /admin/contact-messages/:id` | `contact.manage` | spam, or a sender's erasure request |
+
+### Home page showcase
+
+Which templates the home page's sections show, chosen in the console's Home page screen. Sections (`SHOWCASE_SECTIONS` in `@bulava/validation`): `hero` (1 website), `heroBack` (2), `scenes` (12), `collection` (24), `spotlight` (1), `videos` (3 films) and `cards` (24 canvas templates: the card gallery's Featured order). The site shows a section's picks first and fills the rest itself.
+
+| Routes | Permission | Notes |
+|---|---|---|
+| public `GET /public/showcase` | none | `{ [section]: templateKeys[] }` for sections with picks, keeping only published templates that still fit (`Cache-Control: public, max-age=60`) |
+| `GET /admin/showcase` | `showcase.manage` | every section (`max`, `fit`, the saved `templateKeys`, `updatedAt`), the published templates with the sections each fits, and the site's origin |
+| `PUT /admin/showcase/:section` `{ templateKeys }` | `showcase.manage` | the section's picks in order, at most its `max`, each once; every key must be a published template that fits (`SHOWCASE_TEMPLATE_UNFIT`, with `details.keys`). `[]` hands the section back to the automatic choice. Audited as `admin.showcase_saved` |
 
 `GET /public/templates` filters by `type`, `eventType`, `tag`, `tier`, `featured`, `q` and `keys` (comma-separated). It lists templates without their definitions, each with a `preview` (`colors`, `heroVariant`); `include=definition` adds them for at most 60 templates (`VALIDATION_FAILED` beyond, so narrow by type, event type or keys). `GET /public/templates/:key` returns one template with its definition.
 

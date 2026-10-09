@@ -7,6 +7,7 @@ import { dispatchReminders } from './reminders';
 import { checkDueDomains, type DnsResolver, type HostnameProvider, type RoutingTarget } from '@bulava/domains';
 import { WhatsAppSendError, type EmailMessage, type EmailProvider, type WhatsAppChannel } from './providers';
 import { refreshWhatsAppStatuses } from './whatsapp-status';
+import { cardRetention, sendCardOrderEmail } from './cards';
 
 export interface WorkerDeps {
   prisma: PrismaClient;
@@ -22,6 +23,8 @@ export interface WorkerDeps {
   domains?: () => Promise<{ resolver: DnsResolver; provider: HostnameProvider; target: RoutingTarget } | null>;
   env: { WEB_ORIGIN: string; TOKEN_ENCRYPTION_KEY: string; POSTHOG_KEY?: string; POSTHOG_HOST?: string };
   log: { info: (o: object, msg: string) => void; warn: (o: object, msg: string) => void };
+  /** Reads a stored file (a paid card's image, attached to its email). */
+  readObject?: (key: string) => Promise<Buffer>;
 }
 
 /** The event's live custom domain (same scheme and port as the main site), or the main site. */
@@ -243,6 +246,7 @@ async function compose(deps: WorkerDeps, n: NotificationRow, payload: Record<str
 
 /** Direct emails (e.g. OTP codes, the console's test email) that are not stored as Notification rows. */
 export async function processEmail(deps: WorkerDeps, job: JobPayloads['email']): Promise<string> {
+  if ('cardOrderId' in job) return sendCardOrderEmail(deps, job.cardOrderId);
   const email = await deps.email();
   if (!email) {
     deps.log.warn({ to: '[redacted]' }, 'Email provider not configured; dropping email');
@@ -347,6 +351,10 @@ export async function processCleanup(deps: WorkerDeps & { deleteObject: (key: st
     if (!routing) return 'no-domains';
     const r = await checkDueDomains({ prisma: deps.prisma, ...routing });
     return `checked:${r.checked} active:${r.active}`;
+  }
+  if (job.task === 'card-retention') {
+    const r = await cardRetention({ prisma: deps.prisma, deleteObject: deps.deleteObject, log: deps.log }, now);
+    return `images:${r.images} uploads:${r.uploads} checkouts:${r.checkouts} cards:${r.cards} contacts:${r.contacts} steps:${r.steps}`;
   }
   if (job.task === 'whatsapp-status') {
     const channel = (await deps.whatsapp?.()) ?? null;

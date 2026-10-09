@@ -1,5 +1,6 @@
 import { ArrowRight, SlidersHorizontal, X } from 'lucide-react';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
 import { cn } from '@/lib/utils';
 import { filterItems, hrefFor, type ExplorerFilters, type ExplorerItem, type FilterKey, type FilterOption } from './template-explorer';
@@ -14,9 +15,7 @@ export interface FilterGroup {
   visible?: number;
 }
 
-const BASE = '/templates';
-
-function GroupLinks({ group, items, current, t }: { group: FilterGroup; items: ExplorerItem[]; current: ExplorerFilters; t: Translator }) {
+function GroupLinks({ group, items, current, t, basePath }: { group: FilterGroup; items: ExplorerItem[]; current: ExplorerFilters; t: Translator; basePath: string }) {
   const value = current[group.key] ?? '';
   // How many templates each choice would show, given the other filters.
   const count = (v: string) => filterItems(items, { ...current, [group.key]: v }).length;
@@ -41,7 +40,7 @@ function GroupLinks({ group, items, current, t }: { group: FilterGroup; items: E
           </span>
         ) : (
           <TrackedLink
-            href={hrefFor(BASE, { ...current }, group.key, o.value)}
+            href={hrefFor(basePath, { ...current }, group.key, o.value)}
             scroll={false}
             event="template_filter"
             properties={{ kind: group.key, value: o.value }}
@@ -76,20 +75,29 @@ function GroupLinks({ group, items, current, t }: { group: FilterGroup; items: E
   );
 }
 
-function Filters({ groups, items, current, t }: { groups: FilterGroup[]; items: ExplorerItem[]; current: ExplorerFilters; t: Translator }) {
+function Filters({ groups, items, current, t, basePath }: { groups: FilterGroup[]; items: ExplorerItem[]; current: ExplorerFilters; t: Translator; basePath: string }) {
   return (
     <div className="space-y-7">
       {groups.map((g) => (
-        <GroupLinks key={g.key} group={g} items={items} current={current} t={t} />
+        <GroupLinks key={g.key} group={g} items={items} current={current} t={t} basePath={basePath} />
       ))}
     </div>
   );
+}
+
+/** Words a gallery may use instead of the templates gallery's own. */
+export interface GalleryLabels {
+  showing?: (shown: number, total: number) => string;
+  emptyTitle?: string;
+  emptyBody?: string;
+  more?: (count: number) => string;
 }
 
 /**
  * The template gallery: filters in a sticky sidebar (a fold-out panel on phones),
  * the active filters as removable chips, and the cards. Filtering happens on the
  * server from the URL, so every choice is a link and a page ships only its cards.
+ * The digital card gallery uses it too, with its own path, words and a search bar.
  */
 export function TemplateGallery({
   items,
@@ -98,6 +106,10 @@ export function TemplateGallery({
   limit,
   moreHref,
   t,
+  basePath = '/templates',
+  labels = {},
+  toolbar,
+  gridClassName = 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,17.5rem),1fr))] gap-6',
 }: {
   /** Every template; the gallery filters them. */
   items: ExplorerItem[];
@@ -106,23 +118,32 @@ export function TemplateGallery({
   limit: number;
   moreHref: string;
   t: Translator;
+  /** Where the filter links point. */
+  basePath?: string;
+  labels?: GalleryLabels;
+  /** Above the results (the card gallery's search and order). */
+  toolbar?: ReactNode;
+  /** The results grid (cards sit two to a row on phones). */
+  gridClassName?: string;
 }) {
   const matching = filterItems(items, current);
   const shown = matching.slice(0, limit);
-  const active = groups.flatMap((g) => {
+  const active: Array<{ key: keyof ExplorerFilters; label: string }> = groups.flatMap((g) => {
     const value = current[g.key];
     const option = value ? g.options.find((o) => o.value === value) : undefined;
     return option ? [{ key: g.key, label: option.label }] : [];
   });
+  if (current.q) active.push({ key: 'q', label: `“${current.q}”` });
   return (
     <div className="lg:grid lg:grid-cols-[16.5rem_minmax(0,1fr)] lg:gap-10">
       <aside aria-label={t('gallery.filters')} className="hidden lg:block">
         <div className="clay sticky top-24 max-h-[calc(100dvh-7.5rem)] overflow-y-auto rounded-[1.75rem] p-4 [scrollbar-width:thin]" data-lenis-prevent>
-          <Filters groups={groups} items={items} current={current} t={t} />
+          <Filters groups={groups} items={items} current={current} t={t} basePath={basePath} />
         </div>
       </aside>
 
       <div className="min-w-0">
+        {toolbar ? <div className="mb-5">{toolbar}</div> : null}
         {/* Phones and tablets: the same filters, folded into a panel. */}
         <details className="group/filters mb-5 lg:hidden">
           <summary className="btn-3d btn-3d-light min-h-12 w-full cursor-pointer list-none justify-between rounded-2xl px-5 text-base [&::-webkit-details-marker]:hidden">
@@ -136,20 +157,20 @@ export function TemplateGallery({
             </span>
           </summary>
           <div className="clay mt-3 rounded-[1.5rem] p-4">
-            <Filters groups={groups} items={items} current={current} t={t} />
+            <Filters groups={groups} items={items} current={current} t={t} basePath={basePath} />
           </div>
         </details>
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-stone-600" aria-live="polite">
-            {t('gallery.showing', { shown: shown.length, total: matching.length })}
+            {labels.showing ? labels.showing(shown.length, matching.length) : t('gallery.showing', { shown: shown.length, total: matching.length })}
           </p>
           {active.length ? (
             <ul aria-label={t('gallery.active')} className="flex flex-wrap items-center gap-2">
               {active.map((a) => (
                 <li key={a.key}>
                   <Link
-                    href={hrefFor(BASE, current, a.key, '')}
+                    href={hrefFor(basePath, current, a.key, '')}
                     scroll={false}
                     className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-surface py-1 pr-2.5 pl-3.5 text-sm font-medium text-brand-700 shadow-clay-sm transition-colors hover:text-brand-800"
                     aria-label={t('gallery.remove', { filter: a.label })}
@@ -160,7 +181,7 @@ export function TemplateGallery({
                 </li>
               ))}
               <li>
-                <Link href={BASE} scroll={false} className="px-2 text-sm font-semibold text-stone-600 underline decoration-gold-300 underline-offset-4 hover:text-brand-700">
+                <Link href={basePath} scroll={false} className="px-2 text-sm font-semibold text-stone-600 underline decoration-gold-300 underline-offset-4 hover:text-brand-700">
                   {t('gallery.clear')}
                 </Link>
               </li>
@@ -169,16 +190,16 @@ export function TemplateGallery({
         </div>
 
         {shown.length ? (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17.5rem),1fr))] gap-6">
+          <ul className={gridClassName}>
             {shown.map((i) => (
               <li key={i.key}>{i.node}</li>
             ))}
           </ul>
         ) : (
           <div className="clay-inset rounded-3xl px-6 py-14 text-center">
-            <p className="font-display text-2xl text-ink">{t('gallery.emptyTitle')}</p>
-            <p className="mt-2 text-stone-600">{t('gallery.emptyBody')}</p>
-            <Link href={BASE} scroll={false} className="btn-3d mt-6 min-h-11 rounded-xl px-5 text-sm">
+            <p className="font-display text-2xl text-ink">{labels.emptyTitle ?? t('gallery.emptyTitle')}</p>
+            <p className="mt-2 text-stone-600">{labels.emptyBody ?? t('gallery.emptyBody')}</p>
+            <Link href={basePath} scroll={false} className="btn-3d mt-6 min-h-11 rounded-xl px-5 text-sm">
               {t('gallery.clear')}
             </Link>
           </div>
@@ -187,7 +208,7 @@ export function TemplateGallery({
         {matching.length > shown.length ? (
           <div className="mt-12 text-center">
             <Link href={moreHref} scroll={false} className="btn-3d group/more min-h-13 rounded-2xl px-7">
-              {t('templates.showMore', { count: matching.length - shown.length })}
+              {labels.more ? labels.more(matching.length - shown.length) : t('templates.showMore', { count: matching.length - shown.length })}
               <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/more:translate-x-1" />
             </Link>
           </div>

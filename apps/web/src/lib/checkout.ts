@@ -72,7 +72,17 @@ export function paymentStatusPath(orderId: string, state?: 'confirming' | 'faile
  * buyer retry inside the window after a failure, so "failed" is reported only
  * when they close it without a successful attempt.
  */
-export async function runCheckout(session: CheckoutSession, options: { unavailable: string; siteName?: string }): Promise<CheckoutOutcome> {
+export async function runCheckout(
+  session: CheckoutSession,
+  options: {
+    unavailable: string;
+    siteName?: string;
+    /** Confirms the payment with the API (plan orders by default; digital cards pass their own). */
+    verify?: (response: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) => Promise<unknown>;
+    /** Told about each failed attempt, with the bank's reason when it gives one. */
+    onFailedAttempt?: (reason: string | undefined) => void;
+  },
+): Promise<CheckoutOutcome> {
   if (!(await loadCheckout()) || !window.Razorpay) throw new Error(options.unavailable);
   return new Promise<CheckoutOutcome>((resolve) => {
     let failed = false;
@@ -88,11 +98,8 @@ export async function runCheckout(session: CheckoutSession, options: { unavailab
       modal: { ondismiss: () => resolve(failed ? 'failed' : 'dismissed') },
       handler: async (res: RazorpayResponse) => {
         try {
-          await apiPost(`/orders/${session.orderId}/verify`, {
-            razorpayOrderId: res.razorpay_order_id,
-            razorpayPaymentId: res.razorpay_payment_id,
-            razorpaySignature: res.razorpay_signature,
-          });
+          const proof = { razorpayOrderId: res.razorpay_order_id, razorpayPaymentId: res.razorpay_payment_id, razorpaySignature: res.razorpay_signature };
+          await (options.verify ? options.verify(proof) : apiPost(`/orders/${session.orderId}/verify`, proof));
           resolve('paid');
         } catch {
           resolve('confirming');
@@ -102,6 +109,7 @@ export async function runCheckout(session: CheckoutSession, options: { unavailab
     rzp.on('payment.failed', (e) => {
       failed = true;
       const reason = (e as RazorpayFailure)?.error?.description;
+      options.onFailedAttempt?.(reason);
       try {
         if (reason) sessionStorage.setItem(failureKey(session.orderId), reason.slice(0, 300));
       } catch {

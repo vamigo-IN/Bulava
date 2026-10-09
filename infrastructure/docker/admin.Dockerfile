@@ -10,10 +10,11 @@ ENV npm_config_store_dir=/pnpm/store npm_config_fetch_retries=5 npm_config_fetch
 WORKDIR /repo
 
 FROM base AS build
-# Rewrites (/api/v1 -> API) and the CSP storage origin are resolved at build time.
+# Rewrites (/api/v1 -> API, /template-previews -> web) and the CSP storage origin are resolved at build time.
 ARG API_INTERNAL_URL=http://api:4000
+ARG WEB_INTERNAL_URL=http://web:3000
 ARG STORAGE_PUBLIC_ORIGIN=https://media.bulava.in
-ENV API_INTERNAL_URL=$API_INTERNAL_URL STORAGE_PUBLIC_ORIGIN=$STORAGE_PUBLIC_ORIGIN NEXT_TELEMETRY_DISABLED=1
+ENV API_INTERNAL_URL=$API_INTERNAL_URL WEB_INTERNAL_URL=$WEB_INTERNAL_URL STORAGE_PUBLIC_ORIGIN=$STORAGE_PUBLIC_ORIGIN NEXT_TELEMETRY_DISABLED=1
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store,sharing=locked pnpm fetch
 COPY . .

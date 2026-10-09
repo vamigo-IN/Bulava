@@ -1,0 +1,489 @@
+import { z } from 'zod';
+import { createTranslator, formatEventTime, utcToZonedWallTime, zonedWallTimeToUtcIso } from '@bulava/localization';
+import type { Value } from './base';
+import { resolveBinding, resolveValue } from './bindings';
+import { ArtboardSchema, type Artboard, type ArtboardInput, type CanvasSection, type Layer, type LayerInput, type WidgetLayer } from './canvas';
+import { sampleRenderContext, type GalleryImage, type RenderContext } from './context';
+import { FontsSchema, ThemeColorsSchema, type PhotoSlot, type TemplateDefinition } from './definition';
+
+/**
+ * Digital cards (docs/cards.md): a template's opening artboard turned into a
+ * still card anyone can edit and download, without an account. A card design
+ * is self-contained: its own artboard at the chosen format's size, the
+ * palette and fonts, the details its text follows (names, date, venue…) and
+ * the photos placed in it. The same design renders in the editor, in the
+ * download preview and in the exported image, so the three always match.
+ */
+
+// ─────────────────────────── Formats ───────────────────────────
+
+export const CARD_FORMAT_KEYS = ['phone', 'story', 'portrait', 'square', 'landscape'] as const;
+export type CardFormat = (typeof CARD_FORMAT_KEYS)[number];
+
+export interface CardFormatSpec {
+  /** The artboard's size in design units (CSS px). */
+  width: number;
+  height: number;
+  /** Image pixels per design unit in the exported card. */
+  scale: number;
+  /** Which of the template's artboards the card starts from. */
+  source: 'mobile' | 'desktop';
+}
+
+/**
+ * Phone: a phone screen (WhatsApp, the template's own artboard); story: 9:16
+ * statuses and stories; portrait: a 5 × 7 card (prints at 300 dpi); square:
+ * posts; landscape: 16:10 from the template's desktop artboard.
+ */
+export const CARD_FORMATS: Record<CardFormat, CardFormatSpec> = {
+  phone: { width: 390, height: 844, scale: 3, source: 'mobile' },
+  story: { width: 450, height: 800, scale: 2.4, source: 'mobile' },
+  portrait: { width: 500, height: 700, scale: 3, source: 'mobile' },
+  square: { width: 640, height: 640, scale: 1.6875, source: 'mobile' },
+  landscape: { width: 1440, height: 900, scale: 4 / 3, source: 'desktop' },
+};
+
+/** The exported image's size in pixels. */
+export function cardPixelSize(format: CardFormat): { width: number; height: number } {
+  const f = CARD_FORMATS[format];
+  return { width: Math.round(f.width * f.scale), height: Math.round(f.height * f.scale) };
+}
+
+// ─────────────────────────── Details ───────────────────────────
+
+/** Event details a card's text can follow; the editor's Details form fills them. */
+export const CARD_DETAIL_KEYS = ['title', 'partnerOne', 'partnerTwo', 'honoree', 'date', 'time', 'venue', 'address', 'city', 'message', 'family'] as const;
+export type CardDetailKey = (typeof CARD_DETAIL_KEYS)[number];
+
+const detail = (max: number) => z.string().max(max).default('');
+
+export const CardDetailsSchema = z.object({
+  title: detail(120),
+  partnerOne: detail(60),
+  partnerTwo: detail(60),
+  honoree: detail(80),
+  /** YYYY-MM-DD, or empty. */
+  date: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).default(''),
+  /** HH:mm on a 24-hour clock, or empty. */
+  time: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]).default(''),
+  venue: detail(120),
+  address: detail(200),
+  city: detail(80),
+  /** The invitation's line under the names. */
+  message: detail(300),
+  /** Parents' or family names (the blessing line). */
+  family: detail(400),
+});
+export type CardDetails = z.infer<typeof CardDetailsSchema>;
+
+/** The bindings that follow each detail. Text using only these stays linked to the Details form. */
+export const CARD_DETAIL_BINDINGS: Record<CardDetailKey, readonly string[]> = {
+  title: ['event.title'],
+  partnerOne: ['couple.partnerOne', 'couple.brideName'],
+  partnerTwo: ['couple.partnerTwo', 'couple.groomName'],
+  honoree: ['honoree.name'],
+  date: ['event.startDate', 'function.startsAt', 'function.date'],
+  time: ['custom.time'],
+  venue: ['venue.name', 'function.venue.name'],
+  address: ['venue.address', 'function.venue.address'],
+  city: ['venue.city', 'function.venue.city'],
+  message: ['custom.tagline'],
+  family: ['custom.blessings'],
+};
+
+const TEXT_BINDINGS: ReadonlySet<string> = new Set(Object.values(CARD_DETAIL_BINDINGS).flat());
+/** Date-and-time bindings: on a card they always show as a date (the time is its own detail). */
+const DATE_BINDINGS: ReadonlySet<string> = new Set(CARD_DETAIL_BINDINGS.date);
+const DATE_FORMATS: ReadonlySet<string> = new Set(['date', 'dateWithWeekday']);
+
+/** Cards are dated in Indian time. */
+export const CARD_TIME_ZONE = 'Asia/Kolkata';
+
+// ─────────────────────────── Photos ───────────────────────────
+
+/** Where a card's photos go: the template's named spots and three free ones. */
+export const CARD_PHOTO_BINDINGS = ['photo.cover', 'photo.partnerOne', 'photo.partnerTwo', 'photo.story', 'photo.closing', 'photos[0]', 'photos[1]', 'photos[2]'] as const;
+export type CardPhotoBinding = (typeof CARD_PHOTO_BINDINGS)[number];
+const PHOTO_BINDINGS: ReadonlySet<string> = new Set(CARD_PHOTO_BINDINGS);
+export const isCardPhotoBinding = (binding: string): binding is CardPhotoBinding => PHOTO_BINDINGS.has(binding);
+
+// ─────────────────────────── Text values ───────────────────────────
+
+const TEMPLATE_BINDING = /\{\{\s*([\w.[\]]+)\s*(?:\|\s*(\w+))?\s*\}\}/g;
+
+/** Whether a text value can stay live on a card: words, translations, or the card's details shown as text or dates. */
+export function isCardTextValue(value: Value): boolean {
+  if ('literal' in value || 't' in value) return true;
+  const ok = (path: string, format: string | undefined) => TEXT_BINDINGS.has(path) && (!DATE_BINDINGS.has(path) || (format !== undefined && DATE_FORMATS.has(format)));
+  if ('binding' in value) return ok(value.binding, value.format) && (!value.fallback || isCardTextValue(value.fallback));
+  for (const m of value.template.matchAll(TEMPLATE_BINDING)) if (!ok(m[1]!, m[2])) return false;
+  return !value.fallback || isCardTextValue(value.fallback);
+}
+
+/** The details a value shows. */
+function detailsIn(value: Value, into: Set<CardDetailKey>): void {
+  const add = (path: string) => {
+    for (const key of CARD_DETAIL_KEYS) if (CARD_DETAIL_BINDINGS[key].includes(path)) into.add(key);
+  };
+  if ('binding' in value) {
+    add(value.binding);
+    if (value.fallback) detailsIn(value.fallback, into);
+  } else if ('template' in value) {
+    for (const m of value.template.matchAll(TEMPLATE_BINDING)) add(m[1]!);
+    if (value.fallback) detailsIn(value.fallback, into);
+  }
+}
+
+/** Which details a board shows somewhere (the editor offers to add the others). */
+export function cardDetailsShown(board: Pick<Artboard, 'layers'>): Set<CardDetailKey> {
+  const shown = new Set<CardDetailKey>();
+  for (const layer of board.layers) if (layer.kind === 'text' && !layer.hidden) detailsIn(layer.content, shown);
+  return shown;
+}
+
+// ─────────────────────────── The design ───────────────────────────
+
+export const CARD_LANGUAGES = ['en', 'hi', 'hi-Latn'] as const;
+
+export const CardDesignSchema = z
+  .object({
+    v: z.literal(1),
+    templateKey: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(80),
+    format: z.enum(CARD_FORMAT_KEYS),
+    /** The occasion the card is for (an event type key): it picks the template's matching wording. */
+    eventType: z.string().regex(/^[A-Z][A-Z0-9_]{1,39}$/),
+    language: z.enum(CARD_LANGUAGES),
+    colors: ThemeColorsSchema,
+    fonts: FontsSchema,
+    details: CardDetailsSchema.prefault({}),
+    board: ArtboardSchema,
+    /** Photo spot → the upload shown there. */
+    photos: z.partialRecord(z.enum(CARD_PHOTO_BINDINGS), z.uuid()).default({}),
+  })
+  .superRefine((d, ctx) => {
+    const size = CARD_FORMATS[d.format];
+    if (d.board.width !== size.width || d.board.height !== size.height) {
+      ctx.addIssue({ code: 'custom', path: ['board'], message: `A ${d.format} card is ${size.width} × ${size.height}` });
+    }
+    d.board.layers.forEach((layer, i) => {
+      const path = ['board', 'layers', i];
+      if (layer.kind === 'widget') ctx.addIssue({ code: 'custom', path, message: 'Cards have no buttons or countdowns' });
+      if (layer.visibleWhen) ctx.addIssue({ code: 'custom', path, message: 'Card layers are always shown or hidden, never conditional' });
+      if (layer.kind === 'text' && !isCardTextValue(layer.content)) ctx.addIssue({ code: 'custom', path, message: 'This text uses data a card does not have' });
+      if (layer.kind === 'image' && layer.source.type === 'binding' && !isCardPhotoBinding(layer.source.binding)) ctx.addIssue({ code: 'custom', path, message: 'Unknown photo spot' });
+    });
+    const ids = new Set<string>();
+    for (const layer of d.board.layers) {
+      if (ids.has(layer.id)) ctx.addIssue({ code: 'custom', path: ['board', 'layers'], message: `Two layers are called ${layer.id}` });
+      ids.add(layer.id);
+    }
+  });
+export type CardDesign = z.infer<typeof CardDesignSchema>;
+export type CardDesignInput = z.input<typeof CardDesignSchema>;
+
+/** Licensed template assets a design shows (each must be one of its template's). */
+export function cardAssetIds(design: Pick<CardDesign, 'board'>): string[] {
+  const ids = new Set<string>();
+  const board = design.board;
+  if (board.background.type === 'image') ids.add(board.background.assetId);
+  for (const layer of board.layers) {
+    if (layer.kind === 'image' && layer.source.type === 'asset') ids.add(layer.source.assetId);
+    if (layer.kind === 'shape' && layer.fill.type === 'image') ids.add(layer.fill.assetId);
+  }
+  return [...ids];
+}
+
+/** Uploads a design shows (photo spots placed on its board). */
+export function cardUploadIds(design: Pick<CardDesign, 'board' | 'photos'>): string[] {
+  const used = new Set<string>();
+  for (const layer of design.board.layers) if (layer.kind === 'image' && layer.source.type === 'binding' && !layer.hidden) used.add(layer.source.binding);
+  return [...new Set(Object.entries(design.photos).flatMap(([binding, id]) => (used.has(binding) && id ? [id] : [])))];
+}
+
+/** JSON with object keys sorted, so equal designs serialise (and hash) equally. */
+export function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== undefined);
+  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`;
+}
+
+// ─────────────────────────── Rendering context ───────────────────────────
+
+const SLOT_OF: Partial<Record<CardPhotoBinding, PhotoSlot>> = {
+  'photo.cover': 'cover',
+  'photo.partnerOne': 'partnerOne',
+  'photo.partnerTwo': 'partnerTwo',
+  'photo.story': 'story',
+  'photo.closing': 'closing',
+};
+
+/** A detail's date and time as one instant (noon when no time is given; the time shows only through its own detail). */
+export function cardInstant(details: Pick<CardDetails, 'date' | 'time'>): string | null {
+  return details.date ? zonedWallTimeToUtcIso(`${details.date}T${details.time || '12:00'}`, CARD_TIME_ZONE) : null;
+}
+
+/**
+ * What a card's text and photos bind to: its details as a one-function event,
+ * and the photos' URLs (signed links, or local previews in the editor).
+ * Template assets load through the public asset route unless `assets` has them.
+ */
+export function cardRenderContext(design: Pick<CardDesign, 'details' | 'eventType' | 'language'>, photoUrls: Partial<Record<CardPhotoBinding, string>> = {}, assets?: Record<string, string>): RenderContext {
+  const d = design.details;
+  const s = (v: string) => v.trim();
+  const when = cardInstant(d);
+  const venue = s(d.venue) || s(d.address) || s(d.city) ? { name: s(d.venue), address: s(d.address) || null, city: s(d.city) || null, mapUrl: null } : null;
+  const fn = { id: 'card', name: s(d.title), description: null, startsAt: when, endsAt: null, status: 'SCHEDULED', venue };
+  const time = d.time ? formatEventTime(zonedWallTimeToUtcIso(`${d.date || '2026-01-01'}T${d.time}`, CARD_TIME_ZONE), { language: design.language, timeZone: CARD_TIME_ZONE }) : '';
+  const image = (url: string | undefined): GalleryImage | undefined => (url ? { url, thumbUrl: url } : undefined);
+  const photoSlots: NonNullable<RenderContext['photoSlots']> = {};
+  for (const [binding, slot] of Object.entries(SLOT_OF) as Array<[CardPhotoBinding, PhotoSlot]>) {
+    const img = image(photoUrls[binding]);
+    if (img) photoSlots[slot] = img;
+  }
+  // Free spots keep their positions: photos[1] stays second even without a first.
+  const photos = [image(photoUrls['photos[0]']), image(photoUrls['photos[1]']), image(photoUrls['photos[2]'])] as GalleryImage[];
+  return {
+    event: { title: s(d.title), description: null, typeKey: design.eventType, startDate: when, endDate: when, language: design.language, timezone: CARD_TIME_ZONE },
+    ...(s(d.partnerOne) || s(d.partnerTwo) ? { couple: { partnerOne: s(d.partnerOne), partnerTwo: s(d.partnerTwo), brideName: s(d.partnerOne), groomName: s(d.partnerTwo) } } : {}),
+    ...(s(d.honoree) ? { honoree: { name: s(d.honoree) } } : {}),
+    functions: [fn],
+    function: fn,
+    ...(venue ? { venue } : {}),
+    gallery: { images: [] },
+    photos,
+    photoSlots,
+    custom: { tagline: s(d.message), blessings: s(d.family), time },
+    ...(assets && Object.keys(assets).length ? { assets } : {}),
+  };
+}
+
+// ─────────────────────────── From a template ───────────────────────────
+
+/** The template's opening artboards: the first section of its first page, when that is a canvas. */
+export function heroCanvas(definition: Pick<TemplateDefinition, 'website'>): CanvasSection | null {
+  const section = definition.website?.pages[0]?.sections[0];
+  return section?.section === 'canvas' && section.canvas ? section.canvas : null;
+}
+
+/** Whether a template can become a card. */
+export const hasCardDesign = (definition: Pick<TemplateDefinition, 'website'>): boolean => heroCanvas(definition) !== null;
+
+const STILL = { entrance: 'none', delaySec: 0, durationSec: 0.8, motion: 'none' } as const;
+
+function isEmpty(v: unknown): boolean {
+  return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
+/** Details as the sample event has them, so a new card reads like a real invitation. */
+function sampleDetails(ctx: RenderContext): CardDetails {
+  const when = ctx.function?.startsAt ?? ctx.event.startDate;
+  const wall = when ? utcToZonedWallTime(when, CARD_TIME_ZONE) : '';
+  return {
+    title: ctx.event.title,
+    partnerOne: ctx.couple?.partnerOne ?? '',
+    partnerTwo: ctx.couple?.partnerTwo ?? '',
+    honoree: ctx.honoree?.name ?? '',
+    date: wall.slice(0, 10),
+    time: wall.slice(11, 16),
+    venue: ctx.venue?.name ?? '',
+    address: ctx.venue?.address ?? '',
+    city: ctx.venue?.city ?? '',
+    message: ctx.custom.tagline ?? '',
+    family: ctx.custom.blessings ?? '',
+  };
+}
+
+/**
+ * Widgets have nothing to do on a still card: a countdown becomes the time and
+ * venue in the same place and lettering, the date/time/venue rows become text,
+ * and buttons are dropped.
+ */
+function widgetAsText(layer: WidgetLayer): LayerInput[] {
+  const w = layer.widget;
+  const base = { frame: layer.frame, opacity: layer.opacity, blend: layer.blend, locked: layer.locked, hidden: layer.hidden };
+  if (w.type === 'countdown') {
+    return [
+      {
+        ...base,
+        id: `${layer.id}-when`,
+        name: 'Time and venue',
+        kind: 'text',
+        content: { template: '{{custom.time}} · {{venue.name}}', fallback: { binding: 'venue.name', fallback: { binding: 'custom.time' } } },
+        style: { font: w.font, size: Math.max(9, Math.round(w.size * 0.62)), weight: 500, color: w.color, letterSpacing: 0.04, lineHeight: 1.2 },
+        overflow: 'shrink',
+      },
+    ];
+  }
+  if (w.type === 'details') {
+    const contents: Record<string, Value> = {
+      date: { binding: 'event.startDate', format: 'dateWithWeekday' },
+      time: { binding: 'custom.time' },
+      venue: { binding: 'venue.name' },
+      address: { binding: 'venue.address' },
+      city: { binding: 'venue.city' },
+    };
+    const rowH = layer.frame.h / w.rows.length;
+    return w.rows.map((row, i) => ({
+      ...base,
+      id: `${layer.id}-${row}`,
+      kind: 'text' as const,
+      frame: { ...layer.frame, y: layer.frame.y + i * rowH, h: rowH },
+      content: contents[row]!,
+      style: { font: w.font, size: w.valueSize, color: w.valueColor, align: 'left' as const, lineHeight: 1.25 },
+      overflow: 'shrink' as const,
+    }));
+  }
+  return [];
+}
+
+export interface CardFromTemplateOptions {
+  format?: CardFormat;
+  /** The occasion; the template's first event type by default. */
+  eventType?: string;
+  /** One of the template's languages; its first by default. */
+  language?: string;
+  /** The template's tags, for sample wording that matches its tradition. */
+  tags?: readonly string[];
+}
+
+/**
+ * A new card from a template: its opening artboard with the wording for the
+ * occasion, every text either linked to the card's details or turned into
+ * words the customer can edit, widgets as text, motion removed, fitted to the
+ * format. The template is never changed.
+ */
+export function cardFromTemplate(definition: TemplateDefinition, options: CardFromTemplateOptions = {}): CardDesign {
+  const hero = heroCanvas(definition);
+  if (!hero) throw new Error(`Template ${definition.templateKey} has no card design`);
+  const format = options.format ?? 'phone';
+  const spec = CARD_FORMATS[format];
+  const source = spec.source === 'desktop' ? (hero.desktop ?? hero.mobile) : hero.mobile;
+  const eventType = options.eventType ?? definition.eventTypes[0] ?? 'WEDDING';
+  const languages = definition.languages.filter((l): l is (typeof CARD_LANGUAGES)[number] => (CARD_LANGUAGES as readonly string[]).includes(l));
+  const language = languages.find((l) => l === options.language) ?? languages[0] ?? 'en';
+  const sample = sampleRenderContext({ typeKey: eventType, language, tags: options.tags, noPhotos: true });
+  const opts = { t: createTranslator(language), language, timeZone: CARD_TIME_ZONE };
+
+  const layers: LayerInput[] = [];
+  for (const layer of source.layers) {
+    const when = layer.visibleWhen;
+    if (when?.eventTypes && !when.eventTypes.includes(eventType)) continue;
+    // Photo spots stay (the customer fills them); other conditions follow the sample invitation.
+    if (when?.exists && !isCardPhotoBinding(when.exists) && isEmpty(resolveBinding(when.exists, sample))) continue;
+    const { visibleWhen: _when, ...rest } = layer;
+    const still = { ...rest, animation: STILL };
+    switch (still.kind) {
+      case 'widget':
+        layers.push(...widgetAsText(still));
+        break;
+      case 'text': {
+        if (isCardTextValue(still.content)) {
+          layers.push(still);
+        } else {
+          const text = resolveValue(still.content, sample, opts);
+          if (text !== undefined && text !== '') layers.push({ ...still, content: { literal: String(text) } });
+        }
+        break;
+      }
+      case 'image':
+        if (still.source.type === 'asset' || isCardPhotoBinding(still.source.binding)) layers.push(still);
+        break;
+      default:
+        layers.push(still);
+    }
+  }
+  const board = ArtboardSchema.parse({ ...source, effect: 'none', layers } satisfies ArtboardInput);
+  return CardDesignSchema.parse({
+    v: 1,
+    templateKey: definition.templateKey,
+    format,
+    eventType,
+    language,
+    colors: definition.theme.colors,
+    fonts: definition.fonts,
+    details: sampleDetails(sample),
+    board: fitBoard(board, spec.width, spec.height),
+    photos: {},
+  } satisfies CardDesignInput);
+}
+
+// ─────────────────────────── Resizing ───────────────────────────
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+/**
+ * One axis of a layer's frame on a resized board. Layers spanning the board
+ * stretch with it (backgrounds, bands, borders); layers touching an edge stay
+ * on that edge, bleeding off it as before (corner art, hanging strings); the
+ * rest keep their place proportionally. Sizes scale by `k` so nothing is
+ * distorted or grows past the smaller side's scale.
+ */
+function fitAxis(pos: number, size: number, from: number, to: number, k: number): { pos: number; size: number } {
+  const scale = to / from;
+  const atStart = pos <= 1;
+  const atEnd = pos + size >= from - 1;
+  if (atStart && atEnd) return { pos: pos * scale, size: size * scale };
+  const s = size * k;
+  if (atStart) return { pos: pos * k, size: s };
+  if (atEnd) return { pos: to - (from - pos) * k, size: s };
+  return { pos: (pos + size / 2) * scale - s / 2, size: s };
+}
+
+/** Lengths inside a layer (type sizes, radii, borders) at a scale. */
+function scaleLayer(layer: Layer, k: number): Layer {
+  const n = (v: number, min = 0, max = 8000) => clamp(round1(v * k), min, max);
+  switch (layer.kind) {
+    case 'text':
+      return { ...layer, style: { ...layer.style, size: n(layer.style.size, 6, 600) } };
+    case 'image':
+      return { ...layer, radius: n(layer.radius, 0, 1000), ...(layer.border ? { border: { ...layer.border, width: n(layer.border.width, 0, 100) } } : {}) };
+    case 'shape':
+      return { ...layer, radius: n(layer.radius, 0, 1000), ...(layer.stroke ? { stroke: { ...layer.stroke, width: n(layer.stroke.width, 0, 100), dash: n(layer.stroke.dash, 0, 100) } } : {}) };
+    case 'widget': {
+      const w = layer.widget;
+      if (w.type === 'countdown') return { ...layer, widget: { ...w, size: n(w.size, 10, 200) } };
+      if (w.type === 'button') return { ...layer, widget: { ...w, size: n(w.size, 8, 120), radius: n(w.radius, 0, 500) } };
+      return { ...layer, widget: { ...w, labelSize: n(w.labelSize, 6, 60), valueSize: n(w.valueSize, 8, 120) } };
+    }
+    default:
+      return layer;
+  }
+}
+
+/**
+ * A board at another size: the composition keeps its proportions (nothing
+ * stretched or cropped), edge art stays on its edges, and full-width pieces
+ * span the new width. Used when a card changes format.
+ */
+export function fitBoard(board: Artboard, width: number, height: number): Artboard {
+  if (board.width === width && board.height === height) return board;
+  const k = Math.min(width / board.width, height / board.height);
+  return {
+    ...board,
+    width,
+    height,
+    layers: board.layers.map((layer) => {
+      const f = layer.frame;
+      const x = fitAxis(f.x, f.w, board.width, width, k);
+      const y = fitAxis(f.y, f.h, board.height, height, k);
+      const frame = {
+        x: clamp(round1(x.pos), -4000, 8000),
+        y: clamp(round1(y.pos), -4000, 8000),
+        w: clamp(round1(x.size), 1, 8000),
+        h: clamp(round1(y.size), 1, 8000),
+        rotate: f.rotate,
+      };
+      return scaleLayer({ ...layer, frame }, k);
+    }),
+  };
+}
+
+/** A design in another format: the board refitted, everything else kept. */
+export function withCardFormat(design: CardDesign, format: CardFormat): CardDesign {
+  if (design.format === format) return design;
+  const spec = CARD_FORMATS[format];
+  return { ...design, format, board: fitBoard(design.board, spec.width, spec.height) };
+}

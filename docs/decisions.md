@@ -188,3 +188,28 @@ Rejected:
 
 - Generating templates at random from the art and palettes: designs need a designer's choices (which art suits a sangeet, which colours a Christian wedding), and the catalog already had to retire lookalikes (ADR-031).
 - Keeping full definitions in the list and compressing the response: Next's data cache refuses entries over 2 MB, and every API request would still parse the whole catalog.
+
+### ADR-049: Digital cards are designed without an account, downloaded free with a watermark, and bought per card (2026-10-09)
+Most people who want an invitation want a card for WhatsApp, not a website, and they will not sign up to get one. The card flow had to work for a stranger in a minute, earn money without blocking the free download, and give the team a funnel they can trust.
+
+- **Templates, not a second catalog.** Every canvas template's opening artboard becomes a card (`cardFromTemplate`). Text that shows the event's details stays linked to a Details form; everything else becomes the customer's own words. The three scene-based DIGITAL_CARD templates stay with the event dashboard.
+- **One drawing for everything.** The editor, the download preview and the exported image all draw `CardView`; the export is a Chromium screenshot of the web app's own render page in the media worker. Drawing cards a second way (satori, a canvas port) would drift from the editor on container queries, blend modes, foil and fitted text.
+- **Anonymous by design.** A card session is a random token kept by the browser (hashed in the database); designs also live in localStorage. Contacts are one row per mobile number. The free download asks for a number only; a purchase also asks for a name and an email, kept with the order for the receipt and disputes. Offers on WhatsApp are a separate, unticked box, recorded as a Consent with the contact.
+- **The order is the entitlement.** A paid order freezes the design it buys and settles only on Razorpay's verified signature or webhook, idempotently. Its page is reached by an HMAC token after a `#` (never logged), emailed with the card, and works again for a year: download, email again, make the image again. One open order per design and a design already bought returning its order mean a customer cannot be charged twice.
+- **Conversions are facts, not clicks.** Funnel steps that are conversions (a card changed from the template, a downloaded image, a verified payment, a sent email) are written by the server when they happen; the browser may only report steps it alone sees.
+- **Plan holders pay nothing.** A signed-in customer whose plan in force removes the watermark downloads clean cards; the Super Admin chooses whether event plans count (`cards.planDownloads`).
+
+Rejected:
+
+- Requiring an account to download: the free card is the funnel's top, and a login wall there loses most people.
+- Hiding the watermark with CSS on a client-made image: the free image must be made on the server with the mark in it.
+- A per-card OTP for the free download: WhatsApp codes cost money per message, and the number is a lead, not an identity.
+
+### ADR-050: Staff choose the home page's templates; the automatic choice fills the rest (2026-10-09)
+The home page picked its templates in code (a hero by key, two phones behind it by key, the first scenes, featured or not), so changing the shop window needed a release. Each section that shows templates now reads staff picks from `showcase_sections` (one row per section: keys in order), chosen in the console's Home page screen by content managers (`showcase.manage`, not a Super Admin setting: it is merchandising, not configuration).
+
+- **Picks first, never an empty section.** The site shows a section's picks in their order and fills what is left with the automatic choice it always made, so a half-filled section still looks complete and a deploy with no picks looks as before.
+- **Keys, checked on save and on read.** Picks are template keys (stable across releases and the catalog sync). Saving accepts only published templates that fit the section (a website, a film, or a canvas card) and at most its size; reading skips any that were unpublished since, and the console flags them.
+- **The card gallery's Featured order is a section too**, so the cards people see first are chosen the same way.
+
+Rejected: a `featured` flag per template (one flag cannot say which section or in what order) and a JSON platform setting (only the Super Admin edits settings).

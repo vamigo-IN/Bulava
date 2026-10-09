@@ -10,6 +10,10 @@ export interface ExplorerItem {
   tags: string[];
   eventTypes: string[];
   outputs: string[];
+  /** The occasion as the catalog names it (Wedding, Haldi…), for galleries that filter by it. */
+  category?: string;
+  /** Lower-case text a search matches (name, occasion, style and tags). */
+  search?: string;
   node: ReactNode;
 }
 
@@ -18,28 +22,29 @@ export interface FilterOption {
   label: string;
 }
 
-export interface ExplorerFilters {
-  tag?: string;
-  tier?: string;
-  event?: string;
-  format?: string;
-}
+/** Filters a gallery offers as groups of links. */
+export type FilterKey = 'tag' | 'tier' | 'event' | 'format' | 'category' | 'style';
 
-export type FilterKey = keyof ExplorerFilters;
+/** The gallery's state in its URL: the chosen filters, a search and an order. */
+export type ExplorerFilters = Partial<Record<FilterKey | 'q' | 'sort', string>>;
 
-/** Keeps only the templates matching every chosen filter. */
+/** Keeps only the templates matching every chosen filter (and the search). */
 export function filterItems<T extends Omit<ExplorerItem, 'node'>>(items: T[], f: ExplorerFilters): T[] {
+  const q = f.q?.trim().toLowerCase();
   return items.filter(
     (i) =>
       (!f.tag || i.tags.includes(f.tag)) &&
+      (!f.style || i.tags.includes(f.style)) &&
       (!f.tier || i.tier === f.tier) &&
       (!f.event || i.eventTypes.length === 0 || i.eventTypes.includes(f.event)) &&
-      (!f.format || i.outputs.includes(f.format)),
+      (!f.category || i.category === f.category) &&
+      (!f.format || i.outputs.includes(f.format)) &&
+      (!q || (i.search ?? '').includes(q)),
   );
 }
 
 /** A gallery link with one filter changed (an empty value removes it). */
-export function hrefFor(basePath: string, current: ExplorerFilters, key: FilterKey, value: string): string {
+export function hrefFor(basePath: string, current: ExplorerFilters, key: keyof ExplorerFilters, value: string): string {
   const next = new URLSearchParams();
   for (const [k, v] of Object.entries({ ...current, [key]: value })) if (v) next.set(k, v);
   const query = next.toString();

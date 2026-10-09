@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Choose the home page's templates, and filter cards like templates
+
+- **Pick what the home page shows** in the console's new *Home page* screen: the invitation playing in the hero and the two phones behind it, the illustrated scenes, the collection, the spotlight, the video invitations, and the first cards in the card gallery. Your picks come first, in your order, with previews; anything left is filled automatically, and a template that is unpublished later drops out on its own.
+- **The card gallery filters like the templates gallery**: occasion, tradition and style in a sidebar with how many cards each would show (a *Filters* panel on phones), the chosen filters as chips with *Clear all*, plus search and sorting.
+
+### Digital cards: design online, download free or without the watermark
+
+- **Make an invitation card without an account** at `/cards`: 524 designs for weddings, engagements, haldi, mehendi, sangeet, receptions, birthdays, baby showers, pujas, housewarmings and festivals, with occasion filters, search and sorting.
+- **A full card editor**: fill in the names, date, venue and message once and the card follows; edit any text right on the card with any of 21 fonts (Hindi included), sizes, colours, spacing and foil; recolour the whole card or one panel; add your photos and crop them; add decorations, shapes and text; move, resize, rotate and reorder anything; undo, redo and reset; five sizes (phone, story, 5 × 7 portrait, square, landscape). The card is saved on your device and online as you go.
+- **Free download** with a small Bulava watermark across the bottom, for your WhatsApp number.
+- **Without the watermark for ₹50** (the price is set in the console): name and email for the receipt, Razorpay checkout, then the clean card to download and by email. If the email or the image fails, the order page sends or makes it again without charging again, and *Find my card* emails the links to everything you bought.
+- **Included with your plan**: signed in with a plan that removes the watermark, you download clean cards straight away.
+- **Long names fit properly for everyone.** For visitors whose phone asks for reduced motion, long names on canvas invitations could shrink far smaller than needed; they now shrink only as much as they must.
+- **Digital cards in the console**: the funnel from real conversions (cards made, free downloads, checkouts, purchases), revenue, free-to-paid conversion, failures, popular templates and daily activity; contacts and orders with resend, remake and refund; an export of the contacts who agreed to offers; and the price.
+
 ### 513 new illustrated invitations
 
 - **Designs for every occasion**, each an illustrated theme in several layouts with a card for every function:

@@ -50,6 +50,8 @@ export interface CanvasArtboardProps {
   rsvpTargetId?: string;
   /** Layer ids to leave out (the editor hides the layer it is editing inline). */
   omit?: ReadonlySet<string>;
+  /** Drawn over every layer, inside the artboard (so `cqw` units follow its width): a card's watermark. */
+  overlay?: ReactNode;
   className?: string;
   style?: CSSProperties;
 }
@@ -79,7 +81,7 @@ const pct = (n: number, of: number) => `${((n / of) * 100).toFixed(4)}%`;
  * every layer placed by percentage and sized in `cqw` (container width units),
  * so the whole composition scales with the viewer's screen without any script.
  */
-export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode, slots, rsvpTargetId, omit, className, style }: CanvasArtboardProps) {
+export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode, slots, rsvpTargetId, omit, overlay, className, style }: CanvasArtboardProps) {
   const W = board.width;
   const H = board.height;
   /** Design units → container width units. */
@@ -135,6 +137,7 @@ export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode
         );
       })}
       {board.texture !== 'none' ? <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...textureStyle(board.texture, board.textureStrength, backdrop) }} /> : null}
+      {overlay}
     </div>
   );
 }
@@ -303,7 +306,9 @@ function ImageView({ layer, env }: { layer: ImageLayer; env: LayerEnv }) {
   const radius = env.u(layer.radius);
   const border = layer.border && layer.border.width > 0 ? `${env.u(layer.border.width)} solid ${resolveColor(layer.border.color, env.colors)}` : undefined;
   const filter = [layer.brightness !== 1 ? `brightness(${layer.brightness})` : '', layer.saturate !== 1 ? `saturate(${layer.saturate})` : ''].filter(Boolean).join(' ') || undefined;
-  const flip = layer.flipX || layer.flipY ? `scale(${layer.flipX ? -1 : 1}, ${layer.flipY ? -1 : 1})` : undefined;
+  // The crop: the focus point stays put while the photo zooms around it; flips mirror the result.
+  const crop = [layer.zoom > 1 ? `scale(${layer.zoom})` : '', layer.flipX || layer.flipY ? `scale(${layer.flipX ? -1 : 1}, ${layer.flipY ? -1 : 1})` : ''].filter(Boolean).join(' ') || undefined;
+  const focus = `${layer.focusX}% ${layer.focusY}%`;
   return (
     <div
       style={{
@@ -322,7 +327,7 @@ function ImageView({ layer, env }: { layer: ImageLayer; env: LayerEnv }) {
         loading={env.mode === 'live' ? 'lazy' : undefined}
         decoding="async"
         draggable={false}
-        style={{ display: 'block', width: '100%', height: '100%', objectFit: layer.fit, filter, transform: flip }}
+        style={{ display: 'block', width: '100%', height: '100%', objectFit: layer.fit, objectPosition: focus, filter, transform: crop, transformOrigin: focus }}
       />
     </div>
   );

@@ -11,7 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     serverApi<Array<{ slug: string; updatedAt: string }>>('/public/events/sitemap', { revalidate: 600 }).then((e) => e ?? []),
     getSitePages(),
   ]);
-  const staticPages = ['', '/templates', '/pricing'];
+  const staticPages = ['', '/templates', '/cards', '/pricing'];
   return [
     ...staticPages.map((p) => ({ url: `${origin}${p}`, changeFrequency: 'weekly' as const, priority: p === '' ? 1 : 0.8 })),
     // About, Contact, the policies and pages added in the admin console (published only).

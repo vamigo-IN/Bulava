@@ -66,6 +66,12 @@ export const StorageKeys = {
   /** Short-lived object written and deleted by the admin storage check. */
   healthProbe: (id: string) => `health/probe-${safe(id)}.txt`,
   export: (eventId: string, name: string) => `exports/${safe(eventId)}/${safe(name)}`,
+  /** A photo placed in a digital card, as uploaded (deleted once processed). */
+  cardUploadOriginal: (sessionId: string, uploadId: string, ext: string) => `cards/uploads/${safe(sessionId)}/${safe(uploadId)}-original.${safe(ext)}`,
+  /** The photo as the card shows it: re-encoded without metadata, at most 2400 px. */
+  cardUpload: (sessionId: string, uploadId: string) => `cards/uploads/${safe(sessionId)}/${safe(uploadId)}.webp`,
+  /** A rendered digital card. */
+  cardExport: (exportId: string) => `cards/exports/${safe(exportId)}.jpg`,
 };
 
 export const ALLOWED_UPLOAD_TYPES: Record<string, { ext: string; kind: 'image' | 'video' | 'audio' | 'font' | 'svg'; maxBytes: number }> = {

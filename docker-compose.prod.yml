@@ -196,6 +196,7 @@ services:
       dockerfile: infrastructure/docker/admin.Dockerfile
       args:
         API_INTERNAL_URL: http://api:4000
+        WEB_INTERNAL_URL: http://web:3000
         STORAGE_PUBLIC_ORIGIN: ${STORAGE_PUBLIC_ORIGIN}
     image: ${IMAGE_PREFIX:-bulava}/admin:${BULAVA_VERSION:-latest}
     container_name: bulava-admin
@@ -244,13 +245,19 @@ services:
     environment:
       <<: *node-env
       WORKER_HEALTH_PORT: "4102"
+      # Digital cards are drawn by Chromium from the web app's /cards/render page (docs/cards.md).
+      WEB_INTERNAL_URL: http://web:3000
+      # The root filesystem is read-only: Chromium keeps its profile in /tmp.
+      HOME: /tmp
     read_only: true
     tmpfs: [/tmp]
     depends_on:
       api: { condition: service_healthy }
+      web: { condition: service_healthy }
     deploy:
       resources:
-        limits: { cpus: "${MEDIA_WORKER_CPUS:-1}", memory: "${MEDIA_WORKER_MEMORY:-768m}" }
+        # Chromium needs room while it draws a card (one at a time, CARD_RENDER_CONCURRENCY).
+        limits: { cpus: "${MEDIA_WORKER_CPUS:-1}", memory: "${MEDIA_WORKER_MEMORY:-1g}" }
 
   # Video and card rendering (Remotion + Chrome) is the heaviest load: opt in with
   # COMPOSE_PROFILES=video on a server with CPUs and memory to spare.

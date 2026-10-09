@@ -8,7 +8,9 @@ import {
   CodeXml,
   FileClock,
   FileText,
+  House,
   Image as ImageIcon,
+  IdCard,
   Inbox,
   LayoutDashboard,
   LayoutTemplate,
@@ -61,6 +63,7 @@ const NAV: Array<{ group: AdminMessageKey | null; items: NavItem[] }> = [
     items: [
       { href: '/pricing', label: 'nav.pricing', icon: Tags, permission: 'pricing.manage' },
       { href: '/orders', label: 'nav.orders', icon: Receipt, permission: 'billing.read' },
+      { href: '/cards', label: 'nav.cards', icon: IdCard, permission: 'cards.view' },
     ],
   },
   {
@@ -79,6 +82,7 @@ const NAV: Array<{ group: AdminMessageKey | null; items: NavItem[] }> = [
   {
     group: 'nav.group.website',
     items: [
+      { href: '/showcase', label: 'nav.showcase', icon: House, permission: 'showcase.manage' },
       { href: '/pages', label: 'nav.pages', icon: FileText, permission: 'page.manage' },
       { href: '/settings', label: 'nav.siteBranding', icon: Palette, permission: 'settings.manage' },
       { href: '/settings/seo', label: 'nav.siteSeo', icon: Search, permission: 'settings.manage' },

@@ -2,6 +2,8 @@ import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const apiInternalUrl = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
+/** The web app, for the pre-rendered template previews the Home page screen shows. */
+const webInternalUrl = process.env.WEB_INTERNAL_URL || 'http://127.0.0.1:3000';
 /** Origin serving signed storage URLs (R2 custom domain in production, SeaweedFS locally). */
 const storageOrigin = process.env.STORAGE_PUBLIC_ORIGIN || 'http://localhost:9000';
 const isDev = process.env.NODE_ENV === 'development';
@@ -43,7 +45,11 @@ const nextConfig: NextConfig = {
   // Same-origin API proxy: the admin session cookies stay first-party and httpOnly
   // on the admin domain, separate from customer sessions on the main site.
   async rewrites() {
-    return [{ source: '/api/v1/:path*', destination: `${apiInternalUrl}/api/v1/:path*` }];
+    return [
+      { source: '/api/v1/:path*', destination: `${apiInternalUrl}/api/v1/:path*` },
+      // Same origin as the console, so its image policy (img-src 'self') allows them.
+      { source: '/template-previews/:path*', destination: `${webInternalUrl}/template-previews/:path*` },
+    ];
   },
   async headers() {
     return [

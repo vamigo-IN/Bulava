@@ -215,3 +215,7 @@ Object storage: keep R2 versioning on for the media bucket too, and add a lifecy
 ## Scaling
 
 Workers are stateless: add replicas of `worker`, `media-worker` or `video-worker` (on the same host or another host on the same private network) and raise their concurrency. BullMQ distributes jobs. The API and web apps are stateless too and can be replicated behind Bulava's Nginx. Moving Bulava to a dedicated server later is the same runbook on a new machine plus a database restore (below). Move PostgreSQL to a managed service when a single host is no longer enough.
+
+## Digital cards
+
+The media worker draws digital cards in Chromium ([cards.md](cards.md#export-renderer)), so its image carries Alpine's `chromium` (about 250 MB more than the general worker) and its memory limit defaults to 1 GB (`MEDIA_WORKER_MEMORY`); `CARD_RENDER_CONCURRENCY` (default 1) caps how many cards render at once. It reaches the web app at `WEB_INTERNAL_URL` (`http://web:3000` in `docker-compose.prod.yml`), and Nginx refuses `/cards/render/` and `/api/v1/public/cards/render/` from outside. Card orders use the Razorpay keys and webhook already set up for plans.

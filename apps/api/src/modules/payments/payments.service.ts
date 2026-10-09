@@ -15,6 +15,18 @@ import { ConsentService } from '../users/consent.service';
 import { SETTINGS_STORE } from '../settings/settings.service';
 import { PAYMENT_PROVIDER, RazorpayProvider, type PaymentProvider } from './payment-provider';
 
+/** A payment entity from a Razorpay webhook. */
+export interface GatewayPayment {
+  id?: string;
+  order_id?: string;
+  amount?: number;
+  status?: string;
+  error_description?: string;
+}
+
+/** Settles a webhook for a gateway order that is not a plan purchase; true when it was its own. */
+export type OtherPaymentHandler = (event: string | undefined, payment: GatewayPayment & { id: string; order_id: string }, raw: Prisma.InputJsonValue) => Promise<boolean>;
+
 /**
  * Plan purchases. The browser never decides that a payment succeeded:
  * entitlements are granted only after a verified Razorpay signature
@@ -25,6 +37,8 @@ import { PAYMENT_PROVIDER, RazorpayProvider, type PaymentProvider } from './paym
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private built: { fingerprint: string; provider: PaymentProvider } | null = null;
+  /** Other purchases over the same gateway and webhook (digital cards register theirs). */
+  private readonly otherPayments: OtherPaymentHandler[] = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -50,6 +64,24 @@ export class PaymentsService {
     const fingerprint = createHash('sha256').update(`${s.value.keyId}\n${secret}\n${s.secrets.webhookSecret ?? ''}`).digest('hex');
     if (this.built?.fingerprint !== fingerprint) this.built = { fingerprint, provider: new RazorpayProvider(s.value.keyId, secret, s.secrets.webhookSecret) };
     return this.built.provider;
+  }
+
+  /** The gateway, for other purchases (digital cards): `forCheckout` also requires payments to be switched on. */
+  gateway(forCheckout = false): Promise<PaymentProvider> {
+    return this.requireProvider(forCheckout);
+  }
+
+  /** Whether a checkout can start now (payments on, keys saved). */
+  async checkoutReady(): Promise<boolean> {
+    return this.requireProvider(true).then(
+      () => true,
+      () => false,
+    );
+  }
+
+  /** Webhooks for gateway orders that are not plan purchases go to the handler that owns them. */
+  onOtherPayment(handler: OtherPaymentHandler): void {
+    this.otherPayments.push(handler);
   }
 
   private async priceWithCoupon(plan: PricingPlan, couponCode?: string) {
@@ -207,12 +239,16 @@ export class PaymentsService {
     }
     const body = JSON.parse(rawBody.toString('utf8')) as {
       event?: string;
-      payload?: { payment?: { entity?: { id?: string; order_id?: string; amount?: number; status?: string } } };
+      payload?: { payment?: { entity?: GatewayPayment } };
     };
     const payment = body.payload?.payment?.entity;
     if (!payment?.order_id || !payment.id) return { ok: true };
     const order = await this.prisma.order.findUnique({ where: { providerOrderId: payment.order_id } });
-    if (!order) return { ok: true };
+    if (!order) {
+      const known = { ...payment, id: payment.id, order_id: payment.order_id };
+      for (const handler of this.otherPayments) if (await handler(body.event, known, body as Prisma.InputJsonValue)) break;
+      return { ok: true };
+    }
 
     if (body.event === 'payment.captured' || body.event === 'order.paid') {
       if (payment.amount !== undefined && payment.amount < order.amountMinor) {

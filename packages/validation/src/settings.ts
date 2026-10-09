@@ -7,7 +7,7 @@ import { z } from 'zod';
  * browser: the console only sees whether each secret is set.
  */
 
-export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'google', 'maps', 'domains'] as const;
+export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'cards'] as const;
 export type SettingGroup = (typeof SETTING_GROUPS)[number];
 
 const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
@@ -271,6 +271,22 @@ export const DomainSettingsSchema = z.object({
   addresses: z.array(z.ipv4()).max(4).default([]),
 });
 
+// ───────────────────────────── Digital cards ─────────────────────────────
+
+/** The smallest price of a watermark-free card: ₹50, in paise. */
+export const CARD_MIN_PRICE_MINOR = 5000;
+
+/** Who downloads cards without the watermark at no charge: holders of any paid plan in force, of a yearly plan, or nobody. */
+export const CARD_PLAN_DOWNLOADS = ['any', 'subscription', 'off'] as const;
+
+export const CardsSettingsSchema = z.object({
+  /** The public card gallery and editor (/cards). */
+  enabled: z.boolean().default(true),
+  /** The watermark-free download of one card, in paise (₹50 at least). */
+  priceMinor: z.coerce.number().int().min(CARD_MIN_PRICE_MINOR, 'At least ₹50 (5000 paise)').max(1_000_000).default(CARD_MIN_PRICE_MINOR),
+  planDownloads: z.enum(CARD_PLAN_DOWNLOADS).default('any'),
+});
+
 export const SETTING_SCHEMAS = {
   site: SiteSettingsSchema,
   seo: SeoSettingsSchema,
@@ -282,6 +298,7 @@ export const SETTING_SCHEMAS = {
   google: GoogleSettingsSchema,
   maps: MapsSettingsSchema,
   domains: DomainSettingsSchema,
+  cards: CardsSettingsSchema,
 } as const;
 
 export type SettingValues = { [G in SettingGroup]: z.infer<(typeof SETTING_SCHEMAS)[G]> };
@@ -299,6 +316,7 @@ export const SETTING_SECRETS = {
   google: ['clientSecret'],
   maps: [],
   domains: ['cloudflareApiToken'],
+  cards: [],
 } as const satisfies Record<SettingGroup, readonly string[]>;
 export type SettingSecretName<G extends SettingGroup> = (typeof SETTING_SECRETS)[G][number];
 

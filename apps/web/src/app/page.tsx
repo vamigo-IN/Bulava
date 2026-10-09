@@ -51,7 +51,7 @@ import { TemplateCard, TemplatePhone } from '@/components/marketing/template-car
 import { TemplateExplorer, type ExplorerItem } from '@/components/marketing/template-explorer';
 import { VideoShowcase } from '@/components/marketing/video-showcase';
 import { MagneticButton } from '@/lib/motion/magnetic-button';
-import { getGalleryTemplates, getPlans, getStats, getTemplate, getTemplateDefinitions, getTestimonials, tierPrice, type TemplateSummary } from '@/lib/server-api';
+import { getGalleryTemplates, getPlans, getShowcase, getStats, getTemplate, getTemplateDefinitions, getTestimonials, tierPrice, type TemplateSummary } from '@/lib/server-api';
 import { getSiteConfig } from '@/lib/site-config';
 import { fullPreview } from '@/lib/template-previews';
 import { cn } from '@/lib/utils';
@@ -139,6 +139,21 @@ function CompareMark({ value, lead }: { value: string; lead: boolean }) {
   return <>{value}</>;
 }
 
+/**
+ * A section's templates: the ones chosen in the console (Home page) first, in
+ * their order, then the automatic choice fills what is left. Picks the API no
+ * longer lists (unpublished since) simply drop out.
+ */
+function withPicks(picked: string[] | undefined, pool: TemplateSummary[], automatic: Array<TemplateSummary | undefined>, count = Number.POSITIVE_INFINITY): TemplateSummary[] {
+  const byKey = new Map(pool.map((p) => [p.key, p]));
+  const out = new Map<string, TemplateSummary>();
+  for (const tpl of [...(picked ?? []).map((k) => byKey.get(k)), ...automatic]) {
+    if (out.size >= count) break;
+    if (tpl && !out.has(tpl.key)) out.set(tpl.key, tpl);
+  }
+  return [...out.values()];
+}
+
 function Proof({ stats }: { stats: Awaited<ReturnType<typeof getStats>> }) {
   if (!stats) return null;
   // Only real numbers from the database; small counts are not shown as "social proof".
@@ -179,28 +194,39 @@ function RisingWords({ text, start = 0.15, accent = 0 }: { text: string; start?:
 }
 
 export default async function HomePage() {
-  const [templates, plans, stats, testimonials, siteConfig] = await Promise.all([getGalleryTemplates(), getPlans(), getStats(), getTestimonials(), getSiteConfig()]);
+  const [templates, plans, stats, testimonials, siteConfig, showcase] = await Promise.all([getGalleryTemplates(), getPlans(), getStats(), getTestimonials(), getSiteConfig(), getShowcase()]);
   const websites = templates.filter((x) => x.outputs.includes('WEBSITE'));
   const videos = templates.filter((x) => x.outputs.includes('VIDEO'));
   const byKey = new Map(websites.map((w) => [w.key, w]));
-  // The stage plays a flagship scene live; two more designs sit behind it.
-  const heroLive = byKey.get('marigold-mahal') ?? websites.find((w) => w.featured) ?? websites[0];
-  const heroBack = ['rajwada-royale', 'kanjeevaram-gold'].map((k) => byKey.get(k)).filter((x): x is TemplateSummary => !!x);
+  // The stage plays a flagship scene live; two more designs sit behind it. Each section
+  // shows what the console's Home page chose first, then its own choice.
+  const [heroLive] = withPicks(showcase.hero, websites, [byKey.get('marigold-mahal'), websites.find((w) => w.featured), websites[0]], 1);
+  const heroBack = withPicks(
+    showcase.heroBack,
+    websites.filter((w) => w.key !== heroLive?.key),
+    ['rajwada-royale', 'kanjeevaram-gold'].filter((k) => k !== heroLive?.key).map((k) => byKey.get(k)),
+    2,
+  );
   const heroImage = heroLive ? fullPreview(heroLive.key) : null;
+  const films = withPicks(showcase.videos, videos, videos, 3);
   // Definitions only where the live renderer draws: the hero phone without its image, and the films.
   const [heroDefinition, videoDefinitions] = await Promise.all([
     heroLive && !heroImage ? (heroLive.definition ?? getTemplate(heroLive.key).then((t) => t?.definition ?? null)) : null,
-    getTemplateDefinitions(videos.slice(0, 3).map((v) => v.key)),
+    getTemplateDefinitions(films.map((v) => v.key)),
   ]);
   // Illustrated 3D scene templates, found from their data (the hero section's variant), flagships first.
   const sceneNames = new Set<string>(SCENES);
-  const scenes: CoverflowItem[] = websites
+  const sceneTemplates = websites
     .filter((w) => sceneNames.has(w.preview?.heroVariant ?? w.definition?.website?.pages[0]?.sections[0]?.variant ?? ''))
-    .sort((a, b) => Number(b.featured) - Number(a.featured))
-    .slice(0, 12)
-    .map((w) => ({ key: w.key, name: w.name, blurb: w.description ?? '', node: <TemplatePhone template={w} width={250} height={470} sections={1} /> }));
-  const spotlight = websites.find((w) => w.featured && w.tier === 'PREMIUM') ?? websites[0];
-  const explorerItems: ExplorerItem[] = websites.map((tpl) => ({
+    .sort((a, b) => Number(b.featured) - Number(a.featured));
+  const scenes: CoverflowItem[] = withPicks(showcase.scenes, websites, sceneTemplates, 12).map((w) => ({
+    key: w.key,
+    name: w.name,
+    blurb: w.description ?? '',
+    node: <TemplatePhone template={w} width={250} height={470} sections={1} />,
+  }));
+  const [spotlight] = withPicks(showcase.spotlight, websites, [websites.find((w) => w.featured && w.tier === 'PREMIUM'), websites[0]], 1);
+  const explorerItems: ExplorerItem[] = withPicks(showcase.collection, websites, websites).map((tpl) => ({
     key: tpl.key,
     tier: tpl.tier,
     tags: tpl.tags,
@@ -432,8 +458,7 @@ export default async function HomePage() {
               <div className="mt-16">
                 <VideoShowcase
                   playLabel={t('home.video.play')}
-                  templates={videos
-                    .slice(0, 3)
+                  templates={films
                     .filter((v) => videoDefinitions.has(v.key))
                     .map((v) => ({ key: v.key, name: v.name, eventType: v.eventTypes[0] ?? 'WEDDING', definition: videoDefinitions.get(v.key)! }))}
                 />

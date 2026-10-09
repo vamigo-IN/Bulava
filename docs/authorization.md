@@ -44,6 +44,7 @@ Staff access to the admin console is a separate system: `User.platformRole` maps
 | `contact.manage`: the contact-form inbox (read, reply, resolve) | ✓ | | | ✓ | ✓ |
 | `template.manage`, `asset.manage`, `content.manage` (testimonials) | | ✓ | | ✓ | ✓ |
 | `page.manage`: site pages (About, Contact, policies, new pages) | | ✓ | | ✓ | ✓ |
+| `showcase.manage`: the templates each home page section shows, and the card gallery's first cards | | ✓ | | ✓ | ✓ |
 | `pricing.manage`, `payment.refund` | | | ✓ | ✓ | ✓ |
 | `user.manage`: suspend customers, sign them out | | | | ✓ | ✓ |
 | `plan.grant`: complimentary upgrades | | | | | ✓ |

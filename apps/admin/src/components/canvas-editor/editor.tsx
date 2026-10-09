@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Magnet, Monitor, Plus, Redo2, Save, Smartphone, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createTranslator } from '@bulava/localization';
-import { CanvasArtboard, CanvasIcon, themeStyle } from '@bulava/template-engine';
+import { CanvasArtboard, CanvasIcon, Stage, themeStyle, useHistory } from '@bulava/template-engine';
 import {
   ArtboardSchema,
   BINDINGS,
@@ -31,11 +31,9 @@ import { cn } from '@/lib/utils';
 import type { EditorProps } from '../studio/common';
 import { Alert, Badge, Button, Checkbox, Modal, Select } from '../ui';
 import { AssetPicker } from './asset-picker';
-import { useHistory } from './history';
 import { Inspector } from './inspector';
 import { LayersPanel } from './layers-panel';
 import { illustrationTint, isIllustration, layerId, newLayer, type LayerPreset } from './presets';
-import { Stage } from './stage';
 
 const ROLE = 'canvas';
 const LANGUAGE_LABELS: Record<string, string> = { en: 'English', hi: 'हिन्दी', 'hi-Latn': 'Hinglish' };

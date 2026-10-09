@@ -88,7 +88,17 @@ export const ErrorCode = {
   RESTORE_EXPIRED: HttpStatus.GONE,
   PAGE_SLUG_TAKEN: HttpStatus.CONFLICT,
   PAGE_PROTECTED: HttpStatus.CONFLICT,
+  /** A home page pick that is not published, or not the kind of template its section shows. */
+  SHOWCASE_TEMPLATE_UNFIT: HttpStatus.BAD_REQUEST,
   EMAIL_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  /** Digital cards are switched off in the settings. */
+  CARDS_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  /** A card's saved session is gone (cleaned up after a month untouched): start from the template again. */
+  CARD_SESSION_EXPIRED: HttpStatus.GONE,
+  /** The card's image is still being made, or making it failed. */
+  CARD_NOT_READY: HttpStatus.CONFLICT,
+  /** A watermark-free download without paying needs a plan that covers it. */
+  CARD_PLAN_REQUIRED: HttpStatus.FORBIDDEN,
   SERVICE_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   INTERNAL_ERROR: HttpStatus.INTERNAL_SERVER_ERROR,
 } as const;

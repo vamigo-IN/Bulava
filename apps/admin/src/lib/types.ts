@@ -8,9 +8,12 @@ export type PlatformPermission =
   | 'user.manage'
   | 'content.manage'
   | 'page.manage'
+  | 'showcase.manage'
   | 'contact.manage'
   | 'media.moderate'
   | 'billing.read'
+  | 'cards.view'
+  | 'cards.manage'
   | 'payment.refund'
   | 'plan.grant'
   | 'settings.manage'
@@ -339,7 +342,7 @@ export interface StaffOverview {
 
 // ───── Site settings ─────
 
-export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'google' | 'maps' | 'domains';
+export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'google' | 'maps' | 'domains' | 'cards';
 
 export interface SettingCheckStep {
   label: string;
@@ -421,6 +424,28 @@ export interface Testimonial {
   sortOrder: number;
 }
 
+/** A home page section whose templates staff choose (Home page screen). */
+export type ShowcaseSectionKey = 'hero' | 'heroBack' | 'scenes' | 'collection' | 'spotlight' | 'videos' | 'cards';
+
+export interface ShowcaseCandidate {
+  key: string;
+  name: string;
+  category: string;
+  tier: TemplateTier;
+  badge: string | null;
+  featured: boolean;
+  /** The sections this published template can appear in. */
+  fits: ShowcaseSectionKey[];
+  colors: Record<string, string> | null;
+}
+
+export interface AdminShowcase {
+  sections: Array<{ section: ShowcaseSectionKey; max: number; fit: 'website' | 'video' | 'card'; templateKeys: string[]; updatedAt: string | null }>;
+  /** Every published template. */
+  templates: ShowcaseCandidate[];
+  siteOrigin: string;
+}
+
 /** A site page (About, Contact, the policies, pages staff add). */
 export interface SitePage {
   id: string;
@@ -492,4 +517,95 @@ export interface AuditEntry {
 export interface EventTypeOption {
   key: string;
   name: string;
+}
+
+// ─────────────────────────── Digital cards ───────────────────────────
+
+export interface CardStats {
+  days: number;
+  settings: { enabled: boolean; priceMinor: number; planDownloads: 'any' | 'subscription' | 'off' };
+  funnel: { templatesSelected: number; editorsOpened: number; cardsCreated: number; downloadDialogs: number; freeDownloads: number; paymentsStarted: number; purchases: number };
+  totals: { newLeads: number; totalLeads: number; consentedLeads: number; freeImages: number; planDownloads: number; revenueMinor: number; pendingOrders: number };
+  conversion: { createdToFree: number; createdToPaid: number; freeToPaid: number; checkoutToPaid: number };
+  failures: { payments: number; exports: number; emails: number };
+  daily: Array<{ day: string; created: number; free: number; paid: number; revenueMinor: number }>;
+  templates: Array<{ templateKey: string; name: string; category: string | null; created: number; free: number; paid: number }>;
+}
+
+export interface CardLeadRow {
+  id: string;
+  phone: string;
+  countryCode: string;
+  name: string | null;
+  email: string | null;
+  offers: boolean;
+  lastChoice: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  cards: number;
+  freeDownloads: number;
+  purchases: number;
+}
+
+export interface CardLeadsResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  leads: CardLeadRow[];
+}
+
+export interface CardLeadDetail {
+  id: string;
+  phoneE164: string;
+  countryCode: string;
+  nationalNumber: string;
+  name: string | null;
+  email: string | null;
+  offers: boolean;
+  marketingConsentAt: string | null;
+  marketingWithdrawnAt: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  consents: Array<{ id: string; kind: string; granted: boolean; version: string; source: string | null; createdAt: string }>;
+  sessions: Array<{ id: string; templateKey: string; format: string; eventType: string; createdAt: string; customizedAt: string | null; lastSeenAt: string }>;
+  orders: Array<{ id: string; reference: string; status: string; amountMinor: number; createdAt: string; paidAt: string | null; emailStatus: string; templateKey: string }>;
+  events: Array<{ type: string; templateKey: string | null; createdAt: string; meta: unknown }>;
+}
+
+export interface CardOrderRow {
+  id: string;
+  reference: string;
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED' | 'REFUNDED';
+  amountMinor: number;
+  currency: string;
+  name: string;
+  email: string;
+  phoneE164: string;
+  templateKey: string;
+  format: string;
+  emailStatus: 'NONE' | 'QUEUED' | 'SENT' | 'FAILED';
+  createdAt: string;
+  paidAt: string | null;
+  providerPaymentId: string | null;
+  failureReason: string | null;
+}
+
+export interface CardOrdersResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  totals: Partial<Record<CardOrderRow['status'], { count: number; amountMinor: number }>>;
+  orders: CardOrderRow[];
+}
+
+export interface CardOrderDetail extends CardOrderRow {
+  providerOrderId: string | null;
+  termsAcceptedAt: string;
+  emailError: string | null;
+  emailedAt: string | null;
+  refundedAt: string | null;
+  orderUrl: string | null;
+  exports: Array<{ id: string; status: string; attempts: number; error: string | null; readyAt: string | null; downloads: number; firstDownloadedAt: string | null; expiresAt: string | null; createdAt: string }>;
+  events: Array<{ type: string; createdAt: string; meta: unknown }>;
+  lead: { id: string; phoneE164: string; marketingConsentAt: string | null; marketingWithdrawnAt: string | null };
 }

@@ -53,8 +53,10 @@ export function FitText({ children, lineHeight, singleLine }: { children: ReactN
     };
   }, [children, singleLine]);
 
+  // Never a transition on the size: with reduced motion the site gives every element a 0.01 ms
+  // transition (globals.css), and a measurement right after a change would read the old size.
   return (
-    <span ref={ref} style={{ display: 'block', width: '100%', whiteSpace: singleLine ? 'nowrap' : undefined, fontSize: 'calc(1em * var(--fit, 1))', lineHeight, ['--fit' as string]: String(fit) }}>
+    <span ref={ref} style={{ display: 'block', width: '100%', whiteSpace: singleLine ? 'nowrap' : undefined, fontSize: 'calc(1em * var(--fit, 1))', lineHeight, transitionProperty: 'none', ['--fit' as string]: String(fit) }}>
       {children}
     </span>
   );

@@ -35,11 +35,17 @@ export const PLATFORM_PERMISSIONS = [
   'content.manage',
   /** Site pages: About, Contact, the policies, and new pages. */
   'page.manage',
+  /** The templates each home page section shows, and the card gallery's first cards. */
+  'showcase.manage',
   /** The contact-form inbox: read, reply, resolve. */
   'contact.manage',
   'media.moderate',
   /** Orders, payments and customers' payment history. */
   'billing.read',
+  /** Digital cards: the funnel, leads (numbers, names, emails) and card orders. */
+  'cards.view',
+  /** Digital cards: resend a card's email, render it again, export the leads who agreed to offers. */
+  'cards.manage',
   'payment.refund',
   /** Super Admin only: complimentary plan upgrades. */
   'plan.grant',
@@ -112,9 +118,9 @@ export const EVENT_ROLE_PERMISSIONS: Record<EventRole, readonly EventPermission[
 
 export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, readonly PlatformPermission[]> = {
   USER: [],
-  SUPPORT: ['admin.read', 'billing.read', 'media.moderate', 'contact.manage'],
-  CONTENT_MANAGER: ['admin.read', 'template.manage', 'asset.manage', 'content.manage', 'page.manage', 'media.moderate'],
-  FINANCE_MANAGER: ['admin.read', 'billing.read', 'payment.refund', 'pricing.manage'],
+  SUPPORT: ['admin.read', 'billing.read', 'media.moderate', 'contact.manage', 'cards.view', 'cards.manage'],
+  CONTENT_MANAGER: ['admin.read', 'template.manage', 'asset.manage', 'content.manage', 'page.manage', 'showcase.manage', 'media.moderate'],
+  FINANCE_MANAGER: ['admin.read', 'billing.read', 'payment.refund', 'pricing.manage', 'cards.view'],
   PLATFORM_ADMIN: PLATFORM_PERMISSIONS.filter((p) => !SUPER_ONLY.includes(p)),
   SUPER_ADMIN: PLATFORM_PERMISSIONS,
 };

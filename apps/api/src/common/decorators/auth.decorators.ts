@@ -28,6 +28,11 @@ export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionConte
   return request.user;
 });
 
+/** The signed-in user on a public route, or null for visitors. */
+export const OptionalUser = createParamDecorator((_: unknown, ctx: ExecutionContext): AuthUser | null => {
+  return ctx.switchToHttp().getRequest<AuthenticatedRequest>().user ?? null;
+});
+
 export const EventAccess = createParamDecorator((_: unknown, ctx: ExecutionContext): EventAccessContext => {
   const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
   if (!request.eventAccess) throw new Error('EventAccess used on a route without RequireEventPermission');

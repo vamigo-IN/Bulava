@@ -1,6 +1,6 @@
 import type { TemplateDefinition, ThemeColors } from '@bulava/template-schema';
 import { cardPreview, posterPreview } from './template-previews';
-import type { PublicSitePage, PublicSitePageLink } from '@bulava/validation';
+import type { PublicShowcase, PublicSitePage, PublicSitePageLink } from '@bulava/validation';
 
 const API = process.env.API_INTERNAL_URL || 'http://127.0.0.1:4000';
 
@@ -71,8 +71,8 @@ export interface TemplateSummary {
   languages: string[];
   outputs: Array<'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD'>;
   templateVersionId: string;
-  /** What a card shows without the definition: the theme's colours and the hero section's variant. */
-  preview?: { colors: ThemeColors | null; heroVariant: string | null };
+  /** What a card shows without the definition: the theme's colours, the hero section's variant and kind ("canvas" templates also make digital cards). */
+  preview?: { colors: ThemeColors | null; heroVariant: string | null; heroSection?: string | null };
   /** Lists leave definitions out (they run to megabytes); single templates and `keys` lists carry them. */
   definition?: TemplateDefinition;
 }
@@ -137,6 +137,8 @@ export const getTemplate = (key: string) => serverApi<TemplateSummary>(`/public/
 export const getPlans = () => serverApi<Plan[]>('/meta/plans', { revalidate: 300 }).then((p) => p ?? []);
 export const getStats = () => serverApi<SiteStats>('/public/site-stats', { revalidate: 300 });
 export const getTestimonials = () => serverApi<Testimonial[]>('/public/testimonials', { revalidate: 300 }).then((t) => t ?? []);
+/** The templates staff chose for the home page's sections and the card gallery (console: Home page); sections without picks are left out. */
+export const getShowcase = () => serverApi<PublicShowcase>('/public/showcase', { revalidate: 60 }).then((s) => s ?? {});
 
 export function formatInr(minor: number): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(minor / 100);

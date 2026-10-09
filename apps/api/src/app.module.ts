@@ -104,16 +104,26 @@ import { WhatsAppWebhookController } from './modules/whatsapp/whatsapp-webhook.c
 import { WhatsAppWebhookService } from './modules/whatsapp/whatsapp-webhook.service';
 import { AdminSitePagesController, PublicSitePagesController } from './modules/site-pages/site-pages.controller';
 import { SitePagesService } from './modules/site-pages/site-pages.service';
+import { AdminShowcaseController, PublicShowcaseController } from './modules/showcase/showcase.controller';
+import { ShowcaseService } from './modules/showcase/showcase.service';
 import { AdminContactController, PublicContactController } from './modules/contact/contact.controller';
 import { ContactService } from './modules/contact/contact.service';
 import { AccountService } from './modules/users/account.service';
 import { ConsentService } from './modules/users/consent.service';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 import { PlatformPermissionGuard } from './common/guards/platform-permission.guard';
+import { AdminCardsController, CardsController, PublicCardsController } from './modules/cards/cards.controller';
+import { CardAdminService } from './modules/cards/card-admin.service';
+import { CardDownloadsService } from './modules/cards/card-downloads.service';
+import { CardOrdersService } from './modules/cards/card-orders.service';
+import { CardsService } from './modules/cards/cards.service';
 
-/** Invitation tokens and the GetGabs webhook token travel in URLs; keep them out of logs. */
+/** Invitation tokens, card render tokens and the GetGabs webhook token travel in URLs; keep them out of logs. */
 function redactUrl(url: string | undefined): string | undefined {
-  return url?.replace(/(\/public\/invitations\/)[^/?#]+/, '$1[REDACTED]').replace(/(\/whatsapp\/getgabs)\?[^#]*/, '$1?[REDACTED]');
+  return url
+    ?.replace(/(\/public\/invitations\/)[^/?#]+/, '$1[REDACTED]')
+    .replace(/(\/public\/cards\/render\/)[^/?#]+/, '$1[REDACTED]')
+    .replace(/(\/whatsapp\/getgabs)\?[^#]*/, '$1?[REDACTED]');
 }
 
 const bootConfig = loadConfig();
@@ -218,8 +228,13 @@ const bootConfig = loadConfig();
     PublicSiteController,
     AdminSitePagesController,
     PublicSitePagesController,
+    AdminShowcaseController,
+    PublicShowcaseController,
     AdminContactController,
     PublicContactController,
+    PublicCardsController,
+    CardsController,
+    AdminCardsController,
   ],
   providers: [
     // Guards run in this order: rate limit -> authenticate -> CSRF -> event permission.
@@ -287,9 +302,14 @@ const bootConfig = loadConfig();
     RemindersService,
     DomainsService,
     SitePagesService,
+    ShowcaseService,
     ContactService,
     ConsentService,
     AccountService,
+    CardsService,
+    CardDownloadsService,
+    CardOrdersService,
+    CardAdminService,
     { provide: DNS_RESOLVER, useValue: systemResolver },
     {
       // Customer-domain certificates come from the Super Admin's settings (Cloudflare for SaaS,

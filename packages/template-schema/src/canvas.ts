@@ -147,6 +147,10 @@ export const ImageLayerSchema = z.object({
     z.object({ type: z.literal('binding'), binding: z.string().regex(/^[a-zA-Z]\w*(\[\d+\])?(\.\w+(\[\d+\])?)*$/).max(120) }),
   ]),
   fit: z.enum(['cover', 'contain']).default('cover'),
+  /** The crop: which point of the photo stays in view (0–100 % from the left and top) and how far it is zoomed in (1 = fills the frame). */
+  focusX: z.number().min(0).max(100).default(50),
+  focusY: z.number().min(0).max(100).default(50),
+  zoom: z.number().min(1).max(4).default(1),
   mask: z.enum(IMAGE_MASKS).default('none'),
   /** Corner radius in design units (mask "rounded"). */
   radius: z.number().min(0).max(1000).default(0),

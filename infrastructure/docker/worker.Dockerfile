@@ -26,8 +26,10 @@ RUN --mount=type=cache,id=bulava-pnpm-store,target=/pnpm/store pnpm --filter "@b
 
 FROM node:22-alpine AS runtime
 ARG APP
-# sharp ships prebuilt libvips for musl; openssl is needed by the Prisma engine.
-RUN apk add --no-cache openssl tini
+# sharp ships prebuilt libvips for musl; openssl is needed by the Prisma engine. The media
+# worker also draws digital cards in Chromium (the card's fonts come from the web page; the
+# emoji font covers emoji typed into a card).
+RUN apk add --no-cache openssl tini   && if [ "$APP" = "media-worker" ]; then apk add --no-cache chromium font-noto-emoji; fi
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./

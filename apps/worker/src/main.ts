@@ -6,6 +6,7 @@ import { createPrismaClient } from '@bulava/database';
 import { connectionFromUrl, createQueue, createWorker, QueueName } from '@bulava/queue';
 import { ObjectStorage } from '@bulava/storage';
 import { processAnalytics, processCleanup, processEmail, processNotification, processWhatsApp, type WorkerDeps } from './processors';
+import { cardEmailFailed } from './cards';
 import { SettingsProviders } from './providers';
 import { STATUS_SWEEP_MINUTES } from './whatsapp-status';
 import { systemResolver } from '@bulava/domains';
@@ -58,13 +59,15 @@ async function main(): Promise<void> {
       POSTHOG_HOST: process.env.POSTHOG_HOST || undefined,
     },
     log,
+    readObject: (key) => storage.getBuffer(key),
   };
   if (!(await deps.email())) log.warn('Email is not configured (admin console > Integrations): email notifications will be marked SKIPPED');
   const concurrency = Number(process.env.WORKER_CONCURRENCY ?? 10);
 
+  const emailWorker = createWorker(QueueName.EMAIL, (job) => processEmail(deps, job.data), connection, { concurrency });
   const workers = [
     createWorker(QueueName.NOTIFICATIONS, (job) => processNotification(deps, job.data), connection, { concurrency }),
-    createWorker(QueueName.EMAIL, (job) => processEmail(deps, job.data), connection, { concurrency }),
+    emailWorker,
     createWorker(QueueName.WHATSAPP, (job) => processWhatsApp(deps, job.data), connection, { concurrency }),
     createWorker(QueueName.ANALYTICS, (job) => processAnalytics(deps, job.data), connection, { concurrency: concurrency * 2 }),
     createWorker(QueueName.CLEANUP, (job) => processCleanup({ ...deps, deleteObject: (k) => storage.delete(k) }, job.data), connection, { concurrency: 1 }),
@@ -75,6 +78,13 @@ async function main(): Promise<void> {
       if (process.env.SENTRY_DSN) Sentry.captureException(error);
     });
   }
+  // A paid card's email that failed its last attempt: the order shows it, and the customer can ask again.
+  emailWorker.on('failed', (job, error) => {
+    const data = job?.data;
+    if (job && data && 'cardOrderId' in data && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+      void cardEmailFailed(prisma, data.cardOrderId, error).catch((err: unknown) => log.warn({ err }, 'Could not record a failed card email'));
+    }
+  });
 
   // Repeatable housekeeping jobs (deduplicated by BullMQ across worker replicas).
   const cleanup = createQueue(QueueName.CLEANUP, connection);
@@ -84,6 +94,8 @@ async function main(): Promise<void> {
   await cleanup.add('deleted-events', { task: 'deleted-events' }, { repeat: { pattern: '10 4 * * *' }, jobId: 'cleanup-deleted-events' });
   await cleanup.add('reminders', { task: 'reminders' }, { repeat: { pattern: '* * * * *' }, jobId: 'cleanup-reminders' });
   await cleanup.add('domains', { task: 'domains' }, { repeat: { pattern: '*/10 * * * *' }, jobId: 'cleanup-domains' });
+  // Digital cards: images past their keep date, abandoned cards and checkouts (docs/cards.md#retention).
+  await cleanup.add('card-retention', { task: 'card-retention' }, { repeat: { pattern: '25 3 * * *' }, jobId: 'cleanup-card-retention' });
   // Delivery reports from providers that give them on request (GetGabs); the interval must match STATUS_SWEEP_MINUTES.
   await cleanup.add('whatsapp-status', { task: 'whatsapp-status' }, { repeat: { pattern: `*/${STATUS_SWEEP_MINUTES} * * * *` }, jobId: 'cleanup-whatsapp-status' });
   log.info({ concurrency }, 'Worker started');

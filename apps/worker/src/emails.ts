@@ -8,7 +8,7 @@ export function escapeHtml(s: string): string {
  * Minimal, email-client-safe layout (inline styles, no external assets).
  * `site` is the site name from the admin console (Branding & contact).
  */
-export function layout(site: string, title: string, bodyHtml: string, cta?: { label: string; url: string }): string {
+export function layout(site: string, title: string, bodyHtml: string, cta?: { label: string; url: string }, footer?: string): string {
   const name = escapeHtml(site);
   return `<!doctype html><html><body style="margin:0;background:#f6f1e9;font-family:Arial,Helvetica,sans-serif;color:#1c1917">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
@@ -17,7 +17,7 @@ export function layout(site: string, title: string, bodyHtml: string, cta?: { la
 <tr><td style="padding:24px"><h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">${escapeHtml(title)}</h1>${bodyHtml}
 ${cta ? `<p style="margin:24px 0 0"><a href="${escapeHtml(cta.url)}" style="display:inline-block;background:#6b0f1a;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:bold">${escapeHtml(cta.label)}</a></p>` : ''}
 </td></tr>
-<tr><td style="padding:16px 24px;color:#78716c;font-size:12px;border-top:1px solid #eee">You received this because of an event you are part of on ${name}.</td></tr>
+<tr><td style="padding:16px 24px;color:#78716c;font-size:12px;border-top:1px solid #eee">${footer ? escapeHtml(footer) : `You received this because of an event you are part of on ${name}.`}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -125,5 +125,32 @@ export function accountDeletedEmail(input: { site: string; name: string }) {
     subject: `Your ${input.site} account has been deleted`,
     html: layout(input.site, 'Your account has been deleted', body.map((p) => `<p style="line-height:1.5;margin:0 0 12px">${escapeHtml(p)}</p>`).join('')),
     text: body.join('\n\n'),
+  };
+}
+
+/** A watermark-free card, paid for: the image is attached, the order page keeps it downloadable. */
+export function cardOrderEmail(input: { site: string; name: string; reference: string; amountMinor: number; paidAt: Date; paymentId: string | null; orderUrl: string; fileName: string }) {
+  const amount = `₹${(input.amountMinor / 100).toFixed(2)}`;
+  const paid = input.paidAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  const rows: Array<[string, string]> = [
+    ['Order', input.reference],
+    ['Amount paid', amount],
+    ['Paid on', paid],
+    ...(input.paymentId ? ([['Payment ID', input.paymentId]] as Array<[string, string]>) : []),
+  ];
+  const receipt = rows.map(([k, v]) => `<tr><td style="padding:4px 0;color:#78716c">${escapeHtml(k)}</td><td style="padding:4px 0;text-align:right;font-weight:bold">${escapeHtml(v)}</td></tr>`).join('');
+  const greeting = `Hello ${input.name},`;
+  const intro = `Thank you for your purchase. Your watermark-free invitation card is attached (${input.fileName}), ready to share on WhatsApp or print.`;
+  const later = 'You can download it again from your order page at any time, and have it emailed to you again from there.';
+  return {
+    subject: `Your invitation card is ready (${input.reference})`,
+    html: layout(
+      input.site,
+      'Your invitation card is ready',
+      `<p style="line-height:1.5;margin:0 0 12px">${escapeHtml(greeting)}</p><p style="line-height:1.5;margin:0 0 12px">${escapeHtml(intro)}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1e9;border-radius:8px;padding:10px 14px;margin:0 0 12px">${receipt}</table><p style="line-height:1.5;margin:0">${escapeHtml(later)}</p>`,
+      { label: 'Open my order', url: input.orderUrl },
+      `You received this because you bought an invitation card on ${input.site}. Keep the order link to yourself: anyone with it can download your card.`,
+    ),
+    text: [greeting, '', intro, '', ...rows.map(([k, v]) => `${k}: ${v}`), '', later, input.orderUrl].join('\n'),
   };
 }

@@ -3,6 +3,7 @@
  * other catalogs may be partial and fall back through fallbackChain().
  * Placeholders use {name} syntax.
  */
+import { enCards } from './en-cards';
 import { enDashboard } from './en-dashboard';
 import { enMarketing } from './en-marketing';
 
@@ -477,6 +478,7 @@ const core = {
   'error.PAYMENT_VERIFICATION_FAILED': 'We could not confirm this payment yet. If money left your account, it will be confirmed or refunded automatically.',
   'error.PAGE_SLUG_TAKEN': 'Another page already uses this address.',
   'error.PAGE_PROTECTED': 'Built-in pages keep their address and layout, stay published and cannot be deleted.',
+  'error.SHOWCASE_TEMPLATE_UNFIT': 'Choose published templates that fit this section (invitation websites, films or cards).',
   'error.EMAIL_UNAVAILABLE': 'Email is not set up yet, so the reply cannot be sent. Set up email under Integrations first.',
   'error.WHATSAPP_UNAVAILABLE': 'Sending on WhatsApp is not available right now. Share each invitation with the WhatsApp button instead.',
   'error.GOOGLE_UNAVAILABLE': 'Google sign-in is not available right now. Please use your email and password.',
@@ -510,7 +512,7 @@ const core = {
   'error.UPLOAD_NEEDS_INVITATION': 'Open the album from your invitation to add photos.',
 } as const;
 
-export const en = { ...core, ...enMarketing, ...enDashboard } as const;
+export const en = { ...core, ...enMarketing, ...enDashboard, ...enCards } as const;
 
 export type MessageKey = keyof typeof en;
 export type Catalog = Partial<Record<MessageKey, string>>;

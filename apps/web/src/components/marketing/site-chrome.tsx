@@ -20,6 +20,7 @@ const t = createTranslator('en');
 
 const NAV = [
   { href: '/templates', label: t('nav.templates') },
+  { href: '/cards', label: t('nav.cards') },
   { href: '/#how-it-works', label: t('nav.howItWorks') },
   { href: '/#features', label: t('nav.features') },
   { href: '/pricing', label: t('nav.pricing') },
@@ -183,6 +184,7 @@ export async function SiteFooter() {
           </FooterColumn>
           <FooterColumn title={t('footer.product')}>
             <FooterLink href="/templates">{t('nav.templates')}</FooterLink>
+            <FooterLink href="/cards">{t('nav.cards')}</FooterLink>
             <FooterLink href="/#how-it-works">{t('nav.howItWorks')}</FooterLink>
             <FooterLink href="/#features">{t('nav.features')}</FooterLink>
             <FooterLink href="/pricing">{t('nav.pricing')}</FooterLink>

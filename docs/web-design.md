@@ -63,6 +63,12 @@ Section text is parsed by `parsePageBody` (`@bulava/validation`) and rendered by
 
 `/templates` puts its filters in a sticky `.clay` sidebar (`TemplateGallery`): occasion, tradition, plan and format, each option with the number of templates it would show (zero dims it), long lists folded behind "+ N more". On phones the same filters fold into a "Filters" panel. Active filters show as chips with a remove button and "Clear all". The homepage teaser keeps chip rows (`TemplateExplorer`).
 
+The digital card gallery (`/cards`) is the same `TemplateGallery` with its own groups (occasion, tradition, style), a search and an order above the results (a GET form, so it works before hydration), and two cards to a row on phones.
+
+## Home page templates
+
+The home page's template sections (the hero's live phone and the two behind it, the illustrated scenes, the collection, the spotlight and the films) and the card gallery's Featured order show what staff chose in the console's Home page screen first (`GET /public/showcase`, `showcase.manage`), then their automatic choice fills what is left (`withPicks` in `app/page.tsx`); a pick that is unpublished later drops out. A new home section that shows templates gets a showcase section (`SHOWCASE_SECTIONS` in `@bulava/validation`) rather than hard-coded keys. A hero pick without a long pre-rendered preview plays live, which loads the template engine with the page: give it one with the preview script's `--full <key>` ([templates.md](templates.md#marketing-previews)). The console shows the same pre-rendered previews through a rewrite to the web app (`/template-previews/*`, `WEB_INTERNAL_URL`).
+
 A card (`TemplateCard`, 280px minimum) is a `.clay-lift` card: a stage tinted with the template's own accent and primary colours, where the phone (176 × 320, the posters' shape) stands near the bottom edge and rises on hover; the badge and format icons sit on the stage; below are the occasion and tradition, the name, the price with its plan, the palette as four dots, and "Live demo" (websites) or "Preview".
 
 ## Motion

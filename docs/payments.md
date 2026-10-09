@@ -99,3 +99,7 @@ Subscribe the webhook to `payment.captured`, `order.paid` and `payment.failed` (
 ## Testing
 
 `apps/api/test/platform.e2e-spec.ts` uses a fake provider that keeps Razorpay's real HMAC verification. It covers the free-plan limits, a verified Premium purchase unlocking templates, forged signatures, the webhook, a 100% coupon, and refunds. `super-admin.e2e-spec.ts` covers complimentary upgrades (the same access as a purchase, no refund, revocation) and the orders list's states, filters and totals.
+
+## Digital cards
+
+Watermark-free cards are bought per card without an account ([cards.md](cards.md#paid-cards)). They use the same gateway, keys and webhook as plans: `PaymentsService.handleWebhook` hands gateway orders it does not know to the card orders (`onOtherPayment`), which settle them the same way (verified signature or webhook, idempotent under a row lock, amounts below the price refused). Card orders are `CardOrder` rows, not `Order`s: they have no user or plan, and their entitlement is the paid image itself. The price is the `cards` settings group (₹50 at least).

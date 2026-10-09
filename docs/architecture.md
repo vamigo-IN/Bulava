@@ -105,7 +105,9 @@ All routes live under `/api/v1`, except health (`/health`, `/health/db`, `/healt
 | domains | `/events/:id/domain` (+ `/check`), `/public/domains/resolve` | `event.read` / `event.update` / public (used by the web middleware) |
 | announcements, notifications | `/events/:id/announcements`, `/notifications` | event permissions / signed in |
 | payments | `/events/:id/orders`, `/orders/:id` (+ `/verify`, `/checkout`), `/payments/razorpay/webhook` | signed in (the buyer's own orders) / HMAC |
+| cards | `/public/cards/*` (config, sessions, photos, downloads, orders, recovery, the renderer's data), `/cards/session/plan-download`, `/admin/cards/*` ([cards.md](cards.md#api)) | public with the card's or order's token in a header / signed in / `cards.view`, `cards.manage` |
 | site pages | `/public/pages` (+ `/:slug`), `/admin/pages` | public / `page.manage` |
+| home page showcase | `/public/showcase`, `/admin/showcase` (+ `/:section`) | public / `showcase.manage` |
 | contact | `/public/contact`, `/admin/contact-messages` | public (rate limited) / `contact.manage` |
 | admin | `/admin/*` (templates, assets, music, licences, plans, coupons, users and profiles, staff, orders, complimentary upgrades, moderation, renders, audit) | platform permissions ([authorization.md](authorization.md#platform-roles)) |
 | settings | `/admin/settings` (+ `/:group`, `/checks/:target`, `/site-assets`), `/public/site-config`, `/public/site-assets/:kind` | `settings.manage` (Super Admin) / public |
@@ -133,12 +135,13 @@ Browsers upload photos and download media directly from R2 with short-lived sign
 
 | Queue | Producer | Consumer | Notes |
 |---|---|---|---|
-| media-processing | upload completion | media-worker | `MEDIA_WORKER_CONCURRENCY` (CPU bound) |
+| media-processing | upload completion (event photos, card photos) | media-worker | `MEDIA_WORKER_CONCURRENCY` (CPU bound) |
+| card-render | a card download or a paid order | media-worker | Chromium screenshot of `/cards/render/<token>`, `CARD_RENDER_CONCURRENCY` (default 1) |
 | video-render | VideoJob creation, admin retry | video-worker | `VIDEO_WORKER_CONCURRENCY` jobs × `VIDEO_RENDER_THREADS` tabs |
 | notifications | announcements, invitations, RSVPs, registrations | worker | one job per Notification row |
-| email | OTP codes and other direct mail | worker | not stored as notifications |
+| email | OTP codes and other direct mail; paid cards (`{ cardOrderId }`, image attached) | worker | not stored as notifications |
 | analytics | API events | worker | stored, optionally forwarded to PostHog |
-| cleanup | repeatable schedules | worker | expired sessions, stale uploads, event lifecycle, retention purge, reminders (every minute) |
+| cleanup | repeatable schedules | worker | expired sessions, stale uploads, event lifecycle, retention purge, reminders (every minute), digital card retention |
 | exports | reserved | — | exports are currently synchronous CSV responses |
 
 Failures retry with exponential backoff (`DEFAULT_JOB_OPTIONS`). Failed renders are visible and retryable in the admin console.

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import type { Artboard, Layer } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { layerLabel } from './geometry';
+import { layerLabel } from '@bulava/template-engine';
 
 const KIND_ICON: Record<Layer['kind'], LucideIcon> = { text: Type, image: ImageIcon, shape: Shapes, ornament: Flower2, icon: Sparkles, widget: Component, scene: Landmark };
 

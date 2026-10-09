@@ -288,6 +288,11 @@ function ImageProps({ layer, colors, onLayer, onPickAsset }: { layer: ImageLayer
         <SelectField label={t('canvas.source.binding')} value={layer.source.binding} onChange={(binding) => edit((l) => void (l.source = { type: 'binding', binding }))} options={IMAGE_BINDINGS.includes(layer.source.binding) ? IMAGE_BINDINGS : [layer.source.binding, ...IMAGE_BINDINGS]} />
       )}
       <SelectField label={t('canvas.fit')} value={layer.fit} onChange={(fit) => edit((l) => void (l.fit = fit))} options={['cover', 'contain']} />
+      <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+        <NumberField compact label={t('canvas.zoom')} value={layer.zoom} min={1} max={4} step={0.05} onChange={(zoom) => edit((l) => void (l.zoom = zoom))} />
+        <NumberField compact label={t('canvas.focusX')} value={layer.focusX} min={0} max={100} onChange={(focusX) => edit((l) => void (l.focusX = focusX))} />
+        <NumberField compact label={t('canvas.focusY')} value={layer.focusY} min={0} max={100} onChange={(focusY) => edit((l) => void (l.focusY = focusY))} />
+      </div>
       <SelectField label={t('canvas.mask')} value={layer.mask} onChange={(mask) => edit((l) => void (l.mask = mask))} options={IMAGE_MASKS} />
       {layer.mask === 'rounded' || layer.mask === 'arch' ? <NumberField label={t('canvas.radius')} value={layer.radius} min={0} max={1000} onChange={(radius) => edit((l) => void (l.radius = radius))} /> : null}
       <NumberField label={t('canvas.borderWidth')} value={layer.border?.width ?? 0} min={0} max={100} onChange={(width) => edit((l) => void (l.border = width > 0 ? { width, color: l.border?.color ?? 'surface' } : undefined))} />

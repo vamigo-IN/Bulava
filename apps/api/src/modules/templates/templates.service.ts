@@ -22,7 +22,7 @@ export const TemplateListQuerySchema = z.object({
 });
 export type TemplateListQuery = z.infer<typeof TemplateListQuerySchema>;
 
-const LIST_CACHE_KEY = 'cache:templates:published:v2';
+const LIST_CACHE_KEY = 'cache:templates:published:v3';
 const LIST_TTL_SECONDS = 600;
 /** A published version never changes (Studio edits make a new draft), so its definition caches for long. */
 const definitionKey = (versionId: string) => `cache:templates:definition:${versionId}`;
@@ -44,8 +44,12 @@ export interface TemplateSummary {
   outputs: TemplateType[];
   version: number;
   templateVersionId: string;
-  /** What a gallery card shows without the definition: the theme's colours and the hero section's variant. */
-  preview: { colors: Record<string, string> | null; heroVariant: string | null };
+  /**
+   * What a gallery card shows without the definition: the theme's colours, the
+   * hero section's variant, and the opening section's kind ("canvas" templates
+   * can also become digital cards).
+   */
+  preview: { colors: Record<string, string> | null; heroVariant: string | null; heroSection: string | null };
   definition?: unknown;
 }
 
@@ -89,8 +93,9 @@ export class TemplatesService implements OnApplicationBootstrap {
     // Only the parts of each definition a card shows, read in the database.
     const ids = published.map((r) => r.currentVersion!.id);
     const looks = ids.length
-      ? await this.prisma.$queryRaw<Array<{ id: string; colors: Record<string, string> | null; heroVariant: string | null }>>`
-          SELECT "id", "definition"->'theme'->'colors' AS "colors", "definition" #>> '{website,pages,0,sections,0,variant}' AS "heroVariant"
+      ? await this.prisma.$queryRaw<Array<{ id: string; colors: Record<string, string> | null; heroVariant: string | null; heroSection: string | null }>>`
+          SELECT "id", "definition"->'theme'->'colors' AS "colors", "definition" #>> '{website,pages,0,sections,0,variant}' AS "heroVariant",
+            "definition" #>> '{website,pages,0,sections,0,section}' AS "heroSection"
           FROM "template_versions" WHERE "id" = ANY(${ids}::uuid[])`
       : [];
     const look = new Map(looks.map((l) => [l.id, l]));
@@ -110,7 +115,11 @@ export class TemplatesService implements OnApplicationBootstrap {
       outputs: r.outputs,
       version: r.currentVersion!.version,
       templateVersionId: r.currentVersion!.id,
-      preview: { colors: look.get(r.currentVersion!.id)?.colors ?? null, heroVariant: look.get(r.currentVersion!.id)?.heroVariant ?? null },
+      preview: {
+        colors: look.get(r.currentVersion!.id)?.colors ?? null,
+        heroVariant: look.get(r.currentVersion!.id)?.heroVariant ?? null,
+        heroSection: look.get(r.currentVersion!.id)?.heroSection ?? null,
+      },
     }));
     await this.redis.client.set(LIST_CACHE_KEY, JSON.stringify(list), 'EX', LIST_TTL_SECONDS).catch(() => undefined);
     return list;
