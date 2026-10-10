@@ -46,6 +46,16 @@ export const BINDINGS: Record<string, { type: BindingType; description: string }
   'photo.story': { type: 'image', description: 'Photo beside the story' },
   'photo.closing': { type: 'image', description: 'Photo in the closing section' },
   'announcements': { type: 'list', description: 'Published announcements for the viewer' },
+  // The first functions the viewer may see, by position: a card's timeline (Mehendi · Sangeet · Wedding).
+  ...Object.fromEntries(
+    [0, 1, 2, 3].flatMap((n) => [
+      [`functions[${n}].name`, { type: 'text' as const, description: `Function ${n + 1}: name` }],
+      [`functions[${n}].startsAt`, { type: 'datetime' as const, description: `Function ${n + 1}: start` }],
+      [`functions[${n}].date`, { type: 'datetime' as const, description: `Function ${n + 1}: start (format as date)` }],
+      [`functions[${n}].time`, { type: 'datetime' as const, description: `Function ${n + 1}: start (format as time)` }],
+      [`functions[${n}].venue.name`, { type: 'text' as const, description: `Function ${n + 1}: venue` }],
+    ]),
+  ),
 };
 
 /** custom.<key> bindings are validated against capabilities.textSlots. */
@@ -61,7 +71,8 @@ export function resolveBinding(path: string, ctx: RenderContext): unknown {
   if (slot) return ctx.photoSlots?.[slot[1] as keyof NonNullable<RenderContext['photoSlots']>]?.url;
   const normalized = path
     .replace('function.date', 'function.startsAt')
-    .replace('function.time', 'function.startsAt');
+    .replace('function.time', 'function.startsAt')
+    .replace(/^(functions\[\d+\])\.(date|time)$/, '$1.startsAt');
   const parts = normalized.split('.').flatMap((p) => {
     const m = /^(\w+)\[(\d+)\]$/.exec(p);
     return m ? [m[1]!, Number(m[2])] : [p];
