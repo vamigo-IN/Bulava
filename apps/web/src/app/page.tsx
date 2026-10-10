@@ -634,7 +634,7 @@ export default async function HomePage() {
                 <p className="mx-auto mt-5 max-w-xl text-lg text-ivory/85">{t('home.final.subtitle')}</p>
                 <div className="mt-10 flex flex-wrap justify-center gap-4">
                   <MagneticButton strength={0.25}>
-                    <AuthAwareLink signedOutHref="/signup" signedInHref="/dashboard" className="btn-3d btn-3d-gold group/cta min-h-14 rounded-2xl px-8 text-base">
+                    <AuthAwareLink signedOutHref="/login" signedInHref="/dashboard" className="btn-3d btn-3d-gold group/cta min-h-14 rounded-2xl px-8 text-base">
                       {t('nav.getStarted')}
                       <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                     </AuthAwareLink>

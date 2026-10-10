@@ -7,6 +7,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import type { MessageKey } from '@bulava/localization';
 import { BrandLogo } from '@/components/marketing/brand-logo';
 import { Alert, Button, Field, Input, Spinner } from '@/components/ui/primitives';
+import { ConsentBox } from '@/components/auth/consent-box';
 import { ApiError, apiGet, apiPost } from '@/lib/api';
 import { errorMessage, I18nProvider, useT } from '@/lib/i18n';
 import { useSession } from '@/lib/session';
@@ -34,6 +35,10 @@ function Join({ token }: { token: string }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  /** The Terms box: never pre-ticked. */
+  const [accepted, setAccepted] = useState(false);
+  const [consentError, setConsentError] = useState<string | undefined>();
+  const passwordShort = password.length > 0 && password.length < 10;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [eventId, setEventId] = useState<string | null>(null);
@@ -92,10 +97,15 @@ function Join({ token }: { token: string }) {
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
+    if (!accepted) {
+      setConsentError(t('auth.consent.required'));
+      return;
+    }
+    if (passwordShort) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await apiPost<{ eventId: string }>(`/team-invites/${token}/accept`, { code, name, password });
+      const result = await apiPost<{ eventId: string }>(`/team-invites/${token}/accept`, { code, name, acceptTerms: true, password });
       finish(result.eventId);
     } catch (err) {
       fail(err);
@@ -181,12 +191,21 @@ function Join({ token }: { token: string }) {
               {step === 'create' ? (
                 <form onSubmit={create} className="space-y-4" noValidate>
                   <h2 className="font-display text-2xl">{t('join.create.title')}</h2>
-                  <p className="text-sm text-stone-600">{t('join.create.subtitle', { email: info.email })}</p>
                   <Field label={t('auth.field.name')}>{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={120} />}</Field>
-                  <Field label={t('auth.field.password')} hint={t('auth.field.passwordHint')}>
-                    {(p) => <Input {...p} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />}
+                  {/* For password managers: which account a password belongs to. */}
+                  <input type="email" autoComplete="username" value={info.email} readOnly tabIndex={-1} aria-hidden="true" className="sr-only" />
+                  <Field label={t('auth.new.password')} error={passwordShort ? t('auth.field.passwordHint') : undefined}>
+                    {(p) => <Input {...p} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" maxLength={128} />}
                   </Field>
-                  <Button type="submit" size="lg" className="w-full" disabled={busy || !name.trim() || password.length < 10}>
+                  <ConsentBox
+                    checked={accepted}
+                    error={consentError}
+                    onChange={(e) => {
+                      setAccepted(e.target.checked);
+                      if (e.target.checked) setConsentError(undefined);
+                    }}
+                  />
+                  <Button type="submit" size="lg" className="w-full" disabled={busy || !name.trim() || passwordShort}>
                     {busy ? t('common.loading') : t('join.create.submit')}
                   </Button>
                 </form>

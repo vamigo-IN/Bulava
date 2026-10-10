@@ -95,8 +95,6 @@ export class QuickStartService {
       if (existing.status !== 'ACTIVE' || existing.deletedAt) {
         throw new AppError('PHONE_TAKEN', 'This number belongs to an account that cannot be used right now. Please sign in.');
       }
-      // No point in a code when the account cannot take another free event (PLAN_LIMIT_REACHED says so).
-      await this.events.assertEventAllowance(existing.id);
       // Someone else's number must not open their account: the owner proves it with a code.
       const { target } = await this.otp.send(input.phone, 'quick-start');
       await this.audit.record({ actorType: 'ANONYMOUS', action: 'user.quick_start_otp', targetType: 'User', targetId: existing.id, meta });
@@ -130,8 +128,6 @@ export class QuickStartService {
     const resolved = await this.resolve(input);
     const found = await this.prisma.user.findUnique({ where: { phone: input.phone } });
     if (!found || found.status !== 'ACTIVE' || found.deletedAt) throw new AppError('PHONE_TAKEN', 'This number belongs to an account that cannot be used right now.');
-    // Checked before the code is spent, so a refusal costs nothing.
-    await this.events.assertEventAllowance(found.id);
     await this.otp.verify(input.phone, input.code, 'quick-start');
     // A verified number secures the account.
     const user = await this.prisma.user.update({ where: { id: found.id }, data: { phoneVerifiedAt: found.phoneVerifiedAt ?? new Date(), provisional: false } });

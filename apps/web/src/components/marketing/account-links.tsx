@@ -53,7 +53,7 @@ export function AccountLinks({ variant }: { variant: 'desktop' | 'mobile' }) {
       <Link href="/login" className="rounded-full px-4 py-2 text-sm font-medium text-[var(--hdr-muted)] transition-colors duration-300 hover:bg-[var(--hdr-hover)] hover:text-[var(--hdr-text)]">
         {t('nav.signIn')}
       </Link>
-      <Link href="/signup" className={HEADER_CTA}>
+      <Link href="/login" className={HEADER_CTA}>
         {t('nav.getStarted')} <Arrow />
       </Link>
     </div>
@@ -62,7 +62,7 @@ export function AccountLinks({ variant }: { variant: 'desktop' | 'mobile' }) {
       <Link href="/login" className="block rounded-2xl px-4 py-3 text-base font-medium transition-colors duration-200 hover:bg-gold-100/70">
         {t('nav.signIn')}
       </Link>
-      <Link href="/signup" className={buttonVariants({ className: 'group/cta mt-1 w-full' })}>
+      <Link href="/login" className={buttonVariants({ className: 'group/cta mt-1 w-full' })}>
         {t('nav.getStarted')} <Arrow />
       </Link>
     </>

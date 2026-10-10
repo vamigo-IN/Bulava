@@ -2,13 +2,14 @@ import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { Order, PricingPlan, Prisma } from '@bulava/database';
 import { SettingsStore } from '@bulava/settings';
-import type { CreateOrderInput, VerifyPaymentInput } from '@bulava/validation';
+import { FEATURE_KEYS, type CreateOrderInput, type OrderQuoteInput, type VerifyPaymentInput } from '@bulava/validation';
 import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import type { AuthUser, EventAccessContext } from '../../common/request-context';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditService } from '../audit/audit.service';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { assertVerifiedAccount } from '../users/account-gate';
 import { ConsentService } from '../users/consent.service';
@@ -46,6 +47,7 @@ export class PaymentsService {
     private readonly analytics: AnalyticsService,
     private readonly notifications: NotificationsService,
     private readonly consents: ConsentService,
+    private readonly entitlements: EntitlementsService,
     /** Set by tests only; production reads Razorpay from the Super Admin's settings. */
     @Optional() @Inject(PAYMENT_PROVIDER) private readonly override: PaymentProvider | null,
     @Inject(SETTINGS_STORE) private readonly settings: SettingsStore,
@@ -98,14 +100,54 @@ export class PaymentsService {
     return { amountMinor: Math.max(0, plan.priceMinor - off), couponId: coupon.id };
   }
 
-  /** Per-event plans (ONE_TIME) attach to an event; yearly plans attach to the user. */
+  /**
+   * Does the account already have what this one-time plan unlocks? Compared by
+   * the design tier it gives (templates.maxTier), from any plan on the account
+   * (one-time or yearly). A plan without a tier is never "already there".
+   */
+  private async accountHas(userId: string, plan: PricingPlan & { features: Array<{ featureKey: string; limit: number | null }> }): Promise<boolean> {
+    if (plan.interval !== 'ONE_TIME') return false;
+    const row = plan.features.find((f) => f.featureKey === FEATURE_KEYS.TEMPLATES_MAX_TIER);
+    if (!row) return false;
+    const own = (await this.entitlements.forUser(userId)).get(FEATURE_KEYS.TEMPLATES_MAX_TIER);
+    if (!own || own.source === 'FREE_PLAN' || !own.enabled) return false;
+    return (own.limit ?? 2) >= (row.limit ?? 2);
+  }
+
+  /**
+   * The checkout page's price breakdown: a plan's price, a coupon's discount
+   * and the total, before anything is bought, and whether the account has the
+   * plan already (`included`). A code that is not valid answers COUPON_INVALID,
+   * so the page can say so beside the field.
+   */
+  async quote(user: AuthUser, input: OrderQuoteInput) {
+    const plan = await this.prisma.pricingPlan.findUnique({ where: { key: input.planKey }, include: { features: true } });
+    if (!plan || !plan.active || plan.priceMinor <= 0) throw new AppError('NOT_FOUND', 'Plan not found.');
+    const [{ amountMinor }, included] = await Promise.all([this.priceWithCoupon(plan, input.couponCode || undefined), this.accountHas(user.id, plan)]);
+    return {
+      plan: { key: plan.key, name: plan.name, description: plan.description, interval: plan.interval },
+      couponCode: input.couponCode || null,
+      priceMinor: plan.priceMinor,
+      discountMinor: plan.priceMinor - amountMinor,
+      totalMinor: amountMinor,
+      currency: plan.currency,
+      included,
+    };
+  }
+
+  /**
+   * Plans belong to the account (ADR-053): `POST /orders` buys a one-time or a
+   * yearly plan, and every event of the buyer's gets it. `POST /events/:id/orders`
+   * still buys a one-time plan for that event alone (API clients; older orders).
+   */
   async createOrder(user: AuthUser, access: EventAccessContext | null, input: CreateOrderInput, meta: RequestMeta) {
     // Receipts and refunds need a reachable account, not a number alone.
     await assertVerifiedAccount(this.prisma, user.id);
-    const plan = await this.prisma.pricingPlan.findUnique({ where: { key: input.planKey } });
+    const plan = await this.prisma.pricingPlan.findUnique({ where: { key: input.planKey }, include: { features: true } });
     if (!plan || !plan.active || plan.priceMinor <= 0) throw new AppError('NOT_FOUND', 'Plan not found.');
     if (access && plan.interval !== 'ONE_TIME') throw new AppError('BAD_REQUEST', 'This plan is not purchased per event.');
-    if (!access && plan.interval === 'ONE_TIME') throw new AppError('BAD_REQUEST', 'Choose the event to upgrade.');
+    // Never sold twice: a one-time plan the account already has (or a higher one).
+    if (!access && (await this.accountHas(user.id, plan))) throw new AppError('PLAN_ALREADY_ACTIVE', 'Your account already has this plan.');
 
     const { amountMinor, couponId } = await this.priceWithCoupon(plan, input.couponCode);
     const versions = await this.consents.versions(['terms', 'refund']);

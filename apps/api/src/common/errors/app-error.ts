@@ -13,7 +13,7 @@ export const ErrorCode = {
   CONFLICT: HttpStatus.CONFLICT,
   EMAIL_TAKEN: HttpStatus.CONFLICT,
   PHONE_TAKEN: HttpStatus.CONFLICT,
-  /** An account made from a WhatsApp number alone must be secured (code, or email and password) before it publishes or pays. */
+  /** An account made from a WhatsApp number alone must be secured (its WhatsApp code, or an email and its code) before it publishes or pays. */
   ACCOUNT_UNVERIFIED: HttpStatus.FORBIDDEN,
   /** WhatsApp codes need the WhatsApp Business integration and an approved authentication template. */
   PHONE_OTP_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
@@ -54,6 +54,8 @@ export const ErrorCode = {
   PAYMENT_VERIFICATION_FAILED: HttpStatus.BAD_REQUEST,
   ORDER_NOT_PAYABLE: HttpStatus.CONFLICT,
   COUPON_INVALID: HttpStatus.BAD_REQUEST,
+  /** A one-time plan the account already has (or a higher one): it is not sold again. */
+  PLAN_ALREADY_ACTIVE: HttpStatus.CONFLICT,
   ALREADY_CHECKED_IN: HttpStatus.CONFLICT,
   REGISTRATION_NOT_AVAILABLE: HttpStatus.BAD_REQUEST,
   REGISTRATION_CLOSED: HttpStatus.CONFLICT,

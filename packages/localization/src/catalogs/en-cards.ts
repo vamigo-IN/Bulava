@@ -61,6 +61,8 @@ export const enCards = {
   'cards.editor.canvasHint': 'Tap anything on the card to change it. Drag to move, use the handles to resize and rotate.',
   'cards.editor.inspector': 'Selected element',
   'cards.editor.closeSheet': 'Close',
+  'cards.editor.foldSheet': 'Fold down to see more of the card',
+  'cards.editor.unfoldSheet': 'Show the settings',
   'cards.editor.saving': 'Saving…',
   'cards.editor.saved': 'Saved',
   'cards.editor.savedDevice': 'Saved on this device',

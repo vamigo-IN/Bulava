@@ -210,15 +210,15 @@ export const enMarketing = {
 
   'home.pricing.eyebrow': 'Pricing',
   'home.pricing.title': 'Simple. No surprises.',
-  'home.pricing.subtitle': 'Start free. Upgrade a single event when you need more. Prices include GST.',
-  'home.pricing.oneTime': 'one-time, per event',
+  'home.pricing.subtitle': 'Start free. Unlock more with a one-time payment when you need it. Prices include GST.',
+  'home.pricing.oneTime': 'one-time',
   'home.pricing.yearly': 'per year',
   'home.pricing.free': 'Free forever',
   'home.pricing.popular': 'Most popular',
   'home.pricing.choose': 'Choose {plan}',
   'home.pricing.start': 'Start free',
-  'plan.feature.events.max': '{limit} active event',
-  'plan.feature.events.max.many': 'Up to {limit} events',
+  'plan.feature.events.max': '{limit} published event at a time, unlimited drafts',
+  'plan.feature.events.max.many': 'Up to {limit} published events, unlimited drafts',
   'plan.feature.functions.max': 'Up to {limit} functions',
   'plan.feature.functions.unlimited': 'Unlimited functions',
   'plan.feature.guests.max': 'Up to {limit} guests',
@@ -252,10 +252,10 @@ export const enMarketing = {
   'home.faq.5.q': 'Is my guest list private?',
   'home.faq.5.a': 'Yes. Invitations use secret links that you can revoke at any time, and you can add a PIN or one-time code. We never sell your data.',
   'home.faq.6.q': 'How do payments work?',
-  'home.faq.6.a': 'You can start free. Upgrades are one-time payments per event through Razorpay (UPI, cards, net banking). Planners can choose the yearly Studio plan.',
+  'home.faq.6.a': 'You can start free. Plans are one-time payments through Razorpay (UPI, cards, net banking). Planners can choose the yearly Studio plan.',
 
   'home.final.title': 'Ready to send an invitation your guests will remember?',
-  'home.final.subtitle': 'Create your event for free. Upgrade only if you need to.',
+  'home.final.subtitle': 'Create your event for free. Unlock more only if you need it.',
 
   'footer.templates': 'Templates',
   'footer.product': 'Product',
@@ -329,7 +329,7 @@ export const enMarketing = {
   'templates.detail.desktop': 'Desktop',
 
   'pricing.title': 'Plans for every celebration',
-  'pricing.subtitle': 'Pay once per event. No subscriptions for families.',
+  'pricing.subtitle': 'Pay once. No subscriptions for families.',
 
   // Design v2: cursor label, hero status chips, section captions
   'cursor.view': 'View',

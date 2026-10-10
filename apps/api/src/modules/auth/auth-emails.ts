@@ -2,6 +2,11 @@ import { escapeHtml } from '../guest-access/otp.service';
 import type { EmailCodePurpose } from './email-code.service';
 
 const COPY: Record<EmailCodePurpose, { title: string; intro: (site: string) => string; footer: string }> = {
+  access: {
+    title: 'Your sign-in code',
+    intro: (site) => `Enter this code to sign in to ${site}. New here? It creates your account too.`,
+    footer: 'If you did not just try to sign in, you can ignore this email. Nobody can sign in without the code.',
+  },
   signup: {
     title: 'Confirm your email',
     intro: (site) => `Enter this code to finish creating your ${site} account.`,

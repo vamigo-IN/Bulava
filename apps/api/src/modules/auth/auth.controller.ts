@@ -6,7 +6,10 @@ import {
   ClaimAccountSchema,
   EmailCodeResendSchema,
   EmailCodeSchema,
+  EmailSignupSchema,
+  EmailStartSchema,
   ForgotPasswordSchema,
+  GoogleSignupSchema,
   LoginMfaSchema,
   LoginSchema,
   MfaDisableSchema,
@@ -20,7 +23,10 @@ import {
   type ClaimAccountInput,
   type EmailCodeInput,
   type EmailCodeResendInput,
+  type EmailSignupInput,
+  type EmailStartInput,
   type ForgotPasswordInput,
+  type GoogleSignupInput,
   type LoginInput,
   type LoginMfaInput,
   type MfaDisableInput,
@@ -102,14 +108,13 @@ export class AuthController {
     });
   }
 
-  /** "Continue with Google" from the sign-in and sign-up pages (a top-level navigation). */
+  /** "Continue with Google" from the sign-in page (a top-level navigation). A new account is made on the page's last step (`google/signup`). */
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Get('google/start')
-  async googleStart(@Query('next') next: string | undefined, @Query('consent') consent: string | undefined, @Res() res: Response) {
+  async googleStart(@Query('next') next: string | undefined, @Res() res: Response) {
     if (!(await this.google.enabled())) return res.redirect(302, `${this.config.WEB_ORIGIN.replace(/\/$/, '')}/login?error=GOOGLE_UNAVAILABLE`);
-    // consent=1: the sign-up page's box was ticked, so a new account may be created (and its consent recorded).
-    const { url, state } = await this.google.start({ next, mode: 'signin', consented: consent === '1' });
+    const { url, state } = await this.google.start({ next, mode: 'signin' });
     this.setGoogleState(res, state);
     res.setHeader('Cache-Control', 'no-store');
     return res.redirect(302, url);
@@ -162,6 +167,71 @@ export class AuthController {
     const session = await this.auth.setPassword(user.id, body, meta, user.mfa);
     setSessionCookies(res, session, this.config);
     return { hasPassword: true };
+  }
+
+  // ───── The one sign-in form (ADR-052): an email address ─────
+
+  /**
+   * The address typed in: an account with a password asks for it
+   * (`method: 'password'`); any other address gets a code (`method: 'code'`).
+   */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('email/start')
+  @HttpCode(200)
+  @ApiZodBody(EmailStartSchema)
+  emailStart(@ZodBody(EmailStartSchema) body: EmailStartInput, @ReqMeta() meta: RequestMeta) {
+    return this.auth.startEmail(body.email, meta);
+  }
+
+  /** "Email me a code": a sign-in code to the address, also for accounts with a password. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('email/code')
+  @HttpCode(200)
+  @ApiZodBody(EmailStartSchema)
+  emailCode(@ZodBody(EmailStartSchema) body: EmailStartInput, @ReqMeta() meta: RequestMeta) {
+    return this.auth.sendEmailCode(body.email, meta);
+  }
+
+  /** The emailed code: signed in (or the authenticator step, or the restore offer), or `signupRequired` with the token that makes the account. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('email/verify')
+  @HttpCode(200)
+  @ApiZodBody(EmailCodeSchema)
+  async emailVerify(@ZodBody(EmailCodeSchema) body: EmailCodeInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    const result = await this.auth.verifyEmailCode(body.challengeToken, body.code, meta);
+    if ('signupRequired' in result) return result;
+    return finishSignIn(res, result, this.config);
+  }
+
+  /** A new account for the address just proved: a name, the ticked Terms box and, if wanted, a password. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('email/signup')
+  @ApiZodBody(EmailSignupSchema)
+  async emailSignup(@ZodBody(EmailSignupSchema) body: EmailSignupInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    return finishSignIn(res, await this.auth.signupWithEmail(body, meta), this.config);
+  }
+
+  /** The account's password: signed in (or the authenticator step, or the restore offer). */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('email/password')
+  @HttpCode(200)
+  @ApiZodBody(LoginSchema)
+  async emailPassword(@ZodBody(LoginSchema) body: LoginInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    return finishSignIn(res, await this.auth.loginWithPassword(body, meta), this.config);
+  }
+
+  /** A new account from Google: the sign-in page's last step (a name and the ticked Terms box). */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('google/signup')
+  @ApiZodBody(GoogleSignupSchema)
+  async googleSignup(@ZodBody(GoogleSignupSchema) body: GoogleSignupInput, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response) {
+    return finishSignIn(res, await this.google.completeSignup(body, meta), this.config);
   }
 
   /** Signing up with an email: nothing is saved yet; a code goes to the address (`signup/verify` makes the account). */

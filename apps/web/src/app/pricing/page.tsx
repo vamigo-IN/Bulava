@@ -12,7 +12,7 @@ const t = createTranslator('en');
 
 export const metadata: Metadata = {
   title: 'Pricing',
-  description: 'Start free. Upgrade a single event with a one-time payment, or choose Studio for planners.',
+  description: 'Start free. Unlock more for a single event with a one-time payment, or choose Studio for planners.',
   alternates: { canonical: '/pricing' },
 };
 

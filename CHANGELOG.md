@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### One sign-in, a real checkout, and smoother editing on phones
+
+- **Shorter sign-up steps.** Creating an account (and joining a team) asks only for your name, an optional password and the Terms box, without long explanations.
+- **One way in for everyone.** Sign-in and sign-up are now one page with one field: type your email or your WhatsApp number and we tell them apart. Indian mobile numbers need no code: the India flag and +91 appear as you type. Continue with Google stays one tap.
+- **No password to remember.** WhatsApp numbers get a code on WhatsApp and emails get a code by email. New here? The same steps create your account: your name, the Terms box, and a password only if you want one. Set a password and next time it signs you in straight away, with "email me a code" right beside it.
+- **One account, any way in.** Started with WhatsApp? Add your email in Account (no password needed) and sign in with either. Started with email? Confirm your WhatsApp number and use that too.
+- **A simple checkout.** Choosing a plan now opens a short checkout page: the plan, the price, a coupon box with an *Apply* button that shows your saving (or why a code does not work), and the terms, before you pay. Choosing a plan before signing in brings you back to its checkout afterwards.
+- **Make as many drafts as you like.** Creating an event is never blocked by your plan: try designs, share previews, prepare the next celebration. A plan is asked for only when you publish more events than your plan allows.
+- **Plans are for your account.** A plan is a one-time payment that unlocks its features for your account and all your events; you no longer pick an event when you pay, and the same plan is never charged twice.
+- **Unlock, not upgrade.** When your plan's limit is reached (another event, more guests or photos), the message says which limit and gives you *Click here to unlock*.
+- **A quieter preview.** The preview link shows only a small *Preview · Not published yet* mark; if it is your event, *Edit* and *Publish* sit right in it.
+- **Editing cards on a phone.** The settings for the element you tap now open below the card instead of covering it, so you can see what you resize; fold them down for a bigger card.
+
 ### Every design once, cards that resize properly, and a quicker download for plan holders
 
 - **No more repeated designs.** 54 templates that were another design of the same occasion in a different colour are gone (for example *Rajwada Jharokha*, which repeated *Shahi Gajraj*); the design that stays now offers their colours as presets, so nothing is lost. Cards and invitations already made with them keep working.

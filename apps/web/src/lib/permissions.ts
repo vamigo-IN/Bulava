@@ -52,7 +52,7 @@ export const SECTION_PERMISSIONS: Record<string, EventPermission[]> = {
   '/video': ['event.update'],
   '/checkin': ['guest.read'],
   '/settings': ['event.update'],
-  '/upgrade': ['payment.read'],
+  '/unlock': ['payment.read'],
 };
 
 /** May the member open this section (any one of its permissions)? Unknown sections are left to the API. */

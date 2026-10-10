@@ -68,9 +68,12 @@ The web app maps codes to translation keys `error.<CODE>`.
 ## Typical host flow
 
 ```http
-POST /api/v1/auth/signup            {"name":"Riya","email":"riya@example.com","password":"…","acceptTerms":true}
-                                    → { verificationRequired: true, challengeToken, target, expiresAt, resendAfter }
-POST /api/v1/auth/signup/verify     {"challengeToken":"…","code":"123456"}   (the emailed code: makes the account, signs in)
+POST /api/v1/auth/email/start       {"email":"riya@example.com"}
+                                    → { method: "code", challengeToken, target, expiresAt, resendAfter }
+                                      (or { method: "password" } for an account with a password)
+POST /api/v1/auth/email/verify      {"challengeToken":"…","code":"123456"}   (signs in, or for a new address
+                                    → { signupRequired: true, signupToken, target })
+POST /api/v1/auth/email/signup      {"signupToken":"…","name":"Riya","acceptTerms":true,"password":"…optional…"}
 POST /api/v1/events                 {"typeKey":"WEDDING","title":"Aman & Riya Wedding","language":"hi",
                                      "details":{"partnerOne":"Riya","partnerTwo":"Aman"},"applyDefaults":false}
 POST /api/v1/events/:id/groups      {"name":"Friends"}
@@ -103,9 +106,9 @@ POST /api/v1/auth/phone/verify       {"phone":"98765 43210","code":"123456"}  (a
 POST /api/v1/auth/phone/signup       {"signupToken":"…","name":"Riya","acceptTerms":true,"whatsappUpdates":false}
 POST /api/v1/users/me/phone/code     → { sent, target, sendId, resendAfter }   (signed in: confirm the account's number)
 POST /api/v1/users/me/phone/confirm  {"code":"123456"}
-POST /api/v1/auth/claim              {"email":"riya@example.com","password":"…"}  (signed in; an account without an email)
+POST /api/v1/auth/claim              {"email":"riya@example.com","password":"…optional…"}  (signed in; an account without an email)
                                      → { verificationRequired: true, challengeToken, … }
-POST /api/v1/auth/claim/verify       {"challengeToken":"…","code":"123456"}   (adds the confirmed email and the password)
+POST /api/v1/auth/claim/verify       {"challengeToken":"…","code":"123456"}   (adds the confirmed email, and the password if given)
 PATCH /api/v1/users/me               {"name":"Riya","phone":"98765 43210","whatsappUpdates":true}
 ```
 
@@ -138,8 +141,8 @@ The GET returns the event shell, the guest's name, and only the functions the gu
 | Event team | `GET`/`POST /events/:id/members`, `PATCH`/`DELETE /events/:id/members/:memberId`, `POST /events/:id/members/invites/:inviteId/resend`, `DELETE /events/:id/members/invites/:inviteId`; the invited person: `GET /team-invites/:token`, `POST /team-invites/:token/{verify,accept,join}` (10 per minute) | [authorization.md](authorization.md#event-team) |
 | Videos and cards | `GET/POST /events/:id/videos`, `…/:jobId/cancel`, `…/:jobId/download`, `GET /music` | [video-rendering.md](video-rendering.md) |
 | Check-in | `/events/:id/check-ins/{lookup/:code,summary}`, `POST /events/:id/check-ins`, `GET`/`PUT /events/:id/check-ins/settings` (`{ entryPasses }`) | [qr-system.md](qr-system.md) |
-| Payments | `POST /events/:id/orders` `{ planKey, couponCode?, acceptTerms: true }`, `POST /orders/:id/verify`, `GET /orders` (payment history), `GET /orders/:id` (status, the buyer's own orders), `POST /orders/:id/checkout` (retry or finish paying the same order), `POST /payments/razorpay/webhook` | [payments.md](payments.md#payment-status-page) |
-| Account | `POST /auth/signup` `{ name, email, password, acceptTerms: true }` then `POST /auth/signup/verify` `{ challengeToken, code }`; `POST /auth/login` answers `{ emailCodeRequired, challengeToken, target }` (then `POST /auth/login/email` `{ challengeToken, code }`) or `{ mfaRequired, challengeToken }`, and after the code may answer `{ restoreRequired, restoreToken, deleteAt }`; `POST /auth/email-code/resend` `{ challengeToken }`; `POST /auth/password/forgot` `{ email }` and `/auth/password/reset` `{ challengeToken, code, newPassword }`; `DELETE /users/me` `{ password }` or `{ confirm: "DELETE" }` (schedules erasure in 30 days); `POST /auth/restore` `{ token }` | [authentication.md](authentication.md#hosts-users) |
+| Payments | `POST /orders/quote` `{ planKey, couponCode? }` (the checkout's price breakdown: `{ plan, couponCode, priceMinor, discountMinor, totalMinor, currency, included }`, `400 COUPON_INVALID`), `POST /orders` `{ planKey, couponCode?, acceptTerms: true }` (plans for the account: one-time and yearly; `409 PLAN_ALREADY_ACTIVE` for a one-time plan the account has), `POST /events/:id/orders` (a one-time plan for one event), `POST /orders/:id/verify`, `GET /orders` (payment history), `GET /orders/:id` (status, the buyer's own orders), `POST /orders/:id/checkout` (retry or finish paying the same order), `POST /payments/razorpay/webhook` | [payments.md](payments.md#payment-status-page) |
+| Account | The one sign-in form: `POST /auth/email/start` `{ email }` (`{ method: "password" }` or `{ method: "code", challengeToken, … }`), `POST /auth/email/code` `{ email }`, `POST /auth/email/verify` `{ challengeToken, code }` (a session, the two-step or restore step, or `{ signupRequired, signupToken, target }`), `POST /auth/email/signup` `{ signupToken, name, acceptTerms: true, password? }`, `POST /auth/email/password` `{ email, password }`; `POST /auth/signup` `{ name, email, password, acceptTerms: true }` then `POST /auth/signup/verify` `{ challengeToken, code }`; `POST /auth/login` answers `{ emailCodeRequired, challengeToken, target }` (then `POST /auth/login/email` `{ challengeToken, code }`) or `{ mfaRequired, challengeToken }`, and after the code may answer `{ restoreRequired, restoreToken, deleteAt }`; `POST /auth/email-code/resend` `{ challengeToken }`; `POST /auth/password/forgot` `{ email }` and `/auth/password/reset` `{ challengeToken, code, newPassword }`; `DELETE /users/me` `{ password }` or `{ confirm: "DELETE" }` (schedules erasure in 30 days); `POST /auth/restore` `{ token }` | [authentication.md](authentication.md#hosts-users) |
 | Site pages and contact | public `GET /public/pages`, `GET /public/pages/:slug`, `POST /public/contact` (4 per 10 minutes per IP); staff `/admin/pages` (`page.manage`), `/admin/contact-messages` (`contact.manage`) | [below](#site-pages-and-the-contact-inbox) |
 | Home page showcase | public `GET /public/showcase`; staff `GET /admin/showcase`, `PUT /admin/showcase/:section` (`showcase.manage`) | [below](#home-page-showcase) |
 | Admin | `/admin/*` (see below for staff, settings and orders) | [template-studio.md](template-studio.md), [authorization.md](authorization.md#platform-roles) |
@@ -158,7 +161,7 @@ The public card editor's routes (no account; the card's token in `x-card-session
 | Stay, travel, seating | `GET /events/:id/logistics`; `PUT /events/:id/logistics/settings`; `PUT /events/:id/guests/:guestId/logistics`; `GET`/`PUT /events/:id/functions/:functionId/seating`; exports `travel`, `stays`, `seating`; guest `POST /public/invitations/:token/travel` |
 | Live photo wall | `PATCH /events/:id/album` with `liveWallEnabled`; `POST /events/:id/album/wall/rotate`; public `GET /public/walls/:token` and `/qr.svg` |
 | Reminders | `GET`/`PUT /events/:id/reminders`; `POST /events/:id/reminders/rsvp/send-now` |
-| Google sign-in | `GET /auth/providers` (`google`, `phoneOtp`, `emailCodes`); `GET /auth/google/start?next=`; `GET /auth/google/callback`; `POST /auth/google/link`, `/auth/google/unlink`; `PUT /auth/password` (set or change) |
+| Google sign-in | `GET /auth/providers` (`google`, `phoneOtp`, `emailCodes`); `GET /auth/google/start?next=`; `GET /auth/google/callback` (a new person: `/login#google-signup=<token>&name=`); `POST /auth/google/signup` `{ signupToken, name, acceptTerms: true }`; `POST /auth/google/link`, `/auth/google/unlink`; `PUT /auth/password` (set or change) |
 | Custom domains | `GET`/`PUT`/`DELETE /events/:id/domain`; `POST /events/:id/domain/check`; public `GET /public/domains/resolve?host=` |
 | Design photos | `POST /events/:id/media/design-uploads` (signed upload for a photo placed in a template); `POST …/design-uploads/:itemId/complete`; `GET …/design-uploads/:itemId` (processing status). All need `event.update`. |
 | Template retirement (staff) | `GET /admin/templates?deleted=true`; `DELETE /admin/templates/:id` (soft delete); `POST /admin/templates/:id/restore` |

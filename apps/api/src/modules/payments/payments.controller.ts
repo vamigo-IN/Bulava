@@ -2,7 +2,7 @@ import { Controller, Get, HttpCode, Param, Post, Req, type RawBodyRequest } from
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
-import { CreateOrderSchema, VerifyPaymentSchema, type CreateOrderInput, type VerifyPaymentInput } from '@bulava/validation';
+import { CreateOrderSchema, OrderQuoteSchema, VerifyPaymentSchema, type CreateOrderInput, type OrderQuoteInput, type VerifyPaymentInput } from '@bulava/validation';
 import { CurrentUser, EventAccess, Public, ReqMeta, RequireEventPermission, SkipCsrf, type RequestMeta } from '../../common/decorators/auth.decorators';
 import { ApiZodBody, ZodBody } from '../../common/decorators/zod.decorators';
 import { ParseIdPipe } from '../../common/pipes/zod-validation.pipe';
@@ -38,7 +38,16 @@ export class PaymentsController {
     return this.payments.listForUser(user);
   }
 
-  /** Yearly plans (Studio) belong to the user, not an event. */
+  /** The checkout page's price breakdown: the plan, a coupon's discount and the total (nothing is bought). */
+  @Post('orders/quote')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiZodBody(OrderQuoteSchema)
+  quote(@CurrentUser() user: AuthUser, @ZodBody(OrderQuoteSchema) body: OrderQuoteInput) {
+    return this.payments.quote(user, body);
+  }
+
+  /** Plans for the account (ADR-053): one-time plans and yearly ones (Studio); every event of the buyer's gets them. */
   @Post('orders')
   @ApiZodBody(CreateOrderSchema)
   createForUser(@CurrentUser() user: AuthUser, @ZodBody(CreateOrderSchema) body: CreateOrderInput, @ReqMeta() meta: RequestMeta) {

@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { createTranslator, getLanguage, type MessageKey, type Translator } from '@bulava/localization';
 import { ApiError } from './api';
+import { isPlanLimit, planLimitMessage } from './plan-limits';
 
 interface I18nValue {
   language: string;
@@ -39,6 +40,8 @@ export function useOptionalT(): Translator {
 
 /** Map an API error code to a translated message, falling back to the generic error. */
 export function errorMessage(t: Translator, error: unknown): string {
+  // Plan limits in their own words (how many the plan allows), never "upgrade".
+  if (isPlanLimit(error)) return planLimitMessage(t, error);
   if (error instanceof ApiError) {
     const key = `error.${error.code}` as MessageKey;
     const translated = t(key);

@@ -139,7 +139,7 @@ export default function InvitationsPage() {
           {channels.data.whatsappLimit === 0 ? (
             <>
               <p className="text-sm text-stone-600">{t('invitation.whatsapp.upgrade')}</p>
-              <Link href={`/dashboard/events/${eventId}/upgrade`} className="text-sm font-semibold text-brand-800 underline underline-offset-2">
+              <Link href={`/dashboard/events/${eventId}/unlock`} className="text-sm font-semibold text-brand-800 underline underline-offset-2">
                 {t('invitation.whatsapp.upgradeCta')}
               </Link>
             </>

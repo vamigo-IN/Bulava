@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createTranslator } from '@bulava/localization';
-import { ApiError, apiPatch } from '@/lib/api';
+import { apiPatch } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
+import { isPlanLimit, unlockHref } from '@/lib/plan-limits';
 import { keys, useMe, useShareLink } from '@/lib/queries';
 import { LINK_MODES } from '@/lib/setup-steps';
 import type { AccessMode, EventSummary } from '@/lib/types';
@@ -56,7 +57,8 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
   const ref = useRef<HTMLDialogElement>(null);
   const [access, setAccess] = useState<AccessMode>(event.accessMode);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ text: string; upgrade: boolean } | null>(null);
+  /** `unlock`: where to unlock more when a plan stops publishing (the number of published events, or the design). */
+  const [error, setError] = useState<{ text: string; unlock: string | null } | null>(null);
   const [live, setLive] = useState(event.status !== 'DRAFT');
   const base = `/dashboard/events/${event.id}`;
 
@@ -73,7 +75,7 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
       await Promise.all([client.invalidateQueries({ queryKey: ['events', event.id] }), client.invalidateQueries({ queryKey: keys.events })]);
       setLive(true);
     } catch (err) {
-      setError({ text: errorMessage(t, err), upgrade: err instanceof ApiError && err.code === 'PLAN_UPGRADE_REQUIRED' });
+      setError({ text: errorMessage(t, err), unlock: isPlanLimit(err) ? unlockHref(err, event.id) : null });
     } finally {
       setBusy(false);
     }
@@ -136,10 +138,10 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
             {error ? (
               <div className="mt-5 space-y-3">
                 <Alert>{error.text}</Alert>
-                {error.upgrade ? (
-                  <Link href={`${base}/upgrade`} onClick={() => ref.current?.close()} className="btn-3d btn-3d-gold min-h-11 rounded-2xl px-5 text-sm">
+                {error.unlock ? (
+                  <Link href={error.unlock} onClick={() => ref.current?.close()} className="btn-3d btn-3d-gold min-h-11 rounded-2xl px-5 text-sm">
                     <Sparkles aria-hidden className="size-4" />
-                    {t('dash.nav.upgrade')}
+                    {t('unlock.cta')}
                   </Link>
                 ) : null}
               </div>

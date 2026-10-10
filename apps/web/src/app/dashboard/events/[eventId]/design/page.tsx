@@ -234,7 +234,7 @@ function DesignEditor() {
               // Beyond the plan: the design still saves and previews (with a watermark); publishing without it needs the upgrade.
               <div className="space-y-3">
                 <Alert tone="info">{t('design.watermarked')}</Alert>
-                <Link href={`/dashboard/events/${eventId}/upgrade?template=${encodeURIComponent(selected?.key ?? '')}`} className="btn-3d btn-3d-light min-h-11 w-full rounded-2xl text-sm">
+                <Link href={`/dashboard/events/${eventId}/unlock?template=${encodeURIComponent(selected?.key ?? '')}`} className="btn-3d btn-3d-light min-h-11 w-full rounded-2xl text-sm">
                   <Lock aria-hidden className="size-4" />
                   {t('design.watermarked.cta')}
                 </Link>

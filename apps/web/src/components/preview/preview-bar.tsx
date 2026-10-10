@@ -1,68 +1,71 @@
 'use client';
 
-import { Eye, Palette, Rocket, Sparkles } from 'lucide-react';
+import { Eye, Palette, Rocket } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { createTranslator } from '@bulava/localization';
-import { whatsappLink } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+
+/** What the signed-in person may do with the event: GET /events/:id answers its members only. */
+interface HostRights {
+  edit: boolean;
+  publish: boolean;
+}
 
 /**
- * Floats over a preview: the "Preview" mark with its explanation, sharing on
- * WhatsApp, and (for the host, who is signed in and a member of the event)
- * the way back to the design and to publishing. Others see how to make their own.
+ * A small mark over a preview: "Preview · Not published yet", and nothing
+ * else for visitors. The host (signed in, allowed to edit or publish the
+ * event) also gets the two ways forward: back to the design, and publishing.
  */
-export function PreviewBar({ eventId, language, status, templateName }: { eventId: string; language: string; status: string; templateName: string }) {
+export function PreviewBar({ eventId, language, status }: { eventId: string; language: string; status: string }) {
   const t = useMemo(() => createTranslator(language), [language]);
-  const [host, setHost] = useState<boolean | null>(null);
-  const [url, setUrl] = useState('');
+  const [rights, setRights] = useState<HostRights | null>(null);
 
   useEffect(() => {
-    setUrl(window.location.href);
-    // Members of the event may read it; everyone else gets 401/403 and the visitor's bar.
+    // Everyone else gets 401 or 403 here, and only the mark.
     fetch(`/api/v1/events/${eventId}`, { credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } })
-      .then((r) => setHost(r.ok))
-      .catch(() => setHost(false));
+      .then(async (r) => {
+        if (!r.ok) return;
+        const body = (await r.json()) as { data?: { permissions?: string[] } };
+        const permissions = body.data?.permissions ?? [];
+        setRights({ edit: permissions.includes('event.update'), publish: permissions.includes('event.publish') });
+      })
+      .catch(() => undefined);
   }, [eventId]);
 
   const base = `/dashboard/events/${eventId}`;
-  const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors';
+  const edit = !!rights?.edit;
+  const publish = !!rights?.publish && status === 'DRAFT';
+  const button = 'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors duration-200';
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-3 pt-6 bg-gradient-to-t from-black/25 to-transparent">
-      <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 rounded-3xl border border-gold-200 bg-ivory/95 p-3 shadow-lift backdrop-blur">
-        <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-night-900 px-3 text-xs font-semibold tracking-[0.14em] text-gold-200 uppercase">
-          <Eye aria-hidden className="size-3.5" />
-          {t('preview.badge')}
-        </span>
-        <p className="min-w-0 flex-1 basis-40 text-xs leading-snug text-stone-600">
-          <span className="font-medium text-ink">{templateName}</span> · {t('preview.note')}
+    <aside aria-label={t('preview.badge')} className="pointer-events-none fixed inset-x-0 bottom-3 z-[60] flex justify-center px-3">
+      <div className={cn('pointer-events-auto flex max-w-full items-center gap-2 rounded-full bg-night-900/90 py-1.5 pl-3.5 text-ivory shadow-lift ring-1 ring-white/10 backdrop-blur', edit || publish ? 'pr-1.5' : 'pr-3.5 min-h-9')}>
+        <Eye aria-hidden className="size-3.5 shrink-0 text-gold-200" />
+        <p className="min-w-0 truncate text-xs">
+          <span className="font-semibold tracking-[0.14em] text-gold-200 uppercase">{t('preview.badge')}</span>
+          {/* Hosts on phones see the buttons instead; the mark says enough. */}
+          <span className={cn(edit || publish ? 'hidden sm:inline' : undefined)}>
+            <span aria-hidden className="mx-1.5 text-ivory/40">
+              ·
+            </span>
+            {t('preview.note')}
+          </span>
         </p>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-          {/* WhatsApp's dark teal: white text reads on it (AA), unlike the bright green. */}
-          <a href={url ? whatsappLink(null, t('preview.shareText', { url })) : '#'} target="_blank" rel="noopener noreferrer" className={`${button} bg-[#075E54] text-white hover:bg-[#064e46]`}>
-            {t('preview.share')}
-          </a>
-          {host ? (
-            <>
-              <Link href={`${base}/design`} className={`${button} border border-gold-300 bg-white text-brand-700 hover:bg-gold-100/60`}>
-                <Palette aria-hidden className="size-4" />
-                {t('preview.edit')}
-              </Link>
-              {status === 'DRAFT' ? (
-                <Link href={base} className={`${button} bg-brand-700 text-ivory hover:bg-brand-800`}>
-                  <Rocket aria-hidden className="size-4" />
-                  {t('preview.publish')}
-                </Link>
-              ) : null}
-            </>
-          ) : host === false ? (
-            <Link href="/templates" className={`${button} border border-gold-300 bg-white text-brand-700 hover:bg-gold-100/60`}>
-              <Sparkles aria-hidden className="size-4" />
-              {t('preview.makeYourOwn')}
-            </Link>
-          ) : null}
-        </div>
+        {edit ? (
+          <Link href={`${base}/design`} className={`${button} bg-white/10 text-ivory hover:bg-white/20`}>
+            <Palette aria-hidden className="size-3.5" />
+            {t('preview.edit')}
+          </Link>
+        ) : null}
+        {publish ? (
+          // The event's publish dialog opens from ?publish=1.
+          <Link href={`${base}?publish=1`} className={`${button} bg-gradient-to-b from-gold-200 to-gold-300 text-night-900 hover:from-gold-100 hover:to-gold-200`}>
+            <Rocket aria-hidden className="size-3.5" />
+            {t('preview.publish')}
+          </Link>
+        ) : null}
       </div>
-    </div>
+    </aside>
   );
 }

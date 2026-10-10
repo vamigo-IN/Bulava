@@ -99,7 +99,8 @@ export const moreKeys = {
   notifications: ['notifications'] as const,
 };
 
-export const useDesign = (id: string) => useQuery({ queryKey: moreKeys.design(id), queryFn: () => apiGet<DesignState>(`/events/${id}/design`) });
+export const useDesign = (id: string, enabled = true) =>
+  useQuery({ queryKey: moreKeys.design(id), queryFn: () => apiGet<DesignState>(`/events/${id}/design`), enabled });
 /** Polls every 3 s only while a render is queued or in progress. */
 export const useVideos = (id: string) =>
   useQuery({

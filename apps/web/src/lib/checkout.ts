@@ -58,10 +58,11 @@ export function lastPaymentFailure(orderId: string): string | null {
  * The payment status page. `state` carries what the browser saw: "confirming"
  * when Razorpay reported success but our confirmation didn't finish yet, "failed"
  * when the buyer closed checkout after a failed attempt. `template` is applied
- * to the event once the payment is confirmed (pricing → template → upgrade).
+ * once the payment is confirmed (template → unlock → checkout) to the order's
+ * event, or to `event` for a plan bought for the account.
  */
-export function paymentStatusPath(orderId: string, state?: 'confirming' | 'failed', template?: string | null): string {
-  const query = new URLSearchParams({ ...(state ? { state } : {}), ...(template ? { template } : {}) }).toString();
+export function paymentStatusPath(orderId: string, state?: 'confirming' | 'failed', template?: string | null, event?: string | null): string {
+  const query = new URLSearchParams({ ...(state ? { state } : {}), ...(template ? { template } : {}), ...(template && event ? { event } : {}) }).toString();
   return `/dashboard/payments/${orderId}${query ? `?${query}` : ''}`;
 }
 

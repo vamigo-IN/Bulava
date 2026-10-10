@@ -8,7 +8,7 @@ export interface PublicUser {
   platformRole: string;
   /**
    * Made from a WhatsApp number alone (the template page's quick start) and not
-   * yet secured with a verified code, an email and password, or Google. Such an
+   * yet secured with a verified code, an email confirmed with its code, or Google. Such an
    * account designs and previews, but cannot publish, pay or invite.
    */
   provisional: boolean;

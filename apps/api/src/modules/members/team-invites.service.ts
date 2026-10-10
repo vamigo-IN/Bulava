@@ -14,6 +14,7 @@ import { AuditService } from '../audit/audit.service';
 import { SessionService } from '../auth/session.service';
 import { EventLinksService } from '../domains/event-links.service';
 import { SETTINGS_STORE } from '../settings/settings.service';
+import { ConsentService } from '../users/consent.service';
 import { teamInviteEmail } from './team-invite-email';
 
 /** Wrong codes before an invitation locks (the host can send a new one). */
@@ -56,6 +57,7 @@ export class TeamInvitesService {
     private readonly audit: AuditService,
     private readonly sessions: SessionService,
     private readonly links: EventLinksService,
+    private readonly consents: ConsentService,
     @Inject(SETTINGS_STORE) private readonly store: SettingsStore,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
@@ -203,17 +205,21 @@ export class TeamInvitesService {
     );
   }
 
-  /** Step two for someone new: the code again, plus their name and password. They are signed in. */
+  /** Step two for someone new: the code again (it proves the address), their name, the ticked Terms box and, if wanted, a password. They are signed in. */
   async accept(token: string, input: AcceptTeamInviteInput, meta: RequestMeta) {
     const invite = await this.byToken(token);
     await this.checkCode(invite, input.code);
     if (await this.accountExists(invite.email)) {
       throw new AppError('TEAM_INVITE_SIGN_IN', 'An account with this email already exists. Sign in to join the team.');
     }
-    const passwordHash = await hashPassword(input.password);
+    const [passwordHash, versions] = await Promise.all([input.password ? hashPassword(input.password) : null, this.consents.versions(['terms', 'privacy'])]);
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({ data: { name: input.name, email: invite.email, passwordHash, emailVerifiedAt: new Date() } });
-      await this.audit.record({ actorType: 'USER', actorId: created.id, action: 'user.signup', targetType: 'User', targetId: created.id, metadata: { via: 'team_invite' }, meta }, tx);
+      await this.consents.recordSignup(tx, created.id, versions, 'team_invite');
+      await this.audit.record(
+        { actorType: 'USER', actorId: created.id, action: 'user.signup', targetType: 'User', targetId: created.id, metadata: { via: 'team_invite', password: Boolean(passwordHash) }, meta },
+        tx,
+      );
       await this.join(tx, invite, created.id, meta);
       return created;
     });

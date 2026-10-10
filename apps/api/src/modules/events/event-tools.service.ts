@@ -2,14 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import type { Prisma } from '@bulava/database';
 import { isLinkMode } from '@bulava/auth';
-import { FEATURE_KEYS, slugify, z } from '@bulava/validation';
+import { slugify, z } from '@bulava/validation';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import type { EventAccessContext } from '../../common/request-context';
 import { AuditService } from '../audit/audit.service';
 import { AudienceService } from '../audience/audience.service';
-import { EntitlementsService } from '../entitlements/entitlements.service';
 import { openRegistrationByDefault } from '../registrations/registration-defaults';
 import { newPreviewToken } from './events.service';
 import { ShareLinkService } from './share-link.service';
@@ -53,7 +52,6 @@ export class EventToolsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly audience: AudienceService,
-    private readonly entitlements: EntitlementsService,
     private readonly shareLinks: ShareLinkService,
   ) {}
 
@@ -69,11 +67,7 @@ export class EventToolsService {
         rsvpQuestions: true,
       },
     });
-    const features = await this.entitlements.forUser(access.userId);
-    const owned = await this.prisma.event.count({ where: { ownerId: access.userId, deletedAt: null, status: { notIn: ['ARCHIVED', 'CANCELLED'] } } });
-    const paid = await this.prisma.entitlement.findMany({ where: { userId: access.userId, eventId: { not: null } }, select: { eventId: true }, distinct: ['eventId'] });
-    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.EVENTS_MAX, Math.max(0, owned - paid.length));
-
+    // A copy starts as a draft: the plan is asked for when it is published (ADR-054).
     const created = await this.prisma.$transaction(async (tx) => {
       const policy = await tx.accessPolicy.create({ data: { mode: source.accessPolicy.mode, requireOtp: source.accessPolicy.requireOtp } });
       const event = await tx.event.create({

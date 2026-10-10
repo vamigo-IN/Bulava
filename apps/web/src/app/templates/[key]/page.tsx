@@ -87,7 +87,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
                   </UseTemplateButton>
                 ) : (
                   <AuthAwareLink
-                    signedOutHref={`/signup?template=${tpl.key}`}
+                    signedOutHref={`/login?template=${tpl.key}`}
                     signedInHref={`/dashboard/events/new?template=${tpl.key}${tpl.eventTypes[0] ? `&type=${tpl.eventTypes[0]}` : ''}`}
                     className="btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base"
                   >

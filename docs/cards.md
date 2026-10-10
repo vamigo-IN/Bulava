@@ -49,7 +49,7 @@ Switching format in the editor (`withCardFormat`, one undo step) lays the card o
 - **Elements**: decorations drawn by the engine (no licences), shapes, and the layer list (show, lock, reorder).
 - **Size**: the formats, and "Reset to the original template" (details kept).
 - **Inspector**: font (the design's fonts or any of the 21 families, Devanagari included), size, bold, italic, alignment, colour, line and letter spacing, capitals, shadow, foil, long-text behaviour, rotation and opacity, duplicate, front/back, lock, hide, delete.
-- Undo and redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y), delete key, arrow nudges, zoom and fit, and a preview of the final card with or without the watermark. On phones the tools are a bottom bar and the panels a bottom sheet.
+- Undo and redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y), delete key, arrow nudges, zoom and fit, and a preview of the final card with or without the watermark. On phones the tools are a bottom bar and the panels a sheet below the card, never over it: the card shrinks to fit above the sheet, and the sheet folds down to its title to give the card the room to move and resize things. Tapping an element opens its settings once the finger lifts, so a drag that starts by selecting keeps the card's scale.
 
 ### Saving
 

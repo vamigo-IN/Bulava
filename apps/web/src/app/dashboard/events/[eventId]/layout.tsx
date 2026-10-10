@@ -36,6 +36,7 @@ import type { EventSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { NoAccess } from '@/components/dashboard/no-access';
 import { NextStepBar } from '@/components/events/next-step-bar';
+import { PlanLimitPrompt } from '@/components/events/plan-limit-prompt';
 import { PublishProvider, usePublish } from '@/components/events/publish-dialog';
 import { useSetupSteps } from '@/components/events/use-setup-steps';
 import { Alert, Spinner } from '@/components/ui/primitives';
@@ -205,7 +206,7 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
               </a>
             ) : null}
             {!paid && can(event, 'payment.read') ? (
-              <Link href={`${base}/upgrade`} className={status === 'DRAFT' && publish ? HEADER_BUTTON : GOLD_BUTTON}>
+              <Link href={`${base}/unlock`} className={status === 'DRAFT' && publish ? HEADER_BUTTON : GOLD_BUTTON}>
                 <Sparkles aria-hidden className="size-4" />
                 {t('dash.nav.upgrade')}
               </Link>
@@ -263,6 +264,8 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
           )}
         </div>
       </div>
+      {/* A plan limit met on any of the event's pages: the way to unlock more. */}
+      <PlanLimitPrompt eventId={event.id} canPay={can(event, 'payment.read')} />
     </div>
   );
 }

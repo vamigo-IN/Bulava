@@ -141,6 +141,38 @@ export const ChallengeTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{20,200}$/, 
 export const EmailCodeSchema = z.object({ challengeToken: ChallengeTokenSchema, code: OneTimeCodeSchema });
 export type EmailCodeInput = z.infer<typeof EmailCodeSchema>;
 
+/**
+ * One sign-in form for everyone (docs/authentication.md#signing-in): an email
+ * address or a WhatsApp number, or Google. POST /auth/email/start and
+ * /auth/email/code take the address typed in.
+ */
+export const EmailStartSchema = z.object({ email: z.email().max(254).transform((v) => v.toLowerCase()) });
+export type EmailStartInput = z.infer<typeof EmailStartSchema>;
+
+/** An optional password: empty means none (a code by email always signs in). */
+const optionalPassword = z
+  .union([z.literal(''), z.string().min(10, 'At least 10 characters').max(128)])
+  .transform((v) => (v === '' ? undefined : v))
+  .optional();
+
+/** POST /auth/email/signup: an account for the address its owner has just proved with a code. */
+export const EmailSignupSchema = z.object({
+  signupToken: ChallengeTokenSchema,
+  name: trimmed(120),
+  acceptTerms: agreed('Please accept the Terms of Service and the Privacy Policy'),
+  /** Optional: with one, the address signs in with the password (or a code); without, by code. */
+  password: optionalPassword,
+});
+export type EmailSignupInput = z.infer<typeof EmailSignupSchema>;
+
+/** POST /auth/google/signup: an account from a Google sign-in, once its owner ticks the Terms box. */
+export const GoogleSignupSchema = z.object({
+  signupToken: ChallengeTokenSchema,
+  name: trimmed(120),
+  acceptTerms: agreed('Please accept the Terms of Service and the Privacy Policy'),
+});
+export type GoogleSignupInput = z.infer<typeof GoogleSignupSchema>;
+
 /** POST /auth/email-code/resend: a new code for the same step. */
 export const EmailCodeResendSchema = z.object({ challengeToken: ChallengeTokenSchema });
 export type EmailCodeResendInput = z.infer<typeof EmailCodeResendSchema>;
@@ -305,13 +337,14 @@ export const PhoneConfirmSchema = z.object({ code: OtpCodeSchema });
 export type PhoneConfirmInput = z.infer<typeof PhoneConfirmSchema>;
 
 /**
- * An account made from a WhatsApp number (the quick start, or signing up with
- * WhatsApp) adds an email and a password, so it can sign in anywhere and receive
- * receipts. The email is attached once the code sent to it is entered.
+ * An account made from a WhatsApp number (the quick start, or signing in with
+ * WhatsApp) adds an email, so it can sign in with either and receive receipts;
+ * a password is optional (a code by email always signs in). The email is
+ * attached once the code sent to it is entered.
  */
 export const ClaimAccountSchema = z.object({
   email: z.email().max(254).transform((v) => v.toLowerCase()),
-  password: z.string().min(10, 'At least 10 characters').max(128),
+  password: optionalPassword,
   name: trimmed(120).optional(),
 });
 export type ClaimAccountInput = z.infer<typeof ClaimAccountSchema>;
@@ -684,6 +717,13 @@ export const CreateOrderSchema = z.object({
 });
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 
+/** POST /orders/quote: what a plan costs with a coupon, before anything is bought (the checkout page's price breakdown). */
+export const OrderQuoteSchema = z.object({
+  planKey: z.string().trim().min(1).max(40),
+  couponCode: z.string().trim().toUpperCase().max(40).optional(),
+});
+export type OrderQuoteInput = z.infer<typeof OrderQuoteSchema>;
+
 export const VerifyPaymentSchema = z.object({
   razorpayOrderId: z.string().min(1).max(100),
   razorpayPaymentId: z.string().min(1).max(100),
@@ -826,11 +866,12 @@ export const TeamInviteCodeSchema = z
 export const VerifyTeamInviteSchema = z.object({ code: TeamInviteCodeSchema });
 export type VerifyTeamInviteInput = z.infer<typeof VerifyTeamInviteSchema>;
 
-/** Accepting a team invitation by creating the account it was sent to. */
+/** Accepting a team invitation by creating the account it was sent to: a name, the ticked Terms box, a password only if wanted. */
 export const AcceptTeamInviteSchema = z.object({
   code: TeamInviteCodeSchema,
   name: trimmed(120),
-  password: z.string().min(10, 'At least 10 characters').max(128),
+  acceptTerms: agreed('Please accept the Terms of Service and the Privacy Policy'),
+  password: optionalPassword,
 });
 export type AcceptTeamInviteInput = z.infer<typeof AcceptTeamInviteSchema>;
 

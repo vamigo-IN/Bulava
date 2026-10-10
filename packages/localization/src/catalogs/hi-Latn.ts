@@ -26,4 +26,6 @@ export const hiLatn: Catalog = {
   'upload.album': 'Yeh photos kis function ki hain?',
   'gallery.all': 'Sabhi',
   'error.EVENT_LINK_EXPIRED': 'Yeh invitation link expire ho gaya hai. Naye link ke liye apne host se poochhiye.',
+  'error.PLAN_LIMIT_REACHED': 'Is event mein ab aur nahin joda ja sakta. Apne host se baat kijiye.',
+  'limit.media.photos.max': 'Is album mein zyada se zyada {limit} photos jud sakti hain, aur yeh bhar gaya hai.',
 };

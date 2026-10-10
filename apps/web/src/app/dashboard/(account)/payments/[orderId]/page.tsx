@@ -89,6 +89,9 @@ export default function PaymentStatusPage() {
   const state = params.get('state');
   const rawTemplate = params.get('template');
   const template = rawTemplate && /^[a-z0-9-]{1,80}$/.test(rawTemplate) ? rawTemplate : null;
+  // A plan bought for the account from an event's plans page: the event its chosen template goes on.
+  const rawEvent = params.get('event');
+  const templateEvent = rawEvent && /^[0-9a-f-]{36}$/.test(rawEvent) ? rawEvent : null;
 
   // When the current "confirming" wait began (a retry starts a new one).
   const since = useRef(Date.now());
@@ -117,19 +120,18 @@ export default function PaymentStatusPage() {
   const settled = useRef(false);
   const data = order.data;
 
-  // Once paid: refresh the event's data everywhere, and apply the template chosen before upgrading.
+  // Once paid: refresh the events' data everywhere (a plan for the account reaches all of them), and apply the template chosen before unlocking.
   useEffect(() => {
     if (data?.status !== 'PAID' || settled.current) return;
     settled.current = true;
-    if (data.event) {
-      void client.invalidateQueries({ queryKey: ['events', data.event.id] });
-      if (template) {
-        void apiPut(`/events/${data.event.id}/design/website`, { templateKey: template })
-          .then(() => setTemplateApplied(true))
-          .catch(() => undefined);
-      }
+    void client.invalidateQueries({ queryKey: data.event ? ['events', data.event.id] : ['events'] });
+    const target = data.event?.id ?? templateEvent;
+    if (template && target) {
+      void apiPut(`/events/${target}/design/website`, { templateKey: template })
+        .then(() => setTemplateApplied(true))
+        .catch(() => undefined);
     }
-  }, [data, client, template]);
+  }, [data, client, template, templateEvent]);
 
   if (order.isPending) return <Spinner label={t('common.loading')} />;
   if (order.isError || !data) {
@@ -151,7 +153,7 @@ export default function PaymentStatusPage() {
     try {
       const session = await apiPost<CheckoutSession>(`/orders/${data.id}/checkout`);
       const outcome = session.status === 'PAID' ? 'paid' : await runCheckout(session, { unavailable: t('upgrade.unavailable') });
-      if (outcome !== 'dismissed') router.replace(paymentStatusPath(data.id, outcome === 'paid' ? undefined : outcome, template));
+      if (outcome !== 'dismissed') router.replace(paymentStatusPath(data.id, outcome === 'paid' ? undefined : outcome, template, templateEvent));
       await order.refetch();
     } catch (err) {
       setError(err instanceof Error && !('code' in err) ? err.message : errorMessage(t, err));
@@ -160,7 +162,7 @@ export default function PaymentStatusPage() {
     }
   };
 
-  const plansHref = data.event ? `/dashboard/events/${data.event.id}/upgrade` : '/pricing';
+  const plansHref = data.event ? `/dashboard/events/${data.event.id}/unlock` : '/pricing';
   const stepLabels: MessageKey[] = ['payment.step.placed', 'payment.step.payment', 'payment.step.confirmation', 'payment.step.active'];
 
   return (
@@ -275,7 +277,7 @@ export default function PaymentStatusPage() {
         <h2 className="font-display text-2xl">{t('payment.summary')}</h2>
         <dl className="mt-5 grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
           <Row label={t('payment.field.plan')}>
-            {data.plan.name} <span className="text-stone-500">· {t(data.plan.interval === 'YEAR' ? 'payment.yearly' : 'payment.oneEvent')}</span>
+            {data.plan.name} <span className="text-stone-500">· {t(data.plan.interval === 'YEAR' ? 'payment.yearly' : 'payment.oneTime')}</span>
           </Row>
           <Row label={t('payment.field.for')}>
             {data.event ? (

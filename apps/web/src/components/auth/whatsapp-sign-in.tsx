@@ -1,16 +1,15 @@
 'use client';
 
-import { CheckCheck, Check, KeyRound, Loader2, PhoneOff, Sparkles } from 'lucide-react';
+import { CheckCheck, Check, Loader2, Mail, PhoneOff } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ApiError, apiPost } from '@/lib/api';
+import { apiPost } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { Alert, Button, Checkbox, Field, Input } from '@/components/ui/primitives';
+import { Alert, Button, Field } from '@/components/ui/primitives';
 import { WhatsAppMark } from '@/components/ui/whatsapp-mark';
-import { PhoneInput } from '@/components/ui/phone-input';
 import { CodeInput, useCountdown } from './code-input';
-import { ConsentBox } from './consent-box';
 import { GoogleButton } from './google-button';
+import { NewAccountStep } from './new-account-step';
 import { useWhatsAppDelivery, type WhatsAppDelivery } from './use-whatsapp-delivery';
 
 /** What verifying the code answers: signed in, the next step of an existing account, or a new account to make. */
@@ -20,8 +19,8 @@ type VerifyResult = { mfaRequired?: boolean; challengeToken?: string; restoreReq
 const WAITING_HINT_MS = 40_000;
 
 export interface WhatsAppSignInProps {
-  /** The sign-up page's Terms box was ticked before choosing WhatsApp, so a new account needs no second tick. */
-  consented: boolean;
+  /** The number from the sign-in field (E.164). */
+  phone: string;
   /** Google sign-in is offered (as the way out for a number without WhatsApp). */
   google: boolean;
   /** Where Google sends people back to. */
@@ -29,22 +28,21 @@ export interface WhatsAppSignInProps {
   onDone: () => void;
   onChallenge: (token: string) => void;
   onRestore: (token: string, until: string | null) => void;
-  /** Back to the other ways in (email and password). */
-  onBack: () => void;
+  /** Back to the sign-in field (another number, or an email instead), with a message or none. */
+  onBack: (message: string | null) => void;
 }
 
 /**
- * Signing in, or up, with a WhatsApp number: a six-digit code instead of a
- * password. The code signs in to the number's account; for a number without
- * one, it confirms the number and a name (and the ticked Terms box) makes the
+ * Signing in with a WhatsApp number: a six-digit code instead of a password,
+ * sent as soon as the number is in. The code signs in to the number's account;
+ * for a number without one, it confirms the number and the last step makes the
  * account. While the code is on its way the page asks whether the message got
  * through: a number that is not on WhatsApp is offered Google or email instead.
  */
-export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, onRestore, onBack }: WhatsAppSignInProps) {
+export function WhatsAppSignIn({ phone, google, next, onDone, onChallenge, onRestore, onBack }: WhatsAppSignInProps) {
   const t = useT();
-  const [phone, setPhone] = useState('');
   const [sent, setSent] = useState<{ target: string; sendId: string } | null>(null);
-  const [signup, setSignup] = useState<{ token: string; target: string } | null>(null);
+  const [signup, setSignup] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +51,7 @@ export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, o
   const [waitedLong, setWaitedLong] = useState(false);
   const delivery = useWhatsAppDelivery(sent?.sendId ?? null);
   const tried = useRef('');
+  const started = useRef(false);
 
   // Nothing heard about the message for a while: point to the other ways in.
   useEffect(() => {
@@ -62,24 +61,33 @@ export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, o
     return () => clearTimeout(timer);
   }, [sent]);
 
-  const send = async (e?: FormEvent) => {
-    e?.preventDefault();
+  const send = async () => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       const r = await apiPost<{ target: string; sendId: string; resendAfter: number }>('/auth/phone/otp', { phone });
+      if (sent) setNotice(t('auth.code.resent'));
       setSent({ target: r.target, sendId: r.sendId });
       setResendIn(r.resendAfter);
       setCode('');
       tried.current = '';
-      if (sent) setNotice(t('auth.code.resent'));
     } catch (err) {
-      setError(errorMessage(t, err));
+      // Nothing was sent: back to the field, where the message says why.
+      if (!sent) onBack(errorMessage(t, err));
+      else setError(errorMessage(t, err));
     } finally {
       setBusy(false);
     }
   };
+
+  // The code goes out as soon as the number is in (once, even when React runs effects twice).
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void send();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const verify = async (value: string) => {
     tried.current = value;
@@ -88,7 +96,7 @@ export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, o
     setNotice(null);
     try {
       const result = await apiPost<VerifyResult>('/auth/phone/verify', { phone, code: value });
-      if (result.signupRequired && result.signupToken) return setSignup({ token: result.signupToken, target: result.target ?? sent?.target ?? '' });
+      if (result.signupRequired && result.signupToken) return setSignup(result.signupToken);
       if (result.restoreRequired && result.restoreToken) return onRestore(result.restoreToken, result.deleteAt ?? null);
       if (result.mfaRequired && result.challengeToken) return onChallenge(result.challengeToken);
       onDone();
@@ -106,43 +114,19 @@ export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  const changeNumber = () => {
-    setSent(null);
-    setCode('');
-    setError(null);
-    setNotice(null);
-  };
+  if (signup) return <NewAccountStep via="whatsapp" token={signup} onDone={onDone} onExpired={(message) => onBack(message)} />;
 
-  if (signup) {
-    return <NewAccount token={signup.token} target={signup.target} consented={consented} onDone={onDone} onExpired={(message) => {
-      setSignup(null);
-      changeNumber();
-      setError(message);
-    }} />;
-  }
-
-  // ───── The number ─────
+  // ───── Sending the first code ─────
   if (!sent) {
     return (
-      <form onSubmit={send} className="space-y-5" noValidate>
-        <span className="grid size-12 place-items-center rounded-2xl bg-gradient-to-b from-[#22a08f] to-[#0a6158] text-white shadow-[inset_0_2px_2px_rgba(255,255,255,0.3),0_8px_18px_-6px_rgba(4,50,44,0.45)]">
+      <div role="status" className="space-y-5 py-6 text-center">
+        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-gradient-to-b from-[#22a08f] to-[#0a6158] text-white shadow-[inset_0_2px_2px_rgba(255,255,255,0.3),0_8px_18px_-6px_rgba(4,50,44,0.45)]">
           <WhatsAppMark className="size-7" />
         </span>
-        <div>
-          <h1 className="font-display text-4xl leading-tight tracking-[-0.015em]">{t('auth.whatsapp')}</h1>
-          <p className="mt-2 leading-relaxed text-stone-600">{t('auth.phone.body')}</p>
-        </div>
-        {error ? <Alert>{error}</Alert> : null}
-        <Field label={t('auth.phone.number')} hint={t('auth.phone.numberHint')}>
-          {(p) => <PhoneInput {...p} autoFocus required value={phone} onChange={setPhone} placeholder="98765 43210" />}
-        </Field>
-        <Button type="submit" variant="whatsapp" size="lg" className="min-h-13 w-full rounded-2xl" disabled={busy || phone.replace(/\D/g, '').length < 8}>
-          {busy ? t('common.loading') : t('auth.phone.send')}
-        </Button>
-        <button type="button" className="w-full text-center text-sm text-stone-600 underline underline-offset-4" onClick={onBack}>
-          {t('auth.phone.otherWays')}
-        </button>
-      </form>
+        <p className="flex items-center justify-center gap-2 text-stone-600">
+          <Loader2 aria-hidden className="size-4 animate-spin motion-reduce:animate-none" /> {t('auth.phone.sending')}
+        </p>
+      </div>
     );
   }
 
@@ -158,15 +142,12 @@ export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, o
           <p className="mt-2 leading-relaxed text-stone-600">{t('auth.phone.failed.body', { target: sent.target })}</p>
         </div>
         <div className="space-y-3">
-          {google ? <GoogleButton next={next} label={t('auth.google')} consent={consented ? true : undefined} /> : null}
-          <button type="button" className="btn-3d btn-3d-light min-h-12 w-full gap-3 rounded-2xl px-5 font-medium" onClick={onBack}>
-            <KeyRound aria-hidden className="size-5 text-gold-700" />
+          {google ? <GoogleButton next={next} label={t('auth.google')} /> : null}
+          <button type="button" className="btn-3d btn-3d-light min-h-12 w-full gap-3 rounded-2xl px-5 font-medium" onClick={() => onBack(null)}>
+            <Mail aria-hidden className="size-5 text-gold-700" />
             {t('auth.phone.useEmail')}
           </button>
         </div>
-        <button type="button" className="w-full text-center text-sm font-medium text-brand-700 underline decoration-gold-300 underline-offset-4" onClick={changeNumber}>
-          {t('auth.phone.tryAnother')}
-        </button>
       </div>
     );
   }
@@ -174,7 +155,7 @@ export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, o
   // ───── The code ─────
   return (
     <form
-      onSubmit={(e) => {
+      onSubmit={(e: FormEvent) => {
         e.preventDefault();
         if (code.length === 6 && !busy) void verify(code);
       }}
@@ -204,14 +185,14 @@ export function WhatsAppSignIn({ consented, google, next, onDone, onChallenge, o
         >
           {resendIn > 0 ? t('auth.code.resendIn', { seconds: resendIn }) : t('auth.code.resend')}
         </button>
-        <button type="button" className="text-stone-600 underline underline-offset-4" onClick={changeNumber}>
+        <button type="button" className="text-stone-600 underline underline-offset-4" onClick={() => onBack(null)}>
           {t('auth.phone.change')}
         </button>
       </div>
       {waitedLong && delivery !== 'delivered' && delivery !== 'read' ? (
         <div role="status" className="space-y-2 rounded-2xl border border-gold-200 bg-white/70 p-4 text-sm leading-relaxed text-stone-700">
           <p>{t('auth.phone.waiting')}</p>
-          <button type="button" className="font-medium text-brand-700 underline decoration-gold-300 underline-offset-4" onClick={onBack}>
+          <button type="button" className="font-medium text-brand-700 underline decoration-gold-300 underline-offset-4" onClick={() => onBack(null)}>
             {t('auth.phone.otherWays')}
           </button>
         </div>
@@ -230,68 +211,5 @@ export function DeliveryChip({ delivery }: { delivery: WhatsAppDelivery }) {
       <Icon aria-hidden className={cn('size-3.5', delivery === 'sending' && 'animate-spin motion-reduce:animate-none')} />
       {t(`auth.phone.status.${delivery}`)}
     </p>
-  );
-}
-
-/** A number without an account, just proved with a code: a name and the Terms box make the account. */
-function NewAccount({ token, target, consented, onDone, onExpired }: { token: string; target: string; consented: boolean; onDone: () => void; onExpired: (message: string) => void }) {
-  const t = useT();
-  const [name, setName] = useState('');
-  const [accepted, setAccepted] = useState(false);
-  const [updates, setUpdates] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [consentError, setConsentError] = useState<string | undefined>();
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!consented && !accepted) {
-      setConsentError(t('auth.consent.required'));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      // The sign-up page's box was ticked before WhatsApp was chosen, or this one is ticked now.
-      await apiPost('/auth/phone/signup', { signupToken: token, name: name.trim(), acceptTerms: true, whatsappUpdates: updates });
-      onDone();
-    } catch (err) {
-      if (err instanceof ApiError && err.code === 'VERIFICATION_EXPIRED') onExpired(errorMessage(t, err));
-      else setError(errorMessage(t, err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
-      <span className="icon-3d size-12 rounded-2xl">
-        <Sparkles aria-hidden className="size-6" />
-      </span>
-      <div>
-        <h1 className="font-display text-4xl leading-tight tracking-[-0.015em]">{t('auth.phone.new.title')}</h1>
-        <p className="mt-2 leading-relaxed text-stone-600">{t('auth.phone.new.body', { target })}</p>
-      </div>
-      {error ? <Alert>{error}</Alert> : null}
-      <Field label={t('auth.field.name')}>
-        {(p) => <Input {...p} autoComplete="name" autoFocus required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />}
-      </Field>
-      {/* A separate, optional consent: never bundled with the Terms. */}
-      <Checkbox label={t('auth.field.whatsappUpdates')} checked={updates} onChange={(e) => setUpdates(e.target.checked)} />
-      {consented ? null : (
-        <ConsentBox
-          via="whatsapp"
-          checked={accepted}
-          error={consentError}
-          onChange={(e) => {
-            setAccepted(e.target.checked);
-            if (e.target.checked) setConsentError(undefined);
-          }}
-        />
-      )}
-      <Button type="submit" variant="whatsapp" size="lg" className="min-h-13 w-full rounded-2xl" disabled={busy || !name.trim()}>
-        {busy ? t('common.loading') : t('auth.phone.new.submit')}
-      </Button>
-    </form>
   );
 }

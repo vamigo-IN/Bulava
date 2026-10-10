@@ -57,6 +57,7 @@ function Claim() {
     setBusy(true);
     setError(null);
     try {
+      // The password is optional: a code by email always signs in.
       setChallenge(await apiPost<EmailChallenge>('/auth/claim', { email: email.trim(), password }));
     } catch (err) {
       setError(errorMessage(t, err));
@@ -109,10 +110,10 @@ function Claim() {
               <Field label={t('auth.field.email')}>
                 {(p) => <Input {...p} type="email" inputMode="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />}
               </Field>
-              <Field label={t('auth.field.password')} hint={t('auth.field.passwordHint')}>
-                {(p) => <Input {...p} type="password" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} />}
+              <Field label={t('auth.new.password')} error={password.length > 0 && password.length < 10 ? t('auth.field.passwordHint') : undefined}>
+                {(p) => <Input {...p} type="password" autoComplete="new-password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} />}
               </Field>
-              <Button type="submit" className="rounded-2xl" disabled={busy || !email.includes('@') || password.length < 10}>
+              <Button type="submit" className="rounded-2xl" disabled={busy || !email.includes('@') || (password.length > 0 && password.length < 10)}>
                 {busy ? t('common.loading') : t('claim.email.submit')}
               </Button>
             </form>

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Alert, Button, Field } from '@/components/ui/primitives';
 import { CodeInput, useCountdown } from './code-input';
 
-/** A code on its way to an email address: the API's answer when signing up, signing in or adding an email. */
+/** A code on its way to an email address: the API's answer when signing in (or up) or adding an email. */
 export interface EmailChallenge {
   challengeToken: string;
   /** The address, masked. */
@@ -18,7 +18,7 @@ export interface EmailChallenge {
 }
 
 /** Where each step's code is checked. */
-const VERIFY_PATH = { signup: '/auth/signup/verify', login: '/auth/login/email', claim: '/auth/claim/verify' } as const;
+const VERIFY_PATH = { access: '/auth/email/verify', signup: '/auth/signup/verify', login: '/auth/login/email', claim: '/auth/claim/verify' } as const;
 export type EmailCodePurpose = keyof typeof VERIFY_PATH;
 
 /**

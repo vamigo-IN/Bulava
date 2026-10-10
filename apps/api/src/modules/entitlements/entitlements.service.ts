@@ -40,14 +40,14 @@ export class EntitlementsService {
   static assertWithinLimit(features: Map<string, FeatureValue>, key: FeatureKey, current: number, adding = 1): void {
     const limit = EntitlementsService.limit(features, key);
     if (limit !== null && current + adding > limit) {
-      throw new AppError('PLAN_LIMIT_REACHED', `Your plan allows up to ${limit} for this feature. Upgrade to add more.`, { feature: key, limit });
+      throw new AppError('PLAN_LIMIT_REACHED', `Your plan allows up to ${limit} for this feature. Unlock more with a plan.`, { feature: key, limit });
     }
   }
 
   static assertTemplateTier(features: Map<string, FeatureValue>, tier: keyof typeof TEMPLATE_TIER_RANK): void {
     const maxTier = EntitlementsService.limit(features, FEATURE_KEYS.TEMPLATES_MAX_TIER) ?? 2;
     if (TEMPLATE_TIER_RANK[tier] > maxTier) {
-      throw new AppError('PLAN_UPGRADE_REQUIRED', `This is a ${tier.toLowerCase()} template. Upgrade your event to use it.`, { tier });
+      throw new AppError('PLAN_UPGRADE_REQUIRED', `This is a ${tier.toLowerCase()} template. Unlock it with a plan.`, { tier });
     }
   }
 

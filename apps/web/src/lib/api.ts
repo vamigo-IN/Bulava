@@ -61,10 +61,16 @@ export async function api<T>(path: string, options: { method?: Method; body?: un
   if (sessionLost && retry && !path.startsWith('/auth/') && !path.startsWith('/public/')) {
     if (await refreshSession()) return api<T>(path, options, false);
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-      window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      // The whole address, query included: a checkout's plan or a template survives signing in again.
+      window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
     }
   }
   if (!response.ok || !json?.success) {
+    // A plan limit: the dashboard offers to unlock more (lib/plan-limits).
+    if ((code === 'PLAN_LIMIT_REACHED' || code === 'PLAN_UPGRADE_REQUIRED') && typeof window !== 'undefined') {
+      const details = (json?.error?.details ?? {}) as { feature?: string; limit?: number | null };
+      window.dispatchEvent(new CustomEvent('bulava:plan-limit', { detail: { code, feature: details.feature, limit: details.limit } }));
+    }
     throw new ApiError(
       json?.error?.code ?? (response.status === 403 ? 'FORBIDDEN' : response.status === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR'),
       json?.error?.message ?? 'Something went wrong.',

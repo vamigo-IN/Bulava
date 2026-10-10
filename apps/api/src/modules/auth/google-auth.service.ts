@@ -15,9 +15,13 @@ import { ConsentService } from '../users/consent.service';
 import { SETTINGS_STORE } from '../settings/settings.service';
 import { googleRedirectUri } from './google-redirect';
 import { MfaService } from './mfa.service';
+import { toPublicUser, type PublicUser } from './public-user';
 import { SessionService, type IssuedSession } from './session.service';
 
 const FLOW_TTL_SECONDS = 10 * 60;
+/** Minutes to finish making an account after Google proved the address (a name and the ticked Terms box). */
+const SIGNUP_TTL_SECONDS = 15 * 60;
+const signupKey = (token: string) => `google-signup:${hashToken(token)}`;
 export const GOOGLE_STATE_COOKIE = 'bulava_google_state';
 export const GOOGLE_STATE_COOKIE_PATH = '/api/v1/auth/google';
 
@@ -30,8 +34,6 @@ interface Flow {
   mode: Mode;
   /** The signed-in user linking Google (link mode only). */
   userId?: string;
-  /** Started from the sign-up page with the Terms and Privacy box ticked: a new account may be created. */
-  consented?: boolean;
 }
 
 /** The OAuth web client from Google Cloud. */
@@ -49,6 +51,7 @@ interface GoogleClaims extends JWTPayload {
 
 export type GoogleCallbackResult =
   | { kind: 'session'; session: IssuedSession; redirect: string }
+  | { kind: 'signup'; redirect: string }
   | { kind: 'mfa'; redirect: string }
   | { kind: 'linked'; redirect: string }
   | { kind: 'restore'; redirect: string }
@@ -70,8 +73,11 @@ const base64url = (b: Buffer) => b.toString('base64url');
  *   planted in someone else's browser (login CSRF).
  * - The ID token is verified against Google's published keys (issuer,
  *   audience, expiry, nonce) and only verified emails are accepted.
- * - An existing password account is never merged silently: Bulava does not
- *   verify emails at sign-up, so the owner links Google while signed in.
+ * - An existing account is joined only when its email was confirmed with a
+ *   code; otherwise its owner signs in with the email once, or links Google
+ *   while signed in.
+ * - A new account is made only on the sign-in page's last step, where its
+ *   owner ticks the Terms box (`completeSignup`).
  * - Accounts with two-step sign-in still need their second factor.
  *
  * The OAuth client comes from the Super Admin's settings (Integrations →
@@ -120,7 +126,7 @@ export class GoogleAuthService {
   }
 
   /** Builds Google's consent URL and remembers the flow. Returns the state for the browser cookie. */
-  async start(input: { next?: string | null; mode: Mode; userId?: string; consented?: boolean }): Promise<{ url: string; state: string }> {
+  async start(input: { next?: string | null; mode: Mode; userId?: string }): Promise<{ url: string; state: string }> {
     const client = await this.client();
     if (!client) throw new AppError('GOOGLE_UNAVAILABLE', 'Google sign-in is not configured.');
     const state = generateSecureToken();
@@ -130,7 +136,6 @@ export class GoogleAuthService {
       next: safeNext(input.next, input.mode === 'link' ? '/dashboard/account/security' : '/dashboard'),
       mode: input.mode,
       userId: input.userId,
-      consented: input.consented === true,
     };
     await this.redis.client.set(this.flowKey(state), JSON.stringify(flow), 'EX', FLOW_TTL_SECONDS);
     const url = new URL(this.config.GOOGLE_AUTH_URL);
@@ -188,7 +193,6 @@ export class GoogleAuthService {
 
     // ───── Sign in, or sign up ─────
     let user = await this.prisma.user.findUnique({ where: { googleSub: sub } });
-    let created = false;
     if (!user) {
       const existing = await this.prisma.user.findUnique({ where: { email } });
       if (existing) {
@@ -199,18 +203,12 @@ export class GoogleAuthService {
         }
         user = await this.prisma.user.update({ where: { id: existing.id }, data: { googleSub: sub } });
       } else {
-        // A new account needs the sign-up page's ticked box; from the sign-in page, send them there first.
-        if (!flow.consented) return { kind: 'error', code: 'CONSENT_REQUIRED', redirect: this.web('/signup?error=CONSENT_REQUIRED') };
-        const versions = await this.consents.versions(['terms', 'privacy']);
-        user = await this.prisma.$transaction(async (tx) => {
-          const createdUser = await tx.user.create({
-            data: { email, name: (claims.name?.trim() || email.split('@')[0]!).slice(0, 120), googleSub: sub, emailVerifiedAt: new Date() },
-          });
-          await this.consents.recordSignup(tx, createdUser.id, versions, 'signup_google');
-          await this.audit.record({ actorType: 'USER', actorId: createdUser.id, action: 'user.signup', targetType: 'User', targetId: createdUser.id, metadata: { method: 'google' }, meta }, tx);
-          return createdUser;
-        });
-        created = true;
+        // A new account needs the Terms box ticked: the sign-in page's last step asks for it (and a name).
+        const name = (claims.name?.trim() || email.split('@')[0]!).slice(0, 120);
+        const signupToken = generateSecureToken();
+        await this.redis.client.set(signupKey(signupToken), JSON.stringify({ sub, email }), 'EX', SIGNUP_TTL_SECONDS);
+        // The token travels in the fragment: never sent to servers or logged.
+        return { kind: 'signup', redirect: this.web(`/login?next=${encodeURIComponent(flow.next)}#google-signup=${signupToken}&name=${encodeURIComponent(name)}`) };
       }
     }
     // An account waiting to be deleted: Google proved it is the owner, so offer to restore it.
@@ -228,17 +226,40 @@ export class GoogleAuthService {
       return { kind: 'mfa', redirect: this.web(`/login?next=${encodeURIComponent(flow.next)}#mfa=${challengeToken}`) };
     }
     const session = await this.sessions.issue(user, meta);
-    if (!created) {
-      await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'user.login', targetType: 'User', targetId: user.id, metadata: { method: 'google' }, meta });
-    }
+    await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'user.login', targetType: 'User', targetId: user.id, metadata: { method: 'google' }, meta });
     return { kind: 'session', session, redirect: this.web(flow.next) };
+  }
+
+  /** Makes the account a Google sign-in proved a moment ago, once its owner has ticked the Terms box (and chosen the name). */
+  async completeSignup(input: { signupToken: string; name: string }, meta: RequestMeta): Promise<{ user: PublicUser; session: IssuedSession }> {
+    const raw = await this.redis.client.getdel(signupKey(input.signupToken));
+    if (!raw) throw new AppError('VERIFICATION_EXPIRED', 'This step expired. Please start again.');
+    const { sub, email } = JSON.parse(raw) as { sub: string; email: string };
+    // Made meanwhile (another tab): sign in with Google instead.
+    if (await this.prisma.user.findFirst({ where: { OR: [{ googleSub: sub }, { email }] }, select: { id: true } })) {
+      throw new AppError('EMAIL_TAKEN', 'An account with this email already exists. Sign in with it instead.');
+    }
+    const versions = await this.consents.versions(['terms', 'privacy']);
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({ data: { email, name: input.name, googleSub: sub, emailVerifiedAt: new Date() } });
+      await this.consents.recordSignup(tx, created.id, versions, 'signup_google');
+      await this.audit.record({ actorType: 'USER', actorId: created.id, action: 'user.signup', targetType: 'User', targetId: created.id, metadata: { method: 'google' }, meta }, tx);
+      return created;
+    });
+    return { user: toPublicUser(user), session: await this.sessions.issue(user, meta) };
   }
 
   /** Disconnect Google; the account must keep another way to sign in. */
   async unlink(userId: string, meta: RequestMeta): Promise<void> {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { passwordHash: true, googleSub: true } });
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { passwordHash: true, googleSub: true, email: true, phoneVerifiedAt: true },
+    });
     if (!user.googleSub) return;
-    if (!user.passwordHash) throw new AppError('GOOGLE_UNLINK_BLOCKED', 'Set a password before disconnecting Google.');
+    // An email signs in with a code, and a confirmed number with WhatsApp (ADR-052): only an account with no other way in keeps Google.
+    if (!user.passwordHash && !user.email && !user.phoneVerifiedAt) {
+      throw new AppError('GOOGLE_UNLINK_BLOCKED', 'Add an email or confirm a WhatsApp number before disconnecting Google.');
+    }
     await this.prisma.user.update({ where: { id: userId }, data: { googleSub: null } });
     await this.audit.record({ actorType: 'USER', actorId: userId, action: 'user.google_unlinked', targetType: 'User', targetId: userId, meta });
   }

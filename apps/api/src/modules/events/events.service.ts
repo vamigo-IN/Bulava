@@ -8,7 +8,7 @@ import {
   type CreateEventInput,
   type UpdateEventInput,
 } from '@bulava/validation';
-import type { Prisma } from '@bulava/database';
+import type { EventStatus, Prisma } from '@bulava/database';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
@@ -114,6 +114,9 @@ function asDefaultItems(value: Prisma.JsonValue): DefaultItem[] {
 /** The system group every new guest joins automatically. */
 export const ALL_GUESTS_SLUG = 'all-guests';
 
+/** Published events that take a place in the owner's plan (events.max): archived and cancelled ones do not. */
+const LIVE_STATUSES: readonly EventStatus[] = ['ACTIVE', 'COMPLETED'];
+
 @Injectable()
 export class EventsService {
   constructor(
@@ -141,19 +144,26 @@ export class EventsService {
     return toDto(event, access.role);
   }
 
-  /** Free events count against events.max; events with a purchase do not. Throws PLAN_LIMIT_REACHED; returns the person's features. */
-  async assertEventAllowance(userId: string) {
-    const features = await this.entitlements.forUser(userId);
-    const freeEvents = await this.prisma.event.count({
-      where: { ownerId: userId, deletedAt: null, status: { notIn: ['ARCHIVED', 'CANCELLED'] } },
-    });
-    const paidEvents = await this.prisma.entitlement.findMany({
-      where: { userId, eventId: { not: null } },
-      select: { eventId: true },
-      distinct: ['eventId'],
-    });
-    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.EVENTS_MAX, Math.max(0, freeEvents - paidEvents.length));
-    return features;
+  /**
+   * How many events an account may have published at once (events.max,
+   * ADR-054). Drafts never count, so anyone can make and preview as many as they
+   * like; archived and cancelled events free their place. An event bought on its
+   * own (an order for one event) neither counts nor needs a place.
+   */
+  private async assertPublishAllowance(ownerId: string, eventId: string): Promise<void> {
+    const now = new Date();
+    const [features, live, bought] = await Promise.all([
+      this.entitlements.forUser(ownerId),
+      this.prisma.event.findMany({ where: { ownerId, deletedAt: null, status: { in: [...LIVE_STATUSES] }, id: { not: eventId } }, select: { id: true } }),
+      this.prisma.entitlement.findMany({
+        where: { userId: ownerId, eventId: { not: null }, validFrom: { lte: now }, OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
+        select: { eventId: true },
+        distinct: ['eventId'],
+      }),
+    ]);
+    const own = new Set(bought.map((b) => b.eventId));
+    if (own.has(eventId)) return;
+    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.EVENTS_MAX, live.filter((e) => !own.has(e.id)).length);
   }
 
   async create(userId: string, input: CreateEventInput, meta: RequestMeta, options: { source?: 'quick_start' } = {}): Promise<EventDto> {
@@ -170,7 +180,8 @@ export class EventsService {
       );
     }
 
-    const features = await this.assertEventAllowance(userId);
+    // Drafts are never limited: the plan is asked for when publishing (ADR-054).
+    const features = await this.entitlements.forUser(userId);
 
     const slug = `${slugify(input.title) || 'event'}-${randomBytes(4).toString('hex').slice(0, 6)}`;
 
@@ -274,12 +285,15 @@ export class EventsService {
   }
 
   /**
-   * Publishing needs a secured account and a plan that covers the chosen design:
-   * drafts may preview any design with a watermark, but guests only see what the
-   * plan allows.
+   * Publishing needs a secured account, room in the owner's plan for another
+   * published event (`counted`: the event becomes active or completed), and a
+   * plan that covers the chosen design: drafts may preview any design with a
+   * watermark, but guests only see what the plan allows.
    */
-  private async assertPublishable(userId: string, eventId: string): Promise<void> {
+  private async assertPublishable(userId: string, event: { id: string; ownerId: string }, counted: boolean): Promise<void> {
+    const eventId = event.id;
     await assertVerifiedAccount(this.prisma, userId);
+    if (counted) await this.assertPublishAllowance(event.ownerId, eventId);
     const selection = await this.prisma.eventTemplateSelection.findUnique({
       where: { eventId_output: { eventId, output: 'WEBSITE' } },
       include: { templateVersion: { include: { template: { select: { tier: true } } } } },
@@ -307,7 +321,13 @@ export class EventsService {
     if (input.status && input.status !== event.status && !access.permissions.includes('event.publish')) {
       throw AppError.forbidden('You cannot change the event status.');
     }
-    if (input.status === 'ACTIVE' && event.status !== 'ACTIVE') await this.assertPublishable(access.userId, event.id);
+    // Guests can open every event that is not a draft (the public page, invitations, the album), so leaving
+    // draft for any status is publishing; becoming active or completed again also takes a place in the plan.
+    if (input.status && input.status !== event.status) {
+      const leavingDraft = event.status === 'DRAFT';
+      const counted = LIVE_STATUSES.includes(input.status) && !LIVE_STATUSES.includes(event.status);
+      if (leavingDraft || counted) await this.assertPublishable(access.userId, event, counted);
+    }
     if (input.language && !isSupportedLanguage(input.language)) {
       throw new AppError('UNSUPPORTED_LANGUAGE', 'Unsupported language.');
     }

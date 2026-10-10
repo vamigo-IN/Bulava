@@ -10,8 +10,12 @@ import { maskTarget } from '../guest-access/otp.service';
 import { PlatformSettingsService, SETTINGS_STORE } from '../settings/settings.service';
 import { emailCodeEmail } from './auth-emails';
 
-/** What a code is for; a code proves one thing only. */
-export type EmailCodePurpose = 'signup' | 'login' | 'claim' | 'reset';
+/**
+ * What a code is for; a code proves one thing only. `access`: the one sign-in
+ * form's code, which signs in to the address's account or proves the address
+ * for a new one; `login`: the second step after a password (the console).
+ */
+export type EmailCodePurpose = 'access' | 'signup' | 'login' | 'claim' | 'reset';
 
 const CODE_TTL_SECONDS = 10 * 60;
 const MAX_ATTEMPTS = 5;

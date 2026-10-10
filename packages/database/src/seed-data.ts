@@ -97,7 +97,7 @@ const PLANS: PlanSeed[] = [
   {
     key: 'STANDARD',
     name: 'Standard',
-    description: 'One event with Standard templates, more guests and no watermark.',
+    description: 'Standard templates, more guests and no watermark, for a one-time payment.',
     priceMinor: 99900,
     interval: 'ONE_TIME',
     sortOrder: 1,

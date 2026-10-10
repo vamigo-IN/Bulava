@@ -174,7 +174,7 @@ export default function VideoPage() {
             ) : null}
             {choice.outputs.includes('VIDEO') && choice.definition.capabilities.editable.music ? <MusicPicker value={musicId} onChange={setMusicId} /> : null}
             {TIER_RANK[choice.tier] > maxTier ? (
-              <Link href={`/dashboard/events/${eventId}/upgrade`} className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-gold-600 font-semibold text-white hover:bg-gold-700">
+              <Link href={`/dashboard/events/${eventId}/unlock`} className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-gold-600 font-semibold text-white hover:bg-gold-700">
                 <Lock aria-hidden className="size-4" />
                 {t('design.locked')}
               </Link>

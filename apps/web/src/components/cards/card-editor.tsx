@@ -3,6 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
   Cloud,
   CloudOff,
   Download,
@@ -337,6 +339,8 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
   // ── Layout ──
   const [panel, setPanel] = useState<PanelKey>('details');
   const [sheet, setSheet] = useState<'panel' | 'inspector' | null>(null);
+  /** Phones: the sheet folded down to its title, leaving the card more room. */
+  const [sheetFolded, setSheetFolded] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [watermarkPreview, setWatermarkPreview] = useState(true);
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -358,10 +362,44 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
   const zoomBy = (factor: number) => setZoomMode(Math.min(3, Math.max(0.15, Math.round(zoom * factor * 100) / 100)));
   const pixels = config.data?.formats[design.format]?.pixels;
 
+  // Is a finger (or the mouse) down? The stage selects on pointer-down and divides a drag by the zoom.
+  const pointerDown = useRef(false);
+  useEffect(() => {
+    const down = () => {
+      pointerDown.current = true;
+    };
+    const up = () => {
+      pointerDown.current = false;
+    };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    return () => {
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+    };
+  }, []);
+
   const select = useCallback(
     (id: string | null) => {
       setSelectedId(id);
-      if (!desktop) setSheet(id ? 'inspector' : null);
+      if (desktop) return;
+      if (!id) {
+        setSheet(null);
+        return;
+      }
+      // Phones: the element's settings open below the card once the finger lifts. The card then
+      // shrinks to fit above them; doing that mid-gesture would rescale a drag under the finger.
+      const open = () => setSheet('inspector');
+      if (!pointerDown.current) return open();
+      const done = () => {
+        window.removeEventListener('pointerup', done, true);
+        window.removeEventListener('pointercancel', done, true);
+        open();
+      };
+      window.addEventListener('pointerup', done, true);
+      window.addEventListener('pointercancel', done, true);
     },
     [desktop],
   );
@@ -547,7 +585,8 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
         </button>
       </header>
 
-      <div className="relative flex min-h-0 flex-1">
+      {/* Phones stack the canvas over the sheet, so the sheet never covers the card. */}
+      <div className={cn('relative flex min-h-0 flex-1', !desktop && 'flex-col')}>
         {/* ── Panels (desktop) ── */}
         {desktop ? (
           <aside className="flex w-[22rem] shrink-0 border-r border-[#eadfcf] bg-[#fbf6ee]" aria-label={t('cards.editor.tools')}>
@@ -575,7 +614,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
         {/* ── The canvas ── */}
         <main
           ref={stageBox}
-          className="relative min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle,#e3d6c4_1px,transparent_1.2px)] [background-size:18px_18px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600"
+          className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle,#e3d6c4_1px,transparent_1.2px)] [background-size:18px_18px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600"
           aria-label={t('cards.editor.canvas')}
           // Zoomed in, the canvas scrolls: keyboards reach it too.
           tabIndex={0}
@@ -626,17 +665,39 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
           </aside>
         ) : null}
 
-        {/* ── Bottom sheet (phones) ── */}
+        {/* ── Bottom sheet (phones): under the canvas, never over it, so the card and its selected element stay in view. ── */}
         {!desktop && sheet ? (
-          <div className="absolute inset-x-0 bottom-0 z-30 max-h-[58%] overflow-y-auto rounded-t-[1.75rem] bg-[#fbf6ee] p-4 pb-6 shadow-[0_-12px_40px_rgba(70,40,26,0.18)]" role="dialog" aria-label={sheet === 'panel' ? panels.find((p) => p.key === panel)?.label : t('cards.editor.inspector')}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-display text-lg">{sheet === 'panel' ? panels.find((p) => p.key === panel)?.label : t('cards.editor.inspector')}</h2>
-              <button type="button" onClick={() => setSheet(null)} className="btn-3d btn-3d-light size-9 rounded-full" aria-label={t('cards.editor.closeSheet')}>
-                <X aria-hidden className="size-4" />
-              </button>
+          <section
+            id="card-editor-sheet"
+            className={cn(
+              'relative z-30 shrink-0 overflow-y-auto rounded-t-[1.75rem] bg-[#fbf6ee] px-4 pt-3 shadow-[0_-12px_40px_rgba(70,40,26,0.18)] [scrollbar-width:thin]',
+              // An element's settings leave the card more room than a panel does: its handles stay easy to reach.
+              sheetFolded ? 'pb-3' : sheet === 'inspector' ? 'max-h-[36dvh] pb-6' : 'max-h-[44dvh] pb-6',
+            )}
+            aria-label={sheet === 'panel' ? panels.find((p) => p.key === panel)?.label : t('cards.editor.inspector')}
+          >
+            <div className={cn('flex items-center justify-between gap-2', !sheetFolded && 'mb-3')}>
+              <h2 className="min-w-0 truncate font-display text-lg">{sheet === 'panel' ? panels.find((p) => p.key === panel)?.label : t('cards.editor.inspector')}</h2>
+              <div className="flex shrink-0 items-center gap-2">
+                {/* Folded, the sheet is only this row: the card gets the room to move and resize things. */}
+                <button
+                  type="button"
+                  onClick={() => setSheetFolded((v) => !v)}
+                  aria-expanded={!sheetFolded}
+                  aria-controls="card-editor-sheet"
+                  className="btn-3d btn-3d-light size-9 rounded-full"
+                  aria-label={sheetFolded ? t('cards.editor.unfoldSheet') : t('cards.editor.foldSheet')}
+                  title={sheetFolded ? t('cards.editor.unfoldSheet') : t('cards.editor.foldSheet')}
+                >
+                  {sheetFolded ? <ChevronUp aria-hidden className="size-4" /> : <ChevronDown aria-hidden className="size-4" />}
+                </button>
+                <button type="button" onClick={() => setSheet(null)} className="btn-3d btn-3d-light size-9 rounded-full" aria-label={t('cards.editor.closeSheet')}>
+                  <X aria-hidden className="size-4" />
+                </button>
+              </div>
             </div>
-            {sheet === 'panel' ? panelBody(panel) : <LayerInspector editor={editor} onClose={() => select(null)} />}
-          </div>
+            {sheetFolded ? null : sheet === 'panel' ? panelBody(panel) : <LayerInspector editor={editor} onClose={() => select(null)} />}
+          </section>
         ) : null}
       </div>
 
@@ -652,6 +713,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
                 else {
                   setPanel(p.key);
                   setSheet('panel');
+                  setSheetFolded(false);
                 }
               }}
               className={cn('flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[0.625rem] font-semibold', sheet === 'panel' && panel === p.key ? 'text-brand-700' : 'text-stone-600')}

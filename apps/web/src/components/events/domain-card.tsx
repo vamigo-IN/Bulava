@@ -83,7 +83,7 @@ export function DomainCard({ eventId }: { eventId: string }) {
       {data.available && !data.entitled && !d ? (
         <Alert tone="info">
           {t('domain.upsell')}{' '}
-          <Link href={`/dashboard/events/${eventId}/upgrade`} className="font-medium underline">
+          <Link href={`/dashboard/events/${eventId}/unlock`} className="font-medium underline">
             {t('domain.upgrade')}
           </Link>
         </Alert>

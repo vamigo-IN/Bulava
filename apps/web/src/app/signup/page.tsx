@@ -1,16 +1,13 @@
-import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import { AuthForm } from '@/components/auth/auth-form';
+import { redirect } from 'next/navigation';
 
-// Rendered per request so the page carries its own CSP nonce (see src/middleware.ts).
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { title: 'Create account' };
-
-export default function SignupPage() {
-  return (
-    <Suspense>
-      <AuthForm mode="signup" />
-    </Suspense>
-  );
+/** Signing up is the same form as signing in (/login): old links keep their next step, plan or template. */
+export default async function SignupPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === 'string') params.set(key, value);
+  }
+  const query = params.toString();
+  redirect(query ? `/login?${query}` : '/login');
 }

@@ -4,11 +4,11 @@ Prices and limits are data. Admins change them in the console (Plans & coupons) 
 
 ## Plans and features
 
-Seeded plans (editable): **Free** (₹0), **Standard** (₹999, one event), **Premium** (₹2,999, one event), **Studio** (₹5,999 per year, planners). Each plan has `PlanFeature` rows:
+Seeded plans (editable): **Free** (₹0), **Standard** (₹999, one-time), **Premium** (₹2,999, one-time), **Studio** (₹5,999 per year, planners). Paid plans belong to the account ([ADR-053](decisions.md)): every event of the buyer's gets them, and `events.max` (the Free plan's 1 unless a plan sets its own) says how many events it may have published at once. Drafts are never limited ([ADR-054](decisions.md)). Each plan has `PlanFeature` rows:
 
 | Feature key | Meaning |
 |---|---|
-| `events.max` | events a user may own at once (archived and cancelled events do not count) |
+| `events.max` | events an account may have **published** at once (drafts never count, nor archived and cancelled events; checked when publishing, [ADR-054](decisions.md)) |
 | `functions.max`, `guests.max`, `media.photos.max` | per-event limits |
 | `templates.maxTier` | 0 Free, 1 Standard, 2 Premium templates |
 | `video.renders.max`, `video.hd` | render quota and full resolution |
@@ -22,15 +22,25 @@ Seeded plans (editable): **Free** (₹0), **Standard** (₹999, one event), **Pr
 `EntitlementsService.forEvent(eventId)` computes what an event may do:
 
 1. Start from the **Free plan's** features (the baseline for everyone).
-2. Overlay **grants**: `Entitlement` rows created by paid orders, either for one event (event purchases) or for the owner (subscriptions such as Studio).
+2. Overlay **grants**: `Entitlement` rows created by paid orders, for the owner's account (one-time plans, without an end, and yearly ones such as Studio; reported as `SUBSCRIPTION`) or, for older orders and complimentary grants, for one event (`EVENT_PURCHASE`).
 3. When several grants cover a feature, the more generous one wins.
 
-Limits are enforced where the action happens (creating guests or functions, selecting templates, starting renders, uploading photos, registering). A limit returns `PLAN_LIMIT_REACHED` (402) and a locked template returns `PLAN_UPGRADE_REQUIRED`; the dashboard turns both into upgrade prompts.
+Limits are enforced where the action happens (creating guests or functions, starting renders, uploading photos, registering), and publishing checks the rest: the design's tier and the number of published events (any `PATCH /events/:id { status }` out of `DRAFT`, since guests can open every event that is not a draft, and any return to `ACTIVE` or `COMPLETED`). Creating, copying and quick-starting events are never refused for the plan. A limit returns `PLAN_LIMIT_REACHED` (402, with `details.feature` and `details.limit`) and a locked template returns `PLAN_UPGRADE_REQUIRED`. The web app says which limit in words (`lib/plan-limits.ts`: "Your plan allows up to 100 guests per event.") and offers **Click here to unlock**: the event's plans for an event's limits, the plans page for the number of events. `lib/api.ts` announces every such answer (`bulava:plan-limit`), and the event pages show the prompt wherever it happened. Customer copy says *unlock*, never *upgrade* ([ADR-052](decisions.md)); the event's plans page is `/dashboard/events/:id/unlock` (`/upgrade` redirects there).
+
+## Checkout page
+
+Plans are chosen on the pricing page or an event's plans page, and bought on `/dashboard/checkout?plan=<KEY>` ([ADR-052](decisions.md), [ADR-053](decisions.md)) with `POST /orders`, for the account. A buyer who is not signed in goes through `/login?next=` and comes back to it. From an event's plans page the link also carries `event` and `template`: the way back, and the template that goes on that event once paid (the payment status page applies it).
+
+- **The plan** with its features (`planFeatureLines`, the same lines as the pricing cards).
+- **Price details** from `POST /orders/quote` `{ planKey, couponCode? }` (signed in, 20 a minute; nothing is bought): the plan's price, the coupon's discount, the total with GST, and `included` when the account has the plan (or a higher one) already, which the page shows instead of a Pay button. **Apply** checks a coupon and shows the saving, or the reason beside the field (`COUPON_INVALID`); **Remove** takes it off.
+- **The terms box** (below), unticked, then **Pay**. `POST /orders` refuses a one-time plan the account has already (`PLAN_ALREADY_ACTIVE`). Closing Razorpay and paying again reopens the same order (`POST /orders/:id/checkout`) rather than placing another. A provisional account is asked to secure itself first (`/dashboard/claim?next=` back to the checkout).
+
+`POST /events/:id/orders` still buys a one-time plan for one event (API clients; orders from before ADR-053 keep their event).
 
 ## Checkout (Razorpay)
 
 ```text
-Host → POST /events/:id/orders { planKey, couponCode? }
+Host → POST /orders { planKey, couponCode?, acceptTerms }   (or POST /events/:id/orders for one event)
      → Order CREATED (amount from the plan and coupon; never from the client)
      → Razorpay order created with the gateway's REST API
 Browser → Razorpay Checkout → { razorpay_order_id, razorpay_payment_id, razorpay_signature }
@@ -47,7 +57,7 @@ Without `RAZORPAY_KEY` and `RAZORPAY_SECRET` the checkout returns `PAYMENTS_UNAV
 
 ## Consent at checkout
 
-Every purchase needs the buyer's own tick of an unticked box ("I agree to the Terms of Service and the Refund and Cancellation Policy…"), as the Consumer Protection (E-Commerce) Rules, 2020 require: the upgrade page keeps its Pay buttons disabled until it is ticked, and `POST /events/:id/orders` (and `POST /orders`) refuse a request without `acceptTerms: true`. The order records `termsAcceptedAt`, and a `consents` row (`purchase_terms`, source `order:<id>`) keeps the versions of both policies the buyer saw. Complimentary upgrades need no consent.
+Every purchase needs the buyer's own tick of an unticked box ("I agree to the Terms of Service and the Refund and Cancellation Policy…"), as the Consumer Protection (E-Commerce) Rules, 2020 require: the checkout page asks for it when Pay is pressed without it, and `POST /events/:id/orders` (and `POST /orders`) refuse a request without `acceptTerms: true`. The order records `termsAcceptedAt`, and a `consents` row (`purchase_terms`, source `order:<id>`) keeps the versions of both policies the buyer saw. Complimentary upgrades need no consent.
 
 ## Payment history
 
@@ -55,11 +65,11 @@ Every purchase needs the buyer's own tick of an unticked box ("I agree to the Te
 
 ## Payment status page
 
-Every checkout that gets as far as paying ends on `/dashboard/payments/:orderId` (a private page; `lib/checkout.ts` opens Razorpay for the upgrade page and for retries). It reads `GET /orders/:id`, which answers only the buyer, and shows one of:
+Every checkout that gets as far as paying ends on `/dashboard/payments/:orderId` (a private page; `lib/checkout.ts` opens Razorpay for the checkout page and for retries). It reads `GET /orders/:id`, which answers only the buyer, and shows one of:
 
 | What the buyer sees | When |
 |---|---|
-| **Thank you** with the receipt (plan, event, amount, coupon, order and payment IDs) | the order is `PAID`; the event's data is refreshed and a template chosen before upgrading (`?template=`) is applied |
+| **Thank you** with the receipt (plan, event, amount, coupon, order and payment IDs) | the order is `PAID`; the event's data is refreshed and a template chosen before unlocking (`?template=`) is applied |
 | **Confirming your payment** | Razorpay reported success but the browser's verification didn't finish (`?state=confirming`); the page checks every 3 seconds while the webhook settles it |
 | **Your bank is taking a little longer** | still unconfirmed after 45 seconds; it keeps checking every 10 seconds and says the plan switches on by itself |
 | **Your payment didn't go through**, with the bank's reason and **Try again** | the order is `FAILED`, or the buyer closed checkout after a failed attempt (`?state=failed`) |
@@ -98,7 +108,7 @@ Subscribe the webhook to `payment.captured`, `order.paid` and `payment.failed` (
 
 ## Testing
 
-`apps/api/test/platform.e2e-spec.ts` uses a fake provider that keeps Razorpay's real HMAC verification. It covers the free-plan limits, a verified Premium purchase unlocking templates, forged signatures, the webhook, a 100% coupon, and refunds. `super-admin.e2e-spec.ts` covers complimentary upgrades (the same access as a purchase, no refund, revocation) and the orders list's states, filters and totals.
+`apps/api/test/sign-in.e2e-spec.ts` covers the checkout's quote (with a coupon, a refused coupon, the free plan). `apps/api/test/platform.e2e-spec.ts` uses a fake provider that keeps Razorpay's real HMAC verification. It covers the free-plan limits, a verified Premium purchase unlocking templates, forged signatures, the webhook, a 100% coupon, and refunds. `super-admin.e2e-spec.ts` covers complimentary upgrades (the same access as a purchase, no refund, revocation) and the orders list's states, filters and totals.
 
 ## Digital cards
 

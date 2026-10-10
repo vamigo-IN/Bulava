@@ -9,6 +9,7 @@ import type { MessageKey } from '@bulava/localization';
 import { GoogleMark, useProviders } from '@/components/auth/google-button';
 import { Alert, Badge, Button, Card, Field, Input } from '@/components/ui/primitives';
 import { WhatsAppMark } from '@/components/ui/whatsapp-mark';
+import { PasswordReset } from './password-reset';
 import { WhatsAppConfirm } from './whatsapp-confirm';
 import { apiPost, apiPut } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
@@ -23,6 +24,8 @@ export function SignInMethods({ me }: { me: User }) {
   const googleEnabled = providers.google;
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
   const [editing, setEditing] = useState(false);
+  /** Changing a password whose current one is forgotten: an emailed code instead. */
+  const [resetting, setResetting] = useState(false);
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
@@ -127,7 +130,7 @@ export function SignInMethods({ me }: { me: User }) {
       ) : null}
 
       {me.email ? null : (
-        // A password signs in with an email: an account made from a WhatsApp number adds both.
+        // An email signs in with a code (and a password, if one is set): an account made from a WhatsApp number can add one.
         <section className="flex flex-wrap items-center justify-between gap-3 border-t border-gold-100 pt-4">
           <div>
             <p className="flex items-center gap-2 font-medium">
@@ -152,18 +155,43 @@ export function SignInMethods({ me }: { me: User }) {
               </p>
               {me.hasPassword ? null : <p className="text-sm text-stone-600">{t('methods.password.none')}</p>}
             </div>
-            {editing ? null : (
+            {editing || resetting ? null : (
               <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
                 {t(me.hasPassword ? 'methods.password.change' : 'methods.password.set')}
               </Button>
             )}
           </div>
-          {editing ? (
+          {resetting && me.email ? (
+            <PasswordReset
+              email={me.email}
+              onCancel={() => setResetting(false)}
+              onDone={() => {
+                setResetting(false);
+                setMessage({ tone: 'success', text: t('methods.password.saved') });
+                void qc.invalidateQueries({ queryKey: ['me'] });
+              }}
+            />
+          ) : editing ? (
             <form onSubmit={savePassword} className="space-y-3">
               {me.hasPassword ? (
                 <Field label={t('methods.password.current')}>
                   {(p) => <Input {...p} type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} className="max-w-sm" />}
                 </Field>
+              ) : null}
+              {me.hasPassword ? (
+                // Signed in with a code because the password was forgotten: change it with another code.
+                <button
+                  type="button"
+                  className="text-sm font-medium text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700"
+                  onClick={() => {
+                    setEditing(false);
+                    setCurrent('');
+                    setNext('');
+                    setResetting(true);
+                  }}
+                >
+                  {t('methods.password.forgot')}
+                </button>
               ) : null}
               <Field label={t('methods.password.new')} hint={t('methods.password.hint')}>
                 {(p) => <Input {...p} type="password" autoComplete="new-password" required minLength={10} value={next} onChange={(e) => setNext(e.target.value)} className="max-w-sm" />}

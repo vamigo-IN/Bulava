@@ -11,6 +11,7 @@ import { FloralCorner, Mandala } from '@bulava/template-engine/src/ornaments';
 import { CreateEventSchema } from '@bulava/validation';
 import { ApiError, apiPost, apiPut } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
+import { isPlanLimit, unlockHref } from '@/lib/plan-limits';
 import { occasionIcon, occasionShortName } from '@/lib/occasions';
 import { keys, useEventTypes, useLanguages } from '@/lib/queries';
 import { cardPreview } from '@/lib/template-previews';
@@ -54,7 +55,8 @@ function CreateEvent() {
   const [language, setLanguage] = useState('en');
   const [functions, setFunctions] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  // A plan limit carries where to unlock more (the plans page for the number of events).
+  const [error, setError] = useState<{ text: string; unlock: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const type = types.data?.find((x) => x.key === typeKey);
@@ -142,21 +144,21 @@ function CreateEvent() {
     try {
       const event = await apiPost<EventSummary>('/events', payload());
       await client.invalidateQueries({ queryKey: keys.events });
-      // Came from 'Use this template': apply it, or offer the upgrade for paid designs.
+      // Came from 'Use this template': apply it, or offer to unlock paid designs.
       if (templateKey) {
         try {
           await apiPut(`/events/${event.id}/design/website`, { templateKey });
           router.push(`/dashboard/events/${event.id}/design`);
         } catch (err) {
-          const upgrade = err instanceof ApiError && err.code === 'PLAN_UPGRADE_REQUIRED';
-          router.push(upgrade ? `/dashboard/events/${event.id}/upgrade?template=${encodeURIComponent(templateKey)}` : `/dashboard/events/${event.id}/design`);
+          const locked = err instanceof ApiError && err.code === 'PLAN_UPGRADE_REQUIRED';
+          router.push(locked ? `/dashboard/events/${event.id}/unlock?template=${encodeURIComponent(templateKey)}` : `/dashboard/events/${event.id}/design`);
         }
         return;
       }
       // The first step of the setup: choosing the design.
       router.push(`/dashboard/events/${event.id}/design?welcome=1`);
     } catch (err) {
-      setError(errorMessage(t, err));
+      setError({ text: errorMessage(t, err), unlock: isPlanLimit(err) ? unlockHref(err) : null });
       setSubmitting(false);
     }
   };
@@ -178,7 +180,17 @@ function CreateEvent() {
         <form onSubmit={submit} noValidate className="min-w-0">
           {error ? (
             <div className="mb-5">
-              <Alert>{error}</Alert>
+              <Alert>
+                {error.text}
+                {error.unlock ? (
+                  <>
+                    {' '}
+                    <Link href={error.unlock} className="font-semibold underline decoration-red-300 underline-offset-4 hover:decoration-red-800">
+                      {t('unlock.cta')}
+                    </Link>
+                  </>
+                ) : null}
+              </Alert>
             </div>
           ) : null}
 

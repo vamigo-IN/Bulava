@@ -180,6 +180,8 @@ export const hi: Catalog = {
   'phone.countryCode': 'देश कोड',
   'error.UPLOADS_CLOSED': 'इस एल्बम में तस्वीरें केवल मेज़बान और उनकी टीम जोड़ते हैं।',
   'error.UPLOAD_NEEDS_INVITATION': 'तस्वीरें जोड़ने के लिए एल्बम अपने निमंत्रण से खोलें।',
+  'error.PLAN_LIMIT_REACHED': 'इस इवेंट में अब और नहीं जोड़ा जा सकता। मेज़बान से संपर्क करें।',
+  'limit.media.photos.max': 'इस एल्बम में अधिकतम {limit} तस्वीरें जोड़ी जा सकती हैं, और यह भर गया है।',
 
   'email.openInvitation': 'अपना निमंत्रण खोलें',
 
@@ -208,12 +210,10 @@ export const hi: Catalog = {
   'error.PHONE_OTP_UNAVAILABLE': 'WhatsApp कोड अभी उपलब्ध नहीं हैं। कृपया ईमेल से साइन इन करें।',
 
   'preview.badge': 'पूर्वावलोकन',
-  'preview.note': 'यह निमंत्रण का पूर्वावलोकन है। प्रकाशित होने के बाद मेहमान इसे बिना निशान के देखेंगे।',
-  'preview.share': 'WhatsApp पर साझा करें',
+  'preview.note': 'अभी प्रकाशित नहीं हुआ',
   'preview.shareText': 'हमारा निमंत्रण देखिए: {url}',
-  'preview.edit': 'डिज़ाइन बदलें',
-  'preview.publish': 'निमंत्रण प्रकाशित करें',
-  'preview.makeYourOwn': 'अपना निमंत्रण बनाएँ',
+  'preview.edit': 'बदलें',
+  'preview.publish': 'प्रकाशित करें',
   'preview.notFound.title': 'यह पूर्वावलोकन लिंक मान्य नहीं है',
   'preview.notFound.body': 'हो सकता है मेज़बान ने इसे बदल दिया हो। उनसे नया लिंक माँगें।',
   'error.ATTENDEE_LIMIT_EXCEEDED': 'मेहमानों की संख्या आपके निमंत्रण की सीमा से अधिक है।',

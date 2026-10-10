@@ -63,7 +63,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ token:
   if (view.published) redirect(`/e/${view.event.slug}`);
   return (
     <>
-      <div className="pb-28">
+      <main className="pb-16">
         <TemplateRenderer
           definition={view.template.definition}
           customization={view.template.customization}
@@ -73,8 +73,8 @@ export default async function PreviewPage({ params }: { params: Promise<{ token:
           introKey={`preview-${view.event.id}`}
           slots={{ watermark: true }}
         />
-      </div>
-      <PreviewBar eventId={view.event.id} language={view.event.language} status={view.event.status} templateName={view.template.name} />
+      </main>
+      <PreviewBar eventId={view.event.id} language={view.event.language} status={view.event.status} />
     </>
   );
 }

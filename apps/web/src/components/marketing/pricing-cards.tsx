@@ -2,34 +2,9 @@ import { ArrowRight, Check } from 'lucide-react';
 import { SpotlightGrid } from '@/components/effects/spotlight-grid';
 import { AuthAwareLink } from './account-links';
 import type { Translator } from '@bulava/localization';
+import { planFeatureLines } from '@/lib/plan-features';
 import { formatInr, type Plan } from '@/lib/server-api';
 import { cn } from '@/lib/utils';
-
-/** Human-readable feature lines from admin-managed PlanFeature rows (nothing hard-coded). */
-export function planFeatureLines(plan: Plan, t: Translator): string[] {
-  const f = new Map(plan.features.map((x) => [x.featureKey, x]));
-  const lines: string[] = [];
-  const ev = f.get('events.max');
-  if (ev?.enabled && ev.limit !== null) lines.push(ev.limit > 1 ? t('plan.feature.events.max.many', { limit: ev.limit }) : t('plan.feature.events.max', { limit: ev.limit }));
-  const tier = f.get('templates.maxTier');
-  if (tier?.enabled) lines.push(t(`plan.feature.templates.${Math.min(2, tier.limit ?? 2) as 0 | 1 | 2}`));
-  const fn = f.get('functions.max');
-  if (fn?.enabled) lines.push(fn.limit === null ? t('plan.feature.functions.unlimited') : t('plan.feature.functions.max', { limit: fn.limit }));
-  const guests = f.get('guests.max');
-  if (guests?.enabled) lines.push(guests.limit === null ? t('plan.feature.guests.unlimited') : t('plan.feature.guests.max', { limit: guests.limit.toLocaleString('en-IN') }));
-  lines.push(t('plan.feature.rsvp'), t('plan.feature.whatsapp'));
-  const photos = f.get('media.photos.max');
-  if (photos?.enabled && photos.limit !== null) lines.push(t('plan.feature.photos', { limit: photos.limit.toLocaleString('en-IN') }));
-  const video = f.get('video.renders.max');
-  if (video?.enabled && video.limit !== null) lines.push(t('plan.feature.video', { limit: video.limit }));
-  if (f.get('video.hd')?.enabled) lines.push(t('plan.feature.videoHd'));
-  const wa = f.get('messaging.whatsapp.max');
-  if (wa?.enabled) lines.push(wa.limit === null ? t('plan.feature.whatsappMessages.unlimited') : t('plan.feature.whatsappMessages', { limit: wa.limit.toLocaleString('en-IN') }));
-  const wm = f.get('branding.watermark');
-  if (wm) lines.push(wm.enabled ? t('plan.feature.watermark') : t('plan.feature.noWatermark'));
-  if (f.get('planner.workspace')?.enabled) lines.push(t('plan.feature.planner'));
-  return lines;
-}
 
 /** Clay slabs for the plan cards: the popular plan in maroon, the others dark on the pricing band. */
 const MAROON_SLAB =
@@ -79,8 +54,9 @@ export function PricingCards({ plans, t, dark = false, headingLevel = 3 }: { pla
                 ))}
               </ul>
               <AuthAwareLink
-                signedOutHref={plan.priceMinor === 0 ? '/signup' : `/signup?plan=${plan.key}`}
-                signedInHref="/dashboard"
+                // A paid plan goes to its checkout, through sign-in when needed (which comes back to it).
+                signedOutHref={plan.priceMinor === 0 ? '/login' : `/login?next=${encodeURIComponent(`/dashboard/checkout?plan=${plan.key}`)}`}
+                signedInHref={plan.priceMinor === 0 ? '/dashboard' : `/dashboard/checkout?plan=${plan.key}`}
                 className={cn('btn-3d group/cta mt-8 min-h-12 w-full rounded-2xl', popular ? 'btn-3d-gold' : 'btn-3d-light')}
               >
                 {plan.priceMinor === 0 ? t('home.pricing.start') : t('home.pricing.choose', { plan: plan.name })}

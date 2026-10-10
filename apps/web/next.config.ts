@@ -95,6 +95,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: '/api/v1/:path*', destination: `${apiInternalUrl}/api/v1/:path*` }];
   },
+  // An event's plans page was /upgrade (old links, bookmarks, emails); it is /unlock.
+  async redirects() {
+    return [{ source: '/dashboard/events/:eventId/upgrade', destination: '/dashboard/events/:eventId/unlock', permanent: true }];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

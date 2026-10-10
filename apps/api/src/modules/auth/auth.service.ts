@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { generateSecureToken, hashPassword, hashToken, verifyPassword } from '@bulava/auth';
-import type { ClaimAccountInput, LoginInput, PhoneSignupInput, SetPasswordInput, SignupInput } from '@bulava/validation';
+import type { ClaimAccountInput, EmailSignupInput, LoginInput, PhoneSignupInput, SetPasswordInput, SignupInput } from '@bulava/validation';
 import type { User } from '@bulava/database';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
@@ -27,6 +27,7 @@ const PHONE_SENDS_PER_IP_HOUR = 20;
 const PHONE_SIGNUP_SECONDS = 15 * 60;
 
 const phoneSignupKey = (token: string) => `phone-signup:${hashToken(token)}`;
+const emailSignupKey = (token: string) => `email-signup:${hashToken(token)}`;
 
 export type SignedIn = { user: PublicUser; session: IssuedSession };
 
@@ -58,6 +59,17 @@ export interface PhoneSignupStep {
   target: string;
 }
 
+/** A code that proved an address without an account: the token that makes one (a name, the ticked Terms box, an optional password). */
+export interface EmailSignupStep {
+  signupRequired: true;
+  signupToken: string;
+  /** The address, masked. */
+  target: string;
+}
+
+/** What the sign-in form asks for after an email address: the account's password, or the code just emailed. */
+export type EmailStart = { method: 'password' } | ({ method: 'code' } & EmailChallenge);
+
 export type LoginResult = SignedIn | MfaStep | RestoreOffer;
 
 /** What a sign-up keeps while its code is on the way. */
@@ -71,12 +83,14 @@ interface PendingSignup {
 }
 
 /**
- * Signing up and signing in. Every way in proves something the person holds:
- * an email address is confirmed with a code before an account is made with it
- * (or before it is added to one); a password alone never signs in, it is
- * followed by the authenticator app's code or, without one, a code sent to the
- * account's email; a WhatsApp code proves the number. Google sign-in lives in
- * `GoogleAuthService`, the authenticator step in `MfaService`.
+ * Signing in, and making an account on the way (ADR-052). One form takes an
+ * email address or a WhatsApp number. An address is proved with a code before
+ * an account is made with it (or before it is added to one); an account with a
+ * password may sign in with it, or with a code; a WhatsApp code proves the
+ * number. Accounts with an authenticator app always finish with it. Google
+ * sign-in lives in `GoogleAuthService`, the authenticator step in `MfaService`.
+ * The console still signs in with a password followed by an emailed code
+ * (`login`, `completeLogin`).
  */
 @Injectable()
 export class AuthService {
@@ -217,6 +231,103 @@ export class AuthService {
     return this.emailCodes.resend(challengeToken);
   }
 
+  // ───── The one sign-in form: an email address ─────
+
+  /**
+   * After the address: an account with a password asks for it (a code stays
+   * one click away); any other address, with or without an account, gets a code,
+   * so the answer never says whether an account without a password exists.
+   */
+  async startEmail(email: string, meta: RequestMeta): Promise<EmailStart> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    const usable = user && ((user.status === 'ACTIVE' && !user.deletedAt) || AccountService.restorable(user));
+    if (usable && user.passwordHash) return { method: 'password' };
+    return { method: 'code', ...(await this.sendEmailCode(email, meta)) };
+  }
+
+  /** A sign-in code to the address ("Email me a code"): it signs in, or proves the address for a new account. */
+  async sendEmailCode(email: string, meta: RequestMeta): Promise<EmailChallenge> {
+    await this.assertEmailCodes();
+    const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true, name: true } });
+    const challenge = await this.emailCodes.start('access', email, {}, { name: user?.name });
+    await this.audit.record({ actorType: 'ANONYMOUS', action: 'user.email_code_sent', targetType: 'User', targetId: user?.id ?? null, meta });
+    return challenge;
+  }
+
+  /**
+   * The emailed code: it signs in to the address's account (confirming the
+   * address), or, for an address without one, returns the token that makes it.
+   */
+  async verifyEmailCode(challengeToken: string, code: string, meta: RequestMeta): Promise<LoginResult | EmailSignupStep> {
+    const { email } = await this.emailCodes.verify<object>(challengeToken, code, 'access');
+    const found = await this.prisma.user.findUnique({ where: { email } });
+    if (!found) {
+      const signupToken = generateSecureToken();
+      await this.redis.client.set(emailSignupKey(signupToken), email, 'EX', PHONE_SIGNUP_SECONDS);
+      return { signupRequired: true, signupToken, target: maskTarget(email) };
+    }
+    const user = found.emailVerifiedAt ? found : await this.prisma.user.update({ where: { id: found.id }, data: { emailVerifiedAt: new Date() } });
+    if (AccountService.restorable(user)) return this.restoreOffer(user, meta);
+    if (user.status !== 'ACTIVE' || user.deletedAt) {
+      await this.audit.record({ actorType: 'ANONYMOUS', action: 'user.login', targetType: 'User', targetId: user.id, result: 'FAILURE', metadata: { reason: 'NOT_ACTIVE', method: 'email_code' }, meta });
+      throw new AppError('INVALID_CREDENTIALS', 'This account cannot sign in.');
+    }
+    // A confirmed address secures an account made from a WhatsApp number alone.
+    const secured = user.provisional ? await this.prisma.user.update({ where: { id: user.id }, data: { provisional: false } }) : user;
+    if (secured.email) await this.redis.client.del(`login-fail:${secured.email}`);
+    if (secured.totpEnabledAt) return { mfaRequired: true, ...(await this.mfa.createChallenge(secured.id)) };
+    return this.signIn(secured, meta, { method: 'email_code' });
+  }
+
+  /** Makes an account for an address its owner proved with a code a moment ago (name, the ticked Terms box, an optional password). */
+  async signupWithEmail(input: EmailSignupInput, meta: RequestMeta): Promise<SignedIn> {
+    const email = await this.redis.client.getdel(emailSignupKey(input.signupToken));
+    if (!email) throw new AppError('VERIFICATION_EXPIRED', 'This step expired. Please start again.');
+    if (await this.prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+      throw new AppError('EMAIL_TAKEN', 'An account with this email already exists. Sign in with it instead.');
+    }
+    const [passwordHash, versions] = await Promise.all([input.password ? hashPassword(input.password) : null, this.consents.versions(['terms', 'privacy'])]);
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({ data: { name: input.name, email, emailVerifiedAt: new Date(), passwordHash } });
+      // The ticked box on the last step: the Terms and the Privacy Policy, with the versions shown then.
+      await this.consents.recordSignup(tx, created.id, versions, 'signup');
+      await this.audit.record(
+        { actorType: 'USER', actorId: created.id, action: 'user.signup', targetType: 'User', targetId: created.id, metadata: { method: 'email_code', password: Boolean(passwordHash) }, meta },
+        tx,
+      );
+      return created;
+    });
+    const session = await this.sessions.issue(user, meta);
+    return { user: toPublicUser(user), session };
+  }
+
+  /**
+   * The account's password (ADR-052: it signs in by itself, like a code does;
+   * accounts with an authenticator app still finish with it). Ten wrong
+   * passwords for an address pause it for 15 minutes; a code still works then.
+   */
+  async loginWithPassword(input: LoginInput, meta: RequestMeta): Promise<LoginResult> {
+    const lockKey = `login-fail:${input.email}`;
+    if (Number((await this.redis.client.get(lockKey)) ?? 0) >= MAX_FAILED_LOGINS) {
+      throw new AppError('RATE_LIMITED', 'Too many wrong passwords. Sign in with a code instead, or try again later.');
+    }
+    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
+    const valid = user?.passwordHash ? await verifyPassword(input.password, user.passwordHash) : await this.burnPasswordCheck(input.password);
+    const restorable = Boolean(user && AccountService.restorable(user));
+    if (!user || !valid || (!restorable && (user.status !== 'ACTIVE' || user.deletedAt))) {
+      await this.redis.client.multi().incr(lockKey).expire(lockKey, LOCKOUT_SECONDS).exec();
+      await this.audit.record({ actorType: 'ANONYMOUS', action: 'user.login', targetType: 'User', targetId: user?.id ?? null, result: 'FAILURE', metadata: { reason: 'INVALID_CREDENTIALS', method: 'password' }, meta });
+      throw new AppError('INVALID_CREDENTIALS', 'That password is not right. Try again, or sign in with a code.');
+    }
+    await this.redis.client.del(lockKey);
+    if (user.totpEnabledAt) {
+      if (restorable) return this.restoreOffer(user, meta);
+      return { mfaRequired: true, ...(await this.mfa.createChallenge(user.id)) };
+    }
+    if (restorable) return this.restoreOffer(user, meta);
+    return this.signIn(user, meta, { method: 'password' });
+  }
+
   // ───── Forgotten password ─────
 
   /**
@@ -335,14 +446,14 @@ export class AuthService {
 
   // ───── Adding an email to an account made from a WhatsApp number ─────
 
-  /** An account without an email adds one with a password; the address is added once its code is entered. */
+  /** An account without an email adds one (a password is optional); the address is added once its code is entered. */
   async claim(userId: string, input: ClaimAccountInput, meta: RequestMeta): Promise<VerificationStep> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.email) throw new AppError('CONFLICT', 'This account already has an email address.');
     const taken = await this.prisma.user.findUnique({ where: { email: input.email }, select: { id: true } });
     if (taken) throw new AppError('EMAIL_TAKEN', 'An account with this email already exists.');
     await this.assertEmailCodes();
-    const passwordHash = await hashPassword(input.password);
+    const passwordHash = input.password ? await hashPassword(input.password) : null;
     const challenge = await this.emailCodes.start('claim', input.email, { userId, passwordHash, name: input.name ?? null }, { name: input.name ?? user.name });
     await this.audit.record({ actorType: 'USER', actorId: userId, action: 'user.claim_code_sent', targetType: 'User', targetId: userId, meta });
     return { verificationRequired: true, ...challenge };
@@ -350,7 +461,7 @@ export class AuthService {
 
   /** The code proves the address: it is added, confirmed, with the password, and the account is secured. */
   async completeClaim(userId: string, challengeToken: string, code: string, meta: RequestMeta): Promise<PublicUser> {
-    const { email, payload } = await this.emailCodes.verify<{ userId: string; passwordHash: string; name: string | null }>(challengeToken, code, 'claim');
+    const { email, payload } = await this.emailCodes.verify<{ userId: string; passwordHash: string | null; name: string | null }>(challengeToken, code, 'claim');
     if (payload.userId !== userId) throw new AppError('VERIFICATION_EXPIRED', 'This code has expired. Please start again.');
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.email) throw new AppError('CONFLICT', 'This account already has an email address.');
@@ -360,7 +471,7 @@ export class AuthService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.user.update({
         where: { id: userId },
-        data: { email, emailVerifiedAt: new Date(), passwordHash: payload.passwordHash, name: payload.name ?? user.name, provisional: false },
+        data: { email, emailVerifiedAt: new Date(), ...(payload.passwordHash ? { passwordHash: payload.passwordHash } : {}), name: payload.name ?? user.name, provisional: false },
       });
       await this.audit.record({ actorType: 'USER', actorId: userId, action: 'user.claimed', targetType: 'User', targetId: userId, meta }, tx);
       return row;

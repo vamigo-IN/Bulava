@@ -2,7 +2,7 @@
 
 import { Bell, CalendarHeart, CheckCircle2, ChevronDown, House, IdCard, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserRound } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -177,6 +177,7 @@ function Shell({ children }: { children: ReactNode }) {
   const t = useT();
   const router = useRouter();
   const pathname = usePathname();
+  const search = useSearchParams();
   const client = useQueryClient();
   const me = useMe();
   const [scrolled, setScrolled] = useState(false);
@@ -230,17 +231,18 @@ function Shell({ children }: { children: ReactNode }) {
       </header>
       {me.data?.provisional && !pathname.startsWith('/dashboard/claim') ? (
         // An account made from a WhatsApp number alone: it can design and preview, but must be secured to publish.
-        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+        <section aria-label={t('claim.banner.cta')} className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gold-300 bg-gold-100/70 px-4 py-3 text-sm text-ink">
             <p className="flex min-w-0 flex-1 items-start gap-2">
               <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-gold-700" />
               <span>{t('claim.banner')}</span>
             </p>
-            <Link href={`/dashboard/claim?next=${encodeURIComponent(pathname)}`} className="btn-3d min-h-10 rounded-xl px-4 text-sm">
+            {/* Back to this exact page afterwards, query included (a plan's checkout keeps its plan and event). */}
+            <Link href={`/dashboard/claim?next=${encodeURIComponent(search.size ? `${pathname}?${search.toString()}` : pathname)}`} className="btn-3d min-h-10 rounded-xl px-4 text-sm">
               {t('claim.banner.cta')}
             </Link>
           </div>
-        </div>
+        </section>
       ) : null}
       <motion.main
         initial={{ opacity: 0, y: 10 }}
