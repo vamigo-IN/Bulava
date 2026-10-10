@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, TemplateType } from '@bulava/database';
 import {
+  importCardJson,
   runTemplateChecks,
   TemplateDefinitionSchema,
   validateTemplateDefinition,
+  type CardImportResult,
   type TemplateDefinition,
 } from '@bulava/template-schema';
 import { z } from '@bulava/validation';
@@ -24,6 +26,17 @@ export const CreateTemplateSchema = z.object({
   fromTemplateKey: keySchema.optional(),
 });
 export type CreateTemplateInput = z.infer<typeof CreateTemplateSchema>;
+
+/** Card JSON from a design tool or generator (see importCardJson): checked, or made into a draft. */
+export const ImportCardSchema = z.object({
+  card: z.record(z.string(), z.unknown()),
+  key: keySchema.optional(),
+  name: z.string().trim().min(1).max(80).optional(),
+  category: z.string().trim().min(1).max(60).optional(),
+  /** false: only report what would be made and what needs attention; true: make the draft template. */
+  create: z.boolean().default(false),
+});
+export type ImportCardInput = z.infer<typeof ImportCardSchema>;
 
 export const UpdateTemplateMetaSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
@@ -158,6 +171,65 @@ export class AdminTemplatesService {
       await this.audit.record({ actorType: 'USER', actorId: adminId, action: 'template.created', targetType: 'Template', targetId: template.id, meta }, tx);
       return { template, version };
     });
+  }
+
+  /**
+   * Card JSON to a canvas template. Without `create` it only reports: the key,
+   * name and category it would use, what it could not carry over (images that
+   * are not licensed assets, unknown bindings and fonts), whether the key is
+   * taken and any validation issues. With `create` it makes the draft, which
+   * the Studio, its Canvas editor, checks and publishing then treat as any other.
+   */
+  async importCard(adminId: string, input: ImportCardInput, meta: RequestMeta) {
+    let result: CardImportResult;
+    try {
+      result = importCardJson(input.card, { key: input.key, name: input.name, category: input.category });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new AppError(
+          'VALIDATION_FAILED',
+          'This is not card JSON: it needs a canvas and a list of elements.',
+          error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message })),
+        );
+      }
+      throw error;
+    }
+    const parsed = TemplateDefinitionSchema.safeParse(result.definition);
+    if (!parsed.success) {
+      throw new AppError('VALIDATION_FAILED', 'The converted card is not a valid template.', parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message })));
+    }
+    const semantic = validateTemplateDefinition(parsed.data);
+    const assetIds = parsed.data.assets.map((a) => a.assetId);
+    const known = assetIds.length ? await this.prisma.asset.findMany({ where: { id: { in: assetIds } }, select: { id: true } }) : [];
+    const missing = assetIds.filter((id) => !known.some((k) => k.id === id));
+    const hero = parsed.data.website?.pages[0]?.sections[0];
+    const summary = {
+      key: result.key,
+      name: result.name,
+      category: result.category,
+      eventTypes: result.eventTypes,
+      layers: hero?.section === 'canvas' ? (hero.canvas?.mobile.layers.length ?? 0) : 0,
+      standIns: result.standIns,
+      warnings: [...result.warnings, ...missing.map((id) => `The image ${id} is not in the asset library.`)],
+      issues: semantic.ok ? [] : semantic.issues,
+      keyTaken: Boolean(await this.prisma.template.findUnique({ where: { key: result.key }, select: { id: true } })),
+    };
+    if (!input.create) return summary;
+    if (summary.keyTaken) throw new AppError('CONFLICT', 'A template with this key exists. Choose another key.');
+    const template = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.template.create({
+        data: { key: result.key, name: result.name, category: result.category, outputs: ['WEBSITE'], languages: parsed.data.languages, eventTypes: parsed.data.eventTypes, status: 'DRAFT' },
+      });
+      await tx.templateVersion.create({
+        data: { templateId: created.id, version: 1, type: 'WEBSITE', definition: parsed.data as unknown as Prisma.InputJsonValue, status: 'DRAFT', createdById: adminId },
+      });
+      await this.audit.record(
+        { actorType: 'USER', actorId: adminId, action: 'template.imported', targetType: 'Template', targetId: created.id, metadata: { from: 'card-json', layers: summary.layers, standIns: result.standIns.length }, meta },
+        tx,
+      );
+      return created;
+    });
+    return { ...summary, template: { id: template.id } };
   }
 
   async duplicate(adminId: string, id: string, input: z.infer<typeof DuplicateTemplateSchema>, meta: RequestMeta) {

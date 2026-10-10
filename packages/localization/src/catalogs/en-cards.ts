@@ -97,6 +97,10 @@ export const enCards = {
   'cards.details.messageTitle': 'Invitation message',
   'cards.details.message': 'A line for your guests',
   'cards.details.addToCard': 'Add to card',
+  'cards.details.functions': 'Functions',
+  'cards.details.functionName': 'Function {n}',
+  'cards.details.functionAdd': 'Add a function',
+  'cards.details.functionRemove': 'Remove function {n}',
 
   'cards.text.add': 'Add text',
   'cards.text.preset.heading': 'Heading',

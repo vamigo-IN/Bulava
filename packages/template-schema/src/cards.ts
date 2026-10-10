@@ -56,6 +56,17 @@ export const CARD_DETAIL_KEYS = ['title', 'partnerOne', 'partnerTwo', 'honoree',
 export type CardDetailKey = (typeof CARD_DETAIL_KEYS)[number];
 
 const detail = (max: number) => z.string().max(max).default('');
+/** YYYY-MM-DD, or empty. */
+const dateDetail = () => z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).default('');
+/** HH:mm on a 24-hour clock, or empty. */
+const timeDetail = () => z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]).default('');
+
+/** Most functions a card lists (a timeline such as Mehendi · Sangeet · Wedding). */
+export const CARD_MAX_FUNCTIONS = 4;
+
+/** One function on a card's timeline: its name, and its date and time (Indian time). */
+export const CardFunctionSchema = z.object({ name: detail(60), date: dateDetail(), time: timeDetail() });
+export type CardFunction = z.infer<typeof CardFunctionSchema>;
 
 export const CardDetailsSchema = z.object({
   title: detail(120),
@@ -73,6 +84,8 @@ export const CardDetailsSchema = z.object({
   message: detail(300),
   /** Parents' or family names (the blessing line). */
   family: detail(400),
+  /** The functions the card lists, in order: what functions[0], functions[1]… show. */
+  functions: z.array(CardFunctionSchema).max(CARD_MAX_FUNCTIONS).default([]),
 });
 export type CardDetails = z.infer<typeof CardDetailsSchema>;
 
@@ -111,10 +124,24 @@ export const isCardPhotoBinding = (binding: string): binding is CardPhotoBinding
 
 const TEMPLATE_BINDING = /\{\{\s*([\w.[\]]+)\s*(?:\|\s*(\w+))?\s*\}\}/g;
 
+/** A card function by position (functions[0].name, .date, .time, .startsAt, .venue.name), which the Details form fills. */
+const FUNCTION_BINDING = /^functions\[([0-3])\]\.(name|date|time|startsAt|venue\.name)$/;
+export const isCardFunctionBinding = (path: string): boolean => FUNCTION_BINDING.test(path);
+const FUNCTION_TIME_FORMATS: ReadonlySet<string> = new Set(['date', 'dateWithWeekday', 'time', 'dateTime']);
+
+/** A function's name or venue shows as text; its date and time only through a date or time format. */
+function functionValueOk(path: string, format: string | undefined): boolean {
+  const field = FUNCTION_BINDING.exec(path)?.[2];
+  if (!field) return false;
+  if (field === 'name' || field === 'venue.name') return true;
+  return format !== undefined && FUNCTION_TIME_FORMATS.has(format);
+}
+
 /** Whether a text value can stay live on a card: words, translations, or the card's details shown as text or dates. */
 export function isCardTextValue(value: Value): boolean {
   if ('literal' in value || 't' in value) return true;
-  const ok = (path: string, format: string | undefined) => TEXT_BINDINGS.has(path) && (!DATE_BINDINGS.has(path) || (format !== undefined && DATE_FORMATS.has(format)));
+  const ok = (path: string, format: string | undefined) =>
+    (TEXT_BINDINGS.has(path) && (!DATE_BINDINGS.has(path) || (format !== undefined && DATE_FORMATS.has(format)))) || functionValueOk(path, format);
   if ('binding' in value) return ok(value.binding, value.format) && (!value.fallback || isCardTextValue(value.fallback));
   for (const m of value.template.matchAll(TEMPLATE_BINDING)) if (!ok(m[1]!, m[2])) return false;
   return !value.fallback || isCardTextValue(value.fallback);
@@ -132,6 +159,29 @@ function detailsIn(value: Value, into: Set<CardDetailKey>): void {
     for (const m of value.template.matchAll(TEMPLATE_BINDING)) add(m[1]!);
     if (value.fallback) detailsIn(value.fallback, into);
   }
+}
+
+/** How many functions a board lists: one past the highest functions[n] its text or conditions use (0 when none). */
+export function cardFunctionsShown(board: Pick<Artboard, 'layers'>): number {
+  let count = 0;
+  const note = (path: string) => {
+    const n = FUNCTION_BINDING.exec(path)?.[1];
+    if (n !== undefined) count = Math.max(count, Number(n) + 1);
+  };
+  const visit = (value: Value) => {
+    if ('binding' in value) {
+      note(value.binding);
+      if (value.fallback) visit(value.fallback);
+    } else if ('template' in value) {
+      for (const m of value.template.matchAll(TEMPLATE_BINDING)) note(m[1]!);
+      if (value.fallback) visit(value.fallback);
+    }
+  };
+  for (const layer of board.layers) {
+    if (layer.kind === 'text' && !layer.hidden) visit(layer.content);
+    if (layer.visibleWhen?.exists) note(layer.visibleWhen.exists);
+  }
+  return count;
 }
 
 /** Which details a board shows somewhere (the editor offers to add the others). */
@@ -168,7 +218,11 @@ export const CardDesignSchema = z
     d.board.layers.forEach((layer, i) => {
       const path = ['board', 'layers', i];
       if (layer.kind === 'widget') ctx.addIssue({ code: 'custom', path, message: 'Cards have no buttons or countdowns' });
-      if (layer.visibleWhen) ctx.addIssue({ code: 'custom', path, message: 'Card layers are always shown or hidden, never conditional' });
+      // The one condition a card keeps: a timeline item shows while its function is listed.
+      const when = layer.visibleWhen;
+      if (when && (when.eventTypes || !when.exists || !isCardFunctionBinding(when.exists))) {
+        ctx.addIssue({ code: 'custom', path, message: 'Card layers are always shown or hidden, except a timeline item that shows while its function is listed' });
+      }
       if (layer.kind === 'text' && !isCardTextValue(layer.content)) ctx.addIssue({ code: 'custom', path, message: 'This text uses data a card does not have' });
       if (layer.kind === 'image' && layer.source.type === 'binding' && !isCardPhotoBinding(layer.source.binding)) ctx.addIssue({ code: 'custom', path, message: 'Unknown photo spot' });
     });
@@ -235,6 +289,8 @@ export function cardRenderContext(design: Pick<CardDesign, 'details' | 'eventTyp
   const when = cardInstant(d);
   const venue = s(d.venue) || s(d.address) || s(d.city) ? { name: s(d.venue), address: s(d.address) || null, city: s(d.city) || null, mapUrl: null } : null;
   const fn = { id: 'card', name: s(d.title), description: null, startsAt: when, endsAt: null, status: 'SCHEDULED', venue };
+  // The timeline's functions when the card lists some (they share the card's venue); otherwise the card itself.
+  const listed = (d.functions ?? []).map((f, i) => ({ id: `card-${i + 1}`, name: s(f.name), description: null, startsAt: cardInstant(f), endsAt: null, status: 'SCHEDULED', venue }));
   const time = d.time ? formatEventTime(zonedWallTimeToUtcIso(`${d.date || '2026-01-01'}T${d.time}`, CARD_TIME_ZONE), { language: design.language, timeZone: CARD_TIME_ZONE }) : '';
   const image = (url: string | undefined): GalleryImage | undefined => (url ? { url, thumbUrl: url } : undefined);
   const photoSlots: NonNullable<RenderContext['photoSlots']> = {};
@@ -248,7 +304,7 @@ export function cardRenderContext(design: Pick<CardDesign, 'details' | 'eventTyp
     event: { title: s(d.title), description: null, typeKey: design.eventType, startDate: when, endDate: when, language: design.language, timezone: CARD_TIME_ZONE },
     ...(s(d.partnerOne) || s(d.partnerTwo) ? { couple: { partnerOne: s(d.partnerOne), partnerTwo: s(d.partnerTwo), brideName: s(d.partnerOne), groomName: s(d.partnerTwo) } } : {}),
     ...(s(d.honoree) ? { honoree: { name: s(d.honoree) } } : {}),
-    functions: [fn],
+    functions: listed.length ? listed : [fn],
     function: fn,
     ...(venue ? { venue } : {}),
     gallery: { images: [] },
@@ -277,9 +333,13 @@ function isEmpty(v: unknown): boolean {
 }
 
 /** Details as the sample event has them, so a new card reads like a real invitation. */
-function sampleDetails(ctx: RenderContext): CardDetails {
+function sampleDetails(ctx: RenderContext, functionCount = 0): CardDetails {
   const when = ctx.function?.startsAt ?? ctx.event.startDate;
   const wall = when ? utcToZonedWallTime(when, CARD_TIME_ZONE) : '';
+  const functions = (ctx.functions ?? []).slice(0, Math.min(functionCount, CARD_MAX_FUNCTIONS)).map((f) => {
+    const at = f.startsAt ? utcToZonedWallTime(f.startsAt, CARD_TIME_ZONE) : '';
+    return { name: f.name, date: at.slice(0, 10), time: at.slice(11, 16) };
+  });
   return {
     title: ctx.event.title,
     partnerOne: ctx.couple?.partnerOne ?? '',
@@ -292,6 +352,7 @@ function sampleDetails(ctx: RenderContext): CardDetails {
     city: ctx.venue?.city ?? '',
     message: ctx.custom.tagline ?? '',
     family: ctx.custom.blessings ?? '',
+    functions,
   };
 }
 
@@ -373,7 +434,9 @@ export function cardFromTemplate(definition: TemplateDefinition, options: CardFr
     // Photo spots stay (the customer fills them); other conditions follow the sample invitation.
     if (when?.exists && !isCardPhotoBinding(when.exists) && isEmpty(resolveBinding(when.exists, sample))) continue;
     const { visibleWhen: _when, ...rest } = layer;
-    const still = { ...rest, animation: STILL };
+    // A timeline item hides itself when the customer removes its function; other conditions were settled above.
+    const keep = when?.exists && isCardFunctionBinding(when.exists) ? { visibleWhen: { exists: when.exists } } : {};
+    const still = { ...rest, ...keep, animation: STILL };
     switch (still.kind) {
       case 'widget':
         layers.push(...widgetAsText(still));
@@ -403,7 +466,7 @@ export function cardFromTemplate(definition: TemplateDefinition, options: CardFr
     language,
     colors: definition.theme.colors,
     fonts: definition.fonts,
-    details: sampleDetails(sample),
+    details: sampleDetails(sample, cardFunctionsShown(board)),
     board: fitBoard(board, spec.width, spec.height),
     photos: {},
   } satisfies CardDesignInput);

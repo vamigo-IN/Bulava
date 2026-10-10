@@ -10,8 +10,10 @@ import {
   AdminTemplatesService,
   CreateTemplateSchema,
   DuplicateTemplateSchema,
+  ImportCardSchema,
   UpdateTemplateMetaSchema,
   type CreateTemplateInput,
+  type ImportCardInput,
   type UpdateTemplateMetaInput,
 } from './admin-templates.service';
 import {
@@ -122,6 +124,15 @@ export class AdminController {
   @ApiZodBody(CreateTemplateSchema)
   createTemplate(@CurrentUser() user: AuthUser, @ZodBody(CreateTemplateSchema) body: CreateTemplateInput, @ReqMeta() meta: RequestMeta) {
     return this.templates.create(user.id, body, meta);
+  }
+
+  /** Card JSON from a design tool: check it (`create: false`) or make a draft template from it. */
+  @Post('templates/import-card')
+  @HttpCode(200)
+  @RequirePlatformPermission('template.manage')
+  @ApiZodBody(ImportCardSchema)
+  importCard(@CurrentUser() user: AuthUser, @ZodBody(ImportCardSchema) body: ImportCardInput, @ReqMeta() meta: RequestMeta) {
+    return this.templates.importCard(user.id, body, meta);
   }
 
   @Post('templates/:id/duplicate')

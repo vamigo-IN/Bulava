@@ -1,18 +1,21 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Lock, LockOpen, Plus, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Lock, LockOpen, Plus, RotateCcw, Trash2, Upload, X } from 'lucide-react';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { CanvasArtboard, ILLUSTRATION_ASPECT, layerLabel, themeStyle } from '@bulava/template-engine';
 import {
   ArtboardSchema,
   CARD_FORMAT_KEYS,
   CARD_LANGUAGES,
+  CARD_MAX_FUNCTIONS,
   cardDetailsShown,
+  cardFunctionsShown,
   heroCanvas,
   isCardTextValue,
   resolveValue,
   type CardDesign,
   type CardDetailKey,
+  type CardFunction,
   type CardFormat,
   type ColorRef,
   type Layer,
@@ -57,7 +60,16 @@ const isLinked = (layer: TextLayer) => !('literal' in layer.content);
 export function DetailsPanel({ editor, occasions }: { editor: CardEditorApi; occasions: Array<{ key: string; name: string }> }) {
   const { design, t, template } = editor;
   const shown = useMemo(() => cardDetailsShown(design.board), [design.board]);
+  const timeline = useMemo(() => cardFunctionsShown(design.board), [design.board]);
   const set = (key: CardDetailKey, value: string) => editor.change((d) => ({ ...d, details: { ...d.details, [key]: value } }), `detail:${key}`);
+  // The functions the card lists (its timeline): functions[0], functions[1]… on the card follow them.
+  const functions = design.details.functions;
+  const setFunctions = (next: CardFunction[], group?: string) => editor.change((d) => ({ ...d, details: { ...d.details, functions: next } }), group);
+  const setFunction = (i: number, key: keyof CardFunction, value: string) =>
+    setFunctions(
+      functions.map((f, j) => (j === i ? { ...f, [key]: value } : f)),
+      `function:${i}:${key}`,
+    );
   const couple = COUPLE_OCCASIONS.has(design.eventType);
   const honoree = HONOREE_OCCASIONS.has(design.eventType);
   const languages = template.definition.languages.filter((l) => (CARD_LANGUAGES as readonly string[]).includes(l));
@@ -138,6 +150,45 @@ export function DetailsPanel({ editor, occasions }: { editor: CardEditorApi; occ
           {field('time', t('cards.details.time'), { type: 'time' })}
         </div>
       </PanelSection>
+
+      {timeline > 0 || functions.length > 0 ? (
+        <PanelSection title={t('cards.details.functions')}>
+          <ol className="space-y-3">
+            {functions.map((f, i) => (
+              <li key={i} className="space-y-2 rounded-2xl bg-white/60 p-3 ring-1 ring-[#eadfcf]">
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <TextField label={t('cards.details.functionName', { n: i + 1 })} value={f.name} onChange={(v) => setFunction(i, 'name', v)} maxLength={60} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFunctions(functions.filter((_, j) => j !== i))}
+                    aria-label={t('cards.details.functionRemove', { n: i + 1 })}
+                    title={t('cards.details.functionRemove', { n: i + 1 })}
+                    className="mb-0.5 grid size-10 shrink-0 place-items-center rounded-xl text-stone-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                  >
+                    <X aria-hidden className="size-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <TextField label={t('cards.details.date')} type="date" value={f.date} onChange={(v) => setFunction(i, 'date', v)} />
+                  <TextField label={t('cards.details.time')} type="time" value={f.time} onChange={(v) => setFunction(i, 'time', v)} />
+                </div>
+              </li>
+            ))}
+          </ol>
+          {functions.length < CARD_MAX_FUNCTIONS ? (
+            <button
+              type="button"
+              onClick={() => setFunctions([...functions, { name: '', date: '', time: '' }])}
+              className="btn-3d btn-3d-light mt-3 min-h-10 w-full justify-center gap-1.5 rounded-xl text-sm"
+            >
+              <Plus aria-hidden className="size-4" />
+              {t('cards.details.functionAdd')}
+            </button>
+          ) : null}
+        </PanelSection>
+      ) : null}
 
       <PanelSection title={t('cards.details.where')}>
         {field('venue', t('cards.details.venue'), { maxLength: 120 })}

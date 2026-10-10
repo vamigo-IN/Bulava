@@ -1,10 +1,11 @@
 'use client';
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Copy, Film, Globe, IdCard, Plus, RotateCcw, Star, Trash2 } from 'lucide-react';
+import { Copy, FileJson, Film, Globe, IdCard, Plus, RotateCcw, Star, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
+import { ImportCardForm } from '@/components/import-card';
 import { RequirePermission, useInvalidate } from '@/components/shell';
 import { Alert, Badge, Button, EmptyState, ErrorNotice, Field, Input, Modal, PageHeader, Select, Spinner, statusTone, Table, Td, Th } from '@/components/ui';
 import { apiDelete, apiGet, apiPost, errorMessage } from '@/lib/api';
@@ -43,6 +44,7 @@ function TemplateList() {
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [duplicating, setDuplicating] = useState<AdminTemplate | null>(null);
 
   const rows = useMemo(() => {
@@ -61,9 +63,14 @@ function TemplateList() {
         title={t('templates.title')}
         subtitle={t('templates.subtitle')}
         actions={
-          <Button onClick={() => setCreating(true)}>
-            <Plus className="size-4" /> {t('templates.new')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setImporting(true)}>
+              <FileJson className="size-4" /> {t('templates.import')}
+            </Button>
+            <Button onClick={() => setCreating(true)}>
+              <Plus className="size-4" /> {t('templates.new')}
+            </Button>
+          </div>
         }
       />
 
@@ -181,6 +188,9 @@ function TemplateList() {
         </Table>
       ) : null}
 
+      <Modal open={importing} onClose={() => setImporting(false)} title={t('templates.import.title')} wide>
+        {importing ? <ImportCardForm onDone={() => setImporting(false)} /> : null}
+      </Modal>
       <Modal open={creating} onClose={() => setCreating(false)} title={t('templates.createTitle')}>
         <CreateTemplateForm templates={templates.data ?? []} onDone={() => setCreating(false)} />
       </Modal>

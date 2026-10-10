@@ -155,11 +155,12 @@ function withPicks(picked: string[] | undefined, pool: TemplateSummary[], automa
   return [...out.values()];
 }
 
-function Proof({ stats }: { stats: Awaited<ReturnType<typeof getStats>> }) {
+function Proof({ stats, designs }: { stats: Awaited<ReturnType<typeof getStats>>; designs: number }) {
   if (!stats) return null;
   // Only real numbers from the database; small counts are not shown as "social proof".
+  // Designs are counted as the templates page counts them (each design once), so the numbers agree.
   const items = [
-    t('home.proof.templates', { count: stats.templates }),
+    t('home.proof.templates', { count: designs }),
     t('home.proof.languages', { count: stats.languages }),
     ...(stats.events >= 100 ? [t('home.proof.events', { count: stats.events.toLocaleString('en-IN') })] : []),
     ...(stats.rsvps >= 1000 ? [t('home.proof.rsvps', { count: stats.rsvps.toLocaleString('en-IN') })] : []),
@@ -229,6 +230,8 @@ export default async function HomePage() {
   const [spotlight] = withPicks(showcase.spotlight, websites, [websites.find((w) => w.featured && w.tier === 'PREMIUM'), websites[0]], 1);
   // Each design once: a design made for several occasions shows its picked or main version.
   const designs = onePerLook(withPicks(showcase.collection, websites, websites), (w) => w.preview?.look);
+  // Every design once, in every format: the number the templates page shows, which "View all" leads to.
+  const designCount = onePerLook(templates, (w) => w.preview?.look).length;
   const explorerItems: ExplorerItem[] = designs.map((tpl) => ({
     key: tpl.key,
     tier: tpl.tier,
@@ -285,7 +288,7 @@ export default async function HomePage() {
                   </Link>
                 ) : null}
               </div>
-              <Proof stats={stats} />
+              <Proof stats={stats} designs={designCount} />
             </div>
             <div className="lg:col-span-6">
               {heroLive && (heroImage || heroDefinition) ? (
@@ -393,7 +396,7 @@ export default async function HomePage() {
                   limit={12}
                   phoneLimit={6}
                   moreHref="/templates"
-                  moreLabel={t('home.grid.more', { count: designs.length })}
+                  moreLabel={t('home.grid.more', { count: designCount })}
                   emptyLabel={t('home.grid.empty')}
                 />
               </Reveal>
