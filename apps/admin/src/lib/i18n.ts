@@ -610,6 +610,7 @@ const en = {
   'templates.col.template': 'Template',
   'templates.col.tier': 'Tier',
   'templates.col.version': 'Version',
+  'templates.col.likes': 'Likes',
   'templates.draftPending': 'Draft v{version} pending',
   'templates.createTitle': 'Create a template',
   'templates.key': 'Key',
@@ -1254,6 +1255,14 @@ const en = {
   'showcase.saved': 'Saved. The website shows it within about a minute.',
   'showcase.updated': 'Last saved {date}',
   'showcase.featured': 'Featured',
+  'likes.settings.title': 'Likes',
+  'likes.settings.hint': 'Visitors can like any published design, once per account or browser. Every like is real and nobody can add any from here. Counts stay hidden until you show them, and then only on designs that have at least the minimum.',
+  'likes.settings.readOnly': 'Visitors can like any published design. Only the Super Admin decides when the counts show on the website.',
+  'likes.settings.shown': 'Counts shown',
+  'likes.settings.hidden': 'Counts hidden',
+  'likes.settings.showCounts': 'Show like counts on the website',
+  'likes.settings.minimum': 'Show a count from this many likes',
+  'likes.settings.minimumHint': 'A design with fewer likes shows its heart without a number.',
 
   // Site pages
   'nav.pages': 'Pages',

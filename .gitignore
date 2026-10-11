@@ -49,3 +49,6 @@ infrastructure/scripts/ui-smoke.mjs
 infrastructure/scripts/admin-smoke.mjs
 infrastructure/scripts/a11y-check.mjs
 infrastructure/scripts/mailpit.mjs
+
+# Claude Code: agents' git worktrees (temporary checkouts, never part of the repo)
+.claude/worktrees/

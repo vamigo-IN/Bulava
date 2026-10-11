@@ -462,7 +462,7 @@ export function DownloadDialog({
         aria-modal="true"
         aria-labelledby="download-title"
         tabIndex={-1}
-        className="relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[2rem] bg-canvas p-5 shadow-clay-raised outline-none sm:max-w-2xl sm:rounded-[2rem] sm:p-8"
+        className="editor-chrome relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[2rem] bg-canvas p-5 text-ink shadow-clay-raised outline-none sm:max-w-2xl sm:rounded-[2rem] sm:p-8"
       >
         <button type="button" onClick={onClose} aria-label={t('cards.download.close')} className="btn-3d btn-3d-light absolute top-4 right-4 size-10 rounded-full">
           <X aria-hidden className="size-4" />
@@ -531,7 +531,7 @@ function Input({ id, label, value, onChange, error, type = 'text', autoComplete,
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-        className="block min-h-11 w-full rounded-xl border border-[#e2d2c0] bg-[#f8f2ea] px-3.5 text-base text-stone-900 shadow-clay-inset focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-100 focus:outline-none aria-invalid:border-red-500"
+        className="block min-h-11 w-full rounded-xl border border-[var(--ed-field-line)] bg-[var(--ed-field)] px-3.5 text-base text-stone-900 shadow-clay-inset focus:border-brand-600 focus:bg-surface focus:ring-4 focus:ring-brand-100 focus:outline-none aria-invalid:border-red-500"
       />
       {error ? (
         <p id={`${id}-error`} className="mt-1 text-sm text-red-700">

@@ -1,13 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ExternalLink, Plus, Search, Star, TriangleAlert, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ExternalLink, Heart, Plus, Search, Star, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { RequirePermission } from '@/components/shell';
-import { Alert, Badge, Button, buttonVariants, Card, ErrorNotice, Input, PageHeader, Spinner } from '@/components/ui';
+import type { SettingValues } from '@bulava/validation';
+import { SettingsCard, useGroupEditor, useSettingsOverview } from '@/components/settings';
+import { RequirePermission, useCan } from '@/components/shell';
+import { Alert, Badge, Button, buttonVariants, Card, Checkbox, ErrorNotice, Field, Input, PageHeader, Spinner } from '@/components/ui';
 import { apiGet, apiPut, errorMessage } from '@/lib/api';
 import { t, type AdminMessageKey } from '@/lib/i18n';
-import type { AdminShowcase, ShowcaseCandidate } from '@/lib/types';
+import type { AdminShowcase, SettingGroupView, ShowcaseCandidate } from '@/lib/types';
 import { cn, formatDateTime } from '@/lib/utils';
 
 const QUERY_KEY = ['admin', 'showcase'];
@@ -26,6 +28,7 @@ export default function ShowcasePage() {
 
 function Showcase() {
   const data = useQuery({ queryKey: QUERY_KEY, queryFn: () => apiGet<AdminShowcase>('/admin/showcase') });
+  const canSettings = useCan('settings.manage');
   const byKey = useMemo(() => new Map((data.data?.templates ?? []).map((tpl) => [tpl.key, tpl])), [data.data]);
   return (
     <>
@@ -47,9 +50,52 @@ function Showcase() {
           {data.data.sections.map((s) => (
             <SectionEditor key={s.section} section={s} byKey={byKey} templates={data.data.templates} siteOrigin={data.data.siteOrigin} />
           ))}
+          {canSettings ? (
+            <LikesSettings />
+          ) : (
+            <Card>
+              <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+                <Heart aria-hidden className="size-4 text-brand-700" /> {t('likes.settings.title')}
+              </h2>
+              <p className="mt-2 text-sm text-stone-600">{t('likes.settings.readOnly')}</p>
+            </Card>
+          )}
         </div>
       ) : null}
     </>
+  );
+}
+
+type LikesSettingsValue = SettingValues['likes'];
+
+function LikesSettings() {
+  const overview = useSettingsOverview();
+  if (overview.isPending) return <Spinner />;
+  if (overview.isError) return <ErrorNotice error={overview.error} />;
+  return <LikesSettingsForm view={overview.data.groups.likes} />;
+}
+
+/**
+ * Hearts on designs (ADR-055). Every like is real; this only decides when the
+ * numbers are public. There is no way to add likes from here, by design.
+ */
+function LikesSettingsForm({ view }: { view: SettingGroupView }) {
+  const editor = useGroupEditor<LikesSettingsValue>('likes', view);
+  const { draft, set } = editor;
+  const saved = view.value as LikesSettingsValue;
+  return (
+    <SettingsCard
+      title={t('likes.settings.title')}
+      description={t('likes.settings.hint')}
+      view={view}
+      editor={editor}
+      status={saved.showCounts ? { tone: 'success', label: t('likes.settings.shown') } : { tone: 'neutral', label: t('likes.settings.hidden') }}
+    >
+      <Checkbox label={t('likes.settings.showCounts')} checked={draft.showCounts} onChange={(e) => set('showCounts', e.target.checked)} />
+      <Field label={t('likes.settings.minimum')} hint={t('likes.settings.minimumHint')} className="max-w-xs">
+        {(p) => <Input {...p} type="number" min={0} max={10000} step={1} value={draft.minimum} onChange={(e) => set('minimum', Math.max(0, Math.min(10000, Math.round(Number(e.target.value || 0)))))} />}
+      </Field>
+    </SettingsCard>
   );
 }
 

@@ -24,12 +24,13 @@ import {
   type ThemeColors,
 } from '@bulava/template-schema';
 import { cn } from '@/lib/utils';
-import { ColorField, PanelSection, Segmented, TextField } from './editor-ui';
+import { ColorField, FIELD, PanelSection, Segmented, TextField } from './editor-ui';
 import {
   COUPLE_OCCASIONS,
   detailLayer,
   freePhotoBinding,
   HONOREE_OCCASIONS,
+  layerShown,
   ORNAMENT_CHOICES,
   ornamentAspect,
   ornamentLayer,
@@ -41,14 +42,17 @@ import {
   textLayer,
   type TextPreset,
 } from './editor-model';
-import type { CardEditorApi } from './editor-types';
+import type { BoardDesign, BoardEditorApi, CardEditorApi } from './editor-types';
 
 export type PanelKey = 'details' | 'text' | 'colors' | 'photos' | 'elements' | 'size';
 
 const LANGUAGE_NAMES: Record<string, string> = { en: 'English', hi: 'हिन्दी', 'hi-Latn': 'Hinglish' };
 
-/** A text layer's words as the card shows them. */
-export function textOf(editor: Pick<CardEditorApi, 'ctx' | 'cardT' | 'design'>, layer: TextLayer): string {
+/** What resolving a layer's words needs: the data and the design's language. */
+type Words = Pick<BoardEditorApi, 'ctx' | 'cardT'> & { design: Pick<BoardDesign, 'language'> };
+
+/** A text layer's words as the design shows them. */
+export function textOf(editor: Words, layer: TextLayer): string {
   const value = resolveValue(layer.content, editor.ctx, { t: editor.cardT, language: editor.design.language, timeZone: editor.ctx.event.timezone });
   return value === undefined ? '' : String(value);
 }
@@ -102,7 +106,7 @@ export function DetailsPanel({ editor, occasions }: { editor: CardEditorApi; occ
                 onChange={(e) => {
                   if (window.confirm(t('cards.details.occasionConfirm'))) editor.restart(e.target.value);
                 }}
-                className="mt-1 block min-h-10 w-full rounded-xl border border-[#e2d2c0] bg-[#f8f2ea] px-2 text-sm shadow-clay-inset focus:border-brand-600 focus:outline-none"
+                className={cn(FIELD, 'mt-1 min-h-10 px-2')}
               >
                 {occasionChoices.map((o) => (
                   <option key={o.key} value={o.key}>
@@ -118,7 +122,7 @@ export function DetailsPanel({ editor, occasions }: { editor: CardEditorApi; occ
               <select
                 value={design.language}
                 onChange={(e) => editor.change((d) => ({ ...d, language: e.target.value as CardDesign['language'] }))}
-                className="mt-1 block min-h-10 w-full rounded-xl border border-[#e2d2c0] bg-[#f8f2ea] px-2 text-sm shadow-clay-inset focus:border-brand-600 focus:outline-none"
+                className={cn(FIELD, 'mt-1 min-h-10 px-2')}
               >
                 {languages.map((l) => (
                   <option key={l} value={l}>
@@ -155,7 +159,7 @@ export function DetailsPanel({ editor, occasions }: { editor: CardEditorApi; occ
         <PanelSection title={t('cards.details.functions')}>
           <ol className="space-y-3">
             {functions.map((f, i) => (
-              <li key={i} className="space-y-2 rounded-2xl bg-white/60 p-3 ring-1 ring-[#eadfcf]">
+              <li key={i} className="space-y-2 rounded-2xl bg-white/60 p-3 ring-1 ring-[var(--ed-line)]">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <TextField label={t('cards.details.functionName', { n: i + 1 })} value={f.name} onChange={(v) => setFunction(i, 'name', v)} maxLength={60} />
@@ -205,9 +209,9 @@ export function DetailsPanel({ editor, occasions }: { editor: CardEditorApi; occ
 
 const PRESETS: TextPreset[] = ['heading', 'subheading', 'body', 'script'];
 
-export function TextPanel({ editor }: { editor: CardEditorApi }) {
+export function TextPanel<D extends BoardDesign>({ editor }: { editor: BoardEditorApi<D> }) {
   const { design, t } = editor;
-  const texts = design.board.layers.filter((l): l is TextLayer => l.kind === 'text').sort((a, b) => a.frame.y - b.frame.y);
+  const texts = design.board.layers.filter((l): l is TextLayer => l.kind === 'text' && layerShown(l, editor.ctx)).sort((a, b) => a.frame.y - b.frame.y);
   return (
     <div className="space-y-6">
       <PanelSection title={t('cards.text.add')}>
@@ -229,7 +233,10 @@ export function TextPanel({ editor }: { editor: CardEditorApi }) {
           ))}
         </div>
       </PanelSection>
-      <PanelSection title={t('cards.text.onCard')} hint={t('cards.text.onCardHint')}>
+      <PanelSection
+        title={t(editor.kind === 'film' ? 'editor.text.onScene' : editor.kind === 'website' ? 'editor.text.onBoard' : 'cards.text.onCard')}
+        hint={t(editor.kind === 'card' ? 'cards.text.onCardHint' : 'editor.text.onBoardHint')}
+      >
         <ul className="space-y-3">
           {texts.map((layer) => (
             <li key={layer.id}>
@@ -238,7 +245,7 @@ export function TextPanel({ editor }: { editor: CardEditorApi }) {
                 value={textOf(editor, layer)}
                 multiline
                 onChange={(v) => editor.changeLayer(layer.id, (l) => ({ ...l, content: { literal: v } }) as Layer, `text:${layer.id}`)}
-                hint={isLinked(layer) && isCardTextValue(layer.content) && !('t' in layer.content) ? t('cards.text.linked') : undefined}
+                hint={isLinked(layer) && (editor.kind !== 'card' || isCardTextValue(layer.content)) && !('t' in layer.content) ? t(editor.kind === 'card' ? 'cards.text.linked' : 'editor.text.linked') : undefined}
               />
               <button type="button" onClick={() => editor.select(layer.id)} className="mt-1 text-xs font-semibold text-brand-700 hover:underline">
                 {t('cards.text.styleIt')}
@@ -252,7 +259,7 @@ export function TextPanel({ editor }: { editor: CardEditorApi }) {
 }
 
 /** A friendly name for a text layer: what it shows, shortened. */
-function labelFor(editor: CardEditorApi, layer: TextLayer): string {
+function labelFor(editor: Words, layer: TextLayer): string {
   const words = textOf(editor, layer).replace(/\s+/g, ' ').trim();
   return words ? (words.length > 32 ? `${words.slice(0, 32)}…` : words) : layerLabel(layer);
 }
@@ -303,7 +310,7 @@ export function ColorsPanel({ editor }: { editor: CardEditorApi }) {
       >
         <div className="grid grid-cols-2 gap-2">
           {PALETTE_ORDER.map((key) => (
-            <label key={key} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-[#f8f2ea] px-2 shadow-clay-inset">
+            <label key={key} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-[var(--ed-field)] px-2 shadow-clay-inset">
               <span className="relative size-7 shrink-0 overflow-hidden rounded-full border-2 border-white shadow-clay-sm" style={{ background: design.colors[key] }}>
                 <input
                   type="color"
@@ -402,7 +409,7 @@ export function PhotosPanel({ editor }: { editor: CardEditorApi }) {
             const url = id ? editor.photoUrls[id] : undefined;
             return (
               <li key={layer.id} className="clay rounded-2xl p-2">
-                <button type="button" onClick={() => editor.select(layer.id)} className="block aspect-square w-full overflow-hidden rounded-xl bg-[#efe6da]" aria-label={t('cards.photos.select')}>
+                <button type="button" onClick={() => editor.select(layer.id)} className="block aspect-square w-full overflow-hidden rounded-xl bg-[var(--ed-thumb)]" aria-label={t('cards.photos.select')}>
                   {url ? <img src={url} alt="" className="size-full object-cover" /> : <span className="grid size-full place-items-center text-xs text-stone-500">{t('cards.photos.empty')}</span>}
                 </button>
                 <div className="mt-2 flex gap-1">
@@ -440,7 +447,7 @@ export function PhotosPanel({ editor }: { editor: CardEditorApi }) {
 // ─────────────────────────── Elements ───────────────────────────
 
 /** One layer drawn alone, small: the add menu shows decorations as they will look. */
-function LayerThumb({ layer, editor }: { layer: Layer; editor: CardEditorApi }) {
+function LayerThumb<D extends BoardDesign>({ layer, editor }: { layer: Layer; editor: BoardEditorApi<D> }) {
   const parsed = useMemo(() => ArtboardSchema.safeParse({ width: 200, height: 200, background: { type: 'none' }, layers: [{ ...layer, frame: fitThumb(layer.frame) }] }), [layer]);
   const theme = useMemo(() => themeStyle({ colors: editor.design.colors, radius: 16, ornament: 'none', pattern: 'none', heroTone: 'light', look: 'classic', effect: 'none' }, editor.design.colors, editor.design.fonts), [editor.design.colors, editor.design.fonts]);
   if (!parsed.success) return null;
@@ -458,11 +465,11 @@ function fitThumb(frame: Layer['frame']): Layer['frame'] {
   return { x: (200 - w) / 2, y: (200 - h) / 2, w, h, rotate: 0 };
 }
 
-export function ElementsPanel({ editor }: { editor: CardEditorApi }) {
+export function ElementsPanel<D extends BoardDesign>({ editor }: { editor: BoardEditorApi<D> }) {
   const { design, t } = editor;
   const decorations = useMemo(() => ORNAMENT_CHOICES.map((name) => ornamentLayer(design.board, name, ornamentAspect(name, ILLUSTRATION_ASPECT))), [design.board]);
   const shapes = useMemo(() => SHAPE_CHOICES.map((s) => shapeLayer(design.board, s)), [design.board]);
-  const layers = [...design.board.layers].reverse();
+  const layers = design.board.layers.filter((l) => layerShown(l, editor.ctx)).reverse();
   return (
     <div className="space-y-6">
       <PanelSection title={t('cards.elements.decorations')}>

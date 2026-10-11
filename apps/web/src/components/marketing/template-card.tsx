@@ -7,8 +7,10 @@ import { backdropArt, backdropTitleTop, SceneStill } from '@bulava/template-engi
 import { Ornament } from '@bulava/template-engine/src/ornaments';
 import { TemplateStyles } from '@bulava/template-engine/src/styles';
 import type { TemplateSummary } from '@/lib/server-api';
+import { isCanvasFilm } from '@/lib/films';
 import { cardPreview, POSTER_HEIGHT, POSTER_WIDTH, posterPreview } from '@/lib/template-previews';
-import { LiveThumbnail } from './live-thumbnail';
+import { LikeButton } from './like-button';
+import { LiveFilmPoster, LiveThumbnail } from './live-thumbnail';
 
 /** Badges are clay pills on the card; only the text takes the badge's colour. */
 const BADGE_STYLE = {
@@ -93,6 +95,9 @@ function posterScene(template: TemplateSummary) {
 
 export const hasPosterScene = (template: TemplateSummary) => posterScene(template) !== null;
 
+/** A film drawn from a canvas invitation (ADR-058): its poster is its opening board. */
+export const hasCanvasFilm = (template: TemplateSummary) => isCanvasFilm(template.definition);
+
 const posterLabel = (template: TemplateSummary) => (template.outputs.includes('VIDEO') ? '▶ Video' : 'Card');
 
 /**
@@ -137,6 +142,13 @@ function VideoPoster({ template, width, height, priority }: { template: Template
     return (
       <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
         <PosterScene template={template} width={width} height={height} />
+      </div>
+    );
+  }
+  if (hasCanvasFilm(template) && template.definition) {
+    return (
+      <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
+        <LiveFilmPoster definition={template.definition} eventType={template.eventTypes[0] ?? 'WEDDING'} tags={template.tags} width={width} height={height} label={posterLabel(template).replace(/^\W+\s*/, '')} />
       </div>
     );
   }
@@ -259,17 +271,20 @@ export function TemplateCard({
           ) : (
             <span />
           )}
-          {template.outputs.includes('WEBSITE') ? (
-            <Link href={`/templates/${template.key}/demo`} className="btn-3d group/demo min-h-10 rounded-xl px-4 text-xs">
-              <Play aria-hidden className="size-3 fill-current transition-transform duration-300 group-hover/demo:scale-125" />
-              {t('template.demo')}
-            </Link>
-          ) : (
-            <Link href={link} className="btn-3d btn-3d-light group/view min-h-10 rounded-xl px-4 text-xs">
-              {t('template.view')}
-              <ArrowRight aria-hidden className="size-3.5 transition-transform duration-300 group-hover/view:translate-x-0.5" />
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            <LikeButton templateKey={template.key} label={t('like.add', { name: template.name })} labelOn={t('like.remove', { name: template.name })} limitedLabel={t('like.limited')} size="sm" />
+            {template.outputs.includes('WEBSITE') ? (
+              <Link href={`/templates/${template.key}/demo`} className="btn-3d group/demo min-h-10 rounded-xl px-4 text-xs">
+                <Play aria-hidden className="size-3 fill-current transition-transform duration-300 group-hover/demo:scale-125" />
+                {t('template.demo')}
+              </Link>
+            ) : (
+              <Link href={link} className="btn-3d btn-3d-light group/view min-h-10 rounded-xl px-4 text-xs">
+                {t('template.view')}
+                <ArrowRight aria-hidden className="size-3.5 transition-transform duration-300 group-hover/view:translate-x-0.5" />
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </article>

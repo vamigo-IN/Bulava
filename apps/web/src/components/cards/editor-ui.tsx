@@ -5,7 +5,7 @@ import { PALETTE_KEYS, type ColorRef, type ThemeColors } from '@bulava/template-
 import { useOptionalT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
-/** Small building blocks of the card editor's panels: clay surfaces, as the rest of the site. */
+/** Small building blocks of the editors' panels (cards and the invitation's canvas): clay surfaces, as the rest of the site, light or dark (EditorFrame). */
 
 export function PanelSection({ title, hint, actions, children, className }: { title: string; hint?: string; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -148,6 +148,73 @@ export function ColorField({ label, value, colors, onChange, allowNone }: { labe
   );
 }
 
+/** The look of every input and select in the editors' panels. */
+export const FIELD =
+  'block w-full rounded-xl border border-[var(--ed-field-line)] bg-[var(--ed-field)] text-sm text-stone-900 shadow-clay-inset placeholder:text-stone-500 focus:border-brand-600 focus:bg-surface focus:ring-4 focus:ring-brand-100 focus:outline-none';
+
+/** A number with a short label inside the box (X, Y, W, H, size), as design tools show them. */
+export function NumberField({
+  label,
+  short,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  suffix,
+}: {
+  label: string;
+  /** Shown inside the box; `label` is what screen readers say. */
+  short: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  suffix?: string;
+}) {
+  const id = useId();
+  const shown = Number.isInteger(step) ? Math.round(value) : Math.round(value * 100) / 100;
+  return (
+    <div className={cn(FIELD, 'flex min-h-10 items-center gap-1.5 px-2.5 focus-within:border-brand-600 focus-within:ring-4 focus-within:ring-brand-100')}>
+      <label htmlFor={id} className="w-4 shrink-0 text-center text-[0.6875rem] font-semibold text-stone-500" title={label}>
+        <span aria-hidden>{short}</span>
+        <span className="sr-only">{label}</span>
+      </label>
+      <input
+        id={id}
+        type="number"
+        inputMode="decimal"
+        value={shown}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (e.target.value !== '' && Number.isFinite(v)) onChange(min !== undefined || max !== undefined ? Math.min(max ?? v, Math.max(min ?? v, v)) : v);
+        }}
+        className="min-w-0 flex-1 bg-transparent text-sm text-stone-900 tabular-nums focus:outline-none"
+      />
+      {suffix ? <span className="shrink-0 text-xs text-stone-500">{suffix}</span> : null}
+    </div>
+  );
+}
+
+/** A labelled select in the editors' look. */
+export function SelectField({ label, value, onChange, children, hideLabel }: { label: string; value: string; onChange: (v: string) => void; children: ReactNode; hideLabel?: boolean }) {
+  const id = useId();
+  return (
+    <div>
+      <label htmlFor={id} className={hideLabel ? 'sr-only' : 'mb-1 block text-xs font-medium text-stone-700'}>
+        {label}
+      </label>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={cn(FIELD, 'min-h-10 px-2')}>
+        {children}
+      </select>
+    </div>
+  );
+}
+
 export function TextField({
   id: fixedId,
   label,
@@ -171,8 +238,7 @@ export function TextField({
 }) {
   const ownId = useId();
   const id = fixedId ?? ownId;
-  const field =
-    'block w-full rounded-xl border border-[#e2d2c0] bg-[#f8f2ea] px-3 text-sm text-stone-900 shadow-clay-inset placeholder:text-stone-500 focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-100 focus:outline-none';
+  const field = cn(FIELD, 'px-3');
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-xs font-medium text-stone-700">

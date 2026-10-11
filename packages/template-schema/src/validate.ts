@@ -1,7 +1,17 @@
 import { z } from 'zod';
 import { en } from '@bulava/localization';
 import { BINDINGS, bindingsIn, isKnownBinding, translationKeysIn } from './bindings';
-import { canvasAssetIds, type Artboard } from './canvas';
+import { artboardAssetIds, canvasAssetIds, type Artboard } from './canvas';
+import {
+  ADDED_SECTION_WIDTH,
+  AddedSectionsSchema,
+  CanvasCustomizationSchema,
+  canvasSectionsOf,
+  withCanvasCustomization,
+  type AddedSection,
+  type CanvasCustomization,
+} from './canvas-custom';
+import { SceneCustomizationSchema, sceneBoardSize, withSceneCustomization, type SceneCustomization } from './film-custom';
 import {
   EFFECTS,
   INTROS,
@@ -57,6 +67,35 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
 
   const listed = new Set(d.assets.map((a) => a.assetId));
 
+  /** A canvas artboard's layers (in a canvas section or a film's scene). */
+  const checkBoard = (board: Artboard, base: string) => {
+    const layerIds = new Set<string>();
+    board.layers.forEach((layer, li) => {
+      const path = `${base}.layers.${li}`;
+      if (layerIds.has(layer.id)) issues.push({ path: `${path}.id`, message: `Duplicate layer id "${layer.id}"` });
+      layerIds.add(layer.id);
+      if (layer.kind === 'text') checkValue(layer.content, `${path}.content`);
+      if (layer.kind === 'image' && layer.source.type === 'binding') {
+        const b = layer.source.binding;
+        // Only the photo bindings: a text slot holds words anyone editing could make an address.
+        if (!isKnownBinding(b, slots)) issues.push({ path: `${path}.source.binding`, message: `Unknown binding "${b}"` });
+        else if (BINDINGS[b]?.type !== 'image') issues.push({ path: `${path}.source.binding`, message: `"${b}" is not an image` });
+      }
+      if (layer.kind === 'widget' && layer.widget.type === 'button') {
+        checkValue(layer.widget.label, `${path}.widget.label`);
+        checkValue(layer.widget.url, `${path}.widget.url`);
+        if (layer.widget.action === 'link' && !layer.widget.url) issues.push({ path: `${path}.widget.url`, message: 'A link button needs an address' });
+      }
+      if (layer.visibleWhen?.exists && !isKnownBinding(layer.visibleWhen.exists, slots)) {
+        issues.push({ path: `${path}.visibleWhen.exists`, message: `Unknown binding "${layer.visibleWhen.exists}"` });
+      }
+      // Far outside the artboard: probably a lost layer.
+      if (layer.frame.x > board.width * 1.5 || layer.frame.y > board.height * 1.5 || layer.frame.x + layer.frame.w < -board.width * 0.5 || layer.frame.y + layer.frame.h < -board.height * 0.5) {
+        issues.push({ path: `${path}.frame`, message: 'Layer is far outside the artboard' });
+      }
+    });
+  };
+
   d.website?.pages.forEach((page, pi) => {
     const ids = new Set<string>();
     page.sections.forEach((s, si) => {
@@ -78,31 +117,7 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
           ['desktop', s.canvas.desktop],
         ];
         for (const [name, board] of boards) {
-          if (!board) continue;
-          const layerIds = new Set<string>();
-          board.layers.forEach((layer, li) => {
-            const path = `${base}.canvas.${name}.layers.${li}`;
-            if (layerIds.has(layer.id)) issues.push({ path: `${path}.id`, message: `Duplicate layer id "${layer.id}"` });
-            layerIds.add(layer.id);
-            if (layer.kind === 'text') checkValue(layer.content, `${path}.content`);
-            if (layer.kind === 'image' && layer.source.type === 'binding') {
-              const b = layer.source.binding;
-              if (!isKnownBinding(b, slots)) issues.push({ path: `${path}.source.binding`, message: `Unknown binding "${b}"` });
-              else if (BINDINGS[b] && BINDINGS[b].type !== 'image') issues.push({ path: `${path}.source.binding`, message: `"${b}" is not an image` });
-            }
-            if (layer.kind === 'widget' && layer.widget.type === 'button') {
-              checkValue(layer.widget.label, `${path}.widget.label`);
-              checkValue(layer.widget.url, `${path}.widget.url`);
-              if (layer.widget.action === 'link' && !layer.widget.url) issues.push({ path: `${path}.widget.url`, message: 'A link button needs an address' });
-            }
-            if (layer.visibleWhen?.exists && !isKnownBinding(layer.visibleWhen.exists, slots)) {
-              issues.push({ path: `${path}.visibleWhen.exists`, message: `Unknown binding "${layer.visibleWhen.exists}"` });
-            }
-            // Far outside the artboard: probably a lost layer.
-            if (layer.frame.x > board.width * 1.5 || layer.frame.y > board.height * 1.5 || layer.frame.x + layer.frame.w < -board.width * 0.5 || layer.frame.y + layer.frame.h < -board.height * 0.5) {
-              issues.push({ path: `${path}.frame`, message: 'Layer is far outside the artboard' });
-            }
-          });
+          if (board) checkBoard(board, `${base}.canvas.${name}`);
         }
         for (const assetId of canvasAssetIds(s.canvas)) {
           if (!listed.has(assetId)) issues.push({ path: `${base}.canvas`, message: `List asset ${assetId} in assets so its licence is checked` });
@@ -128,6 +143,12 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
         issues.push({ path: `${base}.frame`, message: 'Element is far outside the canvas' });
       }
     });
+    if (scene.canvas) {
+      checkBoard(scene.canvas.board, `scenes.${si}.canvas.board`);
+      for (const assetId of artboardAssetIds(scene.canvas.board)) {
+        if (!listed.has(assetId)) issues.push({ path: `scenes.${si}.canvas`, message: `List asset ${assetId} in assets so its licence is checked` });
+      }
+    }
   });
 
   for (const [key, artwork] of Object.entries(d.artworks ?? {})) {
@@ -144,10 +165,11 @@ export function artworkAssetIds(definition: Pick<TemplateDefinition, 'artworks'>
   return [...new Set(Object.values(definition.artworks ?? {}).flatMap((a) => a.layers.map((l) => l.assetId)))];
 }
 
-/** Every image asset the template shows: painted artwork layers and canvas images (for signing in previews). */
-export function templateAssetIds(definition: Pick<TemplateDefinition, 'artworks' | 'website'>): string[] {
+/** Every image asset the template shows: painted artwork layers and canvas images, on pages and in films (for signing in previews). */
+export function templateAssetIds(definition: Pick<TemplateDefinition, 'artworks' | 'website'> & Partial<Pick<TemplateDefinition, 'scenes'>>): string[] {
   const canvas = (definition.website?.pages ?? []).flatMap((p) => p.sections.flatMap((s) => (s.section === 'canvas' && s.canvas ? canvasAssetIds(s.canvas) : [])));
-  return [...new Set([...artworkAssetIds(definition), ...canvas])];
+  const films = (definition.scenes ?? []).flatMap((s) => (s.canvas ? artboardAssetIds(s.canvas.board) : []));
+  return [...new Set([...artworkAssetIds(definition), ...canvas, ...films])];
 }
 
 /** Total video duration in seconds for a context with `functionCount` functions. */
@@ -191,8 +213,108 @@ export const CustomizationSchema = z.object({
   effect: z.enum(EFFECTS).optional(),
   /** Section ids the customer hid (when layout is editable). The hero always shows. */
   hiddenSections: z.array(z.string().max(64)).max(40).optional(),
+  /** Canvas sections the customer redrew in the canvas editor, by section id (when layout is editable; ADR-057). */
+  canvas: CanvasCustomizationSchema.optional(),
+  /** Canvas sections the customer added to the page (when layout is editable; ADR-059). */
+  addedSections: AddedSectionsSchema.optional(),
+  /** A film's scenes the customer redrew in the film's canvas editor, by scene id (when layout is editable; ADR-059). */
+  scenes: SceneCustomizationSchema.optional(),
 });
 export type Customization = z.infer<typeof CustomizationSchema>;
+
+const bindingOnly = (value: Value): boolean => 'binding' in value && (!value.fallback || bindingOnly(value.fallback));
+
+/**
+ * What a customer's redrawn canvas sections may hold (ADR-057): the template's
+ * own sections at their sizes, link buttons that keep the template's address
+ * or point at the event's own details (never another site), and otherwise what
+ * any template may hold (known bindings and words, the template's licensed assets).
+ */
+/** The addresses the template's own link buttons use: a host may keep them. */
+function ownLinksOf(boards: Array<Artboard | undefined>): Set<string> {
+  const links = new Set<string>();
+  for (const board of boards) for (const layer of board?.layers ?? []) if (layer.kind === 'widget' && layer.widget.type === 'button' && layer.widget.url) links.add(JSON.stringify(layer.widget.url));
+  return links;
+}
+
+/** Link buttons on a host's board: the event's own details (a binding), or an address the template itself uses. */
+function linkIssues(board: Artboard, path: string, ownLinks: Set<string>): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  board.layers.forEach((layer, li) => {
+    const url = layer.kind === 'widget' && layer.widget.type === 'button' ? layer.widget.url : undefined;
+    if (url && !bindingOnly(url) && !ownLinks.has(JSON.stringify(url))) issues.push({ path: `${path}.layers.${li}.widget.url`, message: 'A button can link only to this event’s own details' });
+  });
+  return issues;
+}
+
+function canvasCustomizationIssues(definition: TemplateDefinition, canvas: CanvasCustomization, added: readonly AddedSection[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const sections = new Map(canvasSectionsOf(definition).map((s) => [s.id, s.canvas]));
+  const ownLinks = ownLinksOf([...sections.values()].flatMap((own) => [own.mobile, own.desktop]));
+  // Sections the host added: unique, after a section of the template (or at the end), phone-wide.
+  const pageIds = new Set((definition.website?.pages[0]?.sections ?? []).map((sec) => sec.id));
+  const addedIds = new Set<string>();
+  added.forEach((a, i) => {
+    const path = `addedSections.${i}`;
+    if (addedIds.has(a.id) || pageIds.has(a.id)) issues.push({ path: `${path}.id`, message: `Section id ${a.id} is taken` });
+    addedIds.add(a.id);
+    if (a.after && !pageIds.has(a.after)) issues.push({ path: `${path}.after`, message: `This template has no section ${a.after}` });
+    if (a.mobile.width !== ADDED_SECTION_WIDTH || a.mobile.height < 120 || a.mobile.height > 2400) issues.push({ path: `${path}.mobile`, message: `An added section is ${ADDED_SECTION_WIDTH} wide and 120 to 2400 high` });
+    issues.push(...linkIssues(a.mobile, `${path}.mobile`, ownLinks));
+  });
+  for (const [id, override] of Object.entries(canvas)) {
+    const own = sections.get(id);
+    if (!own) {
+      issues.push({ path: `canvas.${id}`, message: `This template has no canvas section ${id}` });
+      continue;
+    }
+    const boards: Array<['mobile' | 'desktop', Artboard | undefined, Artboard | undefined]> = [
+      ['mobile', override.mobile, own.mobile],
+      ['desktop', override.desktop, own.desktop],
+    ];
+    for (const [name, mine, theirs] of boards) {
+      if (!mine) continue;
+      const path = `canvas.${id}.${name}`;
+      if (!theirs) {
+        issues.push({ path, message: 'This section has no such artboard' });
+        continue;
+      }
+      if (mine.width !== theirs.width || mine.height !== theirs.height) issues.push({ path, message: `This artboard is ${theirs.width} × ${theirs.height}` });
+      issues.push(...linkIssues(mine, path, ownLinks));
+    }
+  }
+  if (issues.length) return issues;
+  const applied = validateTemplateDefinition(withCanvasCustomization(definition, canvas, added));
+  if (!applied.ok) issues.push(...applied.issues.map((i) => ({ path: `canvas (${i.path})`, message: i.message })));
+  return issues;
+}
+
+/**
+ * What a customer's redrawn film scenes may hold (ADR-059): the film's own
+ * scenes, each board at its scene's size, links to the event's own details,
+ * and otherwise what any film may hold.
+ */
+function sceneCustomizationIssues(definition: TemplateDefinition, scenes: SceneCustomization): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (definition.type !== 'VIDEO') return [{ path: 'scenes', message: 'Only films have scenes to redraw' }];
+  const byId = new Map((definition.scenes ?? []).map((sc) => [sc.id, sc]));
+  const ownLinks = ownLinksOf((definition.scenes ?? []).map((sc) => sc.canvas?.board));
+  for (const [id, mine] of Object.entries(scenes)) {
+    const scene = byId.get(id);
+    const path = `scenes.${id}`;
+    if (!scene) {
+      issues.push({ path, message: `This film has no scene ${id}` });
+      continue;
+    }
+    const size = sceneBoardSize(scene);
+    if (mine.board.width !== size.width || mine.board.height !== size.height) issues.push({ path: `${path}.board`, message: `This scene is ${size.width} × ${size.height}` });
+    issues.push(...linkIssues(mine.board, `${path}.board`, ownLinks));
+  }
+  if (issues.length) return issues;
+  const applied = validateTemplateDefinition(withSceneCustomization(definition, scenes));
+  if (!applied.ok) issues.push(...applied.issues.map((i) => ({ path: `scenes (${i.path})`, message: i.message })));
+  return issues;
+}
 
 /** Reject anything the template does not allow the customer to change. */
 export function validateCustomization(definition: TemplateDefinition, input: unknown): { ok: true; value: Customization } | { ok: false; issues: ValidationIssue[] } {
@@ -217,6 +339,14 @@ export function validateCustomization(definition: TemplateDefinition, input: unk
   }
   if ((c.intro || c.effect) && !e.animation) {
     issues.push({ path: c.intro ? 'intro' : 'effect', message: 'This template does not allow animation changes' });
+  }
+  if ((c.canvas && Object.keys(c.canvas).length) || c.addedSections?.length) {
+    if (!e.layout) issues.push({ path: c.canvas ? 'canvas' : 'addedSections', message: 'This template does not allow layout changes' });
+    else issues.push(...canvasCustomizationIssues(definition, c.canvas ?? {}, c.addedSections ?? []));
+  }
+  if (c.scenes && Object.keys(c.scenes).length) {
+    if (!e.layout) issues.push({ path: 'scenes', message: 'This film does not allow layout changes' });
+    else issues.push(...sceneCustomizationIssues(definition, c.scenes));
   }
   if (c.hiddenSections?.length) {
     const sections = new Map((definition.website?.pages.flatMap((p) => p.sections) ?? []).map((s) => [s.id, s]));

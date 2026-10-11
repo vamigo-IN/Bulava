@@ -14,6 +14,8 @@ export function VideoPreview({ definition, context, customization = null }: { de
   const meta = templateVideoMetadata(props);
   return (
     <Player
+      // Another film starts from its own opening, not where the last one was.
+      key={definition.templateKey}
       component={TemplateVideo}
       inputProps={props}
       durationInFrames={meta.durationInFrames}

@@ -7,7 +7,7 @@ import { z } from 'zod';
  * browser: the console only sees whether each secret is set.
  */
 
-export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'cards'] as const;
+export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'cards', 'likes'] as const;
 export type SettingGroup = (typeof SETTING_GROUPS)[number];
 
 const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
@@ -287,6 +287,16 @@ export const CardsSettingsSchema = z.object({
   planDownloads: z.enum(CARD_PLAN_DOWNLOADS).default('any'),
 });
 
+/**
+ * Likes on designs (ADR-055). Every like is real and always counted; the numbers
+ * show publicly only once switched on, and only from `minimum` up, so a new
+ * design shows a heart rather than "0" or "1".
+ */
+export const LikesSettingsSchema = z.object({
+  showCounts: z.boolean().default(false),
+  minimum: z.coerce.number().int().min(0).max(10_000).default(10),
+});
+
 export const SETTING_SCHEMAS = {
   site: SiteSettingsSchema,
   seo: SeoSettingsSchema,
@@ -299,6 +309,7 @@ export const SETTING_SCHEMAS = {
   maps: MapsSettingsSchema,
   domains: DomainSettingsSchema,
   cards: CardsSettingsSchema,
+  likes: LikesSettingsSchema,
 } as const;
 
 export type SettingValues = { [G in SettingGroup]: z.infer<(typeof SETTING_SCHEMAS)[G]> };
@@ -317,6 +328,7 @@ export const SETTING_SECRETS = {
   maps: [],
   domains: ['cloudflareApiToken'],
   cards: [],
+  likes: [],
 } as const satisfies Record<SettingGroup, readonly string[]>;
 export type SettingSecretName<G extends SettingGroup> = (typeof SETTING_SECRETS)[G][number];
 

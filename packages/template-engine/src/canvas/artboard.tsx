@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
 import {
+  BINDINGS,
   ILLUSTRATIONS,
   layerBackdrop,
   resolveBinding,
@@ -52,6 +53,11 @@ export interface CanvasArtboardProps {
   omit?: ReadonlySet<string>;
   /** Drawn over every layer, inside the artboard (so `cqw` units follow its width): a card's watermark. */
   overlay?: ReactNode;
+  /**
+   * Extra style for a layer's entrance wrapper: films drive entrances from the
+   * frame number (CSS animations do not follow Remotion's clock).
+   */
+  layerStyle?: (layer: Layer, index: number) => CSSProperties | undefined;
   className?: string;
   style?: CSSProperties;
 }
@@ -81,7 +87,7 @@ const pct = (n: number, of: number) => `${((n / of) * 100).toFixed(4)}%`;
  * every layer placed by percentage and sized in `cqw` (container width units),
  * so the whole composition scales with the viewer's screen without any script.
  */
-export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode, slots, rsvpTargetId, omit, overlay, className, style }: CanvasArtboardProps) {
+export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode, slots, rsvpTargetId, omit, overlay, layerStyle, className, style }: CanvasArtboardProps) {
   const W = board.width;
   const H = board.height;
   /** Design units → container width units. */
@@ -127,7 +133,7 @@ export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode
           >
             <div
               className={entrance ? `bulava-cv-in ${entrance}` : undefined}
-              style={{ width: '100%', height: '100%', ...(entrance ? { ['--cv-delay' as string]: `${layer.animation.delaySec}s`, ['--cv-dur' as string]: `${layer.animation.durationSec}s` } : {}) }}
+              style={{ width: '100%', height: '100%', ...(entrance ? { ['--cv-delay' as string]: `${layer.animation.delaySec}s`, ['--cv-dur' as string]: `${layer.animation.durationSec}s` } : {}), ...layerStyle?.(layer, index) }}
             >
               <div className={motion} style={{ width: '100%', height: '100%' }}>
                 {content}
@@ -301,6 +307,8 @@ function maskStyle(mask: ImageLayer['mask'], f: { w: number; h: number }, radius
 }
 
 function ImageView({ layer, env }: { layer: ImageLayer; env: LayerEnv }) {
+  // Photos come only from the photo bindings (photo.*, photos[n]), never from words (custom.*).
+  if (layer.source.type === 'binding' && BINDINGS[layer.source.binding]?.type !== 'image') return null;
   const src = layer.source.type === 'asset' ? artworkAssetUrl(layer.source.assetId, layer.frame.w > 700 ? 2400 : 1200, env.ctx) : resolveBinding(layer.source.binding, env.ctx);
   if (typeof src !== 'string' || !src) return null;
   const radius = env.u(layer.radius);

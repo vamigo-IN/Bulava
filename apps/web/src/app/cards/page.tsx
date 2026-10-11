@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { createTranslator, type MessageKey } from '@bulava/localization';
 import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { CardTemplateLink, RecentCards } from '@/components/cards/gallery-client';
+import { LikeButton } from '@/components/marketing/like-button';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { type ExplorerFilters, type ExplorerItem } from '@/components/marketing/template-explorer';
 import { TemplateGallery, type FilterGroup } from '@/components/marketing/template-gallery';
@@ -214,8 +215,13 @@ function CardTile({ template, priority }: { template: TemplateSummary; priority:
         </div>
       </CardTemplateLink>
       <div className="mt-3 flex flex-1 flex-col px-1">
-        <p className="text-xs text-stone-500">{template.category}</p>
-        <h3 className="font-display text-base leading-tight text-ink sm:text-lg">{template.name}</h3>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-stone-500">{template.category}</p>
+            <h3 className="font-display text-base leading-tight text-ink sm:text-lg">{template.name}</h3>
+          </div>
+          <LikeButton templateKey={template.key} label={t('like.add', { name: template.name })} labelOn={t('like.remove', { name: template.name })} limitedLabel={t('like.limited')} size="sm" className="shrink-0" />
+        </div>
         <div className="mt-auto pt-3">
           <CardTemplateLink href={href} templateKey={template.key} category={template.category} className="btn-3d min-h-11 w-full justify-center rounded-xl text-sm">
             {t('cards.gallery.customize')}

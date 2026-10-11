@@ -4,6 +4,7 @@ import { CARD_SPECS } from './canvas-cards';
 import { at, b, canvasWebsite, eyebrows, t, text, type CanvasSpec } from './canvas-kit';
 import { FACTORY_SPECS } from './factory/collection';
 import { LOOKALIKES } from './lookalikes';
+import { PREMIUM_SPECS } from './premium-cards';
 
 /**
  * Canvas templates: pages whose hero and function cards are free-form
@@ -258,4 +259,4 @@ export function foldLookalikes(specs: CanvasSpec[], lookalikes: Readonly<Record<
 }
 
 /** Sort after the standard website templates (index.ts passes the offset). */
-export const canvasTemplates = (offset: number) => foldLookalikes([...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]).map((spec, i) => canvasWebsite(spec, offset + i));
+export const canvasTemplates = (offset: number) => foldLookalikes([...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]).map((spec, i) => canvasWebsite(spec, offset + i));

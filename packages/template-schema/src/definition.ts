@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, SCENE_NAMES, ValueSchema } from './base';
-import { CanvasSectionSchema } from './canvas';
+import { ArtboardSchema, CanvasSectionSchema } from './canvas';
 
 export { ConditionSchema, DARK_SCENE_NAMES, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, SCENE_NAMES, VALUE_FORMATS, ValueSchema, type SceneNameValue } from './base';
 export type { Condition, EffectName, FontFamily, Value } from './base';
@@ -247,6 +247,20 @@ export const ArtworkSchema = z.object({
 });
 export type Artwork = z.infer<typeof ArtworkSchema>;
 
+/**
+ * A canvas artboard filmed as a scene (ADR-058): its layers enter one after
+ * another while the camera moves over it, so a canvas design becomes a film.
+ */
+export const SceneCanvasSchema = z.object({
+  board: ArtboardSchema,
+  /** Seconds between one layer's entrance and the next (top to bottom, unless the layers set their own delays). */
+  stagger: z.number().min(0).max(2).default(0.14),
+  camera: z.enum(CAMERA_MOVES).default('push'),
+  /** Strength of the move: 1 is a slow drift. */
+  intensity: z.number().min(0).max(3).default(0.6),
+});
+export type SceneCanvas = z.infer<typeof SceneCanvasSchema>;
+
 export const SceneSchema = z.object({
   id,
   durationSec: z.number().min(0.5).max(60),
@@ -270,6 +284,8 @@ export const SceneSchema = z.object({
     .optional(),
   /** Particles drifting over the scene (petals, gold dust…), drawn deterministically per frame. */
   particles: z.enum(EFFECTS).default('none'),
+  /** A canvas artboard filmed in this scene, under the elements. */
+  canvas: SceneCanvasSchema.optional(),
   elements: z.array(ElementSchema).max(40),
 });
 export type Scene = z.infer<typeof SceneSchema>;

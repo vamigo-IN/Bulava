@@ -1,11 +1,12 @@
 'use client';
 
-import { ExternalLink, Images, LayoutList, Lock, Palette, Shapes, Sparkles, Type, Wand2, type LucideIcon } from 'lucide-react';
+import { ExternalLink, Images, LayoutList, Lock, MousePointer2, Palette, Shapes, Sparkles, Type, Wand2, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { TemplateRenderer } from '@bulava/template-engine';
-import type { Customization, RenderContext, TemplateDefinition } from '@bulava/template-schema';
+import { canvasSectionsOf, type Customization, type RenderContext, type TemplateDefinition } from '@bulava/template-schema';
+import { CanvasDesigner } from '@/components/design/canvas-designer';
 import { mergePhotos, previewContext as withPhotos, prune } from '@/components/design/customization';
 import { MotionPanel, PhotosPanel, SectionsPanel, StylePanel, WordsPanel } from '@/components/design/design-panels';
 import { TIER_RANK, TemplatePicker } from '@/components/design/template-picker';
@@ -55,6 +56,8 @@ function DesignEditor() {
   const [custom, setCustom] = useState<Customization>({});
   const [tab, setTab] = useState<Tab>('style');
   const [picking, setPicking] = useState(false);
+  /** The canvas editor, over the page: its changes are this page's, saved with Save. */
+  const [designing, setDesigning] = useState(false);
   const [uploaded, setUploaded] = useState<MediaItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
@@ -125,6 +128,9 @@ function DesignEditor() {
 
   const locked = selected ? TIER_RANK[selected.tier] > maxTier : false;
   const panelProps = definition ? { definition, custom, setCustom } : null;
+  // Every template can be designed on the canvas (ADR-057, ADR-059): templates drawn on canvases edit theirs, and any template takes sections the host adds.
+  const canvasEditable = Boolean(definition?.capabilities.editable.layout && definition.type === 'WEBSITE');
+  const hasCanvas = Boolean(definition && canvasSectionsOf(definition).length);
   const name = selected?.name ?? current?.definition.name ?? '';
   const thumb = selectedKey ? cardPreview(selectedKey) : null;
 
@@ -168,6 +174,21 @@ function DesignEditor() {
       </section>
 
       {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
+
+      {canvasEditable ? (
+        <section className="clay flex flex-col gap-4 overflow-hidden rounded-[1.75rem] p-5 sm:flex-row sm:items-center sm:p-6">
+          <span className="icon-3d size-12 shrink-0" aria-hidden>
+            <MousePointer2 className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-xl leading-tight">{t('design.canvas.cta')}</h3>
+            <p className="mt-1 text-sm text-stone-600">{t(hasCanvas ? 'design.canvas.ctaHint' : 'design.canvas.ctaHintAdd')}</p>
+          </div>
+          <button type="button" onClick={() => setDesigning(true)} className="btn-3d min-h-11 shrink-0 rounded-2xl px-5 text-sm">
+            {custom.canvas || custom.addedSections?.length ? t('design.canvas.continue') : t('design.canvas.open')}
+          </button>
+        </section>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0">
@@ -246,6 +267,25 @@ function DesignEditor() {
           </div>
         </aside>
       </div>
+
+      {designing && definition && previewContext ? (
+        <CanvasDesigner
+          eventId={eventId}
+          definition={definition}
+          templateName={name}
+          context={previewContext}
+          custom={custom}
+          setCustom={setCustom}
+          photos={photos}
+          onUploaded={(p) => setUploaded((u) => [p, ...u])}
+          language={event.data.language}
+          watermark={!!design.data?.watermark || locked}
+          dirty={canSave}
+          saving={saving}
+          onSave={() => void save()}
+          onClose={() => setDesigning(false)}
+        />
+      ) : null}
 
       {picking && design.data && previewContext ? (
         <TemplatePicker

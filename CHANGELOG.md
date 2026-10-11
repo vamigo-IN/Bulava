@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Design any invitation and any video on the canvas
+
+- **Every invitation website on the canvas.** *Design it on the canvas* now works for every template. Add your own sections (*Words*, *Photo*, *Save the date* or *Blank*) wherever you like on the page and design them like a card; templates drawn on canvases still let you redraw their own sections too.
+- **Design your video on the canvas.** On the Video page, *Design it on the canvas* opens each scene of your film on the canvas: change and move the words, add text, decorations and your photos, over the film's own illustrated scene. Your film keeps its music, camera and effects, and your design is kept on this device until you make the video.
+- **Everything else stays as it was.** The Style, Photos, Words and other tabs work exactly as before; the canvas is an extra way to design.
+
+### Your invitation on a canvas, editors in light or dark, films from cards, and hearts
+
+- **Design your invitation website on a canvas.** On the Design page, *Design it on the canvas* opens the editor you know from cards: move, resize and restyle anything, change the words, add text, photo frames and decorations, on the phone and desktop versions of each section, with a whole-invitation preview. Your website shows your arrangement once you save, and *Restore this section* brings back the template's.
+- **A more professional editor.** Cards and invitations now have a *Typography* panel (font, weight, size, colour, alignment, bold, italic, capitals), exact *Position and size* boxes with centring, and a zoom bar floating over the canvas.
+- **Light or dark editing.** Switch the editors to dark with the moon in the top bar; your choice is remembered on your device. Your design keeps its own colours.
+- **A premium stationery collection.** Nine new invitations designed like foil-stamped stationery, each in its own tradition: *Royal Maroon & Gold*, *Kalyana Zari* (South Indian), *Phulkari* (Anand Karaj), *Mehrab* (nikah), *Lal Paar* (Bengali), *Champagne Wreath* (engagement), *Genda Phool* (haldi), *Sangeet Sandhya* and *Midnight Deco* (reception). Most include an RSVP block and a timeline of your functions with short dates, and every one works as a website and as a digital card.
+- **26 new video invitations.** Four premium films (*Maharani*, *Ring Ceremony*, *Midnight Deco* and *Deepotsav*), and 22 films made from our best cards and invitations, among them *Royal Maroon & Gold*, *Shahi Gajraj*, *Kalyana Zari*, *Noor Mahal*, *Mor Pankh*, *Kovil Mani* and *Phulkari*: the design's art and words come in one by one as the camera drifts, a card for each function, and your names to close.
+- **New decorations in the editors**: mandala crowns, gold vines, sparkles, wreaths, an alpana, temple lamps, zari and phulkari borders, marigold swags, ghungroo strands, and frames for the whole card.
+- **Hearts on designs.** Tap the heart on any template or card to like it, with or without an account. Like counts appear once we switch them on, and only on designs that many people like; every like is real.
+- **Card timelines.** Cards can list up to four functions (name, date and time), filled in from Details.
+- **Import card designs** (for our team): Template Studio turns card JSON from other tools into a draft template, linking names, dates, venues and the function timeline to each event's details.
+- **One template count everywhere**: the home page and the templates page now agree.
+
 ### One sign-in, a real checkout, and smoother editing on phones
 
 - **Shorter sign-up steps.** Creating an account (and joining a team) asks only for your name, an optional password and the Terms box, without long explanations.

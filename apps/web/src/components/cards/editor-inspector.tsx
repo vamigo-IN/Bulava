@@ -2,9 +2,12 @@
 
 import {
   AlignCenter,
+  AlignHorizontalJustifyCenter,
   AlignLeft,
   AlignRight,
+  AlignVerticalJustifyCenter,
   Bold,
+  CaseUpper,
   ChevronsDown,
   ChevronsUp,
   Copy,
@@ -20,30 +23,87 @@ import {
 } from 'lucide-react';
 import { useRef } from 'react';
 import { layerLabel } from '@bulava/template-engine';
-import { FONT_FAMILIES, IMAGE_MASKS, type CardDesign, type ImageLayer, type Layer, type OrnamentLayer, type ShapeLayer, type TextLayer } from '@bulava/template-schema';
+import {
+  FONT_FAMILIES,
+  IMAGE_MASKS,
+  resolveValue,
+  type FontFamily,
+  type Fonts,
+  type ImageLayer,
+  type Layer,
+  type OrnamentLayer,
+  type ShapeLayer,
+  type TextLayer,
+  type WidgetLayer,
+} from '@bulava/template-schema';
 import { cn } from '@/lib/utils';
 import { duplicate, restack } from './editor-model';
 import { textOf } from './editor-panels';
-import { ColorField, IconButton, PanelSection, Segmented, Slider, TextField } from './editor-ui';
-import type { CardEditorApi } from './editor-types';
+import { ColorField, IconButton, NumberField, PanelSection, Segmented, SelectField, Slider, TextField } from './editor-ui';
+import type { BoardDesign, BoardEditorApi } from './editor-types';
 
-/** The selected element's settings: everything here changes the downloaded card too. */
-export function LayerInspector({ editor, onClose }: { editor: CardEditorApi; onClose?: () => void }) {
+/** The weights each family is loaded in (apps/web/src/app/fonts.ts); the others come in one. */
+const FONT_WEIGHTS: Partial<Record<FontFamily, number[]>> = {
+  'Playfair Display': [400, 500, 600, 700, 800, 900],
+  'Cormorant Garamond': [400, 500, 600, 700],
+  Poppins: [400, 500, 600, 700],
+  'Noto Sans': [300, 400, 500, 600, 700, 800],
+  'Noto Serif': [300, 400, 500, 600, 700, 800],
+  'Noto Sans Devanagari': [400, 600, 700],
+  'Noto Serif Devanagari': [400, 600, 700],
+  Cinzel: [400, 500, 600, 700],
+  Montserrat: [300, 400, 500, 600, 700],
+  'Baloo 2': [400, 500, 600, 700, 800],
+};
+
+const WEIGHT_NAMES = {
+  100: 'editor.weight.100',
+  200: 'editor.weight.200',
+  300: 'editor.weight.300',
+  400: 'editor.weight.400',
+  500: 'editor.weight.500',
+  600: 'editor.weight.600',
+  700: 'editor.weight.700',
+  800: 'editor.weight.800',
+  900: 'editor.weight.900',
+} as const;
+
+function familyOf(font: TextLayer['style']['font'], fonts: Fonts): FontFamily {
+  if (font === 'heading' || font === 'body') return fonts[font].family;
+  if (font === 'script') return (fonts.script ?? fonts.heading).family;
+  return font;
+}
+
+/** The selected element's settings: everything here changes the design itself (the downloaded card, the website). */
+export function LayerInspector<D extends BoardDesign>({ editor, onClose }: { editor: BoardEditorApi<D>; onClose?: () => void }) {
   const { design, t } = editor;
   const layer = design.board.layers.find((l) => l.id === editor.selectedId);
   if (!layer) {
     return (
       <div className="space-y-3 text-sm text-stone-600">
         <p className="font-semibold text-ink">{t('cards.inspector.nothing')}</p>
-        <p className="leading-relaxed">{t('cards.inspector.nothingHint')}</p>
+        <p className="leading-relaxed">{t(editor.kind === 'film' ? 'editor.inspector.nothingHintFilm' : editor.kind === 'website' ? 'editor.inspector.nothingHint' : 'cards.inspector.nothingHint')}</p>
       </div>
     );
   }
   const set = (fn: (l: Layer) => Layer, merge?: string) => editor.changeLayer(layer.id, fn, merge);
-  const title = layer.kind === 'text' ? t('cards.inspector.text') : layer.kind === 'image' ? t('cards.inspector.photo') : layer.kind === 'shape' ? t('cards.inspector.shape') : t('cards.inspector.decoration');
+  const title =
+    layer.kind === 'text'
+      ? t('cards.inspector.text')
+      : layer.kind === 'image'
+        ? t('cards.inspector.photo')
+        : layer.kind === 'shape'
+          ? t('cards.inspector.shape')
+          : layer.kind === 'widget'
+            ? t(`editor.widget.${layer.widget.type}`)
+            : t('cards.inspector.decoration');
+  const W = design.board.width;
+  const H = design.board.height;
+  const frame = layer.frame;
+  const setFrame = (patch: Partial<Layer['frame']>, merge: string) => set((l) => (l.locked ? l : ({ ...l, frame: { ...l.frame, ...patch } } as Layer)), merge);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="eyebrow text-brand-700">{title}</p>
@@ -89,6 +149,7 @@ export function LayerInspector({ editor, onClose }: { editor: CardEditorApi; onC
       {layer.kind === 'image' ? <PhotoSettings editor={editor} layer={layer} /> : null}
       {layer.kind === 'shape' ? <ShapeSettings editor={editor} layer={layer} /> : null}
       {layer.kind === 'ornament' ? <OrnamentSettings editor={editor} layer={layer} /> : null}
+      {layer.kind === 'widget' ? <WidgetSettings editor={editor} layer={layer} /> : null}
       {layer.kind === 'icon' ? <ColorField label={t('cards.inspector.color')} value={layer.color} colors={design.colors} onChange={(c) => set((l) => ({ ...l, color: c }) as Layer, 'color')} /> : null}
       {layer.kind === 'scene' ? (
         <label className="flex min-h-10 items-center gap-2 text-sm text-stone-700">
@@ -97,8 +158,22 @@ export function LayerInspector({ editor, onClose }: { editor: CardEditorApi; onC
         </label>
       ) : null}
 
-      <PanelSection title={t('cards.inspector.placement')}>
-        <Slider label={t('cards.inspector.rotation')} value={Math.round(layer.frame.rotate)} min={-180} max={180} onChange={(v) => set((l) => ({ ...l, frame: { ...l.frame, rotate: v } }), 'rotate')} format={(v) => `${v}°`} />
+      <PanelSection title={t('editor.inspector.position')}>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberField label={t('editor.inspector.x')} short="X" value={frame.x} onChange={(v) => setFrame({ x: v }, 'frameX')} />
+          <NumberField label={t('editor.inspector.y')} short="Y" value={frame.y} onChange={(v) => setFrame({ y: v }, 'frameY')} />
+          <NumberField label={t('editor.inspector.w')} short="W" value={frame.w} min={1} max={W * 4} onChange={(v) => setFrame({ w: v }, 'frameW')} />
+          <NumberField label={t('editor.inspector.h')} short="H" value={frame.h} min={1} max={H * 4} onChange={(v) => setFrame({ h: v }, 'frameH')} />
+        </div>
+        <div className="flex gap-1.5">
+          <IconButton label={t('editor.inspector.centerX')} onClick={() => setFrame({ x: Math.round((W - frame.w) / 2) }, 'centerX')} disabled={layer.locked}>
+            <AlignHorizontalJustifyCenter aria-hidden className="size-4" />
+          </IconButton>
+          <IconButton label={t('editor.inspector.centerY')} onClick={() => setFrame({ y: Math.round((H - frame.h) / 2) }, 'centerY')} disabled={layer.locked}>
+            <AlignVerticalJustifyCenter aria-hidden className="size-4" />
+          </IconButton>
+        </div>
+        <Slider label={t('cards.inspector.rotation')} value={Math.round(frame.rotate)} min={-180} max={180} onChange={(v) => set((l) => ({ ...l, frame: { ...l.frame, rotate: v } }), 'rotate')} format={(v) => `${v}°`} />
         <Slider label={t('cards.inspector.opacity')} value={Math.round(layer.opacity * 100)} min={5} max={100} onChange={(v) => set((l) => ({ ...l, opacity: v / 100 }), 'opacity')} format={(v) => `${v}%`} />
       </PanelSection>
     </div>
@@ -107,11 +182,14 @@ export function LayerInspector({ editor, onClose }: { editor: CardEditorApi; onC
 
 const FONT_ROLES = ['heading', 'body', 'script'] as const;
 
-function TextSettings({ editor, layer }: { editor: CardEditorApi; layer: TextLayer }) {
+function TextSettings<D extends BoardDesign>({ editor, layer }: { editor: BoardEditorApi<D>; layer: TextLayer }) {
   const { design, t } = editor;
   const style = layer.style;
   const setStyle = (patch: Partial<TextLayer['style']>, merge?: string) => editor.changeLayer(layer.id, (l) => ({ ...(l as TextLayer), style: { ...(l as TextLayer).style, ...patch } }), merge);
   const linked = !('literal' in layer.content);
+  const family = familyOf(style.font, design.fonts);
+  const weights = FONT_WEIGHTS[family] ?? [400];
+  const weightChoices = weights.includes(style.weight) ? weights : [...weights, style.weight].sort((a, b) => a - b);
   return (
     <>
       <TextField
@@ -120,15 +198,10 @@ function TextSettings({ editor, layer }: { editor: CardEditorApi; layer: TextLay
         value={textOf(editor, layer)}
         multiline
         onChange={(v) => editor.changeLayer(layer.id, (l) => ({ ...(l as TextLayer), content: { literal: v } }), `text:${layer.id}`)}
-        hint={linked && !('t' in layer.content) ? t('cards.text.linked') : undefined}
+        hint={linked && !('t' in layer.content) ? t(editor.kind === 'card' ? 'cards.text.linked' : 'editor.text.linked') : undefined}
       />
-      <PanelSection title={t('cards.inspector.font')}>
-        <select
-          aria-label={t('cards.inspector.font')}
-          value={style.font}
-          onChange={(e) => setStyle({ font: e.target.value as TextLayer['style']['font'] })}
-          className="block min-h-10 w-full rounded-xl border border-[#e2d2c0] bg-[#f8f2ea] px-2 text-sm shadow-clay-inset focus:border-brand-600 focus:outline-none"
-        >
+      <PanelSection title={t('editor.inspector.typography')}>
+        <SelectField label={t('cards.inspector.font')} value={style.font} onChange={(v) => setStyle({ font: v as TextLayer['style']['font'] })}>
           <optgroup label={t('cards.inspector.fontRoles')}>
             {FONT_ROLES.map((role) => (
               <option key={role} value={role}>
@@ -143,42 +216,54 @@ function TextSettings({ editor, layer }: { editor: CardEditorApi; layer: TextLay
               </option>
             ))}
           </optgroup>
-        </select>
-        <Slider label={t('cards.inspector.size')} value={Math.round(style.size)} min={6} max={Math.max(160, Math.round(style.size))} onChange={(v) => setStyle({ size: v }, 'size')} />
-        <div className="flex flex-wrap items-center gap-1.5">
-          <IconButton label={t('cards.inspector.bold')} active={style.weight >= 600} onClick={() => setStyle({ weight: style.weight >= 600 ? 400 : 700 })}>
-            <Bold aria-hidden className="size-4" />
-          </IconButton>
-          <IconButton label={t('cards.inspector.italic')} active={style.italic} onClick={() => setStyle({ italic: !style.italic })}>
-            <Italic aria-hidden className="size-4" />
-          </IconButton>
-          <span className="mx-1 h-6 w-px bg-stone-300" aria-hidden />
-          <IconButton label={t('cards.inspector.alignLeft')} active={style.align === 'left'} onClick={() => setStyle({ align: 'left' })}>
-            <AlignLeft aria-hidden className="size-4" />
-          </IconButton>
-          <IconButton label={t('cards.inspector.alignCenter')} active={style.align === 'center'} onClick={() => setStyle({ align: 'center' })}>
-            <AlignCenter aria-hidden className="size-4" />
-          </IconButton>
-          <IconButton label={t('cards.inspector.alignRight')} active={style.align === 'right'} onClick={() => setStyle({ align: 'right' })}>
-            <AlignRight aria-hidden className="size-4" />
-          </IconButton>
+        </SelectField>
+        <div className="grid grid-cols-2 gap-2">
+          <SelectField label={t('editor.inspector.weight')} value={String(style.weight)} onChange={(v) => setStyle({ weight: Number(v) })}>
+            {weightChoices.map((w) => (
+              <option key={w} value={w}>
+                {w in WEIGHT_NAMES ? t(WEIGHT_NAMES[w as keyof typeof WEIGHT_NAMES]) : String(w)}
+              </option>
+            ))}
+          </SelectField>
+          <div>
+            <p className="mb-1 text-xs font-medium text-stone-700" aria-hidden>
+              {t('cards.inspector.size')}
+            </p>
+            <NumberField label={t('cards.inspector.size')} short="Aa" value={style.size} min={4} max={400} onChange={(v) => setStyle({ size: v }, 'size')} />
+          </div>
+        </div>
+        <ColorField label={t('cards.inspector.color')} value={style.color} colors={design.colors} onChange={(c) => setStyle({ color: c }, 'color')} />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-[9.5rem] flex-1">
+            <Segmented
+              label={t('editor.inspector.align')}
+              value={style.align}
+              onChange={(v) => setStyle({ align: v })}
+              options={[
+                { value: 'left', label: t('cards.inspector.alignLeft'), icon: <AlignLeft aria-hidden className="size-4" /> },
+                { value: 'center', label: t('cards.inspector.alignCenter'), icon: <AlignCenter aria-hidden className="size-4" /> },
+                { value: 'right', label: t('cards.inspector.alignRight'), icon: <AlignRight aria-hidden className="size-4" /> },
+              ]}
+            />
+          </div>
+          <div className="flex gap-1" role="group" aria-label={t('editor.inspector.style')}>
+            <IconButton label={t('cards.inspector.bold')} active={style.weight >= 600} onClick={() => setStyle({ weight: style.weight >= 600 ? 400 : (weights.find((w) => w >= 600) ?? 700) })}>
+              <Bold aria-hidden className="size-4" />
+            </IconButton>
+            <IconButton label={t('cards.inspector.italic')} active={style.italic} onClick={() => setStyle({ italic: !style.italic })}>
+              <Italic aria-hidden className="size-4" />
+            </IconButton>
+            <IconButton label={t('cards.inspector.case.upper')} active={style.transform === 'upper'} onClick={() => setStyle({ transform: style.transform === 'upper' ? 'none' : 'upper' })}>
+              <CaseUpper aria-hidden className="size-4" />
+            </IconButton>
+          </div>
         </div>
       </PanelSection>
-      <ColorField label={t('cards.inspector.color')} value={style.color} colors={design.colors} onChange={(c) => setStyle({ color: c }, 'color')} />
       <PanelSection title={t('cards.inspector.spacing')}>
         <Slider label={t('cards.inspector.lineHeight')} value={style.lineHeight} min={0.8} max={2.6} step={0.05} onChange={(v) => setStyle({ lineHeight: v }, 'lineHeight')} format={(v) => v.toFixed(2)} />
         <Slider label={t('cards.inspector.letterSpacing')} value={style.letterSpacing} min={-0.1} max={0.6} step={0.01} onChange={(v) => setStyle({ letterSpacing: v }, 'letterSpacing')} format={(v) => v.toFixed(2)} />
       </PanelSection>
       <PanelSection title={t('cards.inspector.effects')}>
-        <Segmented
-          label={t('cards.inspector.case')}
-          value={style.transform === 'upper' ? 'upper' : 'none'}
-          onChange={(v) => setStyle({ transform: v })}
-          options={[
-            { value: 'none', label: t('cards.inspector.case.none') },
-            { value: 'upper', label: t('cards.inspector.case.upper') },
-          ]}
-        />
         <Segmented
           label={t('cards.inspector.shadow')}
           value={style.shadow}
@@ -208,11 +293,11 @@ function TextSettings({ editor, layer }: { editor: CardEditorApi; layer: TextLay
   );
 }
 
-function PhotoSettings({ editor, layer }: { editor: CardEditorApi; layer: ImageLayer }) {
+function PhotoSettings<D extends BoardDesign>({ editor, layer }: { editor: BoardEditorApi<D>; layer: ImageLayer }) {
   const { design, t } = editor;
   const input = useRef<HTMLInputElement>(null);
   const set = (patch: Partial<ImageLayer>, merge?: string) => editor.changeLayer(layer.id, (l) => ({ ...(l as ImageLayer), ...patch }), merge);
-  const binding = layer.source.type === 'binding' ? (layer.source.binding as keyof CardDesign['photos']) : null;
+  const binding = layer.source.type === 'binding' ? layer.source.binding : null;
   const hasPhoto = binding ? Boolean(design.photos[binding]) : true;
   return (
     <>
@@ -281,7 +366,7 @@ function PhotoSettings({ editor, layer }: { editor: CardEditorApi; layer: ImageL
   );
 }
 
-function ShapeSettings({ editor, layer }: { editor: CardEditorApi; layer: ShapeLayer }) {
+function ShapeSettings<D extends BoardDesign>({ editor, layer }: { editor: BoardEditorApi<D>; layer: ShapeLayer }) {
   const { design, t } = editor;
   const set = (patch: Partial<ShapeLayer>, merge?: string) => editor.changeLayer(layer.id, (l) => ({ ...(l as ShapeLayer), ...patch }), merge);
   const fill = layer.fill;
@@ -306,7 +391,7 @@ function ShapeSettings({ editor, layer }: { editor: CardEditorApi; layer: ShapeL
   );
 }
 
-function OrnamentSettings({ editor, layer }: { editor: CardEditorApi; layer: OrnamentLayer }) {
+function OrnamentSettings<D extends BoardDesign>({ editor, layer }: { editor: BoardEditorApi<D>; layer: OrnamentLayer }) {
   const { design, t } = editor;
   const set = (patch: Partial<OrnamentLayer>, merge?: string) => editor.changeLayer(layer.id, (l) => ({ ...(l as OrnamentLayer), ...patch }), merge);
   return (
@@ -326,4 +411,43 @@ function OrnamentSettings({ editor, layer }: { editor: CardEditorApi; layer: Orn
       </div>
     </>
   );
+}
+
+/** The website's ready-made pieces: a button's words and colours, the countdown's and the details' colours. */
+function WidgetSettings<D extends BoardDesign>({ editor, layer }: { editor: BoardEditorApi<D>; layer: WidgetLayer }) {
+  const { design, t } = editor;
+  const w = layer.widget;
+  const setWidget = (patch: Partial<WidgetLayer['widget']>, merge?: string) =>
+    editor.changeLayer(layer.id, (l) => ({ ...(l as WidgetLayer), widget: { ...(l as WidgetLayer).widget, ...patch } as WidgetLayer['widget'] }), merge);
+  if (w.type === 'button') {
+    const label = String(resolveValue(w.label, editor.ctx, { t: editor.cardT, language: design.language, timeZone: editor.ctx.event.timezone }) ?? '');
+    return (
+      <>
+        <TextField label={t('editor.widget.buttonLabel')} value={label} maxLength={60} onChange={(v) => setWidget({ label: { literal: v } }, `label:${layer.id}`)} />
+        <ColorField label={t('cards.inspector.fill')} value={w.fill} colors={design.colors} onChange={(c) => setWidget({ fill: c }, 'fill')} />
+        <ColorField label={t('cards.inspector.color')} value={w.color} colors={design.colors} onChange={(c) => setWidget({ color: c }, 'color')} />
+        <Slider label={t('cards.inspector.size')} value={Math.round(w.size)} min={8} max={60} onChange={(v) => setWidget({ size: v }, 'size')} />
+        <p className="text-xs leading-relaxed text-stone-500">{t(`editor.widget.action.${w.action}`)}</p>
+      </>
+    );
+  }
+  if (w.type === 'countdown') {
+    return (
+      <>
+        <ColorField label={t('cards.inspector.color')} value={w.color} colors={design.colors} onChange={(c) => setWidget({ color: c }, 'color')} />
+        <ColorField label={t('editor.widget.labelColor')} value={w.labelColor} colors={design.colors} onChange={(c) => setWidget({ labelColor: c }, 'labelColor')} />
+        <ColorField label={t('editor.widget.boxColor')} value={w.boxColor} colors={design.colors} onChange={(c) => setWidget({ boxColor: c }, 'boxColor')} />
+      </>
+    );
+  }
+  if (w.type === 'details') {
+    return (
+      <>
+        <ColorField label={t('editor.widget.valueColor')} value={w.valueColor} colors={design.colors} onChange={(c) => setWidget({ valueColor: c }, 'valueColor')} />
+        <ColorField label={t('editor.widget.labelColor')} value={w.labelColor} colors={design.colors} onChange={(c) => setWidget({ labelColor: c }, 'labelColor')} />
+        <ColorField label={t('editor.widget.iconColor')} value={w.iconColor} colors={design.colors} onChange={(c) => setWidget({ iconColor: c }, 'iconColor')} />
+      </>
+    );
+  }
+  return null;
 }

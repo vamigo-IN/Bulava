@@ -107,7 +107,7 @@ export const CARD_DETAIL_BINDINGS: Record<CardDetailKey, readonly string[]> = {
 const TEXT_BINDINGS: ReadonlySet<string> = new Set(Object.values(CARD_DETAIL_BINDINGS).flat());
 /** Date-and-time bindings: on a card they always show as a date (the time is its own detail). */
 const DATE_BINDINGS: ReadonlySet<string> = new Set(CARD_DETAIL_BINDINGS.date);
-const DATE_FORMATS: ReadonlySet<string> = new Set(['date', 'dateWithWeekday']);
+const DATE_FORMATS: ReadonlySet<string> = new Set(['date', 'dateWithWeekday', 'dateShort']);
 
 /** Cards are dated in Indian time. */
 export const CARD_TIME_ZONE = 'Asia/Kolkata';
@@ -127,7 +127,7 @@ const TEMPLATE_BINDING = /\{\{\s*([\w.[\]]+)\s*(?:\|\s*(\w+))?\s*\}\}/g;
 /** A card function by position (functions[0].name, .date, .time, .startsAt, .venue.name), which the Details form fills. */
 const FUNCTION_BINDING = /^functions\[([0-3])\]\.(name|date|time|startsAt|venue\.name)$/;
 export const isCardFunctionBinding = (path: string): boolean => FUNCTION_BINDING.test(path);
-const FUNCTION_TIME_FORMATS: ReadonlySet<string> = new Set(['date', 'dateWithWeekday', 'time', 'dateTime']);
+const FUNCTION_TIME_FORMATS: ReadonlySet<string> = new Set(['date', 'dateWithWeekday', 'dateShort', 'time', 'dateTime']);
 
 /** A function's name or venue shows as text; its date and time only through a date or time format. */
 function functionValueOk(path: string, format: string | undefined): boolean {

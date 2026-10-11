@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TemplateRenderer, TemplateStyles } from '@bulava/template-engine';
 import { sampleRenderContext } from '@bulava/template-schema';
+import { FilmPosterView } from '@/components/marketing/live-template';
+import { isCanvasFilm } from '@/lib/films';
 import { hasPosterScene, PosterScene } from '@/components/marketing/template-card';
 import { POSTER_HEIGHT, POSTER_WIDTH, PREVIEW_VIEWPORT_WIDTH } from '@/lib/template-previews';
 import { getTemplate } from '@/lib/server-api';
@@ -24,6 +26,13 @@ export default async function PreviewFramePage({ params, searchParams }: { param
   if (!tpl?.definition) notFound();
 
   if (view === 'poster') {
+    if (tpl.definition.type !== 'WEBSITE' && isCanvasFilm(tpl.definition)) {
+      return (
+        <div id="preview-frame" style={{ width: POSTER_WIDTH, height: POSTER_HEIGHT }}>
+          <FilmPosterView definition={tpl.definition} eventType={tpl.eventTypes[0] ?? 'WEDDING'} tags={tpl.tags} width={POSTER_WIDTH} height={POSTER_HEIGHT} label="Video" />
+        </div>
+      );
+    }
     if (tpl.definition.type === 'WEBSITE' || !hasPosterScene(tpl)) notFound();
     return (
       <div id="preview-frame" style={{ width: POSTER_WIDTH, height: POSTER_HEIGHT }}>

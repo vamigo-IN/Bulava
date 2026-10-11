@@ -1,4 +1,4 @@
-import type { Customization, GalleryImage, PhotoSlot, RenderContext, TemplateDefinition } from '@bulava/template-schema';
+import { fittingAddedSections, fittingCanvasCustomization, fittingSceneCustomization, type Customization, type GalleryImage, type PhotoSlot, type RenderContext, type TemplateDefinition } from '@bulava/template-schema';
 import type { MediaItem } from '@/lib/types';
 
 /** Shared by the website design page and the video page (plain module, so both server and client code may import it). */
@@ -41,8 +41,25 @@ export function prune(custom: Customization, definition: TemplateDefinition | un
     delete next.effect;
   }
   if (!e.music) delete next.musicId;
-  if (!e.layout) delete next.hiddenSections;
-  else if (next.hiddenSections) next.hiddenSections = next.hiddenSections.filter((id) => sections.has(id));
+  if (!e.layout) {
+    delete next.hiddenSections;
+    delete next.canvas;
+    delete next.addedSections;
+    delete next.scenes;
+  } else {
+    if (next.hiddenSections) next.hiddenSections = next.hiddenSections.filter((id) => sections.has(id));
+    // The host's canvases fit only the sections (and sizes) this template still has; their own sections move to the end if their place is gone.
+    const canvas = fittingCanvasCustomization(definition, next.canvas);
+    if (canvas) next.canvas = canvas;
+    else delete next.canvas;
+    const added = definition.type === 'WEBSITE' ? fittingAddedSections(definition, next.addedSections) : undefined;
+    if (added?.length) next.addedSections = added;
+    else delete next.addedSections;
+    // A film's redrawn scenes fit only the scenes (and sizes) it still has.
+    const scenes = fittingSceneCustomization(definition, next.scenes);
+    if (scenes) next.scenes = scenes;
+    else delete next.scenes;
+  }
   if (!e.photos) {
     delete next.photoSlots;
     delete next.photoIds;

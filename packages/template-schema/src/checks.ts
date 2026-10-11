@@ -91,11 +91,13 @@ export function runTemplateChecks(definition: TemplateDefinition): TemplateCheck
         }
       }),
     );
-    definition.scenes?.forEach((scene) =>
+    definition.scenes?.forEach((scene) => {
       scene.elements.forEach((el) => {
         if (el.kind === 'text') check(`${scene.id}.${el.id}`, el.content, false, Math.max(12, Math.floor((el.frame.w / (el.style.fontSize * 0.55)) * Math.max(1, Math.floor(el.frame.h / (el.style.fontSize * el.style.lineHeight))))));
-      }),
-    );
+      });
+      // A film's canvas scene is checked as the canvas it was drawn from.
+      if (scene.canvas) checkBoard(scene.id, 'canvas', scene.canvas.board);
+    });
     return {
       case: c.name,
       empty,

@@ -85,6 +85,7 @@ model User {
   recoveryCodes    MfaRecoveryCode[]
   memberInvites    EventMemberInvite[]  @relation("MemberInvitesSent")
   cardSessions     CardSession[]
+  templateLikes    TemplateLike[]
 
   @@index([status, deletionScheduledAt])
   @@map("users")
@@ -913,16 +914,39 @@ model Template {
   /// Soft delete: hidden everywhere (staff can restore). Events keep their pinned version,
   /// and the catalog seed never recreates a deleted template.
   deletedAt        DateTime?
+  /// Real likes only (one per person or browser), kept in step with template_likes. Shown publicly
+  /// only when the likes settings allow it (ADR-055); never set by hand.
+  likeCount        Int            @default(0)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   versions       TemplateVersion[] @relation("TemplateVersions")
   currentVersion TemplateVersion?  @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id])
+  likes          TemplateLike[]
 
   @@index([status, category])
   @@index([status, featured, sortOrder])
   @@index([deletedAt])
   @@map("templates")
+}
+
+/// A like on a template (a website, film or card design): from a signed-in person, or from a
+/// browser without an account, kept as the SHA-256 of its random visitor id (never the id itself).
+model TemplateLike {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  templateId  String   @db.Uuid
+  userId      String?  @db.Uuid
+  visitorHash String?
+  createdAt   DateTime @default(now())
+
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@unique([templateId, visitorHash])
+  @@index([userId])
+  @@index([visitorHash])
+  @@map("template_likes")
 }
 
 model TemplateVersion {

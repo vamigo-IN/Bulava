@@ -1,10 +1,10 @@
 'use client';
 
-import { Lock } from 'lucide-react';
+import { Lock, MousePointer2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { backdropArt, backdropTitleTop } from '@bulava/template-engine';
 import type { MessageKey } from '@bulava/localization';
 import type { Customization } from '@bulava/template-schema';
@@ -16,12 +16,34 @@ import { cn } from '@/lib/utils';
 import { MusicPicker } from '@/components/events/music-picker';
 import { mergePhotos, previewContext, prune } from '@/components/design/customization';
 import { PhotosPanel, StylePanel } from '@/components/design/design-panels';
+import { FilmDesigner } from '@/components/design/film-designer';
 import { ScenePoster } from '@/components/design/scene-poster';
+import { FilmPosterView } from '@/components/marketing/live-template';
+import { isCanvasFilm } from '@/lib/films';
 import { Alert, Badge, Button, Card, EmptyState, Spinner } from '@/components/ui/primitives';
 
 const Preview = dynamic(() => import('@/components/events/video-preview').then((m) => m.VideoPreview), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
 
 const TIER_RANK = { FREE: 0, STANDARD: 1, PREMIUM: 2 } as const;
+
+/** A film's design is kept on this device until the video is made (and after), so canvas work survives a refresh. */
+const draftKey = (eventId: string, key: string) => `bulava.film.${eventId}.${key}`;
+function readDraft(eventId: string, key: string): Customization | null {
+  try {
+    const raw = localStorage.getItem(draftKey(eventId, key));
+    return raw ? (JSON.parse(raw) as Customization) : null;
+  } catch {
+    return null;
+  }
+}
+function writeDraft(eventId: string, key: string, custom: Customization) {
+  try {
+    if (Object.keys(custom).length) localStorage.setItem(draftKey(eventId, key), JSON.stringify(custom));
+    else localStorage.removeItem(draftKey(eventId, key));
+  } catch {
+    // Private windows and full storage: the design stays for this visit.
+  }
+}
 
 export default function VideoPage() {
   const t = useT();
@@ -40,10 +62,28 @@ export default function VideoPage() {
   // Colours, fonts and the cover photo for this render; the photo carries over between templates.
   const [custom, setCustom] = useState<Customization>({});
   const [tab, setTab] = useState<'style' | 'photos'>('style');
+  /** The film's canvas editor, over the page: its changes are this page's, used when the video is made. */
+  const [designing, setDesigning] = useState(false);
+  const [draftFor, setDraftFor] = useState<string | null>(null);
   const approved = useApprovedPhotos(eventId);
   const [uploaded, setUploaded] = useState<MediaItem[]>([]);
   const photos = useMemo(() => mergePhotos(uploaded, approved.data), [uploaded, approved.data]);
   const context = useMemo(() => (design.data ? previewContext(design.data.context, photos, custom) : null), [design.data, photos, custom]);
+  const firstKey = videos.data?.[0]?.key ?? cards.data?.[0]?.key ?? null;
+  const choiceKey = selected?.key ?? firstKey;
+
+  // A film opens with its design from this device, else with the photo carried over from the last one.
+  useEffect(() => {
+    if (!choiceKey || draftFor === choiceKey) return;
+    setDraftFor(choiceKey);
+    const draft = readDraft(eventId, choiceKey);
+    setCustom((c) => draft ?? (c.photoSlots ? { photoSlots: c.photoSlots } : {}));
+  }, [choiceKey, draftFor, eventId]);
+  useEffect(() => {
+    if (!choiceKey || draftFor !== choiceKey) return;
+    const id = setTimeout(() => writeDraft(eventId, choiceKey, custom), 400);
+    return () => clearTimeout(id);
+  }, [custom, choiceKey, draftFor, eventId]);
 
   if (!event.data || videos.isPending || cards.isPending || !design.data || !context) return <Spinner label={t('common.loading')} />;
   const maxTier = design.data.entitlements['templates.maxTier']?.limit ?? 0;
@@ -54,7 +94,6 @@ export default function VideoPage() {
 
   const pick = (tpl: TemplateSummaryLite) => {
     setSelected(tpl);
-    setCustom((c) => ({ photoSlots: c.photoSlots }));
     setTab('style');
   };
 
@@ -99,7 +138,15 @@ export default function VideoPage() {
                   aria-pressed={choice?.key === tpl.key}
                   className={cn('w-full rounded-2xl border-2 bg-white p-3 text-left', choice?.key === tpl.key ? 'border-brand-700 shadow-lg' : 'border-gold-200 hover:border-gold-400')}
                 >
-                  {art && backdrop && colors && tpl.definition ? (
+                  {tpl.definition && isCanvasFilm(tpl.definition) ? (
+                    // Films drawn from canvas invitations show their opening board.
+                    <>
+                      <div className="aspect-[9/14] overflow-hidden rounded-xl">
+                        <FilmPosterView definition={tpl.definition} eventType={event.data?.typeKey ?? tpl.eventTypes[0] ?? 'WEDDING'} tags={tpl.tags} label={t('video.posterLabel')} />
+                      </div>
+                      <p className="mt-2 truncate font-display text-lg leading-tight">{tpl.name}</p>
+                    </>
+                  ) : art && backdrop && colors && tpl.definition ? (
                     // Films show their drawn or painted scene.
                     <ScenePoster art={art} ratio={9 / 14}>
                       <span
@@ -142,6 +189,12 @@ export default function VideoPage() {
               <Preview definition={choice.definition} context={context} customization={custom} />
             </div>
             {design.data.watermark ? <p className="text-xs text-stone-500">{t('video.watermark')}</p> : null}
+            {choice.outputs.includes('VIDEO') && editable?.layout ? (
+              <button type="button" onClick={() => setDesigning(true)} className="btn-3d btn-3d-light min-h-11 w-full gap-2 rounded-2xl text-sm">
+                <MousePointer2 aria-hidden className="size-4" />
+                {custom.scenes ? t('film.canvas.continue') : t('film.canvas.open')}
+              </button>
+            ) : null}
             {tabs.length ? (
               <div className="space-y-4 rounded-2xl border border-gold-100 bg-ivory/60 p-3">
                 <p className="text-sm font-semibold">{t('video.customize')}</p>
@@ -186,6 +239,21 @@ export default function VideoPage() {
           </Card>
         ) : null}
       </div>
+
+      {designing && choice?.definition ? (
+        <FilmDesigner
+          eventId={eventId}
+          definition={choice.definition}
+          templateName={choice.name}
+          context={context}
+          custom={custom}
+          setCustom={setCustom}
+          photos={photos}
+          onUploaded={(p) => setUploaded((u) => [p, ...u])}
+          language={event.data.language}
+          onClose={() => setDesigning(false)}
+        />
+      ) : null}
 
       <section>
         <h3 className="mb-3 font-display text-2xl">{t('video.queue')}</h3>

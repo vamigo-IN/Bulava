@@ -7,6 +7,7 @@ import {
   hiddenSectionIds,
   resolveBinding,
   resolveValue,
+  withCanvasCustomization,
   type Customization,
   type RenderContext,
   type SectionInstance,
@@ -79,7 +80,7 @@ export interface TemplateRendererProps {
 
 /** Renders a WEBSITE template definition for a given render context. */
 export function TemplateRenderer({
-  definition,
+  definition: template,
   context,
   customization,
   language: languageOverride,
@@ -88,6 +89,8 @@ export function TemplateRenderer({
   introKey,
   maxSections,
 }: TemplateRendererProps) {
+  // The host's own arrangement of the canvas sections, where it still fits the template (ADR-057), and the sections they added (ADR-059).
+  const definition = withCanvasCustomization(template, customization?.canvas, customization?.addedSections);
   const language = languageOverride ?? context.event.language;
   const t = createTranslator(language);
   const timeZone = context.event.timezone;

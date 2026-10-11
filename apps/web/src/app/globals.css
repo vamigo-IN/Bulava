@@ -106,6 +106,12 @@
     from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.86); }
     to { opacity: 1; transform: none; }
   }
+  /* A heart that has just been tapped. */
+  @keyframes like-pop {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
   @keyframes slide-in-left {
     from { opacity: 0; transform: translate3d(-64px, 0, 0); }
     to { opacity: 1; transform: none; }
@@ -557,5 +563,122 @@
   }
   .site-header[data-tone='dark'] {
     box-shadow: inset 0 -1px 0 rgba(227, 197, 133, 0.12), 0 14px 30px -20px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* ───────────── Editors: light or dark, as the person prefers ─────────────
+   The card editor and the invitation's canvas editor (EditorFrame). Their own surfaces are the
+   --ed-* variables. In dark mode, `.editor-chrome` (the bars, panels, sheets and dialogs, never
+   the canvas) re-maps the site's colour tokens, so every control inside follows; the design on
+   the canvas and its selection handles keep their own colours. */
+@layer components {
+  .editor-ui {
+    --ed-workspace: #efe6da;
+    --ed-dot: #dfd0bc;
+    --ed-panel: #fbf6ee;
+    --ed-line: #eadfcf;
+    --ed-field: #f8f2ea;
+    --ed-field-line: #e2d2c0;
+    --ed-thumb: #efe6da;
+    --ed-sheet-shadow: 0 -12px 40px rgba(70, 40, 26, 0.18);
+    --ed-toolbar: rgba(255, 250, 245, 0.94);
+    --ed-toolbar-line: rgba(122, 90, 62, 0.16);
+    --ed-device: #1c1917;
+    --ed-device-rim: #3f3a36;
+    --ed-accent: #2563eb;
+    background-color: var(--ed-workspace);
+    color: var(--color-ink);
+  }
+  .editor-ui[data-editor-theme='dark'] {
+    color-scheme: dark;
+    --ed-workspace: #0e0c10;
+    --ed-dot: #2a2430;
+    --ed-panel: #16131a;
+    --ed-line: #2a2530;
+    --ed-field: #0f0d12;
+    --ed-field-line: #3a3442;
+    --ed-thumb: #221e27;
+    --ed-sheet-shadow: 0 -12px 40px rgba(0, 0, 0, 0.6);
+    --ed-toolbar: rgba(30, 26, 35, 0.94);
+    --ed-toolbar-line: rgba(255, 255, 255, 0.09);
+    --ed-device: #050406;
+    --ed-device-rim: #2f2a33;
+    --ed-accent: #60a5fa;
+  }
+  .editor-ui[data-editor-theme='dark'] .editor-chrome {
+    color-scheme: dark;
+    --color-white: #241f29;
+    --color-canvas: #0e0c10;
+    --color-surface: #241f29;
+    --color-ivory: #16131a;
+    --color-sand: #2c2632;
+    --color-cream: #1c1820;
+    --color-ink: #f4eff0;
+    --color-stone-50: #1b171e;
+    --color-stone-100: #231f27;
+    --color-stone-200: #332d38;
+    --color-stone-300: #4a434f;
+    --color-stone-400: #847b89;
+    --color-stone-500: #aaa1ae;
+    --color-stone-600: #c6bec9;
+    --color-stone-700: #dbd4dd;
+    --color-stone-800: #ece6ed;
+    --color-stone-900: #f7f3f7;
+    --color-brand-50: #2c141b;
+    --color-brand-100: #3d1a23;
+    --color-brand-200: #5e2834;
+    --color-brand-500: #e88f9c;
+    --color-brand-600: #f0a3ae;
+    --color-brand-700: #f6bcc5;
+    --color-brand-800: #fad3d9;
+    --color-gold-100: #2b2316;
+    --color-gold-200: #4a3b1e;
+    --color-gold-300: #8a6c33;
+    --color-gold-500: #d9b469;
+    --color-gold-600: #e6c98b;
+    --color-gold-700: #eed7a6;
+    --color-red-50: #3a1519;
+    --color-red-200: #6b2a30;
+    --color-red-500: #f87171;
+    --color-red-700: #fda4ac;
+    --color-red-800: #fecdd2;
+    --color-amber-50: #33270f;
+    --color-amber-200: #6b5420;
+    --color-amber-900: #fde7a8;
+    --color-green-50: #10291b;
+    --color-green-200: #1f5136;
+    --color-green-800: #a7f3c4;
+    --shadow-clay: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 1px 0 0 rgba(255, 255, 255, 0.04), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
+    --shadow-clay-raised: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 46px -14px rgba(0, 0, 0, 0.85);
+    --shadow-clay-inset: inset 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .editor-ui[data-editor-theme='dark'] .editor-chrome .btn-3d-light {
+    --btn-top: #322b37;
+    --btn-mid: #29232e;
+    --btn-bottom: #201b25;
+    --btn-rim: rgba(255, 255, 255, 0.1);
+    --btn-rim-side: rgba(255, 255, 255, 0.05);
+    --btn-shade: rgba(0, 0, 0, 0.5);
+    --btn-shade-side: rgba(0, 0, 0, 0.35);
+    --btn-drop: rgba(0, 0, 0, 0.45);
+    --btn-drop-far: rgba(0, 0, 0, 0.3);
+  }
+  .editor-ui[data-editor-theme='dark'] .editor-chrome .clay-inset {
+    background: linear-gradient(180deg, #100e13, #19161d);
+  }
+}
+@layer utilities {
+  /* Tailwind writes the clay shadows out in full, so dark mode swaps them here. */
+  .editor-ui[data-editor-theme='dark'] .editor-chrome .shadow-clay-sm {
+    --tw-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 3px 10px -3px rgba(0, 0, 0, 0.7);
+  }
+  .editor-ui[data-editor-theme='dark'] .editor-chrome .shadow-clay-inset {
+    --tw-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .editor-ui[data-editor-theme='dark'] .editor-chrome .shadow-clay-raised {
+    --tw-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 46px -14px rgba(0, 0, 0, 0.85);
+  }
+  .editor-ui[data-editor-theme='dark'] .editor-chrome .shadow-clay {
+    --tw-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
   }
 }

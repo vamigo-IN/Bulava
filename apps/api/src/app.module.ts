@@ -56,6 +56,8 @@ import { NotificationsController } from './modules/notifications/notifications.c
 import { AnalyticsModule } from './modules/analytics/analytics.service';
 import { AnnouncementsController } from './modules/announcements/announcements.controller';
 import { AnnouncementsService } from './modules/announcements/announcements.service';
+import { LikesController } from './modules/templates/likes.controller';
+import { LikesService } from './modules/templates/likes.service';
 import { TemplatesController } from './modules/templates/templates.controller';
 import { TemplateAssetsService } from './modules/templates/template-assets.service';
 import { TemplatesService } from './modules/templates/templates.service';
@@ -200,6 +202,7 @@ const bootConfig = loadConfig();
     RsvpController,
     GuestInvitationController,
     TemplatesController,
+    LikesController,
     DesignController,
     PublicEventsController,
     AnnouncementsController,
@@ -278,6 +281,7 @@ const bootConfig = loadConfig();
     GuestInvitationService,
     RsvpService,
     TemplatesService,
+    LikesService,
     TemplateAssetsService,
     RenderContextService,
     DesignService,

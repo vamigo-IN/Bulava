@@ -11,7 +11,7 @@ export const id = z.string().regex(/^[a-z0-9][a-z0-9-_]{0,63}$/i, 'Use letters, 
 // ─────────────────────────── Values ───────────────────────────
 
 /** `initial` keeps a name's first letter, capitalised (monograms: {{couple.partnerOne|initial}}). */
-export const VALUE_FORMATS = ['date', 'dateWithWeekday', 'time', 'upper', 'lower', 'dateTime', 'initial'] as const;
+export const VALUE_FORMATS = ['date', 'dateWithWeekday', 'dateShort', 'time', 'upper', 'lower', 'dateTime', 'initial'] as const;
 
 export type Value =
   | { literal: string | number | boolean }

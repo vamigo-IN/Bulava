@@ -8,3 +8,6 @@ import dynamic from 'next/dynamic';
  * code then loads only on pages that actually show a live preview.
  */
 export const LiveThumbnail = dynamic(() => import('./live-template').then((m) => m.LiveThumbnailView));
+
+/** A canvas film's poster, drawn live the same way (until its pre-rendered image exists). */
+export const LiveFilmPoster = dynamic(() => import('./live-template').then((m) => m.FilmPosterView));

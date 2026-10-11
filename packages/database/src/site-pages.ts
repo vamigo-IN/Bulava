@@ -735,6 +735,9 @@ export const SITE_PAGES: SeedSitePage[] = [
           - **bulava_pin_…** remembers that you entered an event's PIN. It lasts 12 hours.
           - **bulava_link_…** keeps the key of a private event link, so it doesn't stay in your address bar. It lasts 90 days.
           - **bulava_invite** (browser storage) remembers your invitation while you upload photos, and is cleared when you close the tab.
+          - **bulava_vid** is set only when you like a design without signing in. It holds a random number, not who you are, so that you can take the like back and one browser likes a design only once. It lasts a year.
+          - **bulava.card…**, **bulava.cards…** and **bulava.film…** (browser storage) keep the cards you design and buy, and the films you design, on this device, so you can come back to them.
+          - **bulava.editor.theme** (browser storage) remembers whether you like our editors light or dark.
         `),
       },
       {

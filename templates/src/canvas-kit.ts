@@ -7,7 +7,7 @@ import { fontsFor, palette, SLOTS, type CatalogEntry, type CatalogMeta, type Fon
  * canvas card per function, standard sections, RSVP and footer).
  */
 
-export const b = (binding: string, extra: Partial<{ format: 'date' | 'dateWithWeekday' | 'time' | 'upper' | 'dateTime'; fallback: Value }> = {}): Value => ({ binding, ...extra });
+export const b = (binding: string, extra: Partial<{ format: 'date' | 'dateWithWeekday' | 'dateShort' | 'time' | 'upper' | 'dateTime'; fallback: Value }> = {}): Value => ({ binding, ...extra });
 export const t = (key: string): Value => ({ t: key });
 export const lit = (literal: string): Value => ({ literal });
 /** Seconds rounded to hundredths: sums like 0.35 + 0.1 would otherwise store float noise in the definition. */

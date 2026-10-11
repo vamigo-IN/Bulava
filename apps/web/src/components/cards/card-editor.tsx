@@ -12,7 +12,6 @@ import {
   EyeOff,
   Image as ImageIcon,
   LoaderCircle,
-  Maximize,
   NotebookPen,
   Palette,
   Redo2,
@@ -22,8 +21,6 @@ import {
   Type,
   Undo2,
   X,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -39,12 +36,13 @@ import {
   type CardFormat,
   type Layer,
 } from '@bulava/template-schema';
+import { CanvasToolbar, ThemeToggle, useEditorTheme } from '@/components/editor/editor-chrome';
 import { errorMessage, useOptionalT } from '@/lib/i18n';
 import { cardApi, isSessionGone, loadStoredCard, saveStoredCard, type CardSessionOrder } from '@/lib/cards';
 import { cn } from '@/lib/utils';
 import { DownloadDialog } from './download-dialog';
 import { LayerInspector } from './editor-inspector';
-import { newLayerId, PHOTO_PLACEHOLDER } from './editor-model';
+import { layerShown, newLayerId, PHOTO_PLACEHOLDER } from './editor-model';
 import { ColorsPanel, DetailsPanel, ElementsPanel, PhotosPanel, SizePanel, TextPanel, type PanelKey } from './editor-panels';
 import type { CardEditorApi, CardTemplateInfo } from './editor-types';
 import { IconButton } from './editor-ui';
@@ -106,6 +104,7 @@ export function CardEditor({ template, occasions, initialEvent, siteName }: { te
 function Editor({ template, occasions, start, siteName }: { template: CardTemplateInfo; occasions: Array<{ key: string; name: string }>; start: Start; siteName: string }) {
   const t = useOptionalT();
   const desktop = useMediaQuery('(min-width: 1024px)');
+  const [theme, setTheme] = useEditorTheme();
   const config = useQuery({ queryKey: ['card-config'], queryFn: cardApi.config, staleTime: 60_000 });
 
   // ── The design and its history ──
@@ -356,7 +355,8 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
   }, []);
   const W = design.board.width;
   const H = design.board.height;
-  const fit = Math.max(0.1, Math.min((box.w - (desktop ? 64 : 24)) / W, (box.h - (desktop ? 72 : 40)) / H, 2.5));
+  // Desktop: room around the card, and under it for the floating zoom bar.
+  const fit = Math.max(0.1, Math.min((box.w - (desktop ? 64 : 24)) / W, (box.h - (desktop ? 168 : 40)) / H, 2.5));
   const [zoomMode, setZoomMode] = useState<'fit' | number>('fit');
   const zoom = zoomMode === 'fit' ? fit : zoomMode;
   const zoomBy = (factor: number) => setZoomMode(Math.min(3, Math.max(0.15, Math.round(zoom * factor * 100) / 100)));
@@ -455,6 +455,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
   }, [downloadOpen, selectedId, undo, redo, removeLayer, changeLayer, select]);
 
   const editor: CardEditorApi = {
+    kind: 'card',
     design,
     template,
     config: config.data ?? null,
@@ -520,10 +521,10 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
     saveState === 'saving' ? t('cards.editor.saving') : saveState === 'saved' ? t('cards.editor.saved') : saveState === 'error' ? t('cards.editor.saveFailed') : t('cards.editor.savedDevice');
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-canvas text-ink">
+    <div className="editor-ui fixed inset-0 flex flex-col" data-editor-theme={theme}>
       <TemplateStyles />
       {/* ── Top bar ── */}
-      <header className="relative z-20 flex min-h-16 items-center gap-2 border-b border-[#eadfcf] bg-surface/95 px-2 shadow-clay-sm backdrop-blur sm:gap-3 sm:px-4">
+      <header className="editor-chrome relative z-20 flex min-h-16 items-center gap-2 border-b border-[var(--ed-line)] bg-surface/95 px-2 text-ink shadow-clay-sm backdrop-blur sm:gap-3 sm:px-4">
         <Link href="/cards" className="btn-3d btn-3d-light size-10 shrink-0 rounded-xl" aria-label={t('cards.editor.back')} title={t('cards.editor.back')}>
           <ArrowLeft aria-hidden className="size-4" />
         </Link>
@@ -559,21 +560,9 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
               >
                 <RotateCcw aria-hidden className="size-5" />
               </IconButton>
-              <span className="mx-1 h-6 w-px bg-stone-200" aria-hidden />
-              <IconButton label={t('cards.editor.zoomOut')} onClick={() => zoomBy(1 / 1.2)} tone="plain">
-                <ZoomOut aria-hidden className="size-5" />
-              </IconButton>
-              <button type="button" onClick={() => setZoomMode('fit')} className="min-w-14 rounded-lg px-1 text-xs font-semibold text-stone-600 tabular-nums hover:bg-sand/80" title={t('cards.editor.fit')}>
-                {Math.round(zoom * 100)}%
-              </button>
-              <IconButton label={t('cards.editor.zoomIn')} onClick={() => zoomBy(1.2)} tone="plain">
-                <ZoomIn aria-hidden className="size-5" />
-              </IconButton>
-              <IconButton label={t('cards.editor.fit')} onClick={() => setZoomMode('fit')} tone="plain" active={zoomMode === 'fit'}>
-                <Maximize aria-hidden className="size-5" />
-              </IconButton>
             </>
           ) : null}
+          <ThemeToggle theme={theme} onChange={setTheme} labels={{ dark: t('editor.theme.dark'), light: t('editor.theme.light') }} />
           <IconButton label={previewing ? t('cards.editor.edit') : t('cards.editor.preview')} onClick={() => setPreviewing((v) => !v)} active={previewing} tone="plain">
             {previewing ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
           </IconButton>
@@ -589,8 +578,8 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
       <div className={cn('relative flex min-h-0 flex-1', !desktop && 'flex-col')}>
         {/* ── Panels (desktop) ── */}
         {desktop ? (
-          <aside className="flex w-[22rem] shrink-0 border-r border-[#eadfcf] bg-[#fbf6ee]" aria-label={t('cards.editor.tools')}>
-            <nav className="flex w-[4.5rem] shrink-0 flex-col items-center gap-1 border-r border-[#eadfcf] py-3" aria-label={t('cards.editor.tools')}>
+          <aside className="editor-chrome flex w-[22rem] shrink-0 border-r border-[var(--ed-line)] bg-[var(--ed-panel)] text-ink" aria-label={t('cards.editor.tools')}>
+            <nav className="flex w-[4.5rem] shrink-0 flex-col items-center gap-1 border-r border-[var(--ed-line)] py-3" aria-label={t('cards.editor.tools')}>
               {panels.map((p) => (
                 <button
                   key={p.key}
@@ -611,10 +600,11 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
           </aside>
         ) : null}
 
-        {/* ── The canvas ── */}
+        {/* ── The canvas, with the zoom bar floating over it ── */}
+        <div className="relative flex min-h-0 min-w-0 flex-1">
         <main
           ref={stageBox}
-          className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle,#e3d6c4_1px,transparent_1.2px)] [background-size:18px_18px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600"
+          className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle,var(--ed-dot)_1px,transparent_1.2px)] [background-size:18px_18px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600"
           aria-label={t('cards.editor.canvas')}
           // Zoomed in, the canvas scrolls: keyboards reach it too.
           tabIndex={0}
@@ -622,13 +612,13 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
             if (e.target === e.currentTarget) select(null);
           }}
         >
-          <div className="flex min-h-full min-w-full items-center justify-center p-4 sm:p-8" onPointerDown={(e) => e.target === e.currentTarget && select(null)}>
+          <div className={cn('flex min-h-full min-w-full items-center justify-center p-4 sm:p-8', desktop && 'pb-28')} onPointerDown={(e) => e.target === e.currentTarget && select(null)}>
             {previewing ? (
               <div className="flex flex-col items-center gap-3">
                 <div style={{ width: W * zoom }} className="overflow-hidden rounded-sm shadow-2xl">
                   <CardView design={design} ctx={ctx} t={cardT} watermark={watermarkPreview ? (config.data?.watermark ?? null) : null} />
                 </div>
-                <label className="mx-auto flex w-fit items-center gap-2 rounded-full bg-surface px-4 py-2 text-xs font-medium text-stone-700 shadow-clay-sm">
+                <label className="editor-chrome mx-auto flex w-fit items-center gap-2 rounded-full bg-surface px-4 py-2 text-xs font-medium text-stone-700 shadow-clay-sm">
                   <input type="checkbox" checked={watermarkPreview} onChange={(e) => setWatermarkPreview(e.target.checked)} className="size-4 accent-brand-700" />
                   {t('cards.editor.watermarkPreview')}
                 </label>
@@ -643,6 +633,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
                   onCommit={(board) => change((d) => ({ ...d, board }))}
                   snapping
                   renderBoard={(board) => <CardView design={design} board={board} ctx={editCtx} t={cardT} />}
+                  selectable={(layer) => layerShown(layer, ctx)}
                   label={t('cards.editor.canvas')}
                   handleSize={desktop ? 10 : 18}
                   onDoubleClick={(id) => {
@@ -650,17 +641,31 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
                     if (layer?.kind === 'text') focusText(id);
                   }}
                 />
-                <p className="text-center text-xs text-stone-500" style={{ maxWidth: Math.max(280, W * zoom) }}>
-                  {t('cards.editor.canvasHint')}
-                </p>
+                {/* Desktop: the inspector says this, and the zoom bar sits here. */}
+                {desktop || sheet ? null : (
+                  <p className="editor-chrome text-center text-xs text-stone-500" style={{ maxWidth: Math.max(280, W * zoom) }}>
+                    {t('cards.editor.canvasHint')}
+                  </p>
+                )}
               </div>
             )}
           </div>
         </main>
+        {desktop ? (
+          <CanvasToolbar
+            className="absolute bottom-5 left-1/2 z-10 -translate-x-1/2"
+            zoom={zoom}
+            fitted={zoomMode === 'fit'}
+            onZoom={zoomBy}
+            onFit={() => setZoomMode('fit')}
+            labels={{ zoomIn: t('cards.editor.zoomIn'), zoomOut: t('cards.editor.zoomOut'), fit: t('cards.editor.fit') }}
+          />
+        ) : null}
+        </div>
 
         {/* ── Inspector (desktop) ── */}
         {desktop ? (
-          <aside className="w-[20rem] shrink-0 overflow-y-auto border-l border-[#eadfcf] bg-[#fbf6ee] p-4 [scrollbar-width:thin]" aria-label={t('cards.editor.inspector')}>
+          <aside className="editor-chrome w-[20rem] shrink-0 overflow-y-auto border-l border-[var(--ed-line)] bg-[var(--ed-panel)] p-4 text-ink [scrollbar-width:thin]" aria-label={t('cards.editor.inspector')}>
             <LayerInspector editor={editor} />
           </aside>
         ) : null}
@@ -670,7 +675,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
           <section
             id="card-editor-sheet"
             className={cn(
-              'relative z-30 shrink-0 overflow-y-auto rounded-t-[1.75rem] bg-[#fbf6ee] px-4 pt-3 shadow-[0_-12px_40px_rgba(70,40,26,0.18)] [scrollbar-width:thin]',
+              'editor-chrome relative z-30 shrink-0 overflow-y-auto rounded-t-[1.75rem] bg-[var(--ed-panel)] px-4 pt-3 text-ink shadow-[var(--ed-sheet-shadow)] [scrollbar-width:thin]',
               // An element's settings leave the card more room than a panel does: its handles stay easy to reach.
               sheetFolded ? 'pb-3' : sheet === 'inspector' ? 'max-h-[36dvh] pb-6' : 'max-h-[44dvh] pb-6',
             )}
@@ -702,7 +707,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
       </div>
 
       {!desktop ? (
-        <nav className="relative z-30 flex border-t border-[#eadfcf] bg-surface px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]" aria-label={t('cards.editor.tools')}>
+        <nav className="editor-chrome relative z-30 flex border-t border-[var(--ed-line)] bg-surface px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]" aria-label={t('cards.editor.tools')}>
           {panels.map((p) => (
             <button
               key={p.key}
@@ -726,7 +731,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
       ) : null}
 
       {toast ? (
-        <p role="alert" className="fixed bottom-24 left-1/2 z-[80] w-[min(92vw,26rem)] -translate-x-1/2 rounded-2xl bg-stone-900 px-4 py-3 text-center text-sm text-white shadow-xl lg:bottom-8">
+        <p role="alert" className="editor-chrome fixed bottom-24 left-1/2 z-[80] w-[min(92vw,26rem)] -translate-x-1/2 rounded-2xl bg-ink px-4 py-3 text-center text-sm text-canvas shadow-xl lg:bottom-8">
           {toast}
         </p>
       ) : null}

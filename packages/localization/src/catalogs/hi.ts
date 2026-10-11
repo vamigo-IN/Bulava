@@ -96,6 +96,8 @@ export const hi: Catalog = {
   'template.mundan': 'मुंडन संस्कार',
   'template.puja': 'ईश्वर के आशीर्वाद से',
   'template.blessings': 'आपकी उपस्थिति एवं आशीर्वाद प्रार्थनीय है',
+  'template.rsvp.accept': 'स्वीकार',
+  'template.rsvp.decline': 'क्षमा करें',
 
   'invite.photos.upload': 'तस्वीरें अपलोड करें',
   'invite.photos.gallery': 'गैलरी देखें',

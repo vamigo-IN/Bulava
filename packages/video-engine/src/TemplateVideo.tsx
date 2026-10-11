@@ -6,6 +6,7 @@ import {
   effectiveFonts,
   resolveValue,
   videoDurationSec,
+  withSceneCustomization,
   type Customization,
   type Element,
   type RenderContext,
@@ -15,6 +16,7 @@ import {
 } from '@bulava/template-schema';
 import { Bell, Crescent, Diya, fontStack, initials, Kalash, Lantern, MarigoldStrand, Ornament, PeacockFeather, Toran } from '@bulava/template-engine';
 import { Particles, SceneBackdrop } from './backdrop';
+import { CanvasScene } from './canvas-scene';
 import { fitFontSize } from './fit';
 
 export const COMPOSITION_ID = 'TemplateVideo';
@@ -271,6 +273,10 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
   const bg = planned.scene.background;
   const background = bg === 'gradient' ? `linear-gradient(160deg, ${colors.primary}, ${colors.secondary})` : color(bg, colors, colors.background);
   const backdrop = planned.scene.backdrop;
+  const canvas = planned.scene.canvas;
+  // A board without a background is words and art over the scene (a host's redrawn scene): it goes over the particles, as elements do.
+  const overlay = canvas?.board.background.type === 'none';
+  const board = canvas ? <CanvasScene canvas={canvas} ctx={planned.ctx} colors={colors} fonts={definition.fonts} theme={definition.theme} language={language} frames={planned.frames} /> : null;
   return (
     <AbsoluteFill style={{ background, opacity }}>
       {backdrop ? (
@@ -284,7 +290,9 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
           photo={planned.ctx.photoSlots?.cover?.url ?? planned.ctx.photos[0]?.url}
         />
       ) : null}
+      {overlay ? null : board}
       <Particles effect={planned.scene.particles} colors={colors} />
+      {overlay ? board : null}
       {planned.scene.elements.map((el) => (
         <ElementView key={el.id} el={el} ctx={planned.ctx} colors={colors} fonts={definition.fonts} language={language} sceneFrames={planned.frames} />
       ))}
@@ -296,10 +304,10 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
 export function TemplateVideo(props: TemplateVideoProps) {
   const { fps, durationInFrames } = useVideoConfig();
   const colors = effectiveColors(props.definition, props.customization);
-  // A customer's font pairing replaces the template fonts wherever scenes read them.
-  const definition = { ...props.definition, fonts: effectiveFonts(props.definition, props.customization) };
+  // A customer's font pairing replaces the template fonts wherever scenes read them, and their redrawn scenes replace the film's (ADR-059).
+  const definition = { ...withSceneCustomization(props.definition, props.customization?.scenes), fonts: effectiveFonts(props.definition, props.customization) };
   const ctx: RenderContext = props.customization?.custom ? { ...props.context, custom: { ...props.context.custom, ...props.customization.custom } } : props.context;
-  const scenes = planScenes(props.definition, ctx, fps);
+  const scenes = planScenes(definition, ctx, fps);
   return (
     <AbsoluteFill style={{ background: colors.background, fontFamily: fontStack(definition.fonts.body, 'sans-serif') }}>
       {scenes.map((s) => (

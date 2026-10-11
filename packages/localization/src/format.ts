@@ -34,6 +34,15 @@ export function formatEventDate(value: Date | string, options: FormatOptions): s
   }).format(toDate(value));
 }
 
+/** e.g. "15 Dec", "15 दिस॰": the day and month alone, for timelines and other tight spaces. */
+export function formatEventDateShort(value: Date | string, options: FormatOptions): string {
+  return new Intl.DateTimeFormat(localeFor(options), {
+    day: 'numeric',
+    month: 'short',
+    timeZone: options.timeZone,
+  }).format(toDate(value));
+}
+
 /** e.g. "Tuesday, 15 December 2026" */
 export function formatEventDateWithWeekday(value: Date | string, options: FormatOptions): string {
   return new Intl.DateTimeFormat(localeFor(options), {

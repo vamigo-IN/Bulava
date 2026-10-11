@@ -170,7 +170,7 @@ export function OrderStatus({ orderToken, siteName, compact }: { orderToken: str
         </p>
       ) : null}
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-2xl border border-[#e2d2c0] p-4 text-sm">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-2xl border border-[var(--ed-field-line,#e2d2c0)] p-4 text-sm">
         <dt className="text-stone-500">{t('cards.order.reference')}</dt>
         <dd className="text-right font-semibold text-ink">{o.reference}</dd>
         <dt className="text-stone-500">{t('cards.order.amount')}</dt>

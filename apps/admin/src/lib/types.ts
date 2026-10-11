@@ -96,6 +96,8 @@ export interface AdminTemplate {
   tags: string[];
   status: TemplateStatus;
   currentVersionId: string | null;
+  /** Real likes from visitors and customers (ADR-055). */
+  likeCount: number;
   createdAt: string;
   updatedAt: string;
   versions: TemplateVersionSummary[];
@@ -342,7 +344,7 @@ export interface StaffOverview {
 
 // ───── Site settings ─────
 
-export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'google' | 'maps' | 'domains' | 'cards';
+export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'google' | 'maps' | 'domains' | 'cards' | 'likes';
 
 export interface SettingCheckStep {
   label: string;

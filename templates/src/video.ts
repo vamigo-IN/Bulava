@@ -1,7 +1,7 @@
 import { DARK_SCENE_NAMES, type CameraMove, type EffectName, type SceneNameValue, type TemplateDefinitionInput, type ThemeColors, type Value } from '@bulava/template-schema';
 import { fontsFor, INVOCATION, palette, TITLE, type CatalogEntry, type CatalogMeta, type FontPreset } from './builder';
 
-type Recipe = 'royal' | 'modern' | 'festive' | 'photo' | 'film';
+type Recipe = 'royal' | 'modern' | 'festive' | 'photo' | 'film' | 'premium';
 type Ornament = 'mandala' | 'paisley' | 'floral' | 'geometric' | 'confetti' | 'lotus' | 'peacock' | 'stars' | 'laurel';
 
 /**
@@ -24,6 +24,14 @@ interface FilmSpec {
   people: 'couple' | 'one';
   /** Ornament over each function card. */
   motif: string;
+  /** Premium films: the ornament that blooms behind the opening and the couple (default mandala). */
+  halo?: Ornament;
+  /** Premium films: "&" between the names instead of "weds". */
+  joiner?: 'weds' | 'and';
+  /** Premium films: the couple's photo in a gold arch or circle, or in the backdrop's own medallion (noir). */
+  portrait?: 'arch' | 'circle' | 'backdrop';
+  /** Premium films: a camera for each part (the opening's is `openingCamera`). */
+  cameras?: Partial<Record<'names' | 'couple' | 'functions' | 'closing', CameraMove>>;
 }
 
 interface VideoSpec extends Omit<CatalogMeta, 'sortOrder'> {
@@ -202,9 +210,150 @@ function filmScenes(spec: VideoSpec, film: FilmSpec) {
   return scenes;
 }
 
+/**
+ * The premium film recipe: the same illustrated scenes and camera, with a
+ * more cinematic cut. A halo blooms behind the opening's blessing and a gold
+ * rule settles under the eyebrow; the names shine in turn with an "&" coming
+ * into focus between them; the couple's photo sits in a gold arch, a gold
+ * ring or the noir medallion; each function is a glass card between two gold
+ * rules; the close invites the guest in script.
+ */
+/** Any film element, for lists that mix kinds. */
+type FilmElement = { id: string; kind: string; frame: { x: number; y: number; w: number; h: number }; [key: string]: unknown };
+
+function premiumFilmScenes(spec: VideoSpec, film: FilmSpec) {
+  const { invocation, eyebrow } = spec;
+  const script = film.nameStyle === 'script';
+  const halo = film.halo ?? 'mandala';
+  const cams = { names: 'pull' as CameraMove, couple: 'panRight' as CameraMove, functions: 'panLeft' as CameraMove, closing: 'push' as CameraMove, ...film.cameras };
+  const nameStyle = (size: number, color: string, shadow?: 'glow'): Style =>
+    script ? { font: 'script', fontSize: size, color, lineHeight: 1.05, shadow } : { font: 'heading', fontSize: Math.round(size * 0.7), letterSpacing: 9, color, lineHeight: 1.1, shadow };
+  const rule = (id: string, y: number, width: number, color: string, delaySec: number) => ({
+    id,
+    kind: 'shape' as const,
+    frame: { x: (W - width) / 2, y, w: width, h: 3 },
+    style: { fill: color, opacity: 0.9, radius: 2 },
+    animation: { in: { type: 'fade', durationSec: 1.2, delaySec } },
+  });
+
+  const o = inks(film.opening);
+  const opening = {
+    id: 'opening',
+    durationSec: 5,
+    backdrop: { scene: film.opening, camera: film.openingCamera ?? 'push', intensity: 1.2 },
+    particles: film.particles.opening,
+    elements: drop(film.opening, [
+      ornament('halo', halo, 210, 130, 660, o.soft, DARK_SCENE_NAMES.includes(film.opening) ? 0.28 : 0.45, 'bloom'),
+      ...(invocation ? [text('invocation', 320, 90, lit(invocation), { font: 'body', fontSize: 46, color: o.soft, shadow: o.shadow }, { type: 'blurIn', delaySec: 0.3, durationSec: 1.4 })] : []),
+      text('eyebrow', 440, 130, eyebrow, { font: 'heading', fontSize: film.people === 'couple' ? 64 : 54, letterSpacing: film.people === 'couple' ? 8 : 5, color: o.body, shadow: o.shadow }, { type: 'tracking', delaySec: 0.9, durationSec: 2 }),
+      rule('rule', 600, 260, o.soft, 1.8),
+    ]),
+  };
+
+  const n = inks(film.names);
+  const joiner = film.joiner === 'and' ? lit('&') : t('template.weds');
+  const names = {
+    id: 'names',
+    durationSec: 6.5,
+    backdrop: { scene: film.names, camera: cams.names, intensity: 1 },
+    particles: film.particles.names,
+    elements: drop(
+      film.names,
+      film.people === 'couple'
+        ? [
+            text('families', 160, 70, t('template.film.families'), { font: 'body', fontSize: 36, letterSpacing: 3, color: n.body, opacity: 0.9, shadow: n.softShadow }, { type: 'fade', delaySec: 0.2 }),
+            text('partner-one', 250, 200, script ? PARTNER_ONE : { ...PARTNER_ONE, format: 'upper' }, nameStyle(156, n.head, n.shadow), { type: 'shine', delaySec: 0.5, durationSec: 2.2 }),
+            text('weds', 452, 110, joiner, film.joiner === 'and' ? { font: 'script', fontSize: 110, color: n.soft, shadow: n.shadow } : { font: 'heading', fontSize: 54, color: n.soft, shadow: n.shadow }, { type: 'blurIn', delaySec: 1.4, durationSec: 1.1 }),
+            text('partner-two', 566, 200, script ? b('couple.partnerTwo') : b('couple.partnerTwo', 'upper'), nameStyle(156, n.head, n.shadow), { type: 'shine', delaySec: 1.9, durationSec: 2.2 }),
+            rule('rule', 790, 220, n.soft, 2.7),
+            text('date', 812, 76, b('event.startDate', 'date'), { font: 'heading', fontSize: 54, color: n.body, shadow: n.softShadow }, { type: 'fadeUp', delaySec: 2.9 }),
+            text('city', 890, 62, b('venue.city', 'upper'), { font: 'body', fontSize: 34, letterSpacing: 12, color: n.soft, shadow: n.softShadow }, { type: 'tracking', delaySec: 3.3, durationSec: 1.6 }),
+          ]
+        : [
+            text('eyebrow-2', 180, 80, eyebrow, { font: 'body', fontSize: 38, letterSpacing: 8, color: n.body, shadow: n.softShadow }, { type: 'tracking', delaySec: 0.2, durationSec: 1.4 }),
+            text('title', 280, 380, script ? TITLE : { ...TITLE, fallback: { binding: 'honoree.name', format: 'upper', fallback: { binding: 'event.title', format: 'upper' } } }, nameStyle(170, n.head, n.shadow), { type: 'shine', delaySec: 0.6, durationSec: 2.4 }),
+            rule('rule', 690, 220, n.soft, 1.8),
+            text('date', 712, 80, b('event.startDate', 'dateWithWeekday'), { font: 'heading', fontSize: 54, color: n.body, shadow: n.softShadow }, { type: 'fadeUp', delaySec: 2 }),
+            text('city', 796, 60, b('venue.city', 'upper'), { font: 'body', fontSize: 34, letterSpacing: 12, color: n.soft, shadow: n.softShadow }, { type: 'tracking', delaySec: 2.4, durationSec: 1.6 }),
+          ],
+    ),
+  };
+
+  const scenes: unknown[] = [opening, names];
+
+  if (film.couple) {
+    const c = inks(film.couple);
+    const portrait = film.portrait ?? 'arch';
+    const photoFrame = portrait === 'circle' ? { x: 300, y: 230, w: 480, h: 480 } : { x: 300, y: 190, w: 480, h: 620 };
+    scenes.push({
+      id: 'couple',
+      durationSec: 5,
+      backdrop: { scene: film.couple, camera: cams.couple, intensity: 1, veil: 0.35 },
+      particles: film.particles.names,
+      elements: drop<FilmElement>(
+        film.couple,
+        portrait === 'backdrop'
+          ? [
+              ornament('halo', halo, 240, 170, 600, c.soft, 0.3, 'bloom'),
+              text('couple-families', 300, 70, t('template.film.families'), { font: 'body', fontSize: 36, letterSpacing: 3, color: c.body, shadow: c.softShadow }, { type: 'fade', delaySec: 0.3 }),
+              text('couple-names', 390, 260, TITLE, script ? { font: 'script', fontSize: 120, color: c.head, lineHeight: 1.05, shadow: c.shadow } : { font: 'heading', fontSize: 84, letterSpacing: 6, color: c.head, lineHeight: 1.1, shadow: c.shadow }, { type: 'shine', delaySec: 0.6, durationSec: 2.2 }),
+              rule('rule', 690, 220, c.soft, 1.6),
+            ]
+          : [
+              ornament('halo', halo, 160, 140, 760, c.soft, 0.32, 'bloom'),
+              {
+                id: 'portrait',
+                kind: 'photo' as const,
+                frame: photoFrame,
+                content: { binding: 'photo.cover', fallback: b('photos[0]') },
+                style: { opacity: 1, radius: 24, mask: portrait, border: 'accent' },
+                animation: { in: { type: 'zoomIn', durationSec: 1.4, delaySec: 0.3 } },
+              },
+              text('couple-names', portrait === 'circle' ? 760 : 850, 130, TITLE, { font: script ? 'script' : 'heading', fontSize: script ? 100 : 66, letterSpacing: script ? 0 : 5, color: c.head, shadow: c.shadow }, { type: 'fadeUp', delaySec: 1 }),
+            ],
+      ),
+    });
+  }
+
+  const f = inks(film.functions);
+  scenes.push({
+    id: 'function',
+    durationSec: 4.5,
+    repeatPerFunction: true,
+    backdrop: { scene: film.functions, camera: cams.functions, intensity: 1, veil: 0.3 },
+    elements: drop(film.functions, [
+      { id: 'fn-card', kind: 'shape' as const, frame: { x: 100, y: 190, w: 880, h: 800 }, style: { fill: f.card, opacity: 0.6, radius: 48 }, animation: { in: { type: 'fade', durationSec: 0.8 } } },
+      rule('fn-rule-top', 236, 200, f.soft, 0.2),
+      ornament('fn-motif', film.motif, 450, 270, 180, f.soft, 0.9, 'bloom'),
+      text('fn-name', 460, 150, b('function.name'), { font: script ? 'script' : 'heading', fontSize: script ? 120 : 96, color: f.head, shadow: f.shadow }, { type: 'reveal', delaySec: 0.3, durationSec: 1 }),
+      text('fn-date', 626, 74, b('function.date', 'dateWithWeekday'), { font: 'body', fontSize: 44, color: f.body }, { type: 'fadeUp', delaySec: 0.7 }),
+      text('fn-time', 702, 64, b('function.time', 'time'), { font: 'body', fontSize: 40, letterSpacing: 4, color: f.soft }, { type: 'tracking', delaySec: 0.9, durationSec: 1.2 }),
+      text('fn-venue', 780, 130, b('function.venue.name'), { font: 'heading', fontSize: 52, color: f.body }, { type: 'fadeUp', delaySec: 1.1 }),
+      rule('fn-rule-bottom', 940, 200, f.soft, 1.3),
+    ], { inset: false }),
+  });
+
+  const e = inks(film.closing);
+  scenes.push({
+    id: 'closing',
+    durationSec: 5.5,
+    backdrop: { scene: film.closing, camera: cams.closing, intensity: 1.1 },
+    particles: film.particles.closing,
+    elements: drop(film.closing, [
+      text('join', 230, 220, t('template.joinUs'), { font: 'script', fontSize: 132, color: e.head, shadow: e.shadow }, { type: 'shine', delaySec: 0.3, durationSec: 2 }),
+      text('thanks', 470, 170, t('template.footer.thanks'), { font: 'heading', fontSize: 52, color: e.body, shadow: e.softShadow }, { type: 'fadeUp', delaySec: 1 }),
+      rule('rule', 666, 220, e.soft, 1.4),
+      text('closing-title', 690, 90, TITLE, { font: 'heading', fontSize: 44, letterSpacing: 6, color: e.soft, shadow: e.softShadow }, { type: 'tracking', delaySec: 1.6, durationSec: 1.6 }),
+      ornament('closing-motif', film.motif, 470, 820, 140, e.soft, 0.85, 'bloom', 2),
+    ]),
+  });
+  return scenes;
+}
+
 function scenes(spec: VideoSpec) {
   const { recipe, invocation, eyebrow } = spec;
   if (recipe === 'film' && spec.film) return filmScenes(spec, spec.film);
+  if (recipe === 'premium' && spec.film) return premiumFilmScenes(spec, spec.film);
   const orn = spec.ornament;
   const particles = spec.particles ?? 'none';
   const intro = {
@@ -315,7 +464,7 @@ function scenes(spec: VideoSpec) {
 }
 
 function video(spec: VideoSpec, sortOrder: number): CatalogEntry {
-  const film = spec.recipe === 'film';
+  const film = spec.recipe === 'film' || spec.recipe === 'premium';
   const photos = spec.recipe === 'photo' || (film && !!spec.film?.couple);
   const def: TemplateDefinitionInput = {
     schemaVersion: 1,
@@ -328,7 +477,8 @@ function video(spec: VideoSpec, sortOrder: number): CatalogEntry {
     theme: { colors: spec.colors, radius: 20, ornament: spec.ornament === 'confetti' ? 'confetti' : spec.ornament, pattern: 'none' },
     fonts: fontsFor(spec.fonts),
     capabilities: {
-      editable: { colors: true, fonts: film, music: true, background: false, layout: false, photos, text: false, animation: false },
+      // Films can be redrawn scene by scene in the film's canvas editor (ADR-059); image cards cannot.
+      editable: { colors: true, fonts: film, music: true, background: false, layout: !spec.card, photos, text: false, animation: false },
       colorPresets: spec.presets ?? [],
       textSlots: [],
       maxPhotos: photos ? 1 : 0,
@@ -478,6 +628,68 @@ const SPECS: VideoSpec[] = [
     film: {
       opening: 'lotus', names: 'lotus', functions: 'lotus', closing: 'lotus',
       particles: { opening: 'petals', names: 'goldDust', closing: 'petals' }, nameStyle: 'caps', motif: 'lotus', people: 'one',
+    },
+  },
+  // ───────────── Premium films ─────────────
+  {
+    key: 'maharani-film', name: 'Maharani Film', category: 'Wedding', style: 'Royal', tier: 'PREMIUM', badge: 'NEW', featured: true,
+    description: 'A royal wedding film in maroon and gold: your monogram glows in a gold medallion, the camera moves into a mandap lit by the sacred fire as your names shine, your photo appears in the medallion, each function unfolds under glowing arches and the fire closes the film.',
+    tags: ['hindu', 'royal', 'north-indian', 'cinematic', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'premium', ornament: 'mandala', fonts: 'royal', invocation: INVOCATION.hindu, eyebrow: t('template.weddingOf'),
+    colors: palette('#5a0f28', '#c9a24a', '#f2dca6', '#fbf5ec', '#fffdf8', '#2a0712', '#7a5a52'),
+    presets: [
+      { name: 'Maroon & Gold', colors: palette('#5a0f28', '#c9a24a', '#f2dca6', '#fbf5ec', '#fffdf8', '#2a0712', '#7a5a52') },
+      { name: 'Emerald & Gold', colors: palette('#0d3b2e', '#c9a24a', '#f0dda8', '#f6f4ec', '#ffffff', '#04201a', '#5c6f66') },
+      { name: 'Midnight & Gold', colors: palette('#16224a', '#c9a24a', '#efddb0', '#f5f5f2', '#ffffff', '#080e24', '#5b6478') },
+    ],
+    film: {
+      opening: 'noir', names: 'mandap', couple: 'noir', functions: 'arches', closing: 'mandap', openingCamera: 'push',
+      particles: { opening: 'goldDust', names: 'marigold', closing: 'goldDust' }, nameStyle: 'script', motif: 'kalash', people: 'couple',
+      halo: 'mandala', joiner: 'and', portrait: 'backdrop', cameras: { names: 'pull', couple: 'push', functions: 'panLeft', closing: 'pull' },
+    },
+  },
+  {
+    key: 'ring-ceremony-film', name: 'Ring Ceremony Film', category: 'Engagement', style: 'Romantic', tier: 'STANDARD', badge: 'NEW', featured: true,
+    description: 'A rose-gold film for an engagement: dawn over a lotus pond, your names in flowing script under glowing arches, your photo in a gold ring, every function on a glass card and a blessing to close.',
+    tags: ['engagement', 'ring-ceremony', 'romantic', 'cinematic', 'video', 'illustrated'], eventTypes: ['ENGAGEMENT', 'WEDDING'], recipe: 'premium', ornament: 'laurel', fonts: 'romantic', eyebrow: t('template.engagementOf'),
+    colors: palette('#5b2a4a', '#c99a6a', '#f3d6c8', '#fbf3f1', '#fffaf8', '#2e1424', '#7f6474'),
+    presets: [
+      { name: 'Plum & Rose Gold', colors: palette('#5b2a4a', '#c99a6a', '#f3d6c8', '#fbf3f1', '#fffaf8', '#2e1424', '#7f6474') },
+      { name: 'Sage & Gold', colors: palette('#3f5a46', '#c2a46a', '#dfe8d8', '#f4f6f0', '#ffffff', '#16211a', '#6b776c') },
+    ],
+    film: {
+      opening: 'lotus', names: 'arches', couple: 'lotus', functions: 'arches', closing: 'lotus', openingCamera: 'rise',
+      particles: { opening: 'petals', names: 'goldDust', closing: 'petals' }, nameStyle: 'script', motif: 'laurel', people: 'couple',
+      halo: 'laurel', joiner: 'and', portrait: 'circle', cameras: { names: 'push', couple: 'pull', functions: 'panRight', closing: 'pull' },
+    },
+  },
+  {
+    key: 'midnight-deco-film', name: 'Midnight Deco Film', category: 'Reception', style: 'Glamour', tier: 'PREMIUM', badge: 'NEW', featured: true,
+    description: 'A black-tie reception film in midnight and gold: the lake palace by night with sky lanterns rising, your monogram in a gold medallion as your names land in tall gold capitals, your photo in a gold arch and every function under the palace lights.',
+    tags: ['reception', 'sangeet', 'art-deco', 'night', 'cinematic', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'premium', ornament: 'geometric', fonts: 'editorial', eyebrow: t('template.reception'),
+    colors: palette('#0e1a2b', '#d4b26a', '#ecdcb0', '#f6f4ef', '#ffffff', '#05090f', '#5b6474'),
+    presets: [
+      { name: 'Midnight & Gold', colors: palette('#0e1a2b', '#d4b26a', '#ecdcb0', '#f6f4ef', '#ffffff', '#05090f', '#5b6474') },
+      { name: 'Onyx & Champagne', colors: palette('#1a1a1a', '#d9c08a', '#efe3c2', '#f5f4f1', '#ffffff', '#050505', '#5f5f5f') },
+    ],
+    film: {
+      opening: 'palace', names: 'noir', couple: 'arches', functions: 'palace', closing: 'noir', openingCamera: 'rise',
+      particles: { opening: 'lanterns', names: 'goldDust', closing: 'goldDust' }, nameStyle: 'caps', motif: 'geometric', people: 'couple',
+      halo: 'geometric', joiner: 'and', portrait: 'arch', cameras: { names: 'push', couple: 'pull', functions: 'panRight', closing: 'pull' },
+    },
+  },
+  {
+    key: 'deepotsav-film', name: 'Deepotsav Film', category: 'Festival', style: 'Festive', tier: 'STANDARD', badge: 'NEW',
+    description: 'A Diwali film in indigo and saffron gold: a marigold toran over a rangoli of diyas, sky lanterns rising over the palace as your evening is announced, the programme on glass cards under glowing arches, and a warm wish to close.',
+    tags: ['festival', 'diwali', 'cinematic', 'video', 'illustrated'], eventTypes: ['FESTIVAL', 'COMMUNITY'], recipe: 'premium', ornament: 'mandala', fonts: 'grand', invocation: '॥ शुभ दीपावली ॥', eyebrow: t('template.celebrateWith'),
+    colors: palette('#1f1b4d', '#f2a93b', '#ffd27a', '#fbf7ef', '#fffdf8', '#0d0b24', '#6b6780'),
+    presets: [
+      { name: 'Indigo & Saffron', colors: palette('#1f1b4d', '#f2a93b', '#ffd27a', '#fbf7ef', '#fffdf8', '#0d0b24', '#6b6780') },
+      { name: 'Aubergine & Gold', colors: palette('#3b0f3f', '#e8a33d', '#ffd98a', '#fbf6f8', '#ffffff', '#1a051c', '#76607a') },
+    ],
+    film: {
+      opening: 'toran', names: 'palace', functions: 'arches', closing: 'toran', openingCamera: 'push',
+      particles: { opening: 'marigold', names: 'lanterns', closing: 'goldDust' }, nameStyle: 'script', motif: 'diya', people: 'one',
+      halo: 'mandala', cameras: { names: 'rise', functions: 'panLeft', closing: 'pull' },
     },
   },
   // ───────────── Ornament films ─────────────

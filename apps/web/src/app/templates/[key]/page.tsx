@@ -9,6 +9,7 @@ import { TemplateCard } from '@/components/marketing/template-card';
 import { TemplatePreviewSwitcher } from '@/components/marketing/template-preview-switcher';
 import { UseTemplateButton } from '@/components/marketing/quick-start';
 import { getGalleryTemplates, getPlans, getTemplate, tierPrice } from '@/lib/server-api';
+import { LikeButton } from '@/components/marketing/like-button';
 
 export const revalidate = 60;
 
@@ -52,7 +53,10 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
             />
             <aside className="lg:sticky lg:top-24 lg:self-start">
               <div className="clay rounded-[2rem] p-7 sm:p-8">
-                <p className="eyebrow text-brand-700">{tpl.category}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="eyebrow text-brand-700">{tpl.category}</p>
+                  <LikeButton templateKey={tpl.key} label={t('like.add', { name: tpl.name })} labelOn={t('like.remove', { name: tpl.name })} limitedLabel={t('like.limited')} />
+                </div>
                 <h1 className="mt-3 font-display text-5xl leading-[1.04] tracking-[-0.015em]">{tpl.name}</h1>
                 {tpl.description ? <p className="mt-4 text-lg leading-relaxed text-stone-600">{tpl.description}</p> : null}
                 {tpl.definition.website && tpl.definition.website.intro !== 'none' ? (

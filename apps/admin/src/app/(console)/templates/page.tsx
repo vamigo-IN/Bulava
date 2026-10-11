@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Copy, FileJson, Film, Globe, IdCard, Plus, RotateCcw, Star, Trash2 } from 'lucide-react';
+import { Copy, FileJson, Film, Globe, Heart, IdCard, Plus, RotateCcw, Star, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
@@ -11,7 +11,7 @@ import { Alert, Badge, Button, EmptyState, ErrorNotice, Field, Input, Modal, Pag
 import { apiDelete, apiGet, apiPost, errorMessage } from '@/lib/api';
 import { t, tMaybe } from '@/lib/i18n';
 import type { AdminTemplate, TemplateType } from '@/lib/types';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatNumber } from '@/lib/utils';
 
 const TYPE_ICONS = { WEBSITE: Globe, VIDEO: Film, DIGITAL_CARD: IdCard } as const;
 const CREATABLE_TYPES = ['WEBSITE', 'VIDEO', 'DIGITAL_CARD'] as const;
@@ -120,6 +120,7 @@ function TemplateList() {
               <Th>{t('templates.col.tier')}</Th>
               <Th>{t('common.status')}</Th>
               <Th>{t('templates.col.version')}</Th>
+              <Th className="text-right">{t('templates.col.likes')}</Th>
               <Th>{t('common.updated')}</Th>
               <Th className="text-right">{t('common.actions')}</Th>
             </tr>
@@ -163,6 +164,11 @@ function TemplateList() {
                   <Td className="tabular-nums">
                     {current ? `v${current.version}` : t('common.none')}
                     {pendingDraft ? <p className="text-xs text-amber-700">{t('templates.draftPending', { version: pendingDraft.version })}</p> : null}
+                  </Td>
+                  <Td className="text-right whitespace-nowrap tabular-nums">
+                    <span className="inline-flex items-center gap-1 text-stone-700">
+                      <Heart aria-hidden className="size-3.5 text-stone-400" /> {formatNumber(tpl.likeCount ?? 0)}
+                    </span>
                   </Td>
                   <Td className="whitespace-nowrap">{formatDate(tpl.updatedAt)}</Td>
                   <Td className="text-right whitespace-nowrap">

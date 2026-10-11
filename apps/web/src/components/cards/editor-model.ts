@@ -1,6 +1,7 @@
 import {
   CARD_PHOTO_BINDINGS,
   LayerSchema,
+  resolveBinding,
   type Artboard,
   type CardDesign,
   type CardDetailKey,
@@ -8,6 +9,7 @@ import {
   type Layer,
   type LayerInput,
   type OrnamentLayerName,
+  type RenderContext,
   type ThemeColors,
   type Value,
 } from '@bulava/template-schema';
@@ -26,6 +28,22 @@ export function newLayerId(kind: string): string {
 }
 
 const parse = (input: LayerInput): Layer => LayerSchema.parse(input);
+
+/**
+ * Whether the design shows a layer for this data: not another occasion's
+ * words, not the row of a function that does not exist. The editors keep the
+ * others out of their lists and off the stage (they are still in the design).
+ */
+export function layerShown(layer: Layer, ctx: RenderContext): boolean {
+  const when = layer.visibleWhen;
+  if (!when) return true;
+  if (when.eventTypes && !when.eventTypes.includes(ctx.event.typeKey)) return false;
+  if (when.exists) {
+    const value = resolveBinding(when.exists, ctx);
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return false;
+  }
+  return true;
+}
 
 export type TextPreset = 'heading' | 'subheading' | 'body' | 'script';
 
@@ -77,8 +95,8 @@ export function freePhotoBinding(design: Pick<CardDesign, 'board'>): CardPhotoBi
   return CARD_PHOTO_BINDINGS.find((b) => !used.has(b)) ?? null;
 }
 
-/** A new photo, framed in the middle of the card. */
-export function photoLayer(board: Pick<Artboard, 'width' | 'height'>, binding: CardPhotoBinding, aspect = 1): Layer {
+/** A new photo, framed in the middle of the board, in the photo spot `binding` (photo.cover, photos[0]…). */
+export function photoLayer(board: Pick<Artboard, 'width' | 'height'>, binding: string, aspect = 1): Layer {
   const w = Math.round(Math.min(board.width * 0.56, board.height * 0.4 * aspect));
   const h = Math.round(w / aspect);
   return parse({
@@ -120,7 +138,32 @@ export const ORNAMENT_CHOICES: OrnamentLayerName[] = [
   'cake',
   'giftBox',
   'moonCloud',
+  // The stationery collection's art (premium-cards.ts)
+  'mandalaCrown',
+  'mandalaHalf',
+  'sparkles',
+  'botanicalWreath',
+  'marigoldWreath',
+  'alpana',
+  'prabhavali',
+  'kuthuvilakku',
+  'marigoldSwag',
+  'zariBand',
+  'phulkari',
+  'laalPaar',
+  'goldVine',
+  'ghungroo',
+  'hairlineFrame',
+  'decoFrame',
+  'mihrab',
 ];
+
+/** Drawn to the whole card, a little inside its edges. */
+const FULL_FRAMES: ReadonlySet<OrnamentLayerName> = new Set<OrnamentLayerName>(['hairlineFrame', 'decoFrame', 'mihrab']);
+/** Borders and swags: across the top, edge to edge. */
+const BANDS: ReadonlySet<OrnamentLayerName> = new Set<OrnamentLayerName>(['zariBand', 'phulkari', 'laalPaar', 'marigoldSwag']);
+/** Tall strands: down the left side. */
+const STRANDS: ReadonlySet<OrnamentLayerName> = new Set<OrnamentLayerName>(['goldVine', 'ghungroo']);
 
 /** Width ÷ height of the line ornaments (illustrations know their own, ILLUSTRATION_ASPECT). */
 const LINE_ASPECT: Partial<Record<OrnamentLayerName, number>> = { lotus: 1.6, laurel: 1.4, stars: 1.6, toran: 3.4, marigoldStrand: 0.2, kalash: 0.8, lantern: 0.5 };
@@ -130,6 +173,16 @@ export function ornamentAspect(name: OrnamentLayerName, illustrationAspect: Part
 }
 
 export function ornamentLayer(board: Pick<Artboard, 'width' | 'height'>, name: OrnamentLayerName, aspect: number): Layer {
+  const make = (frame: { x: number; y: number; w: number; h: number }) => parse({ id: newLayerId('art'), kind: 'ornament', ornament: name, color: 'secondary', frame });
+  if (FULL_FRAMES.has(name)) {
+    const m = Math.round(Math.min(board.width, board.height) * 0.04);
+    return make({ x: m, y: m, w: board.width - 2 * m, h: board.height - 2 * m });
+  }
+  if (BANDS.has(name)) return make({ x: 0, y: 0, w: board.width, h: Math.max(24, Math.round(board.width / aspect)) });
+  if (STRANDS.has(name)) {
+    const h = Math.round(board.height * 0.7);
+    return make({ x: Math.round(board.width * 0.04), y: Math.round((board.height - h) / 2), w: Math.max(18, Math.round(h * aspect)), h });
+  }
   const share = aspect >= 1.5 ? 0.6 : aspect >= 1 ? 0.42 : aspect >= 0.5 ? 0.28 : 0.1;
   const w = Math.round(board.width * share);
   const h = Math.round(Math.min(w / aspect, board.height * 0.6));

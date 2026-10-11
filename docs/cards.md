@@ -13,12 +13,13 @@ Anyone can turn a template into a personalised invitation card at `/cards`, with
 
 ## Templates as cards
 
-Every template whose first section is a canvas section can become a card: the 524 canvas templates (the factory's and the hand-made ones). The three older DIGITAL_CARD scene templates keep serving the event dashboard's card and are not in the gallery.
+Every template whose first section is a canvas section can become a card: the 479 canvas templates (406 designs: the factory's, the hand-made ones and the stationery collection). The three older DIGITAL_CARD scene templates keep serving the event dashboard's card and are not in the gallery.
 
 `cardFromTemplate(definition, { format, eventType, language, tags })` (`@bulava/template-schema`, `cards.ts`) makes a card design from the opening artboard:
 
 - the wording for the occasion: layers shown only for other event types are dropped, other conditions follow the sample invitation;
-- every text is either **linked** to the card's details (names, date, venue, message, family; `CARD_DETAIL_BINDINGS`) or turned into words the customer can edit; time-formatted values become words, dates stay linked;
+- every text is either **linked** to the card's details (names, date, venue, message, family; `CARD_DETAIL_BINDINGS`; a timeline's `functions[0..3]` fields) or turned into words the customer can edit; time-formatted values become words, dates stay linked;
+- a timeline keeps its rows: the card's details start with as many sample functions as the design shows, and a row whose function is removed hides (the only condition a card keeps);
 - widgets become text (a countdown becomes the time and venue in the same lettering; date/time/venue rows become lines) or are dropped (buttons);
 - motion is removed and the artboard is fitted to the format.
 
@@ -42,14 +43,15 @@ Switching format in the editor (`withCardFormat`, one undo step) lays the card o
 
 `apps/web/src/components/cards/`: the full-screen editor uses the engine's shared `Stage` (select, move, resize with handles, rotate, snapping) and `CardView`, the one component that draws a card everywhere (editor, preview, download dialog, export).
 
-- **Details**: bride and groom (or the person celebrated), title, date and time, venue, address, city, message, family names. Linked text updates as they are typed; a detail the design does not show yet has "Add to card".
+- **Details**: bride and groom (or the person celebrated), title, date and time, venue, address, city, message, family names, and up to four functions (name, date and time) for designs with a timeline. Linked text updates as they are typed; a detail the design does not show yet has "Add to card"; a timeline row shows only while its function has a name.
 - **Text**: every line on the card, editable (editing a linked line makes it the customer's own words); headings, small capitals, paragraphs and script to add.
 - **Colours**: palettes (the template's, its presets, and the editor's), each palette colour, the card background (template, colour or gradient). Text colours stay readable (the engine's contrast correction).
 - **Photos**: upload, replace, remove; the inspector crops (zoom and focus), flips, frames (masks, radius, border) and brightens.
 - **Elements**: decorations drawn by the engine (no licences), shapes, and the layer list (show, lock, reorder).
 - **Size**: the formats, and "Reset to the original template" (details kept).
-- **Inspector**: font (the design's fonts or any of the 21 families, Devanagari included), size, bold, italic, alignment, colour, line and letter spacing, capitals, shadow, foil, long-text behaviour, rotation and opacity, duplicate, front/back, lock, hide, delete.
-- Undo and redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y), delete key, arrow nudges, zoom and fit, and a preview of the final card with or without the watermark. On phones the tools are a bottom bar and the panels a sheet below the card, never over it: the card shrinks to fit above the sheet, and the sheet folds down to its title to give the card the room to move and resize things. Tapping an element opens its settings once the finger lifts, so a drag that starts by selecting keeps the card's scale.
+- **Inspector**: *Typography* (font: the design's fonts or any of the 21 families, Devanagari included; weight, from the weights the family is loaded in; size; colour; alignment; bold, italic, capitals), line and letter spacing, shadow, foil, long-text behaviour, *Position and size* (X, Y, width and height, centring across and up and down), rotation and opacity, duplicate, front/back, lock, hide, delete.
+- **Light or dark**: the moon in the top bar switches the editor's look (kept on the device, `bulava.editor.theme`; the system's setting until then). The card keeps its colours. The same editor, with a Sections panel, edits the canvas sections of an event's website ([templates.md](templates.md#customization)).
+- Undo and redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y), delete key, arrow nudges, zoom and fit in a bar floating over the canvas, and a preview of the final card with or without the watermark. On phones the tools are a bottom bar and the panels a sheet below the card, never over it: the card shrinks to fit above the sheet, and the sheet folds down to its title to give the card the room to move and resize things. Tapping an element opens its settings once the finger lifts, so a drag that starts by selecting keeps the card's scale.
 
 ### Saving
 

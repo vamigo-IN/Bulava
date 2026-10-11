@@ -6,7 +6,9 @@ import { BananaLeaf, Doves, Elephant, FloralGarland, JasmineStrand, MehendiHand,
 import { Arabesque, Domes, FiligreeCorner, Flourish, Jharokha, Kolam, Medallion, OrnateFrame, PaisleyOrnate, RangoliBloom, TempleBells } from './illustrations-ornate';
 import { CoupleBengali, CoupleChristian, CoupleElder, CoupleHindu, CoupleNikah, CoupleSikh, CoupleSouth, CoupleVarmala } from './illustrations-people';
 import { BabyCradle, BrideBust, GroomBust, KidBoy, KidGirl, MomToBe } from './illustrations-family';
+import { BotanicalWreath, DecoFrame, GoldVine, HairlineFrame, MandalaCrown, MandalaHalf, Sparkles } from './illustrations-heirloom';
 import { Champagne, Cupcake, Dhol, Dino, Doli, HaldiBowl, Rocket, Stork, TeddyBear, Unicorn } from './illustrations-props';
+import { Alpana, Ghungroo, Kuthuvilakku, LaalPaar, MarigoldSwag, MarigoldWreath, Mihrab, Phulkari, Prabhavali, ZariBand } from './illustrations-regional';
 
 export type { IllustrationProps } from './kit';
 export { foilCss, metalStops } from './kit';
@@ -69,10 +71,27 @@ const COMPONENTS: Record<IllustrationName, (props: IllustrationProps) => ReactNo
   dhol: Dhol,
   haldiBowl: HaldiBowl,
   champagne: Champagne,
+  mandalaCrown: MandalaCrown,
+  mandalaHalf: MandalaHalf,
+  hairlineFrame: HairlineFrame,
+  goldVine: GoldVine,
+  sparkles: Sparkles,
+  prabhavali: Prabhavali,
+  kuthuvilakku: Kuthuvilakku,
+  zariBand: ZariBand,
+  mihrab: Mihrab,
+  phulkari: Phulkari,
+  alpana: Alpana,
+  marigoldSwag: MarigoldSwag,
+  botanicalWreath: BotanicalWreath,
+  decoFrame: DecoFrame,
+  laalPaar: LaalPaar,
+  marigoldWreath: MarigoldWreath,
+  ghungroo: Ghungroo,
 };
 
 /** Drawn to the layer's own size (frames, garlands, strings); the others keep their proportions inside it. */
-export const FRAME_SIZED: ReadonlySet<IllustrationName> = new Set<IllustrationName>(['ornateFrame', 'floralGarland', 'jasmineStrand', 'bunting', 'fairyLights']);
+export const FRAME_SIZED: ReadonlySet<IllustrationName> = new Set<IllustrationName>(['ornateFrame', 'floralGarland', 'jasmineStrand', 'bunting', 'fairyLights', 'hairlineFrame', 'goldVine', 'sparkles', 'zariBand', 'mihrab', 'phulkari', 'marigoldSwag', 'decoFrame', 'laalPaar', 'ghungroo']);
 
 /** Width ÷ height of each illustration as drawn (new layers in the editor start at it). */
 export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
@@ -128,6 +147,23 @@ export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
   dhol: 220 / 170,
   haldiBowl: 240 / 170,
   champagne: 220 / 230,
+  mandalaCrown: 400 / 290,
+  mandalaHalf: 400 / 204,
+  hairlineFrame: 390 / 844,
+  goldVine: 0.07,
+  sparkles: 1.5,
+  prabhavali: 300 / 420,
+  kuthuvilakku: 120 / 300,
+  zariBand: 390 / 56,
+  mihrab: 340 / 600,
+  phulkari: 390 / 56,
+  alpana: 1,
+  marigoldSwag: 390 / 120,
+  botanicalWreath: 1,
+  decoFrame: 390 / 844,
+  laalPaar: 390 / 56,
+  marigoldWreath: 1,
+  ghungroo: 0.1,
 };
 
 /** Where a photo sits behind a jharokha, as fractions of the jharokha's frame (an arch mask fits it). */

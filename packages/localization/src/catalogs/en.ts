@@ -263,6 +263,8 @@ const core = {
   'template.mundan': 'Mundan ceremony',
   'template.puja': 'With divine blessings',
   'template.blessings': 'Your presence and blessings are requested',
+  'template.rsvp.accept': 'Accept',
+  'template.rsvp.decline': 'Decline',
 
 // guest pages
   'invite.photos.upload': 'Upload photos',
