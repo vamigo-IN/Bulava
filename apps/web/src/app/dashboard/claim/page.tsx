@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { safeRelativePath } from '@bulava/validation';
 import { apiPost } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { keys, useMe } from '@/lib/queries';
@@ -14,9 +15,9 @@ import { WhatsAppConfirm } from '@/components/account/whatsapp-confirm';
 import { Alert, Button, Card, Field, Input } from '@/components/ui/primitives';
 import { WhatsAppMark } from '@/components/ui/whatsapp-mark';
 
-/** Only same-site dashboard paths (prevents open redirects). */
+/** Only same-site dashboard paths (no open redirects, see safeRelativePath). */
 function safeNext(next: string | null): string {
-  return next && next.startsWith('/dashboard') && !next.startsWith('//') ? next : '/dashboard';
+  return safeRelativePath(next, '/dashboard', '/dashboard');
 }
 
 /**

@@ -38,6 +38,10 @@ else
 fi
 BULAVA_VERSION="$(git rev-parse HEAD)"
 export BULAVA_VERSION
+# A release that changes infrastructure/nginx/ recreates the Nginx container, which then reads the
+# new files (see the label in docker-compose.prod.yml).
+BULAVA_NGINX_CONFIG="$(git rev-parse HEAD:infrastructure/nginx)"
+export BULAVA_NGINX_CONFIG
 log "Release $BULAVA_VERSION ($(git log -1 --format=%s))"
 
 log "Pulling the images CI built for this commit"

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { generateSecureToken, hashToken } from '@bulava/auth';
 import { SettingsStore } from '@bulava/settings';
-import { googleReady } from '@bulava/validation';
+import { googleReady, safeRelativePath } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
@@ -57,10 +57,9 @@ export type GoogleCallbackResult =
   | { kind: 'restore'; redirect: string }
   | { kind: 'error'; code: ErrorCode | 'GOOGLE_CANCELLED'; redirect: string };
 
-/** Same-site relative paths only, so the flow can never be turned into an open redirect. */
+/** Same-site relative paths only, so the flow can never be turned into an open redirect (see safeRelativePath). */
 export function safeNext(value: string | undefined | null, fallback = '/dashboard'): string {
-  if (!value || value.length > 500 || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return fallback;
-  return value;
+  return safeRelativePath(value, fallback);
 }
 
 const base64url = (b: Buffer) => b.toString('base64url');

@@ -1126,3 +1126,5 @@ export * from './showcase';
 
 // Platform settings (admin console).
 export * from './settings';
+
+export * from './redirects';

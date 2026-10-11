@@ -445,6 +445,7 @@ const core = {
   'error.INVITATION_INVALID': 'This invitation link is not valid.',
   'error.FUNCTION_NOT_AUTHORIZED': 'This invitation does not include that function.',
   'error.RATE_LIMITED': 'Too many attempts. Please wait a moment and try again.',
+  'error.PAYLOAD_TOO_LARGE': 'That is too much to send at once. Make it smaller and try again.',
   'error.PHONE_TAKEN': 'An account already uses this WhatsApp number. Sign in with it instead.',
   'error.ACCOUNT_UNVERIFIED': 'Secure your account first: confirm your WhatsApp number or add your email.',
   'error.PHONE_OTP_UNAVAILABLE': 'WhatsApp codes are not available right now. Sign in with your email instead.',

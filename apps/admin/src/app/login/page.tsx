@@ -3,14 +3,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { safeRelativePath } from '@bulava/validation';
 import { Alert, Button, Field, Input } from '@/components/ui';
 import { ApiError, apiGet, apiPost } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import type { Me } from '@/lib/types';
 
-/** Only same-origin paths: never redirect to an attacker-supplied URL. */
+/** Only paths on the console (no open redirects, see safeRelativePath). */
 function safeNext(value: string | null): string {
-  return value && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') ? value : '/';
+  return safeRelativePath(value, '/');
 }
 
 /** What a sign-in step answers: the next step, or nothing more to do (signed in). */

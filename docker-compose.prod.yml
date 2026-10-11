@@ -33,6 +33,10 @@ services:
     image: nginx:1.27-alpine
     container_name: bulava-nginx
     restart: unless-stopped
+    # Nginx reads the configuration mounted below when its container starts. The deploy scripts set
+    # this to the git tree of infrastructure/nginx/, so a release that changes it recreates the container.
+    labels:
+      bulava.nginx-config: "${BULAVA_NGINX_CONFIG:-}"
     # The stock entrypoints drop privileges themselves; nothing may gain them back.
     security_opt: ["no-new-privileges:true"]
     ports:

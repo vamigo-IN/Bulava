@@ -66,6 +66,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const message = status < 500 ? exception.message : 'An unexpected error occurred.';
       return make(status, code, message);
     }
+    // The body parser's own errors (http-errors): an oversized or unreadable body is the client's
+    // mistake, answered as such, not a server error that floods the logs.
+    const parser = exception as { status?: unknown; expose?: unknown } | null;
+    if (parser && typeof parser.status === 'number' && parser.status >= 400 && parser.status < 500 && parser.expose === true) {
+      if (parser.status === HttpStatus.PAYLOAD_TOO_LARGE) return make(HttpStatus.PAYLOAD_TOO_LARGE, 'PAYLOAD_TOO_LARGE', 'This request is too large.');
+      return make(parser.status, 'BAD_REQUEST', parser.status === HttpStatus.BAD_REQUEST ? 'The request body could not be read.' : 'The request could not be processed.');
+    }
     return make(HttpStatus.INTERNAL_SERVER_ERROR, 'INTERNAL_ERROR', 'An unexpected error occurred.');
   }
 }

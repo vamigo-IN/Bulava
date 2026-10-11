@@ -4,6 +4,7 @@ import { HttpStatus } from '@nestjs/common';
 export const ErrorCode = {
   VALIDATION_FAILED: HttpStatus.BAD_REQUEST,
   BAD_REQUEST: HttpStatus.BAD_REQUEST,
+  PAYLOAD_TOO_LARGE: HttpStatus.PAYLOAD_TOO_LARGE,
   UNAUTHENTICATED: HttpStatus.UNAUTHORIZED,
   INVALID_CREDENTIALS: HttpStatus.UNAUTHORIZED,
   SESSION_EXPIRED: HttpStatus.UNAUTHORIZED,

@@ -59,6 +59,9 @@ jobs:
           git fetch --quiet origin
           git checkout --quiet --force "$SHA"
           export BULAVA_VERSION="$SHA"
+          # A release that changes infrastructure/nginx/ recreates the Nginx container (docker-compose.prod.yml).
+          BULAVA_NGINX_CONFIG="$(git rev-parse HEAD:infrastructure/nginx)"
+          export BULAVA_NGINX_CONFIG
           compose() { docker compose -f docker-compose.prod.yml --env-file .env.production "$@"; }
           compose pull --quiet
           # Back up before migrations touch the schema (skipped on the very first deploy).

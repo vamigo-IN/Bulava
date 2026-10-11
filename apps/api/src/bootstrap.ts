@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
@@ -23,14 +24,12 @@ export function configureApp(app: NestExpressApplication): void {
   if (config.TRUST_PROXY !== false) app.set('trust proxy', config.TRUST_PROXY);
   app.disable('x-powered-by');
 
-  app.use(
-    helmet({
-      // The API only serves JSON (plus Swagger UI in non-production).
-      contentSecurityPolicy: config.swaggerEnabled ? false : { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
-      crossOriginResourcePolicy: { policy: 'same-site' },
-      referrerPolicy: { policy: 'no-referrer' },
-    }),
-  );
+  // The API answers JSON under a policy that runs nothing, in every environment; only the Swagger
+  // UI (outside production) needs its own scripts and styles.
+  const common = { crossOriginResourcePolicy: { policy: 'same-site' as const }, referrerPolicy: { policy: 'no-referrer' as const } };
+  const strict = helmet({ ...common, contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } } });
+  const docs = helmet({ ...common, contentSecurityPolicy: false });
+  app.use((req: Request, res: Response, next: NextFunction) => (config.swaggerEnabled && req.path.startsWith('/api/docs') ? docs : strict)(req, res, next));
   app.use(cookieParser());
   app.useBodyParser('json', { limit: '256kb' });
 

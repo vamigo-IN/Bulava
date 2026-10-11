@@ -7,6 +7,7 @@ import { ApiError, apiPost } from '@/lib/api';
 import { readIdentifier } from '@/lib/identifier';
 import { loadSession } from '@/lib/session';
 import type { MessageKey } from '@bulava/localization';
+import { safeRelativePath } from '@bulava/validation';
 import { EmailCodeStep, type EmailChallenge } from './email-code-step';
 import { GoogleButton, useProviders } from './google-button';
 import { IdentifierInput } from './identifier-input';
@@ -43,9 +44,9 @@ const longDate = (iso: string) => {
   return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
-/** Only allow same-site relative redirects (prevents open redirects). */
+/** Only same-site paths (no open redirects, see safeRelativePath). */
 function safeNext(next: string | null): string | null {
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : null;
+  return safeRelativePath(next, '') || null;
 }
 
 /**

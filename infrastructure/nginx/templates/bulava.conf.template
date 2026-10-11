@@ -40,6 +40,14 @@ server {
     return 404;
   }
 
+  # Sign-in and codes: the stricter edge limit as well (see auth_per_ip in nginx.conf).
+  location /api/v1/auth/ {
+    limit_req zone=auth_per_ip burst=20 nodelay;
+    limit_req zone=api_per_ip burst=40 nodelay;
+    include /etc/nginx/snippets/proxy.conf;
+    proxy_pass http://bulava_api;
+  }
+
   location /api/v1/ {
     limit_req zone=api_per_ip burst=40 nodelay;
     include /etc/nginx/snippets/proxy.conf;
@@ -84,6 +92,14 @@ server {
 
   # Same-origin API calls go straight to the API (skipping the Next.js proxy hop).
   # Session cookies stay first-party on the main domain.
+  # Sign-in and codes: the stricter edge limit as well (see auth_per_ip in nginx.conf).
+  location /api/v1/auth/ {
+    limit_req zone=auth_per_ip burst=20 nodelay;
+    limit_req zone=api_per_ip burst=40 nodelay;
+    include /etc/nginx/snippets/proxy.conf;
+    proxy_pass http://bulava_api;
+  }
+
   location /api/v1/ {
     limit_req zone=api_per_ip burst=40 nodelay;
     include /etc/nginx/snippets/proxy.conf;
@@ -145,6 +161,14 @@ server {
     proxy_pass http://bulava_api;
   }
 
+  # Sign-in and codes: the stricter edge limit as well (see auth_per_ip in nginx.conf).
+  location /api/v1/auth/ {
+    limit_req zone=auth_per_ip burst=20 nodelay;
+    limit_req zone=api_per_ip burst=40 nodelay;
+    include /etc/nginx/snippets/proxy.conf;
+    proxy_pass http://bulava_api;
+  }
+
   location / {
     limit_req zone=api_per_ip burst=40 nodelay;
     include /etc/nginx/snippets/proxy.conf;
@@ -168,6 +192,14 @@ server {
   # Optional: restrict the console to office/VPN addresses (real client IPs, see nginx.conf).
   # allow 203.0.113.0/24;
   # deny all;
+
+  # Sign-in and codes: the stricter edge limit as well (see auth_per_ip in nginx.conf).
+  location /api/v1/auth/ {
+    limit_req zone=auth_per_ip burst=20 nodelay;
+    limit_req zone=api_per_ip burst=40 nodelay;
+    include /etc/nginx/snippets/proxy.conf;
+    proxy_pass http://bulava_api;
+  }
 
   location /api/v1/ {
     limit_req zone=api_per_ip burst=40 nodelay;
