@@ -1,7 +1,7 @@
 import { seedPlatformAdmin } from './admin-seed';
 import { createPrismaClient } from './client';
 import { seedOriginalMusic } from './music-seed';
-import { seedReferenceData, seedTemplates } from './seed-data';
+import { previewTemplates, seedReferenceData, seedTemplates } from './seed-data';
 import { seedSitePages } from './site-pages';
 
 /**
@@ -13,7 +13,9 @@ import { seedSitePages } from './site-pages';
  *
  * --templates-only runs just the template catalog's migration (seedTemplates);
  * --dry-run (templates only) lists what it would create, update, sync or retire
- * and writes nothing. The deploy's migrate job runs the full seed.
+ * and writes nothing; against a database that still lacks this release's
+ * migrations it says so and exits cleanly. The deploy's migrate job runs the
+ * full seed.
  *
  * Admin variables: ADMIN_EMAIL, ADMIN_PASSWORD, optional ADMIN_NAME, and
  * ADMIN_RESET_PASSWORD=true to overwrite an existing admin's password.
@@ -29,7 +31,12 @@ async function main(): Promise<void> {
   try {
     const dryRun = flag('--dry-run');
     if (flag('--templates-only') || dryRun) {
-      const result = await seedTemplates(prisma, { updateChanged: flag('--update-templates'), dryRun });
+      const options = { updateChanged: flag('--update-templates') };
+      const result = dryRun ? await previewTemplates(prisma, options) : await seedTemplates(prisma, options);
+      if (!result) {
+        console.log('Dry run skipped: this release changes the database, so the catalog is compared after its migrations (the migrate job prints what it synced).');
+        return;
+      }
       for (const c of result.changes) console.log(`  ${c.change.padEnd(6)} ${c.key}`);
       console.log(`${dryRun ? 'Dry run (nothing written). Would change' : 'Templates'}: ${templateSummary(result)}.`);
       return;

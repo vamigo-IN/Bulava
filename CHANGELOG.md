@@ -27,6 +27,7 @@
 - **Floods are turned away at the door.** Nginx limits sign-in and code requests to 30 a minute per address before they reach the API, whose own limit of 10 a minute still applies, and drops connections that stop reading.
 - **Clear refusals.** A request that is too large or is not valid JSON gets a 413 or 400 answer instead of a server error, and the API sends its strict content security policy in every environment.
 - **Deploys apply Nginx changes.** A release that changes Bulava's Nginx configuration now recreates its container, so new limits take effect without a manual step.
+- **Deploys that change the database.** The template preview that `deploy-server.sh` runs before a release no longer stops one that adds columns or tables: it says the preview is skipped, and the migrations and the catalog sync run as usual.
 - **Next.js 15.5.27**, which fixes cache poisoning of pre-rendered pages on self-hosted sites. `pnpm audit --prod` finds no known vulnerabilities.
 - A new end-to-end security suite, kept out of the repository with the other tests, attacks the real HTTP stack with rate limiting on: request floods, SQL injection, oversized bodies, cross-site requests, other people's events, forged tokens, mass assignment, path tricks and the security headers. docs/security.md records what it covers.
 

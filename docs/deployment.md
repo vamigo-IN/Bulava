@@ -170,7 +170,7 @@ New and changed catalog templates reach the server with the release, through the
 docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate node dist/seed.js --templates-only --dry-run
 ```
 
-It prints one line per template (`create`, `update`, `sync`, `retire`) and a total, and writes nothing. To apply just the catalog without a full release: the same command without `--dry-run`. If the database was restored from a backup older than the catalog, `up -d` (or that command) brings the templates back.
+It prints one line per template (`create`, `update`, `sync`, `retire`) and a total, and writes nothing. A release that changes the database cannot be compared before its migrations run, so its dry run says so and skips the preview (`previewTemplates`); the migrate job then prints what it synced, which `deploy-server.sh` shows at the end. To apply just the catalog without a full release: the same command without `--dry-run`. If the database was restored from a backup older than the catalog, `up -d` (or that command) brings the templates back.
 
 ## Rollback
 

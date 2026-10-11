@@ -336,3 +336,26 @@ export async function seedTemplates(
   }
   return result;
 }
+
+/**
+ * The deploy's preview of the catalog migration: `seedTemplates` as a dry run, before the release
+ * migrates. A release that changes the database cannot read the old tables yet, so there is nothing
+ * to compare: null instead of an error (the migrate job then reports what it syncs).
+ */
+export async function previewTemplates(
+  prisma: PrismaClient,
+  options: { updateChanged?: boolean; catalog?: CatalogEntry[]; retiredKeys?: readonly string[] } = {},
+): Promise<TemplateSeedResult | null> {
+  try {
+    return await seedTemplates(prisma, { ...options, dryRun: true });
+  } catch (error) {
+    if (schemaBehind(error)) return null;
+    throw error;
+  }
+}
+
+/** The database lacks a table (P2021) or column (P2022) this release reads: its migrations have not run yet. */
+export function schemaBehind(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 'P2021' || code === 'P2022';
+}
