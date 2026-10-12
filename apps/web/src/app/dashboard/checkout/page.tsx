@@ -108,13 +108,13 @@ function Checkout() {
   useEffect(() => {
     if (!planKey || !me.data) return;
     setQuote(null);
-    apiPost<Quote>('/orders/quote', { planKey, quantity, offerToken })
+    apiPost<Quote>('/orders/quote', { planKey, quantity, offerToken, ...(eventId ? { eventId } : {}) })
       .then((q) => {
         setBase(q);
         setBaseError(null);
       })
       .catch((err: unknown) => setBaseError(err instanceof Error ? err : new Error(String(err))));
-  }, [planKey, quantity, offerToken, me.data]);
+  }, [planKey, quantity, offerToken, eventId, me.data]);
 
   const plan = base?.plan ?? null;
   const shown = quote ?? base;
@@ -188,7 +188,7 @@ function Checkout() {
     setApplying(true);
     setCouponError(null);
     try {
-      setQuote(await apiPost<Quote>('/orders/quote', { planKey: plan.key, quantity, offerToken, couponCode: code }));
+      setQuote(await apiPost<Quote>('/orders/quote', { planKey: plan.key, quantity, offerToken, couponCode: code, ...(eventId ? { eventId } : {}) }));
       track('coupon_applied', { plan: plan.key });
     } catch (err) {
       setCouponError(errorMessage(t, err));
@@ -216,7 +216,7 @@ function Checkout() {
       const order =
         open?.key === orderKey
           ? await apiPost<CheckoutSession>(`/orders/${open.orderId}/checkout`)
-          : await apiPost<CheckoutSession>('/orders', { planKey: plan.key, quantity, offerToken, couponCode: applied ?? undefined, acceptTerms: true });
+          : await apiPost<CheckoutSession>('/orders', { planKey: plan.key, quantity, offerToken, couponCode: applied ?? undefined, acceptTerms: true, ...(eventId ? { eventId } : {}) });
       // A 100% coupon is paid already; everything else goes through Razorpay first.
       const outcome = order.status === 'PAID' ? 'paid' : await runCheckout(order, { unavailable: t('upgrade.unavailable') });
       if (outcome === 'dismissed') {
@@ -225,6 +225,7 @@ function Checkout() {
         return;
       }
       void queryClient.invalidateQueries({ queryKey: moreKeys.accountPlan });
+      if (eventId) void queryClient.invalidateQueries({ queryKey: moreKeys.eventPlan(eventId) });
       router.push(paymentStatusPath(order.orderId, outcome === 'paid' ? undefined : outcome, template, eventId));
     } catch (err) {
       // A coupon that ran out while paying: show the plain price again.

@@ -10,18 +10,21 @@ import { LayerInspector } from '@/components/cards/editor-inspector';
 import { layerShown, newLayerId, PHOTO_PLACEHOLDER } from '@/components/cards/editor-model';
 import type { BoardDesign, BoardEditorApi } from '@/components/cards/editor-types';
 import { IconButton } from '@/components/cards/editor-ui';
-import { CanvasToolbar, DeviceFrame, ThemeToggle, useEditorTheme } from '@/components/editor/editor-chrome';
+import { CanvasToolbar, DeviceFrame, PhoneFrame, ThemeToggle, useEditorTheme } from '@/components/editor/editor-chrome';
+import { FrameDocument } from '@/components/editor/frame-document';
 import { errorMessage, useT } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 /**
- * The canvas studio both hosts' editors are built on (ADR-057, ADR-059): the
- * invitation website's canvas editor and the film's. It shows one board at a
- * time (a section of the website, a scene of the film) on the card editor's
- * stage, with its inspector and panels, a whole-design preview, light or dark
- * chrome, one undo history and the keyboard. What a board is, how a change is
- * written back into the customization, and what the panels and preview show
- * come from the editor that uses it.
+ * The canvas studio both hosts' editors are built on (ADR-057, ADR-059,
+ * ADR-065): the invitation website's canvas editor and the film's. The film's
+ * shows one board at a time (a scene) on the card editor's stage; the
+ * website's shows the whole page in one flow (`flow`), every part in its
+ * place, each board edited where it stands. Both have the inspector and
+ * panels, a whole-design preview, light or dark chrome, one undo history and
+ * the keyboard. What a board is, how a change is written back into the
+ * customization, and what the panels and preview show come from the editor
+ * that uses it.
  */
 
 export type StudioSide = 'mobile' | 'desktop';
@@ -41,6 +44,8 @@ export interface StudioTarget {
    * `height` tall screen, with what can be done with it beside it.
    */
   view?: { width: number; height: number; render: () => ReactNode; aside: (controls: StudioControls) => ReactNode };
+  /** Beside a board while none of its layers is chosen: what the part is and what can be done with it. */
+  aside?: (controls: StudioControls) => ReactNode;
 }
 
 /** The studio's own state, for every target (a board or a view). */
@@ -51,6 +56,10 @@ export interface StudioControls {
   /** A change to the whole customization, as one undo step. */
   commit: (next: Customization, merge?: string) => void;
   selectTarget: (id: string) => void;
+  /** Shows the page as phones or desktops see it. */
+  setSide: (side: StudioSide) => void;
+  /** A short message over the canvas. */
+  notify: (message: string) => void;
 }
 
 /** What a panel gets while a board is on the stage: the board editor the inspector uses, and the studio's own state. */
@@ -64,6 +73,21 @@ export interface StudioPanel {
   label: string;
   icon: ReactNode;
   render: (api: StudioApi | null, controls: StudioControls) => ReactNode;
+}
+
+/** What the website's editor gets to draw its page in one flow (ADR-065). */
+export interface StudioFlow {
+  side: StudioSide;
+  /** The part being edited, and its chosen layer. */
+  activeId: string | null;
+  selectedId: string | null;
+  /** A board of the page, picked and moved like a card's, drawn as the design draws it. */
+  stage: (targetId: string) => ReactNode;
+  /** Picks a part, and one of its layers. */
+  activate: (targetId: string, layerId?: string | null) => void;
+  controls: StudioControls;
+  /** The page's visual scale (design units are CSS pixels inside the page). */
+  zoom: number;
 }
 
 export interface BoardStudioProps {
@@ -89,6 +113,8 @@ export interface BoardStudioProps {
   renderPreview: () => ReactNode;
   /** Draw the phone around this side's board (on big screens). */
   framed: (side: StudioSide) => boolean;
+  /** The whole page in one flow (the website): its width on each side, and how it is drawn. */
+  flow?: { width: (side: StudioSide) => number; render: (args: StudioFlow) => ReactNode };
   photoUrls: Record<string, string>;
   /** Without one (the design page, before signing in), adding a photo says how to get there. */
   uploadPhoto?: (file: File) => Promise<string>;
@@ -169,8 +195,10 @@ export function BoardStudio(props: BoardStudioProps) {
   const [theme, setTheme] = useEditorTheme();
   const [chosen, setChosen] = useState<string | null>(props.targetId ?? null);
   const target: StudioTarget | undefined = targets.find((x) => x.id === chosen) ?? targets[0];
+  const flowMode = Boolean(props.flow);
   const [sideChoice, setSideChoice] = useState<StudioSide>('mobile');
-  const side: StudioSide = target?.sides.includes(sideChoice) ? sideChoice : 'mobile';
+  // The whole page has both sides; a single board only the ones it was drawn for.
+  const side: StudioSide = flowMode ? sideChoice : target?.sides.includes(sideChoice) ? sideChoice : 'mobile';
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<string>(props.panels[0]?.key ?? '');
   const [sheet, setSheet] = useState<'panel' | 'inspector' | null>(null);
@@ -184,13 +212,23 @@ export function BoardStudio(props: BoardStudioProps) {
     return () => clearTimeout(id);
   }, [toast]);
 
+  const { onTargetChange } = props;
   const selectTarget = useCallback(
     (id: string) => {
       setChosen(id);
       setSelectedId(null);
-      props.onTargetChange?.(id);
+      onTargetChange?.(id);
     },
-    [props],
+    [onTargetChange],
+  );
+  const activate = useCallback(
+    (id: string, layerId: string | null = null) => {
+      setChosen(id);
+      setSelectedId(layerId);
+      onTargetChange?.(id);
+      if (!desktop) setSheet(layerId ? 'inspector' : null);
+    },
+    [onTargetChange, desktop],
   );
 
   // ── The host's choices, with one undo history for everything changed here ──
@@ -233,23 +271,37 @@ export function BoardStudio(props: BoardStudioProps) {
   const view = board ? null : (target?.view ?? null);
   const photoMap = useMemo(() => photosOf(custom), [custom]);
   const design: BoardDesign | null = useMemo(() => (board ? { board, colors, fonts, language, photos: photoMap } : null), [board, colors, fonts, language, photoMap]);
-  const designRef = useRef(design);
-  designRef.current = design;
   const { writeBoard } = props;
+  const targetsRef = useRef(targets);
+  targetsRef.current = targets;
+  const sideRef = useRef(side);
+  sideRef.current = side;
+  const look = useRef({ colors, fonts, language });
+  look.current = { colors, fonts, language };
 
-  const change = useCallback(
-    (fn: (d: BoardDesign) => BoardDesign, merge?: string) => {
-      const current = designRef.current;
-      if (!current || !target) return;
-      const next = fn(current);
-      if (next === current) return;
+  /** A change to one board's design (any part of the page, not only the one chosen). */
+  const changeTarget = useCallback(
+    (targetId: string, fn: (d: BoardDesign) => BoardDesign, merge?: string) => {
+      const part = targetsRef.current.find((x) => x.id === targetId);
+      const current = part?.board?.(sideRef.current);
+      if (!part || !current) return;
+      const before: BoardDesign = { board: current, ...look.current, photos: photosOf(customRef.current) };
+      const next = fn(before);
+      if (next === before) return;
       let c = customRef.current;
-      if (next.board !== current.board) c = writeBoard(c, target.id, side, next.board);
-      if (next.colors !== current.colors) c = { ...c, colors: next.colors };
-      if (next.photos !== current.photos) c = withPhotos(c, next.photos);
+      if (next.board !== before.board) c = writeBoard(c, targetId, sideRef.current, next.board);
+      if (next.colors !== before.colors) c = { ...c, colors: next.colors };
+      if (next.photos !== before.photos) c = withPhotos(c, next.photos);
       commit(c, merge);
     },
-    [commit, writeBoard, target, side],
+    [commit, writeBoard],
+  );
+  const targetId = target?.id;
+  const change = useCallback(
+    (fn: (d: BoardDesign) => BoardDesign, merge?: string) => {
+      if (targetId) changeTarget(targetId, fn, merge);
+    },
+    [changeTarget, targetId],
   );
   const changeLayer = useCallback(
     (id: string, fn: (l: Layer) => Layer, merge?: string) => change((d) => ({ ...d, board: { ...d.board, layers: d.board.layers.map((l) => (l.id === id ? fn(l) : l)) } }), merge),
@@ -321,7 +373,11 @@ export function BoardStudio(props: BoardStudioProps) {
     design && ctx
       ? { kind: props.kind, design, t, cardT: designT, ctx, selectedId, select, change, changeLayer, addLayer, removeLayer, uploadPhoto, uploading, photoUrls: props.photoUrls, focusText }
       : null;
-  const controls: StudioControls = { target: target ?? null, side, custom, commit, selectTarget };
+  const chooseSide = useCallback((s: StudioSide) => {
+    setSideChoice(s);
+    setSelectedId(null);
+  }, []);
+  const controls: StudioControls = { target: target ?? null, side, custom, commit, selectTarget, setSide: chooseSide, notify: setToast };
   const api: StudioApi | null = editor && target ? { ...controls, editor, target } : null;
 
   // ── Layout ──
@@ -335,14 +391,29 @@ export function BoardStudio(props: BoardStudioProps) {
     return () => observer.disconnect();
   }, []);
   const framed = desktop && props.framed(side);
-  const W = board?.width ?? view?.width ?? 390;
+  const flowWidth = props.flow?.width(side) ?? 390;
+  const W = flowMode ? flowWidth : (board?.width ?? view?.width ?? 390);
   const H = board?.height ?? view?.height ?? 844;
-  // The phone around a board takes about 26 px a side and 72 px of height.
-  const fit = Math.max(0.1, Math.min((box.w - (desktop ? 64 : 24) - (framed ? 26 : 0)) / W, (box.h - (desktop ? 168 : 40) - (framed ? 72 : 0)) / H, 2));
+  // A page fits the canvas's width (it scrolls down); a single board fits the canvas. The phone's bezel takes 5 px a side.
+  const fit = flowMode
+    ? Math.max(0.15, Math.min((box.w - (desktop ? 72 : 20) - (side === 'mobile' ? 10 : 0)) / W, side === 'mobile' ? 1.15 : 1))
+    : Math.max(0.1, Math.min((box.w - (desktop ? 64 : 24) - (framed ? 10 : 0)) / W, (box.h - (desktop ? 168 : 40) - (framed ? 10 : 0)) / H, 2));
   const [zoomMode, setZoomMode] = useState<'fit' | number>('fit');
   const zoom = zoomMode === 'fit' ? fit : zoomMode;
   const zoomBy = (factor: number) => setZoomMode(Math.min(3, Math.max(0.15, Math.round(zoom * factor * 100) / 100)));
-  useEffect(() => setZoomMode('fit'), [target?.id, side]);
+  const singleKey = flowMode ? side : `${target?.id}:${side}`;
+  useEffect(() => setZoomMode('fit'), [singleKey]);
+
+  // The page drawn in a frame of its own: its height, for the scaled box around it.
+  const pageBox = useRef<HTMLDivElement>(null);
+  const [pageHeight, setPageHeight] = useState(0);
+  useEffect(() => {
+    const el = pageBox.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setPageHeight(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [flowMode, previewing]);
 
   // The studio covers the page: the page behind does not scroll, and focus comes back to where it was.
   const root = useRef<HTMLDivElement>(null);
@@ -357,40 +428,81 @@ export function BoardStudio(props: BoardStudioProps) {
     };
   }, []);
 
-  // Keyboard: undo/redo, save, delete, nudge, deselect (never while typing).
+  // Keyboard: undo/redo, save, delete, nudge, deselect (never while typing), here and inside the page's frame.
   const { primary } = props;
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  onKey.current = (e: KeyboardEvent) => {
+    const typing = (e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable="true"]');
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key.toLowerCase() === 'z' && !typing) {
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    } else if (mod && e.key.toLowerCase() === 'y' && !typing) {
+      e.preventDefault();
+      redo();
+    } else if (mod && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (!primary.disabled && !primary.busy) primary.onClick();
+    } else if (!typing && selectedId && (e.key === 'Delete' || e.key === 'Backspace')) {
+      e.preventDefault();
+      removeLayer(selectedId);
+    } else if (!typing && selectedId && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+      const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+      changeLayer(selectedId, (l) => (l.locked ? l : { ...l, frame: { ...l.frame, x: l.frame.x + dx, y: l.frame.y + dy } }), 'nudge');
+    } else if (e.key === 'Escape' && !typing) {
+      select(null);
+    }
+  };
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const typing = (e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable="true"]');
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key.toLowerCase() === 'z' && !typing) {
-        e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
-      } else if (mod && e.key.toLowerCase() === 'y' && !typing) {
-        e.preventDefault();
-        redo();
-      } else if (mod && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        if (!primary.disabled && !primary.busy) primary.onClick();
-      } else if (!typing && selectedId && (e.key === 'Delete' || e.key === 'Backspace')) {
-        e.preventDefault();
-        removeLayer(selectedId);
-      } else if (!typing && selectedId && e.key.startsWith('Arrow')) {
-        e.preventDefault();
-        const step = e.shiftKey ? 10 : 1;
-        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
-        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-        changeLayer(selectedId, (l) => (l.locked ? l : { ...l, frame: { ...l.frame, x: l.frame.x + dx, y: l.frame.y + dy } }), 'nudge');
-      } else if (e.key === 'Escape' && !typing) {
-        select(null);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selectedId, undo, redo, removeLayer, changeLayer, select, primary]);
+    const listener = (e: KeyboardEvent) => onKey.current(e);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
+  const frameKeys = useCallback((e: KeyboardEvent) => onKey.current(e), []);
+
+  // ── The page in one flow: a stage for any of its boards ──
+  const handleSize = Math.max(6, Math.round((desktop ? 10 : 18) / Math.max(zoom, 0.2)));
+  const stage = (id: string): ReactNode => {
+    const part = targets.find((x) => x.id === id);
+    const b = part?.board?.(side);
+    if (!part || !b) return null;
+    const active = part.id === target?.id;
+    const partCtx = active && editCtx ? editCtx : withPlaceholders(b, part.ctx);
+    return (
+      <Stage
+        key={part.id}
+        board={b}
+        zoom={1}
+        flat
+        selectedId={active ? selectedId : null}
+        onSelect={(layerId) => {
+          if (layerId) activate(part.id, layerId);
+          else if (active) select(null);
+          else activate(part.id, null);
+        }}
+        onCommit={(next) => changeTarget(part.id, (d) => ({ ...d, board: next }))}
+        snapping
+        renderBoard={(shown) => props.renderBoard(shown, { ...part, ctx: partCtx }, { width: b.width, height: b.height })}
+        selectable={(layer) => layer.kind !== 'section' && layerShown(layer, part.ctx)}
+        label={part.label}
+        handleSize={handleSize}
+        onDoubleClick={(layerId) => {
+          const layer = b.layers.find((l) => l.id === layerId);
+          if (layer?.kind !== 'text') return;
+          activate(part.id, layerId);
+          requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById('card-inspector-words')?.focus()));
+        }}
+      />
+    );
+  };
+  const flowArgs: StudioFlow | null = props.flow ? { side, activeId: target?.id ?? null, selectedId, stage, activate, controls, zoom } : null;
 
   const current = props.panels.find((p) => p.key === panel) ?? props.panels[0];
+  const inspector = editor && (selectedId || !target?.aside) ? <LayerInspector editor={editor} /> : target?.aside ? target.aside(controls) : view ? view.aside(controls) : null;
 
   // On <body>: a page that animates its content (a transform) would otherwise hold a fixed layer inside its own box.
   return createPortal(
@@ -404,21 +516,18 @@ export function BoardStudio(props: BoardStudioProps) {
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold sm:text-base">{props.title}</h1>
           <p className="truncate text-xs text-stone-500">
-            {target ? `${target.label}${target.sides.length > 1 ? ` · ${side === 'desktop' ? t('design.canvas.desktop') : t('design.canvas.phone')}` : ''}` : props.labels.empty}
+            {target ? `${target.label}${(flowMode || target.sides.length > 1) && side === 'desktop' ? ` · ${t('design.canvas.desktop')}` : ''}` : props.labels.empty}
           </p>
         </div>
-        {target && target.sides.length > 1 ? (
+        {flowMode || (target && target.sides.length > 1) ? (
           <div className="clay-inset hidden gap-1 rounded-xl p-1 sm:flex" role="radiogroup" aria-label={t('design.canvas.device')}>
-            {target.sides.map((s) => (
+            {(flowMode ? (['mobile', 'desktop'] as const) : target!.sides).map((s) => (
               <button
                 key={s}
                 type="button"
                 role="radio"
                 aria-checked={side === s}
-                onClick={() => {
-                  setSideChoice(s);
-                  setSelectedId(null);
-                }}
+                onClick={() => chooseSide(s)}
                 className={cn('inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold', side === s ? 'bg-surface text-brand-700 shadow-clay-sm' : 'text-stone-600 hover:text-ink')}
               >
                 {s === 'mobile' ? <Smartphone aria-hidden className="size-4" /> : <Monitor aria-hidden className="size-4" />}
@@ -481,9 +590,28 @@ export function BoardStudio(props: BoardStudioProps) {
               if (e.target === e.currentTarget) select(null);
             }}
           >
-            <div className={cn('flex min-h-full min-w-full items-center justify-center p-4 sm:p-8', desktop && 'pb-28')} onPointerDown={(e) => e.target === e.currentTarget && select(null)}>
+            <div className={cn('flex min-h-full min-w-full justify-center p-3 sm:p-8', flowMode && !previewing ? 'items-start' : 'items-center', desktop && 'pb-28')} onPointerDown={(e) => e.target === e.currentTarget && select(null)}>
               {previewing ? (
-                <DeviceFrame show>{props.renderPreview()}</DeviceFrame>
+                <PhoneFrame>{props.renderPreview()}</PhoneFrame>
+              ) : flowArgs && props.flow ? (
+                // The whole page, scaled: the frame inside is design-sized, so the boards in it work at scale 1.
+                <div className="relative shrink-0" style={{ width: (W + (side === 'mobile' ? 10 : 0)) * zoom, height: pageHeight * zoom }}>
+                  <div ref={pageBox} className="absolute top-0 left-0 origin-top-left" style={{ transform: `scale(${zoom})`, width: W + (side === 'mobile' ? 10 : 0) }}>
+                    {side === 'mobile' ? (
+                      <PhoneFrame>
+                        <FrameDocument width={W} title={props.labels.canvas} onKeyDown={frameKeys}>
+                          {props.flow.render(flowArgs)}
+                        </FrameDocument>
+                      </PhoneFrame>
+                    ) : (
+                      <div className="overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_var(--ed-device-rim),0_36px_80px_-32px_rgba(0,0,0,0.6)]">
+                        <FrameDocument width={W} title={props.labels.canvas} onKeyDown={frameKeys}>
+                          {props.flow.render(flowArgs)}
+                        </FrameDocument>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : board && target && editCtx ? (
                 <div className="flex flex-col items-center gap-3">
                   <DeviceFrame show={framed}>
@@ -495,7 +623,7 @@ export function BoardStudio(props: BoardStudioProps) {
                       onCommit={(next) => change((d) => ({ ...d, board: next }))}
                       snapping
                       renderBoard={(b) => props.renderBoard(b, { ...target, ctx: editCtx }, { width: Math.round(W * zoom), height: Math.round(H * zoom) })}
-                      selectable={(layer) => layerShown(layer, target.ctx)}
+                      selectable={(layer) => layer.kind !== 'section' && layerShown(layer, target.ctx)}
                       label={props.labels.canvas}
                       handleSize={desktop ? 10 : 18}
                       onDoubleClick={(id) => {
@@ -529,7 +657,7 @@ export function BoardStudio(props: BoardStudioProps) {
               )}
             </div>
           </main>
-          {desktop && !previewing && (board || view) ? (
+          {desktop && !previewing && (flowMode || board || view) ? (
             <CanvasToolbar
               className="absolute bottom-5 left-1/2 z-10 -translate-x-1/2"
               zoom={zoom}
@@ -543,7 +671,7 @@ export function BoardStudio(props: BoardStudioProps) {
 
         {desktop ? (
           <aside className="editor-chrome w-[20rem] shrink-0 overflow-y-auto border-l border-[var(--ed-line)] bg-[var(--ed-panel)] p-4 text-ink [scrollbar-width:thin]" aria-label={t('cards.editor.inspector')}>
-            {editor ? <LayerInspector editor={editor} /> : view ? view.aside(controls) : null}
+            {inspector}
           </aside>
         ) : null}
 

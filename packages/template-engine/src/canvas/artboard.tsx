@@ -15,6 +15,7 @@ import {
   type OrnamentLayer,
   type RenderContext,
   type SceneLayer,
+  type SectionLayer,
   type ShapeLayer,
   type TextLayer,
   type ThemeColors,
@@ -26,6 +27,7 @@ import { Diya, Kalash, MarigoldStrand, r2, Toran } from '../art/motifs';
 import { artworkAssetUrl, sceneArt } from '../art/scenes';
 import { ArchFrame, Ornament, TempleBorder, type OrnamentName } from '../ornaments';
 import { Crescent, CrestFrame, GateLeaf, GothicArch, Lantern, PeacockFeather, RoseWindow, SeaWaves } from '../ornaments-signature';
+import { SectionLayerStyles } from '../styles';
 import type { RenderMode, RenderSlots } from '../types';
 import { fillBackdrop, fillStyle, fontFamilyFor, resolveColor, solidHex, textInk, textureStyle } from './colors';
 import { FitText } from './fit-text';
@@ -58,6 +60,8 @@ export interface CanvasArtboardProps {
    * frame number (CSS animations do not follow Remotion's clock).
    */
   layerStyle?: (layer: Layer, index: number) => CSSProperties | undefined;
+  /** Draws one of the template's sections for a section layer (a website's redrawn section, ADR-065). */
+  drawSection?: (sectionId: string) => ReactNode;
   className?: string;
   style?: CSSProperties;
 }
@@ -87,7 +91,7 @@ const pct = (n: number, of: number) => `${((n / of) * 100).toFixed(4)}%`;
  * every layer placed by percentage and sized in `cqw` (container width units),
  * so the whole composition scales with the viewer's screen without any script.
  */
-export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode, slots, rsvpTargetId, omit, overlay, layerStyle, className, style }: CanvasArtboardProps) {
+export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode, slots, rsvpTargetId, omit, overlay, layerStyle, drawSection, className, style }: CanvasArtboardProps) {
   const W = board.width;
   const H = board.height;
   /** Design units → container width units. */
@@ -109,7 +113,7 @@ export function CanvasArtboard({ board, ctx, colors, t, language, timeZone, mode
         }
         // Text is checked against what is actually behind it (a card, a pill), not only the artboard.
         const behind = layer.kind === 'text' || layer.kind === 'widget' ? layerBackdrop(board, index, colors) : backdrop;
-        const content = renderLayer(layer, { ctx, colors, t, u, W, H, backdrop: behind, opts, mode, slots, rsvpTargetId });
+        const content = renderLayer(layer, { ctx, colors, t, u, W, H, backdrop: behind, opts, mode, slots, rsvpTargetId, drawSection });
         if (content === null) return null;
         const f = layer.frame;
         const entrance = live && layer.animation.entrance !== 'none' ? ENTRANCE_CLASS[layer.animation.entrance] : undefined;
@@ -162,6 +166,7 @@ interface LayerEnv {
   mode: ArtboardMode;
   slots?: RenderSlots;
   rsvpTargetId?: string;
+  drawSection?: (sectionId: string) => ReactNode;
 }
 
 function renderLayer(layer: Layer, env: LayerEnv): ReactNode | null {
@@ -180,6 +185,8 @@ function renderLayer(layer: Layer, env: LayerEnv): ReactNode | null {
       return <WidgetView layer={layer} env={env} />;
     case 'scene':
       return <SceneView layer={layer} env={env} />;
+    case 'section':
+      return <SectionLayerView layer={layer} env={env} />;
     default:
       return null;
   }
@@ -540,6 +547,25 @@ function SceneView({ layer, env }: { layer: SceneLayer; env: LayerEnv }) {
           {l.node}
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * One of the template's sections behind a host's redrawn one (ADR-065): laid
+ * out on a phone's width and screen as in the editor, then zoomed with the
+ * board (styles.tsx), its words hidden while the host's text layers carry
+ * them. It is a picture: nothing in it is focused, read out or clicked.
+ */
+function SectionLayerView({ layer, env }: { layer: SectionLayer; env: LayerEnv }) {
+  const node = env.drawSection?.(layer.section);
+  if (!node) return null;
+  return (
+    <div aria-hidden="true" inert style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      <SectionLayerStyles />
+      <div className={layer.hideText ? 'bulava-sec bulava-sec-words-off' : 'bulava-sec'} style={{ width: `${layer.frame.w}px` }}>
+        {node}
+      </div>
     </div>
   );
 }

@@ -93,15 +93,15 @@ export function Hero(p: SectionProps) {
     case 'split':
       return (
         <header className="relative overflow-hidden px-6 py-12" style={surface}>
-          <div className="mx-auto grid max-w-4xl items-center gap-10 sm:grid-cols-2">
-            <div className="mx-auto w-64 overflow-hidden rounded-t-full border-4 border-[var(--t-secondary)] bg-[var(--t-surface)] shadow-xl sm:w-full">
+          <div className="mx-auto grid max-w-4xl items-center gap-10 @min-[640px]:grid-cols-2">
+            <div className="mx-auto w-64 overflow-hidden rounded-t-full border-4 border-[var(--t-secondary)] bg-[var(--t-surface)] shadow-xl @min-[640px]:w-full">
               {image ? (
                 <img src={image} alt="" className="aspect-[3/4] w-full object-cover" loading="eager" />
               ) : (
                 <div className="flex aspect-[3/4] items-center justify-center text-6xl text-[var(--t-secondary-ink)] [font-family:var(--t-script)]">{initials(title)}</div>
               )}
             </div>
-            <div className="text-center sm:text-left">
+            <div className="text-center @min-[640px]:text-left">
               <HeroText {...common} align="left" />
             </div>
           </div>
@@ -109,7 +109,7 @@ export function Hero(p: SectionProps) {
       );
     case 'photo':
       return (
-        <header className="relative flex min-h-[88vh] items-end overflow-hidden text-center text-white">
+        <header className="relative flex min-h-[calc(var(--bulava-screen,1vh)*88)] items-end overflow-hidden text-center text-white">
           {image ? (
             <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" loading="eager" />
           ) : (
@@ -126,7 +126,7 @@ export function Hero(p: SectionProps) {
         <header className="px-6 pt-16 pb-12" style={dark ? surface : undefined}>
           <div className={cx('mx-auto max-w-3xl border-y py-12', dark ? 'border-[var(--t-accent)]/40' : 'border-[var(--t-secondary)]/40')}>
             {common.eyebrow ? <p className={cx('text-xs font-semibold tracking-[0.35em] uppercase', dark ? 'text-[var(--t-accent-on-primary)]' : 'text-[var(--t-secondary-ink)]')}>{common.eyebrow}</p> : null}
-            <h1 className="mt-4 text-5xl leading-[1.05] tracking-tight [font-family:var(--t-heading)] sm:text-7xl">{title}</h1>
+            <h1 className="mt-4 text-5xl leading-[1.05] tracking-tight [font-family:var(--t-heading)] @min-[640px]:text-7xl">{title}</h1>
             {common.subtitle ? <p className={cx('mt-5 max-w-xl text-lg', dark ? 'opacity-80' : 'text-[var(--t-muted-ink)]')}>{common.subtitle}</p> : null}
             <div className="mt-8 flex flex-wrap gap-x-8 gap-y-2 text-sm font-medium">
               {common.date ? <span>{common.date}</span> : null}
@@ -200,7 +200,7 @@ export function Hero(p: SectionProps) {
     case 'seaside':
       return (
         <header
-          className="relative flex min-h-[82vh] flex-col items-center justify-center overflow-hidden px-6 pt-16 pb-40 text-center"
+          className="relative flex min-h-[calc(var(--bulava-screen,1vh)*82)] flex-col items-center justify-center overflow-hidden px-6 pt-16 pb-40 text-center"
           style={{ background: `linear-gradient(180deg, ${p.colors.surface} 0%, ${p.colors.background} 55%, ${p.colors.accent} 100%)` }}
         >
           <div className="pointer-events-none absolute top-[22%] left-1/2 size-48 -translate-x-1/2 rounded-full opacity-60 blur-[1px]" style={{ background: `radial-gradient(circle, ${p.colors.accent}, transparent 70%)` }} />
@@ -213,7 +213,7 @@ export function Hero(p: SectionProps) {
     case 'celestial':
       return (
         <header
-          className="relative flex min-h-[82vh] items-center justify-center overflow-hidden px-6 py-16 text-center"
+          className="relative flex min-h-[calc(var(--bulava-screen,1vh)*82)] items-center justify-center overflow-hidden px-6 py-16 text-center"
           style={{ background: `radial-gradient(ellipse at 50% 0%, ${p.colors.secondary}55, transparent 60%), linear-gradient(180deg, ${p.colors.primary} 0%, #05060f 100%)`, color: p.colors.background }}
         >
           <StarField
@@ -235,7 +235,7 @@ export function Hero(p: SectionProps) {
         >
           <div className="pointer-events-none flex justify-center gap-6 text-[var(--t-secondary)]" aria-hidden="true">
             {[0, 1, 2, 3, 4].map((i) => (
-              <Lantern key={i} className="bulava-sway w-10 sm:w-12" style={{ marginTop: `${[0, 36, 10, 48, 4][i]}px`, animationDelay: `${i * 0.35}s` }} />
+              <Lantern key={i} className="bulava-sway w-10 @min-[640px]:w-12" style={{ marginTop: `${[0, 36, 10, 48, 4][i]}px`, animationDelay: `${i * 0.35}s` }} />
             ))}
           </div>
           <div className="relative mx-auto mt-6 max-w-lg">
@@ -247,9 +247,9 @@ export function Hero(p: SectionProps) {
       return (
         <header className="relative overflow-hidden px-6 pt-14 pb-16 text-center" style={surface}>
           {/* Feathers lean outward from the corners so they frame, never cross, the text. */}
-          <PeacockFeather className="bulava-sway pointer-events-none absolute -top-4 -left-6 h-64 -rotate-[32deg] text-[var(--t-secondary)] opacity-70 sm:left-6 sm:h-80" />
+          <PeacockFeather className="bulava-sway pointer-events-none absolute -top-4 -left-6 h-64 -rotate-[32deg] text-[var(--t-secondary)] opacity-70 @min-[640px]:left-6 @min-[640px]:h-80" />
           <PeacockFeather
-            className="bulava-sway pointer-events-none absolute -top-4 -right-6 h-64 -scale-x-100 rotate-[32deg] text-[var(--t-secondary)] opacity-70 sm:right-6 sm:h-80"
+            className="bulava-sway pointer-events-none absolute -top-4 -right-6 h-64 -scale-x-100 rotate-[32deg] text-[var(--t-secondary)] opacity-70 @min-[640px]:right-6 @min-[640px]:h-80"
             style={{ animationDelay: '1.2s' }}
           />
           <div className="relative mx-auto max-w-lg pt-28">
@@ -315,9 +315,9 @@ function HeroText({
   const accent = inverse ? 'text-[var(--t-accent)]' : dark ? 'text-[var(--t-accent-on-primary)]' : 'text-[var(--t-secondary-ink)]';
   const names = inverse ? 'text-white' : dark ? 'text-[var(--t-accent-on-primary)]' : 'text-[var(--t-primary-ink)]';
   return (
-    <div className={cx('flex flex-col', align === 'left' ? 'items-center sm:items-start' : 'items-center', dark && !inverse && 'text-[var(--t-on-primary)]')}>
+    <div className={cx('flex flex-col', align === 'left' ? 'items-center @min-[640px]:items-start' : 'items-center', dark && !inverse && 'text-[var(--t-on-primary)]')}>
       {portrait ? (
-        <div className="mb-5 size-24 overflow-hidden rounded-full border-[3px] border-[var(--t-accent)] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] sm:size-28">
+        <div className="mb-5 size-24 overflow-hidden rounded-full border-[3px] border-[var(--t-accent)] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] @min-[640px]:size-28">
           <img src={portrait} alt="" className="h-full w-full object-cover" loading="eager" />
         </div>
       ) : null}
@@ -328,13 +328,13 @@ function HeroText({
         className={cx(
           names,
           namesStyle === 'caps'
-            ? 'text-4xl leading-[1.1] tracking-[0.12em] uppercase [font-family:var(--t-heading)] drop-shadow-[0_2px_10px_rgba(0,0,0,0.12)] sm:text-6xl'
+            ? 'text-4xl leading-[1.1] tracking-[0.12em] uppercase [font-family:var(--t-heading)] drop-shadow-[0_2px_10px_rgba(0,0,0,0.12)] @min-[640px]:text-6xl'
             : namesStyle === 'italic'
-              ? 'text-5xl leading-[1.05] italic [font-family:var(--t-heading)] sm:text-7xl'
-              : 'text-5xl leading-[1.05] [font-family:var(--t-script)] sm:text-6xl',
+              ? 'text-5xl leading-[1.05] italic [font-family:var(--t-heading)] @min-[640px]:text-7xl'
+              : 'text-5xl leading-[1.05] [font-family:var(--t-script)] @min-[640px]:text-6xl',
         )}
       >
-        <Names text={title} className={align === 'left' ? 'sm:items-start' : undefined} ampersandClassName={dark ? 'text-[var(--t-on-primary)] normal-case tracking-normal' : 'normal-case tracking-normal'} />
+        <Names text={title} className={align === 'left' ? '@min-[640px]:items-start' : undefined} ampersandClassName={dark ? 'text-[var(--t-on-primary)] normal-case tracking-normal' : 'normal-case tracking-normal'} />
       </h1>
       {subtitle ? <p className={cx('mt-5 max-w-sm text-base', onColor ? 'opacity-85' : 'text-[var(--t-muted-ink)]')}>{subtitle}</p> : null}
       {date ? (

@@ -43,7 +43,7 @@ export function Quote(p: SectionProps) {
         <span aria-hidden="true" className="block text-6xl leading-none text-[var(--t-accent-ink)] [font-family:var(--t-heading)]">
           “
         </span>
-        <blockquote className="-mt-4 text-2xl leading-snug italic [font-family:var(--t-heading)] sm:text-3xl">{text}</blockquote>
+        <blockquote className="-mt-4 text-2xl leading-snug italic [font-family:var(--t-heading)] @min-[640px]:text-3xl">{text}</blockquote>
         {by ? <figcaption className="mt-5 text-xs tracking-[0.3em] uppercase text-[var(--t-muted-ink)]">{by}</figcaption> : null}
       </figure>
     </SectionShell>

@@ -76,7 +76,7 @@ export function EventTimeline(p: SectionProps) {
   if (p.instance.variant === 'tickets') {
     return (
       <SectionShell {...shell(p)} heading={heading} tone="surface" wide>
-        <ul className="grid gap-6 sm:grid-cols-2">
+        <ul className="grid gap-6 @min-[640px]:grid-cols-2">
           {fns.map((fn) => {
             const parts = fn.startsAt ? dateParts(fn.startsAt, p.language, p.timeZone) : null;
             const href = linkless ? null : mapHref(fn);
@@ -122,7 +122,7 @@ export function EventTimeline(p: SectionProps) {
 
   return (
     <SectionShell {...shell(p)} heading={heading} tone="surface">
-      <ul className={cx('grid gap-5', p.instance.variant === 'tiles' ? 'sm:grid-cols-2' : 'grid-cols-1')}>
+      <ul className={cx('grid gap-5', p.instance.variant === 'tiles' ? '@min-[640px]:grid-cols-2' : 'grid-cols-1')}>
         {fns.map((fn) => {
           const parts = fn.startsAt ? dateParts(fn.startsAt, p.language, p.timeZone) : null;
           return (

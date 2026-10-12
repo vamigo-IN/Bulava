@@ -153,13 +153,13 @@ export function SectionShell({
       <h2
         className={cx(
           'leading-tight',
-          look === 'heritage' && 'text-5xl [font-family:var(--t-script)] text-[var(--t-heading-ink)] sm:text-6xl',
-          look === 'noir' && 'text-4xl italic [font-family:var(--t-heading)] sm:text-5xl',
-          look === 'royal' && 'text-3xl tracking-[0.14em] uppercase [font-family:var(--t-heading)] text-[var(--t-heading-ink)] sm:text-4xl',
+          look === 'heritage' && 'text-5xl [font-family:var(--t-script)] text-[var(--t-heading-ink)] @min-[640px]:text-6xl',
+          look === 'noir' && 'text-4xl italic [font-family:var(--t-heading)] @min-[640px]:text-5xl',
+          look === 'royal' && 'text-3xl tracking-[0.14em] uppercase [font-family:var(--t-heading)] text-[var(--t-heading-ink)] @min-[640px]:text-4xl',
           look === 'garden' && 'text-5xl [font-family:var(--t-script)] text-[var(--t-heading-ink)]',
-          look === 'celebration' && 'text-4xl font-bold [font-family:var(--t-heading)] sm:text-5xl',
-          look === 'modern' && 'text-4xl tracking-tight [font-family:var(--t-heading)] sm:text-6xl',
-          look === 'classic' && 'text-3xl [font-family:var(--t-heading)] sm:text-4xl',
+          look === 'celebration' && 'text-4xl font-bold [font-family:var(--t-heading)] @min-[640px]:text-5xl',
+          look === 'modern' && 'text-4xl tracking-tight [font-family:var(--t-heading)] @min-[640px]:text-6xl',
+          look === 'classic' && 'text-3xl [font-family:var(--t-heading)] @min-[640px]:text-4xl',
         )}
       >
         {heading}
@@ -180,13 +180,13 @@ export function SectionShell({
   );
 
   return (
-    <section id={id} className={cx('bulava-reveal relative overflow-hidden px-6', toran ? 'pt-28 pb-16 sm:pt-32' : 'py-16 sm:py-24', BAND_CLASS[band], className)}>
+    <section id={id} className={cx('bulava-reveal relative overflow-hidden px-6', toran ? 'pt-28 pb-16 @min-[640px]:pt-32' : 'py-16 @min-[640px]:py-24', BAND_CLASS[band], className)}>
       {bandPattern ? <div className="pointer-events-none absolute inset-0 opacity-[0.12]" style={bandPattern} aria-hidden="true" /> : null}
       {toran ? <Toran className="pointer-events-none absolute inset-x-0 top-0 mx-auto w-full max-w-[760px] bulava-sway-soft" swags={4} /> : null}
       {look === 'garden' ? (
         <>
-          <FloralCorner className="pointer-events-none absolute top-0 left-0 w-32 text-[var(--t-secondary)] opacity-50 sm:w-44" />
-          <FloralCorner className="pointer-events-none absolute top-0 right-0 w-32 -scale-x-100 text-[var(--t-secondary)] opacity-50 sm:w-44" />
+          <FloralCorner className="pointer-events-none absolute top-0 left-0 w-32 text-[var(--t-secondary)] opacity-50 @min-[640px]:w-44" />
+          <FloralCorner className="pointer-events-none absolute top-0 right-0 w-32 -scale-x-100 text-[var(--t-secondary)] opacity-50 @min-[640px]:w-44" />
         </>
       ) : null}
       {look === 'noir' ? (
@@ -194,7 +194,7 @@ export function SectionShell({
       ) : null}
       <div className={cx('relative mx-auto', wide ? 'max-w-5xl' : 'max-w-3xl')}>
         {look === 'royal' ? (
-          <div className="relative border border-[var(--t-line)] px-5 py-12 sm:px-12">
+          <div className="relative border border-[var(--t-line)] px-5 py-12 @min-[640px]:px-12">
             <div className="pointer-events-none absolute inset-2 border border-[var(--t-line)] opacity-60" aria-hidden="true" />
             <Filigree className="absolute -top-px -left-px w-12 text-[var(--t-accent)]" />
             <Filigree className="absolute -top-px -right-px w-12 -scale-x-100 text-[var(--t-accent)]" />

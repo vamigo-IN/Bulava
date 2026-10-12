@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { StockSearch, type StockSource } from '@/components/editor/stock-search';
 import { fontStack } from '@bulava/template-engine';
 import type { MessageKey } from '@bulava/localization';
@@ -359,7 +359,8 @@ export function WordsPanel({ definition, custom, setCustom }: PanelProps) {
 
 const EFFECT_ICONS: Record<EffectName, string> = { none: '○', petals: '🌸', marigold: '🏵️', goldDust: '✨', fireflies: '🪲', confetti: '🎊', lanterns: '🏮', snow: '❄️' };
 
-export function MotionPanel({ definition, custom, setCustom }: PanelProps) {
+/** `musicNote`: said beside the music (a plan without it, on an event). */
+export function MotionPanel({ definition, custom, setCustom, musicNote }: PanelProps & { musicNote?: ReactNode }) {
   const t = useT();
   const caps = definition.capabilities;
   const intro = custom.intro ?? definition.website?.intro ?? 'none';
@@ -405,7 +406,12 @@ export function MotionPanel({ definition, custom, setCustom }: PanelProps) {
           </fieldset>
         </>
       ) : null}
-      {caps.editable.music ? <MusicPicker value={custom.musicId} onChange={(musicId) => setCustom({ ...custom, musicId })} /> : null}
+      {caps.editable.music ? (
+        <div className="space-y-3">
+          {musicNote}
+          <MusicPicker value={custom.musicId} onChange={(musicId) => setCustom({ ...custom, musicId })} />
+        </div>
+      ) : null}
     </div>
   );
 }

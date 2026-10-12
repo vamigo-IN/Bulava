@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   MailOpen,
   Megaphone,
+  PackagePlus,
   Palette,
   Rocket,
   ScanLine,
@@ -30,7 +31,7 @@ import { formatEventDate, type MessageKey } from '@bulava/localization';
 import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { errorMessage, useT } from '@/lib/i18n';
 import { can, canOpenSection } from '@/lib/permissions';
-import { useDesign, useEvent } from '@/lib/queries';
+import { useEvent, useEventPlan } from '@/lib/queries';
 import { progressOf, type SetupStepKey } from '@/lib/setup-steps';
 import type { EventSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -115,7 +116,6 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
   const t = useT();
   const pathname = usePathname();
   const router = useRouter();
-  const design = useDesign(event.id);
   const publish = usePublish();
   const canEdit = can(event, 'event.update');
   const steps = useSetupSteps(canEdit ? event : undefined);
@@ -132,9 +132,10 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
     if (section === '' && !allowedHere && first) router.replace(`${base}${first.href}`);
   }, [section, allowedHere, first, base, router]);
 
-  const tier = design.data?.entitlements['templates.maxTier'];
-  const paid = tier?.source === 'EVENT_PURCHASE' || tier?.source === 'SUBSCRIPTION';
-  const planName = !tier ? '' : paid ? t('dash.plan.paid', { plan: tier.limit === 2 ? 'Premium' : 'Standard' }) : t('dash.plan.free');
+  // The plan the event runs on, by its own name (the owner's account plan, or one of the event's own).
+  const plan = useEventPlan(event.id);
+  const paid = Boolean(plan.data?.plan);
+  const planName = !plan.data ? '' : plan.data.plan ? t('dash.plan.paid', { plan: plan.data.plan.name }) : t('dash.plan.free');
   const status = event.status;
   const doneSteps = new Set(steps?.filter((s) => s.done).map((s) => s.key));
   const progress = steps ? progressOf(steps) : null;
@@ -205,11 +206,18 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
                 <ExternalLink aria-hidden className="size-4" />
               </a>
             ) : null}
-            {!paid && can(event, 'payment.read') ? (
-              <Link href={`${base}/unlock`} className={status === 'DRAFT' && publish ? HEADER_BUTTON : GOLD_BUTTON}>
-                <Sparkles aria-hidden className="size-4" />
-                {t('dash.nav.upgrade')}
-              </Link>
+            {plan.data && can(event, 'payment.read') ? (
+              paid ? (
+                <Link href={`${base}/unlock`} className={HEADER_BUTTON}>
+                  <PackagePlus aria-hidden className="size-4" />
+                  {t('dash.nav.planAddOns')}
+                </Link>
+              ) : (
+                <Link href={`${base}/unlock`} className={status === 'DRAFT' && publish ? HEADER_BUTTON : GOLD_BUTTON}>
+                  <Sparkles aria-hidden className="size-4" />
+                  {t('dash.nav.upgrade')}
+                </Link>
+              )
             ) : null}
             {status === 'DRAFT' && publish ? (
               <button type="button" onClick={publish} className={GOLD_BUTTON}>

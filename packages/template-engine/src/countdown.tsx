@@ -34,7 +34,7 @@ function FlipDigit({ value }: { value: string }) {
   const { shown, previous, turning } = state;
   const face = 'absolute inset-x-0 flex justify-center overflow-hidden bg-[var(--t-card)] text-[var(--t-primary-ink)]';
   return (
-    <span className="relative block h-16 w-full [perspective:300px] sm:h-20" aria-hidden="true">
+    <span className="relative block h-16 w-full [perspective:300px] @min-[640px]:h-20" aria-hidden="true">
       <span className={`${face} top-0 h-1/2 items-end rounded-t-[calc(var(--t-radius)*0.8)] border-b border-black/15`}>
         <span className="translate-y-1/2">{shown}</span>
       </span>
@@ -72,7 +72,7 @@ export function CountdownClock({ target, labels, static: isStatic, variant = 'bo
 
   if (variant === 'flip') {
     return (
-      <div className="grid grid-cols-4 gap-3" role="timer" aria-live="off">
+      <div className="grid grid-cols-4 gap-3" role="timer" aria-live="off" data-live="">
         {cells.map(([key, n]) => {
           const text = n === null ? '––' : String(n).padStart(2, '0');
           return (
@@ -80,7 +80,7 @@ export function CountdownClock({ target, labels, static: isStatic, variant = 'bo
               <span className="sr-only">
                 {text} {labels[key]}
               </span>
-              <div className="text-4xl tabular-nums shadow-[0_18px_30px_-18px_rgba(0,0,0,0.6)] [font-family:var(--t-heading)] sm:text-5xl">
+              <div className="text-4xl tabular-nums shadow-[0_18px_30px_-18px_rgba(0,0,0,0.6)] [font-family:var(--t-heading)] @min-[640px]:text-5xl">
                 <FlipDigit value={text} />
               </div>
               <div className="mt-2 text-[0.65rem] tracking-[0.25em] uppercase text-[var(--t-muted-ink)]">{labels[key]}</div>
@@ -92,10 +92,10 @@ export function CountdownClock({ target, labels, static: isStatic, variant = 'bo
   }
 
   return (
-    <div className="grid grid-cols-4 gap-3" role="timer" aria-live="off">
+    <div className="grid grid-cols-4 gap-3" role="timer" aria-live="off" data-live="">
       {cells.map(([key, n]) => (
         <div key={key} className="rounded-[var(--t-radius)] border border-[var(--t-line)] bg-[var(--t-card)] px-2 py-4 text-center shadow-sm">
-          <div className="text-3xl tabular-nums [font-family:var(--t-heading)] text-[var(--t-primary-ink)] sm:text-4xl">{n === null ? '–' : String(n).padStart(2, '0')}</div>
+          <div className="text-3xl tabular-nums [font-family:var(--t-heading)] text-[var(--t-primary-ink)] @min-[640px]:text-4xl">{n === null ? '–' : String(n).padStart(2, '0')}</div>
           <div className="mt-1 text-[0.65rem] tracking-[0.2em] uppercase text-[var(--t-muted-ink)]">{labels[key]}</div>
         </div>
       ))}

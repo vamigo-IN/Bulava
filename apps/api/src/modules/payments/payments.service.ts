@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { planOfferToken, verifyPlanOfferToken } from '@bulava/auth';
-import { ADDON_SOURCE, type Order, type PricingPlan, type Prisma } from '@bulava/database';
+import { ADDON_SOURCE, whatsappMessagesUsed, type Order, type PricingPlan, type Prisma } from '@bulava/database';
 import { SettingsStore } from '@bulava/settings';
 import { ADDON_MAX_QUANTITY, FEATURE_KEYS, type CreateOrderInput, type OrderQuoteInput, type PlanOfferInput, type VerifyPaymentInput } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
@@ -44,6 +44,17 @@ interface Purchase {
   subtotalMinor: number;
   /** The account has it already (the plan or a bigger one; an add-on bought once). */
   included: boolean;
+  /** An add-on for one event's own plan (null: the account's). */
+  eventId: string | null;
+}
+
+/** A plan order in force, with what kind of order it was (bought, or given by the team). */
+interface PlanInForce {
+  orderId: string;
+  /** PURCHASE or ADMIN_GRANT. */
+  kind: string;
+  eventId: string | null;
+  plan: PricingPlan;
 }
 
 /** Entitlements from orders: plans (ORDER) and add-ons (ADDON). */
@@ -51,6 +62,8 @@ const ORDER_SOURCES = ['ORDER', ADDON_SOURCE];
 
 /** Services the team carries out after a purchase: the inbox hears about them. */
 const SERVICES = new Set<string>([FEATURE_KEYS.DONE_FOR_YOU, FEATURE_KEYS.RUSH]);
+
+const planLine = (plan: PricingPlan) => ({ key: plan.key, name: plan.name, priceMinor: plan.priceMinor, interval: plan.interval, tagline: plan.tagline });
 
 const planCard = (plan: PlanWithFeatures) => ({
   key: plan.key,
@@ -146,9 +159,9 @@ export class PaymentsService {
     return plan;
   }
 
-  /** The plans the account bought or was given, in force: one-time ones always, yearly ones for their year. */
-  async accountPlans(userId: string): Promise<PricingPlan[]> {
-    const orders = await this.prisma.order.findMany({ where: { userId, eventId: null, status: 'PAID', plan: { kind: 'PLAN' } }, select: { id: true, plan: true } });
+  /** Plan orders in force (one-time ones always, yearly ones for their year), bought or given. */
+  private async plansInForce(where: Prisma.OrderWhereInput): Promise<PlanInForce[]> {
+    const orders = await this.prisma.order.findMany({ where: { ...where, status: 'PAID', plan: { kind: 'PLAN' } }, select: { id: true, kind: true, eventId: true, plan: true } });
     if (!orders.length) return [];
     const now = new Date();
     const live = await this.prisma.entitlement.findMany({
@@ -157,7 +170,17 @@ export class PaymentsService {
       distinct: ['sourceId'],
     });
     const inForce = new Set(live.map((e) => e.sourceId));
-    return orders.filter((o) => inForce.has(o.id)).map((o) => o.plan);
+    return orders.filter((o) => inForce.has(o.id)).map((o) => ({ orderId: o.id, kind: o.kind, eventId: o.eventId, plan: o.plan }));
+  }
+
+  /** The plans the account bought or was given, in force: one-time ones always, yearly ones for their year. */
+  async accountPlans(userId: string): Promise<PricingPlan[]> {
+    return (await this.plansInForce({ userId, eventId: null })).map((o) => o.plan);
+  }
+
+  /** The biggest of some plan orders (by price), preferring the first given on a tie. */
+  private static biggest(orders: PlanInForce[]): PlanInForce | null {
+    return orders.reduce<PlanInForce | null>((best, o) => (!best || o.plan.priceMinor > best.plan.priceMinor ? o : best), null);
   }
 
   /** The plan a bigger one is paid against: the account's biggest one-time plan. */
@@ -172,27 +195,41 @@ export class PaymentsService {
    * for this account. An add-on: only with a plan it is offered to, once (or
    * as many as wanted when stackable).
    */
-  private async purchase(userId: string, plan: PlanWithFeatures, input: { quantity?: number; offerToken?: string }): Promise<Purchase> {
+  private async purchase(userId: string, plan: PlanWithFeatures, input: { quantity?: number; offerToken?: string; eventId?: string }): Promise<Purchase> {
     const plans = await this.accountPlans(userId);
     const current = this.currentPlan(plans);
     if (plan.kind === 'ADDON') {
-      if (!plans.length) throw new AppError('ADDON_NEEDS_PLAN', 'Add-ons go with a plan: choose your plan first.');
-      if (plan.offeredTo.length && !(current && plan.offeredTo.includes(current.key))) {
-        throw new AppError('ADDON_NOT_OFFERED', 'This add-on is not offered with your plan.', { plan: current?.key ?? null });
+      // An add-on adds to a plan: the account's, or (bought from one of the buyer's events) a bigger
+      // plan bought or given for that event alone, which it then adds to there only.
+      let base = current ?? plans[0] ?? null;
+      let eventId: string | null = null;
+      if (input.eventId) {
+        const event = await this.prisma.event.findFirst({ where: { id: input.eventId, ownerId: userId, deletedAt: null }, select: { id: true } });
+        if (!event) throw AppError.notFound('Event');
+        const own = PaymentsService.biggest(await this.plansInForce({ eventId: input.eventId }));
+        if (own && own.plan.priceMinor > (base?.priceMinor ?? -1)) {
+          base = own.plan;
+          eventId = input.eventId;
+        }
       }
-      const owned = !plan.stackable && (await this.prisma.order.count({ where: { userId, planId: plan.id, status: 'PAID' } })) > 0;
+      if (!base) throw new AppError('ADDON_NEEDS_PLAN', 'Add-ons go with a plan: choose your plan first.');
+      if (plan.offeredTo.length && !plan.offeredTo.includes(base.key)) {
+        throw new AppError('ADDON_NOT_OFFERED', 'This add-on is not offered with your plan.', { plan: base.key });
+      }
+      // One of a kind: bought for the account (it covers every event), or for this event already.
+      const owned = !plan.stackable && (await this.prisma.order.count({ where: { userId, planId: plan.id, status: 'PAID', OR: [{ eventId: null }, ...(eventId ? [{ eventId }] : [])] } })) > 0;
       const quantity = plan.stackable ? Math.min(ADDON_MAX_QUANTITY, Math.max(1, input.quantity ?? 1)) : 1;
-      return { plan, quantity, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor * quantity, included: owned };
+      return { plan, quantity, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor * quantity, included: owned, eventId };
     }
     if (plan.visibility === 'HIDDEN' && !(input.offerToken && verifyPlanOfferToken(input.offerToken, userId, plan.key, this.config.TOKEN_ENCRYPTION_KEY))) {
       throw new AppError('NOT_FOUND', 'Plan not found.');
     }
     // A yearly plan (Studio) is sold whole, never against a one-time plan.
-    if (plan.interval !== 'ONE_TIME') return { plan, quantity: 1, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor, included: false };
+    if (plan.interval !== 'ONE_TIME') return { plan, quantity: 1, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor, included: false, eventId: null };
     const included = Boolean(current && current.priceMinor >= plan.priceMinor);
     const upgradeFrom = current && !included ? current : null;
     const creditMinor = upgradeFrom?.priceMinor ?? 0;
-    return { plan, quantity: 1, upgradeFrom, creditMinor, subtotalMinor: plan.priceMinor - creditMinor, included };
+    return { plan, quantity: 1, upgradeFrom, creditMinor, subtotalMinor: plan.priceMinor - creditMinor, included, eventId: null };
   }
 
   /**
@@ -217,6 +254,8 @@ export class PaymentsService {
       totalMinor: amountMinor,
       currency: plan.currency,
       included: p.included,
+      /** An add-on for this event's own plan (null: for the account). */
+      eventId: p.eventId,
     };
   }
 
@@ -233,7 +272,7 @@ export class PaymentsService {
     let p: Purchase;
     if (access) {
       if (plan.kind !== 'PLAN' || plan.interval !== 'ONE_TIME' || plan.visibility === 'HIDDEN') throw new AppError('BAD_REQUEST', 'This is not bought for one event.');
-      p = { plan, quantity: 1, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor, included: false };
+      p = { plan, quantity: 1, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor, included: false, eventId: access.eventId };
     } else {
       p = await this.purchase(user.id, plan, input);
     }
@@ -248,7 +287,7 @@ export class PaymentsService {
       const created = await tx.order.create({
         data: {
           userId: user.id,
-          eventId: access?.eventId ?? null,
+          eventId: p.eventId,
           planId: plan.id,
           couponId,
           amountMinor,
@@ -262,14 +301,14 @@ export class PaymentsService {
       await tx.consent.create({ data: { userId: user.id, kind: 'purchase_terms', granted: true, version: `${versions.terms};${versions.refund}`, source: `order:${created.id}` } });
       return created;
     });
-    this.analytics.track('checkout_started', { eventId: access?.eventId, userId: user.id }, { plan: plan.key, amountMinor });
+    this.analytics.track('checkout_started', { eventId: p.eventId ?? undefined, userId: user.id }, { plan: plan.key, amountMinor });
     await this.audit.record({
       actorType: 'USER',
       actorId: user.id,
       action: 'order.created',
       targetType: 'Order',
       targetId: order.id,
-      eventId: access?.eventId ?? null,
+      eventId: p.eventId,
       metadata: { plan: plan.key, kind: plan.kind, amountMinor, quantity: p.quantity, creditMinor: p.creditMinor, ...(p.upgradeFrom ? { from: p.upgradeFrom.key } : {}) },
       meta,
     });
@@ -308,22 +347,78 @@ export class PaymentsService {
    * dashboard's Plan page and the checkout's "your plan" line.
    */
   async account(user: AuthUser) {
-    const [plans, addOns, features] = await Promise.all([
+    const [plans, addOns, features, single] = await Promise.all([
       this.accountPlans(user.id),
-      this.prisma.order.findMany({ where: { userId: user.id, eventId: null, status: 'PAID', plan: { kind: 'ADDON' } }, select: { quantity: true, createdAt: true, plan: { select: { key: true, name: true } } }, orderBy: { createdAt: 'asc' } }),
+      this.addOnsOf({ userId: user.id, eventId: null }),
       this.entitlements.forUser(user.id),
+      this.plansInForce({ userId: user.id, eventId: { not: null } }),
     ]);
     const plan = this.currentPlan(plans) ?? plans[0] ?? null;
+    // Plans bought or given for one event alone (older purchases, the team's complimentary ones).
+    const eventIds = [...new Set(single.map((o) => o.eventId!))];
+    const events = eventIds.length ? await this.prisma.event.findMany({ where: { id: { in: eventIds }, deletedAt: null }, select: { id: true, title: true } }) : [];
+    const titles = new Map(events.map((e) => [e.id, e.title]));
+    return {
+      plan: plan ? planLine(plan) : null,
+      addOns,
+      features: EntitlementsService.summary(features),
+      eventPlans: single.filter((o) => titles.has(o.eventId!)).map((o) => ({ eventId: o.eventId!, eventTitle: titles.get(o.eventId!)!, plan: planLine(o.plan), complimentary: o.kind === 'ADMIN_GRANT' })),
+    };
+  }
+
+  /** Add-ons bought or given, added up by kind. */
+  private async addOnsOf(where: Prisma.OrderWhereInput): Promise<Array<{ key: string; name: string; quantity: number }>> {
+    const orders = await this.prisma.order.findMany({ where: { ...where, status: 'PAID', plan: { kind: 'ADDON' } }, select: { quantity: true, plan: { select: { key: true, name: true } } }, orderBy: { createdAt: 'asc' } });
     const owned = new Map<string, { key: string; name: string; quantity: number }>();
-    for (const a of addOns) {
+    for (const a of orders) {
       const row = owned.get(a.plan.key) ?? { key: a.plan.key, name: a.plan.name, quantity: 0 };
       row.quantity += a.quantity;
       owned.set(a.plan.key, row);
     }
+    return [...owned.values()];
+  }
+
+  /**
+   * The plan an event runs on (ADR-062): the bigger of the owner's account plan
+   * and a plan bought or given for this event alone, the add-ons that add to it
+   * (the account's and the event's own), and what the event has with them. The
+   * owner's account plan comes too: a bigger plan is paid against it.
+   */
+  async eventPlan(access: EventAccessContext) {
+    const event = await this.prisma.event.findFirst({ where: { id: access.eventId, deletedAt: null }, select: { ownerId: true } });
+    if (!event) throw AppError.notFound('Event');
+    const eventId = access.eventId;
+    const [account, own, addOns, features, functions, guests, photos, videos, whatsapp] = await Promise.all([
+      this.plansInForce({ userId: event.ownerId, eventId: null }),
+      this.plansInForce({ eventId }),
+      this.addOnsOf({ userId: event.ownerId, OR: [{ eventId: null }, { eventId }] }),
+      this.entitlements.forEvent(eventId),
+      // Counted as the limits count them: functions guests see (with a date), photos kept, films made or on the way.
+      this.prisma.eventFunction.count({ where: { eventId, deletedAt: null, startsAt: { not: null } } }),
+      this.prisma.guest.count({ where: { eventId, deletedAt: null } }),
+      this.prisma.mediaItem.count({ where: { eventId, status: { notIn: ['DELETED', 'REJECTED'] } } }),
+      this.prisma.videoJob.count({ where: { eventId, status: { in: ['QUEUED', 'PROCESSING', 'COMPLETED'] } } }),
+      whatsappMessagesUsed(this.prisma, eventId),
+    ]);
+    const fromAccount = PaymentsService.biggest(account);
+    const fromEvent = PaymentsService.biggest(own);
+    const best = fromEvent && fromEvent.plan.priceMinor > (fromAccount?.plan.priceMinor ?? -1) ? fromEvent : fromAccount;
     return {
-      plan: plan ? { key: plan.key, name: plan.name, priceMinor: plan.priceMinor, interval: plan.interval, tagline: plan.tagline } : null,
-      addOns: [...owned.values()],
+      plan: best ? planLine(best.plan) : null,
+      /** ACCOUNT: the owner's plan, for every event; EVENT: bought or given for this event alone. */
+      scope: best ? (best === fromEvent ? ('EVENT' as const) : ('ACCOUNT' as const)) : null,
+      complimentary: best?.kind === 'ADMIN_GRANT',
+      accountPlan: fromAccount ? planLine(fromAccount.plan) : null,
+      addOns,
       features: EntitlementsService.summary(features),
+      /** What the event uses of the limits (its plan page's meters). */
+      usage: {
+        [FEATURE_KEYS.FUNCTIONS_MAX]: functions,
+        [FEATURE_KEYS.GUESTS_MAX]: guests,
+        [FEATURE_KEYS.PHOTOS_MAX]: photos,
+        [FEATURE_KEYS.VIDEO_RENDERS_MAX]: videos,
+        [FEATURE_KEYS.WHATSAPP_MESSAGES]: whatsapp,
+      },
     };
   }
 

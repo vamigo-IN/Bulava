@@ -74,16 +74,16 @@ export function Gallery(p: SectionProps) {
     }
     return (
       <SectionShell {...shell(p)} heading={heading} wide>
-        <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+        <div className="flex flex-col items-center gap-1.5 @min-[640px]:gap-2">
           {rows.map((row, r) => (
-            <div key={r} className="flex w-full justify-center gap-1.5 sm:gap-2">
+            <div key={r} className="flex w-full justify-center gap-1.5 @min-[640px]:gap-2">
               {row.map((img, k) => {
                 const i = rows.slice(0, r).reduce((n, x) => n + x.length, 0) + k;
                 return wrap(
                   i,
                   img,
                   <img src={img.thumbUrl} alt="" loading="lazy" decoding="async" className="aspect-[4/5] h-full w-full object-cover shadow-md" {...dims(img)} />,
-                  r === 0 ? 'w-1/3 sm:w-1/4' : 'min-w-0 flex-1 max-w-[33%]',
+                  r === 0 ? 'w-1/3 @min-[640px]:w-1/4' : 'min-w-0 flex-1 max-w-[33%]',
                 );
               })}
             </div>
@@ -96,7 +96,7 @@ export function Gallery(p: SectionProps) {
   if (p.instance.variant === 'polaroid') {
     return (
       <SectionShell {...shell(p)} heading={heading} wide>
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 sm:gap-10">
+        <div className="grid grid-cols-2 gap-6 @min-[640px]:grid-cols-3 @min-[640px]:gap-10">
           {shown.slice(0, 9).map((img, i) =>
             wrap(
               i,
@@ -114,7 +114,7 @@ export function Gallery(p: SectionProps) {
 
   return (
     <SectionShell {...shell(p)} heading={heading}>
-      <div className="columns-2 gap-3 sm:columns-3 [&>*]:mb-3">
+      <div className="columns-2 gap-3 @min-[640px]:columns-3 [&>*]:mb-3">
         {shown.map((img, i) =>
           wrap(i, img, <img src={img.thumbUrl} alt="" loading="lazy" decoding="async" className="w-full rounded-[calc(var(--t-radius)*0.75)] object-cover shadow-sm" {...dims(img)} />, 'break-inside-avoid'),
         )}
@@ -164,7 +164,7 @@ export function Footer(p: SectionProps) {
             <img src={photo} alt="" className="h-full w-full object-cover" loading="lazy" />
           </div>
         ) : null}
-        <p className="text-3xl [font-family:var(--t-script)] text-[var(--t-accent-ink)] sm:text-4xl">{closing}</p>
+        <p className="text-3xl [font-family:var(--t-script)] text-[var(--t-accent-ink)] @min-[640px]:text-4xl">{closing}</p>
         {hashtag ? <p className="mt-4 text-sm tracking-[0.25em] uppercase text-[var(--t-muted-ink)]">{hashtag}</p> : null}
         {p.look === 'heritage' ? (
           <div className="mt-8 flex justify-center gap-6" aria-hidden="true">

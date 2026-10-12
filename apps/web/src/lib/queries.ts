@@ -98,6 +98,7 @@ export const moreKeys = {
   plans: ['meta', 'plans'] as const,
   addOns: ['meta', 'add-ons'] as const,
   accountPlan: ['orders', 'plan'] as const,
+  eventPlan: (id: string) => ['events', id, 'plan'] as const,
   notifications: ['notifications'] as const,
 };
 
@@ -132,12 +133,41 @@ export const usePlans = () => useQuery({ queryKey: moreKeys.plans, queryFn: () =
 export const useAddOns = () => useQuery({ queryKey: moreKeys.addOns, queryFn: () => apiGet<Plan[]>('/meta/add-ons'), staleTime: 300_000 });
 /** The signed-in account's plan and add-ons (ADR-062); refetched after a payment. */
 export const useAccountPlan = (enabled = true) => useQuery({ queryKey: moreKeys.accountPlan, queryFn: () => apiGet<AccountPlan>('/orders/plan'), enabled, staleTime: 30_000 });
+/** The plan an event runs on and its add-ons (the owner's account plan, or one of the event's own); refetched after a payment. */
+export const useEventPlan = (id: string, enabled = true) => useQuery({ queryKey: moreKeys.eventPlan(id), queryFn: () => apiGet<EventPlan>(`/events/${id}/plan`), enabled: enabled && Boolean(id), staleTime: 30_000 });
+
+/** A plan as the plan pages name it. */
+export interface PlanLine {
+  key: string;
+  name: string;
+  priceMinor: number;
+  interval: 'ONE_TIME' | 'YEAR';
+  tagline: string | null;
+}
+type FeatureSummary = Record<string, { enabled: boolean; limit: number | null; source: string }>;
 
 /** GET /orders/plan: the account's plan (its biggest one-time plan), its add-ons and what they add up to. */
 export interface AccountPlan {
-  plan: { key: string; name: string; priceMinor: number; interval: 'ONE_TIME' | 'YEAR'; tagline: string | null } | null;
+  plan: PlanLine | null;
   addOns: Array<{ key: string; name: string; quantity: number }>;
-  features: Record<string, { enabled: boolean; limit: number | null; source: string }>;
+  features: FeatureSummary;
+  /** Plans bought or given for one event alone (older purchases, the team's complimentary ones). */
+  eventPlans?: Array<{ eventId: string; eventTitle: string; plan: PlanLine; complimentary: boolean }>;
+}
+
+/** GET /events/:id/plan: the plan an event runs on (ADR-062). */
+export interface EventPlan {
+  plan: PlanLine | null;
+  /** ACCOUNT: the owner's plan, for every event; EVENT: bought or given for this event alone. */
+  scope: 'ACCOUNT' | 'EVENT' | null;
+  /** Given by the team rather than bought. */
+  complimentary: boolean;
+  /** The owner's account plan (a bigger plan is paid against it). */
+  accountPlan: PlanLine | null;
+  addOns: Array<{ key: string; name: string; quantity: number }>;
+  features: FeatureSummary;
+  /** What the event uses of each limit, by feature (functions with a date, guests, photos, videos, WhatsApp messages). */
+  usage?: Record<string, number>;
 }
 export const useCatalog = (type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', eventType: string) =>
   useQuery({

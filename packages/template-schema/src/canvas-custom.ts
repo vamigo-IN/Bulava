@@ -13,10 +13,18 @@ import type { SectionInstance, TemplateDefinition } from './definition';
 /** Canvas sections one invitation may redraw (templates have a handful). */
 export const CANVAS_CUSTOM_MAX_SECTIONS = 12;
 
-/** Sections a host may add to their page. */
-export const ADDED_SECTIONS_MAX = 8;
+/** Sections a host may add to their page, the template's sections they redrew included (ADR-065: any section is redrawn by clicking it). */
+export const ADDED_SECTIONS_MAX = 20;
+/** Entries in a host's order of the page's sections (ADR-065). */
+export const SECTION_ORDER_MAX = 80;
 /** An added section's phone artboard is phone-wide; its height is the host's. */
 export const ADDED_SECTION_WIDTH = 390;
+/**
+ * A phone screen's height: a template section drawn behind a redrawn one
+ * (ADR-065) lays out on it, so its screen-high hero is as high as it was in
+ * the editor's phone, whatever the guest's screen.
+ */
+export const SECTION_SCREEN_HEIGHT = 844;
 
 export const CanvasOverrideSchema = z.object({
   mobile: ArtboardSchema.optional(),
@@ -84,17 +92,53 @@ export function canvasWithOverride(canvas: CanvasSection, override: CanvasOverri
 }
 
 /**
+ * What a part of the page is ordered by (ADR-065): a template section's id, a
+ * host's section's id, and for a redrawn section the id of the section it
+ * stands in for, so that bringing the template's back keeps the place.
+ */
+export function orderKeys(definition: Pick<TemplateDefinition, 'website'>, added: readonly AddedSection[] | undefined | null): Map<string, string> {
+  const keys = new Map<string, string>();
+  for (const [original, standIn] of replacedSections(definition, added)) keys.set(standIn, original);
+  return keys;
+}
+
+/**
+ * The page's sections in the host's order (ADR-065): the opening stays first
+ * and the footer last; the others follow `order` (by `keyOf`). A section the
+ * order does not name (one a newer template version added) keeps its place
+ * after the section it followed.
+ */
+export function withSectionOrder<S extends Pick<SectionInstance, 'id' | 'section'>>(sections: readonly S[], order: readonly string[] | undefined | null, keyOf: (section: S) => string = (s) => s.id): S[] {
+  if (!order?.length || sections.length < 3) return [...sections];
+  const [opening, ...others] = sections;
+  const footers = others.filter((s) => s.section === 'footer');
+  const middle = others.filter((s) => s.section !== 'footer');
+  const rank = new Map(order.map((key, i) => [key, i] as const));
+  // Each named section leads a group; unnamed ones ride along with the section before them.
+  const groups: Array<{ rank: number; items: S[] }> = [{ rank: -1, items: [] }];
+  for (const s of middle) {
+    const r = rank.get(keyOf(s));
+    if (r === undefined) groups[groups.length - 1]!.items.push(s);
+    else groups.push({ rank: r, items: [s] });
+  }
+  const sorted = groups.map((g, i) => ({ ...g, i })).sort((a, b) => a.rank - b.rank || a.i - b.i);
+  return [opening!, ...sorted.flatMap((g) => g.items), ...footers];
+}
+
+/**
  * The template with the host's canvas changes applied: their artboards in
- * place of the template's, and the sections they added, after the section each
- * names (at the end, before the footer, when it names none or one that is gone).
+ * place of the template's, the sections they added, after the section each
+ * names (at the end, before the footer, when it names none or one that is
+ * gone), and the page in the order they chose (ADR-065).
  */
 export function withCanvasCustomization<D extends Pick<TemplateDefinition, 'website'>>(
   definition: D,
   canvas: CanvasCustomization | undefined | null,
   added?: readonly AddedSection[] | null,
+  order?: readonly string[] | null,
 ): D {
   const hasCanvas = Boolean(canvas && Object.keys(canvas).length);
-  if ((!hasCanvas && !added?.length) || !definition.website) return definition;
+  if ((!hasCanvas && !added?.length && !order?.length) || !definition.website) return definition;
   const [first, ...rest] = definition.website.pages;
   if (!first) return definition;
   let sections: SectionInstance[] = hasCanvas ? first.sections.map((s) => (s.section === 'canvas' && s.canvas && canvas![s.id] ? { ...s, canvas: canvasWithOverride(s.canvas, canvas![s.id]) } : s)) : first.sections;
@@ -118,7 +162,20 @@ export function withCanvasCustomization<D extends Pick<TemplateDefinition, 'webs
     }
     sections = out;
   }
+  if (order?.length) {
+    const keys = orderKeys(definition, added);
+    sections = withSectionOrder(sections, order, (s) => keys.get(s.id) ?? s.id);
+  }
   return { ...definition, website: { ...definition.website, pages: [{ ...first, sections }, ...rest] } };
+}
+
+/** The host's order kept to what the page has (its sections and the host's own, once each). */
+export function fittingSectionOrder(definition: Pick<TemplateDefinition, 'website'>, added: readonly AddedSection[] | undefined | null, order: readonly string[] | undefined | null): string[] | undefined {
+  if (!order?.length) return undefined;
+  const known = new Set([...(definition.website?.pages[0]?.sections ?? []).map((s) => s.id), ...(added ?? []).filter((a) => !a.replaces).map((a) => a.id)]);
+  const seen = new Set<string>();
+  const kept = order.filter((key) => known.has(key) && !seen.has(key) && (seen.add(key), true));
+  return kept.length ? kept : undefined;
 }
 
 /** Added sections re-anchored to this template: a section that is gone means at the end (and replaces nothing). */

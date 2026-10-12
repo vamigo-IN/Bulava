@@ -1,4 +1,4 @@
-export { TemplateRenderer, TemplateThumbnail, type TemplateRendererProps } from './renderer';
+export { sectionDrawer, TemplateRenderer, TemplateThumbnail, type TemplateRendererProps } from './renderer';
 export { TemplateStyles } from './styles';
 export { FONT_CSS_VARS, fontStack, themeStyle, isDark, mix } from './theme';
 export {

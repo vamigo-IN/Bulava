@@ -29,7 +29,8 @@ export function CanvasSection(p: SectionProps) {
         ...fillStyle(canvas.mobile.background.type === 'image' ? { type: 'color', color: backdrop?.[0] ?? p.colors.background } : canvas.mobile.background, p.colors, p.ctx),
       };
   const fonts = p.fonts;
-  const common = { colors: p.colors, fonts, t: p.t, language: p.language, timeZone: p.timeZone, mode: p.mode, slots: p.slots, rsvpTargetId };
+  const drawSection = p.drawSection ? (id: string) => p.drawSection!(id, p.index) : undefined;
+  const common = { colors: p.colors, fonts, t: p.t, language: p.language, timeZone: p.timeZone, mode: p.mode, slots: p.slots, rsvpTargetId, drawSection };
 
   return copies.map((ctx, i) => (
     <section

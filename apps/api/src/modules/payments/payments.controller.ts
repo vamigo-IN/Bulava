@@ -41,6 +41,13 @@ export class PaymentsController {
     return this.payments.listForEvent(access);
   }
 
+  /** The plan the event runs on and its add-ons (the owner's account plan, or one bought or given for this event). */
+  @Get('events/:eventId/plan')
+  @RequireEventPermission('event.read')
+  eventPlan(@EventAccess() access: EventAccessContext) {
+    return this.payments.eventPlan(access);
+  }
+
   /** Payment history for the dashboard: the signed-in user's own orders. */
   @Get('orders')
   myOrders(@CurrentUser() user: AuthUser) {

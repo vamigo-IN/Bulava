@@ -107,3 +107,49 @@ export function TemplateStyles() {
     </style>
   );
 }
+
+/**
+ * A template section behind a host's redrawn section (canvas/artboard.tsx, ADR-065): it lays out on a
+ * 390 px phone with an 844 px screen (which screen-high heroes follow) and is zoomed to its board's width:
+ * exactly where CSS divides lengths, else to the common phone width at or below the board's. Its words are
+ * hidden while the host's text layers carry them (they keep their space); a ticking countdown stays.
+ * Rendered by the layer itself, so thumbnails (which leave out the template styles) have it too.
+ */
+const SECTION_LAYER_STYLES = `
+.bulava-sec { --bulava-screen: 8.44px; container-type: inline-size; zoom: 0.75; }
+@container (min-width: 300px) { .bulava-sec { zoom: 0.7692; } }
+@container (min-width: 320px) { .bulava-sec { zoom: 0.8205; } }
+@container (min-width: 340px) { .bulava-sec { zoom: 0.8718; } }
+@container (min-width: 360px) { .bulava-sec { zoom: 0.9231; } }
+@container (min-width: 375px) { .bulava-sec { zoom: 0.9615; } }
+@container (min-width: 384px) { .bulava-sec { zoom: 0.9846; } }
+@container (min-width: 390px) { .bulava-sec { zoom: 1; } }
+@container (min-width: 393px) { .bulava-sec { zoom: 1.0077; } }
+@container (min-width: 400px) { .bulava-sec { zoom: 1.0256; } }
+@container (min-width: 412px) { .bulava-sec { zoom: 1.0564; } }
+@container (min-width: 414px) { .bulava-sec { zoom: 1.0615; } }
+@container (min-width: 428px) { .bulava-sec { zoom: 1.0974; } }
+@container (min-width: 430px) { .bulava-sec { zoom: 1.1026; } }
+@container (min-width: 440px) { .bulava-sec { zoom: 1.1282; } }
+@container (min-width: 460px) { .bulava-sec { zoom: 1.1795; } }
+@container (min-width: 480px) { .bulava-sec { zoom: 1.2308; } }
+@container (min-width: 500px) { .bulava-sec { zoom: 1.2821; } }
+@container (min-width: 540px) { .bulava-sec { zoom: 1.3846; } }
+@container (min-width: 600px) { .bulava-sec { zoom: 1.5385; } }
+@container (min-width: 680px) { .bulava-sec { zoom: 1.7436; } }
+@container (min-width: 768px) { .bulava-sec { zoom: 1.9692; } }
+@container (min-width: 820px) { .bulava-sec { zoom: 2.1026; } }
+@container (min-width: 860px) { .bulava-sec { zoom: 2.2051; } }
+@supports (zoom: calc(100cqw / 1px)) { .bulava-sec { zoom: calc(100cqw / 390px); } }
+.bulava-sec-words-off * { -webkit-text-fill-color: transparent !important; text-shadow: none !important; text-decoration-color: transparent !important; }
+.bulava-sec-words-off [data-live], .bulava-sec-words-off [data-live] * { -webkit-text-fill-color: currentcolor !important; }
+.bulava-sec-words-off a { visibility: hidden !important; }
+`;
+
+export function SectionLayerStyles() {
+  return (
+    <style href="bulava-section-layer-styles" precedence="bulava">
+      {SECTION_LAYER_STYLES}
+    </style>
+  );
+}

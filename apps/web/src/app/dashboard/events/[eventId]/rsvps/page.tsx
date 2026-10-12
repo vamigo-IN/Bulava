@@ -2,7 +2,9 @@
 
 import { useParams } from 'next/navigation';
 import { useT } from '@/lib/i18n';
+import { can } from '@/lib/permissions';
 import { useEvent, useRsvps, useRsvpSummary } from '@/lib/queries';
+import { PlanNotice } from '@/components/events/plan-notice';
 import { RemindersCard } from '@/components/events/reminders-card';
 import { RsvpQuestions } from '@/components/events/rsvp-questions';
 import { Badge, Card, EmptyState, Spinner } from '@/components/ui/primitives';
@@ -20,6 +22,7 @@ export default function RsvpsPage() {
 
   return (
     <div className="space-y-5">
+      <PlanNotice eventId={eventId} feature="rsvp.enabled" message="plan.notice.rsvp" canPay={can(event.data, 'payment.read')} />
       <section aria-labelledby="summary-heading">
         <h2 id="summary-heading" className="mb-2 font-semibold">
           {t('rsvp.summary.title')}

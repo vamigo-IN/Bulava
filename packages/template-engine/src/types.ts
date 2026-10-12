@@ -46,4 +46,6 @@ export interface SectionProps {
   fonts: Fonts;
   /** Id of the page's RSVP section, which canvas RSVP buttons scroll to. */
   rsvpSectionId?: string;
+  /** Draws one of the template's own sections behind a host's redrawn one (canvas section layers, ADR-065). */
+  drawSection?: (sectionId: string, index: number) => ReactNode;
 }

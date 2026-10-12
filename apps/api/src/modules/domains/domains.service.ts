@@ -113,7 +113,7 @@ export class DomainsService {
     const r = await this.routing();
     const provider = this.requireProvider(r);
     if (!(await this.entitled(access.eventId))) {
-      throw new AppError('PLAN_UPGRADE_REQUIRED', 'Custom domains are part of the Premium plan.', { feature: FEATURE_KEYS.CUSTOM_DOMAIN });
+      throw new AppError('PLAN_UPGRADE_REQUIRED', 'Custom domains come with a bigger plan.', { feature: FEATURE_KEYS.CUSTOM_DOMAIN });
     }
     const parsed = normalizeHostname(input, [this.mainHost, r.target.cname]);
     if ('problem' in parsed) throw new AppError('DOMAIN_INVALID', 'That domain cannot be used.', { reason: parsed.problem });

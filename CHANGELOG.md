@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Your invitation as one page on the canvas, and every plan shown as it is
+
+- **Your whole invitation as one page.** *Design it on the canvas* now shows your invitation exactly as guests see it on their phones, in one scrolling page. Move any section up or down, hide it, or press **+** between two sections to add one there. Switch to the desktop view to see the wide layout.
+- **Click any words to change them.** Click any text in your invitation, even in the template's own sections, and it is ready to edit like a card: retype it, restyle it, move it. The section keeps its exact look (its art, glow and lettering) and your names, dates and places still come from your event's details.
+- **A sleek phone preview.** The editors and previews now show your invitation in a thin, modern phone, and the dark editor no longer has a light line along its top.
+- **Your plan, named everywhere.** Each event shows the plan it runs on by its name (a plan our team gave you for one event included), on its header and its *Plan & add-ons* page, with what the event uses: functions, guests, photos, videos and WhatsApp messages.
+- **Add-ons wherever you have a plan.** Add-ons now show on every event's *Plan & add-ons* page; for an event with a plan of its own, what you add goes with that event. Without a plan yet, you see what you can add once you choose one.
+- **Plan as much as you like before publishing.** A draft can hold as many functions and guests as you need; publishing asks for a plan that fits. Pages tell you when your plan leaves out replies or music.
+
 ### One-time plans, a design page for everyone, free stock images, and more from the canvas
 
 - **Plans you pay for once.** Starter ₹299, Standard ₹599, Premium ₹999 (*Most popular*, the first with the MP4 video), Ultimate ₹1,999 and Grand ₹2,999 (we set it up for you). No subscriptions, nothing renews, GST included. Designing and previewing stay free; a plan is needed to publish, make the video or download.

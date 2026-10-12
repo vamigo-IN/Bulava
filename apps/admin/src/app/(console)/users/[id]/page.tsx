@@ -363,13 +363,14 @@ function UpgradeForm({ profile }: { profile: UserProfile }) {
   const paid = (plans.data ?? []).filter((p) => p.key !== 'FREE');
   const events = profile.events.filter((e) => e.status !== 'DELETED');
   const [planKey, setPlanKey] = useState('');
-  const [eventId, setEventId] = useState(events[0]?.id ?? '');
+  // A one-time plan is the whole account's (every event), as a bought one is; or one event's alone.
+  const [eventId, setEventId] = useState('');
   const [note, setNote] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const plan = paid.find((p) => p.key === planKey);
   const perEvent = plan?.interval === 'ONE_TIME';
   const grant = useMutation({
-    mutationFn: () => apiPost<{ plan: string }>(`/admin/users/${profile.user.id}/grants`, { planKey, note: note.trim(), ...(perEvent ? { eventId } : {}) }),
+    mutationFn: () => apiPost<{ plan: string }>(`/admin/users/${profile.user.id}/grants`, { planKey, note: note.trim(), ...(perEvent && eventId ? { eventId } : {}) }),
     onSuccess: async (r) => {
       setNotice(t('profile.upgraded', { plan: r.plan }));
       setNote('');
@@ -381,7 +382,6 @@ function UpgradeForm({ profile }: { profile: UserProfile }) {
     setNotice(null);
     grant.mutate();
   };
-  const blocked = perEvent && !events.length;
   return (
     <Card>
       <CardTitle className="mb-1 flex items-center gap-2">
@@ -406,21 +406,18 @@ function UpgradeForm({ profile }: { profile: UserProfile }) {
             )}
           </Field>
           {perEvent ? (
-            events.length ? (
-              <Field label={t('profile.upgradeEvent')}>
-                {(p) => (
-                  <Select {...p} required value={eventId} onChange={(e) => setEventId(e.target.value)}>
-                    {events.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {`${e.title} · ${e.plan}`}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-            ) : (
-              <Alert tone="warning">{t('profile.needsEvent')}</Alert>
-            )
+            <Field label={t('profile.upgradeEvent')} hint={t('profile.upgradeEventHint')}>
+              {(p) => (
+                <Select {...p} value={eventId} onChange={(e) => setEventId(e.target.value)}>
+                  <option value="">{t('profile.everyEvent')}</option>
+                  {events.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {`${e.title} · ${e.plan}`}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
           ) : null}
         </div>
         <Field label={t('profile.upgradeNote')}>
@@ -428,7 +425,7 @@ function UpgradeForm({ profile }: { profile: UserProfile }) {
         </Field>
         {grant.isError ? <Alert>{errorMessage(grant.error, t('common.error'))}</Alert> : null}
         {notice ? <Alert tone="success">{notice}</Alert> : null}
-        <Button type="submit" disabled={!planKey || note.trim().length < 3 || blocked || grant.isPending}>
+        <Button type="submit" disabled={!planKey || note.trim().length < 3 || grant.isPending}>
           {grant.isPending ? t('common.saving') : t('profile.upgradeSubmit')}
         </Button>
       </form>

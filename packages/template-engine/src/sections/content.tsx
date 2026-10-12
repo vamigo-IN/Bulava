@@ -30,14 +30,14 @@ export function Couple(p: SectionProps) {
   if (variant === 'arch') {
     return (
       <SectionShell {...shell(p)} heading={heading} tone="surface">
-        <div className="grid grid-cols-2 gap-5 sm:gap-10">
+        <div className="grid grid-cols-2 gap-5 @min-[640px]:gap-10">
           {people.map((person, i) => (
             <div key={person.name} className="flex flex-col items-center text-center">
-              <div className={cx('bulava-tilt relative w-full max-w-[220px] rounded-t-full border-[3px] border-[var(--t-accent)] p-1.5 shadow-[0_24px_40px_-20px_rgba(0,0,0,0.5)]', i ? 'sm:mt-12' : '')}>
+              <div className={cx('bulava-tilt relative w-full max-w-[220px] rounded-t-full border-[3px] border-[var(--t-accent)] p-1.5 shadow-[0_24px_40px_-20px_rgba(0,0,0,0.5)]', i ? '@min-[640px]:mt-12' : '')}>
                 <div className="aspect-[3/4] overflow-hidden rounded-t-full bg-[var(--t-card-alt)]">{portrait(person, 'rounded-t-full')}</div>
                 <span className="absolute -bottom-3 left-1/2 size-6 -translate-x-1/2 rotate-45 border-2 border-[var(--t-accent)] bg-[var(--t-card)]" aria-hidden="true" />
               </div>
-              <h3 className="mt-7 text-3xl [font-family:var(--t-script)] text-[var(--t-primary-ink)] sm:text-4xl">{person.name}</h3>
+              <h3 className="mt-7 text-3xl [font-family:var(--t-script)] text-[var(--t-primary-ink)] @min-[640px]:text-4xl">{person.name}</h3>
               {person.parents ? <p className="mt-2 max-w-[16rem] text-sm text-[var(--t-muted-ink)]">{person.parents}</p> : null}
             </div>
           ))}
@@ -49,7 +49,7 @@ export function Couple(p: SectionProps) {
   if (variant === 'flip') {
     return (
       <SectionShell {...shell(p)} heading={heading} tone="surface">
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-6 @min-[640px]:grid-cols-2">
           {people.map((person) => (
             <FlipCard
               key={person.name}
@@ -83,12 +83,12 @@ export function Couple(p: SectionProps) {
       <SectionShell {...shell(p)} heading={heading}>
         <div className="space-y-14">
           {people.map((person, i) => (
-            <div key={person.name} className={cx('flex flex-col items-center gap-6 sm:flex-row', i % 2 ? 'sm:flex-row-reverse sm:text-right' : 'sm:text-left')}>
-              <div className="w-44 shrink-0 overflow-hidden rounded-[calc(var(--t-radius)*1.4)] border border-[var(--t-line)] shadow-2xl sm:w-52">
+            <div key={person.name} className={cx('flex flex-col items-center gap-6 @min-[640px]:flex-row', i % 2 ? '@min-[640px]:flex-row-reverse @min-[640px]:text-right' : '@min-[640px]:text-left')}>
+              <div className="w-44 shrink-0 overflow-hidden rounded-[calc(var(--t-radius)*1.4)] border border-[var(--t-line)] shadow-2xl @min-[640px]:w-52">
                 <div className="aspect-[4/5]">{portrait(person, '')}</div>
               </div>
-              <div className="text-center sm:text-inherit">
-                <span className={cx('mb-3 block h-px w-16 bg-[var(--t-accent)]', i % 2 ? 'mx-auto sm:mr-0' : 'mx-auto sm:ml-0')} aria-hidden="true" />
+              <div className="text-center @min-[640px]:text-inherit">
+                <span className={cx('mb-3 block h-px w-16 bg-[var(--t-accent)]', i % 2 ? 'mx-auto @min-[640px]:mr-0' : 'mx-auto @min-[640px]:ml-0')} aria-hidden="true" />
                 <h3 className="text-5xl italic [font-family:var(--t-heading)]">{person.name}</h3>
                 {person.parents ? <p className="mt-3 max-w-sm text-[var(--t-muted-ink)]">{person.parents}</p> : null}
               </div>
@@ -101,7 +101,7 @@ export function Couple(p: SectionProps) {
 
   return (
     <SectionShell {...shell(p)} heading={heading} tone="surface">
-      <div className={cx('grid gap-10', variant === 'stacked' ? 'grid-cols-1' : 'sm:grid-cols-2')}>
+      <div className={cx('grid gap-10', variant === 'stacked' ? 'grid-cols-1' : '@min-[640px]:grid-cols-2')}>
         {people.map((person) => (
           <div key={person.name} className="flex flex-col items-center text-center">
             <div className="flex size-40 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--t-secondary)] bg-[var(--t-card)] p-1.5 shadow-md">
@@ -126,7 +126,7 @@ export function Family(p: SectionProps) {
   if (!text) return null;
   return (
     <SectionShell {...shell(p)} heading={p.value('heading') ?? p.t('template.family.title')}>
-      <Paragraphs text={text} className="text-lg [font-family:var(--t-heading)] text-[var(--t-text)] sm:text-xl" />
+      <Paragraphs text={text} className="text-lg [font-family:var(--t-heading)] text-[var(--t-text)] @min-[640px]:text-xl" />
     </SectionShell>
   );
 }
@@ -157,11 +157,11 @@ export function Story(p: SectionProps) {
   if (photo && p.instance.variant === 'polaroid') {
     return (
       <SectionShell {...shell(p)} heading={heading}>
-        <div className="grid items-center gap-10 sm:grid-cols-2">
+        <div className="grid items-center gap-10 @min-[640px]:grid-cols-2">
           <div className="bulava-tilt mx-auto w-64 -rotate-3 bg-white p-3 pb-12 shadow-[0_24px_40px_-18px_rgba(0,0,0,0.55)]">
             <img src={photo} alt="" className="aspect-square w-full object-cover" loading="lazy" />
           </div>
-          <Paragraphs text={text} className="sm:text-left" />
+          <Paragraphs text={text} className="@min-[640px]:text-left" />
         </div>
       </SectionShell>
     );
@@ -169,9 +169,9 @@ export function Story(p: SectionProps) {
 
   return (
     <SectionShell {...shell(p)} heading={heading}>
-      <div className={cx('grid items-center gap-8', photo && 'sm:grid-cols-2')}>
+      <div className={cx('grid items-center gap-8', photo && '@min-[640px]:grid-cols-2')}>
         {photo ? <img src={photo} alt="" className="w-full rounded-[var(--t-radius)] object-cover shadow-lg" loading="lazy" /> : null}
-        <Paragraphs text={text} className={photo ? 'sm:text-left' : undefined} />
+        <Paragraphs text={text} className={photo ? '@min-[640px]:text-left' : undefined} />
       </div>
     </SectionShell>
   );

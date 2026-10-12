@@ -173,6 +173,8 @@ export function layerLabel(layer: Layer): string {
       return layer.widget.type;
     case 'scene':
       return `scene · ${layer.scene}`;
+    case 'section':
+      return `section · ${layer.section}`;
     default:
       return 'Layer';
   }

@@ -45,6 +45,8 @@ Plans are chosen on the pricing page or an event's plans page, and bought on `/d
 
 `POST /events/:id/orders` still buys a one-time plan for one event (API clients; orders from before ADR-053 keep their event).
 
+An event runs on the bigger of the owner's account plan and a plan bought or given for that event alone (`GET /events/:id/plan`, ADR-066); its header and plan page name it. An add-on bought from an event (`eventId`) adds to that event's plan when the event's own plan is the bigger (the order is the event's), else to the account's. The console's complimentary grants are the account's unless an event is chosen; revoking one ends an add-on's entitlements as well as a plan's.
+
 ## Checkout (Razorpay)
 
 ```text

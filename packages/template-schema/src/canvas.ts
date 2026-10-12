@@ -375,7 +375,25 @@ export const WidgetLayerSchema = z.object({
   ]),
 });
 
-export const LayerSchema = z.discriminatedUnion('kind', [TextLayerSchema, ImageLayerSchema, ShapeLayerSchema, OrnamentLayerSchema, IconLayerSchema, WidgetLayerSchema, SceneLayerSchema]);
+/**
+ * One of the template's own sections drawn as the template draws it (ADR-065):
+ * the art behind a section the host redrew, its words hidden while the host's
+ * text layers carry them. It names the section by id and draws the template's
+ * own version of it, so a saved design carries none of the section's content.
+ * Only a redrawn section of a website takes one, for the section it stands in
+ * for (never cards, films or a template's own canvases). It lays out at the
+ * board's width on a phone's screen and scales with the board.
+ */
+export const SectionLayerSchema = z.object({
+  ...base,
+  kind: z.literal('section'),
+  /** The template section's id. */
+  section: z.string().regex(/^[a-z0-9][a-z0-9-_]{0,63}$/i),
+  /** Its words are the host's own text layers: the section's are not drawn (they still take their space). */
+  hideText: z.boolean().default(true),
+});
+
+export const LayerSchema = z.discriminatedUnion('kind', [TextLayerSchema, ImageLayerSchema, ShapeLayerSchema, OrnamentLayerSchema, IconLayerSchema, WidgetLayerSchema, SceneLayerSchema, SectionLayerSchema]);
 export type Layer = z.infer<typeof LayerSchema>;
 export type LayerInput = z.input<typeof LayerSchema>;
 export type TextLayer = z.infer<typeof TextLayerSchema>;
@@ -385,6 +403,7 @@ export type OrnamentLayer = z.infer<typeof OrnamentLayerSchema>;
 export type IconLayer = z.infer<typeof IconLayerSchema>;
 export type WidgetLayer = z.infer<typeof WidgetLayerSchema>;
 export type SceneLayer = z.infer<typeof SceneLayerSchema>;
+export type SectionLayer = z.infer<typeof SectionLayerSchema>;
 export type LayerKind = Layer['kind'];
 
 // ─────────────────────────── Artboards ───────────────────────────
@@ -486,6 +505,8 @@ export function layerBackdrop(board: Pick<Artboard, 'background' | 'layers'>, in
     const below = board.layers[i]!;
     if (below.hidden || !covers(below.frame, target.frame)) continue;
     // Photos and illustrated scenes have no single colour to check against.
+    // A template section drawn behind (ADR-065): its words were measured against the artboard's fill.
+    if (below.kind === 'section') continue;
     if (below.kind === 'image' || below.kind === 'scene') return null;
     if (below.kind === 'shape' && below.shape !== 'line' && below.opacity >= 0.85) {
       if (below.fill.type === 'none') continue;

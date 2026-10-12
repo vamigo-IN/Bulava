@@ -116,11 +116,15 @@ export class GuestsService {
     });
     const groupIds = [...new Set([...(allGuests ? [allGuests.id] : []), ...input.groupIds])];
     await this.assertGroupsInEvent(access.eventId, groupIds);
-    EntitlementsService.assertWithinLimit(
-      await this.entitlements.forEvent(access.eventId),
-      FEATURE_KEYS.GUESTS_MAX,
-      await this.prisma.guest.count({ where: { eventId: access.eventId, deletedAt: null } }),
-    );
+    // A draft's guest list is the host's to build (publishing checks it, ADR-054); a published event's is the plan's.
+    const event = await this.prisma.event.findUnique({ where: { id: access.eventId }, select: { status: true } });
+    if (event?.status !== 'DRAFT') {
+      EntitlementsService.assertWithinLimit(
+        await this.entitlements.forEvent(access.eventId),
+        FEATURE_KEYS.GUESTS_MAX,
+        await this.prisma.guest.count({ where: { eventId: access.eventId, deletedAt: null } }),
+      );
+    }
 
     const guest = await this.prisma.$transaction(async (tx) => {
       const created = await tx.guest.create({

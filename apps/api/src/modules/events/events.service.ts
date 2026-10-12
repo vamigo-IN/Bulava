@@ -181,8 +181,6 @@ export class EventsService {
     }
 
     // Drafts are never limited: the plan is asked for when publishing (ADR-054).
-    const features = await this.entitlements.forUser(userId);
-
     const slug = `${slugify(input.title) || 'event'}-${randomBytes(4).toString('hex').slice(0, 6)}`;
 
     const event = await this.prisma.$transaction(async (tx) => {
@@ -222,12 +220,12 @@ export class EventsService {
       });
 
       if (input.applyDefaults) {
-        const maxFunctions = EntitlementsService.limit(features, FEATURE_KEYS.FUNCTIONS_MAX);
         // The host may keep only some of the suggestions (no Mehendi, say); unknown slugs are ignored.
+        // They are placeholders until they have a date: the plan counts only those guests see (ADR-062).
         const chosen = input.functionSlugs ? new Set(input.functionSlugs) : null;
         const defaults = asDefaultItems(type.defaultFunctions).filter((f) => !chosen || chosen.has(f.slug));
         await tx.eventFunction.createMany({
-          data: (maxFunctions === null ? defaults : defaults.slice(0, maxFunctions)).map((f, index) => ({
+          data: defaults.map((f, index) => ({
             eventId: created.id,
             name: f.name,
             slug: f.slug,

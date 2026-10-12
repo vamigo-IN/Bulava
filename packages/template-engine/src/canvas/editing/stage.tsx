@@ -59,6 +59,7 @@ export function Stage({
   handleSize = 10,
   onDoubleClick,
   selectable,
+  flat,
 }: {
   board: Artboard;
   zoom: number;
@@ -74,6 +75,8 @@ export function Stage({
   onDoubleClick?: (id: string) => void;
   /** Which layers can be picked on the canvas (all visible ones by default). */
   selectable?: (layer: Layer) => boolean;
+  /** Part of a page (the website's canvas editor): no shadow of its own. */
+  flat?: boolean;
 }) {
   const [live, setLive] = useState<Artboard | null>(null);
   const [guides, setGuides] = useState<Guide[]>([]);
@@ -133,7 +136,7 @@ export function Stage({
   const handlers = { onPointerMove: update, onPointerUp: end, onPointerCancel: end };
 
   return (
-    <div className="relative shadow-2xl" style={{ width: W * zoom, height: H * zoom }} aria-label={label}>
+    <div className={join('relative', !flat && 'shadow-2xl')} style={{ width: W * zoom, height: H * zoom }} aria-label={label}>
       <div className="absolute inset-0 overflow-hidden" lang="en">
         {renderBoard(shown)}
       </div>

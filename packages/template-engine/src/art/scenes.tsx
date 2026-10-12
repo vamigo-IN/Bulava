@@ -116,7 +116,7 @@ function gopuram(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${colors.background} 0%, ${colors.background} 38%, ${mix(colors.background, colors.accent, 0.35)} 100%)`,
     dark: false,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       { depth: 0.1, node: <GopuramSky colors={colors} /> },
       { depth: 0.2, node: <Birds className="bulava-drift" style={at({ top: '40%', left: '54%', width: 112, color: colors.primary, opacity: 0.5 })} /> },
@@ -255,7 +255,7 @@ function palace(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${night} 0%, ${colors.primary} 70%)`,
     dark: true,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       {
         depth: 0.05,
@@ -333,7 +333,7 @@ function toran(colors: ThemeColors): SceneArt {
   return {
     background: `radial-gradient(ellipse at 50% 40%, ${mix(colors.primary, '#ffffff', 0.06)} 0%, ${colors.primary} 55%, ${mix(colors.primary, '#000000', 0.25)} 100%)`,
     dark: true,
-    textTop: 'pt-32 sm:pt-40',
+    textTop: 'pt-32 @min-[640px]:pt-40',
     layers: [
       { depth: 0.1, node: <Rangoli color={colors.accent} style={at({ top: '18%', left: '50%', width: 620, marginLeft: -310, opacity: 0.14 })} /> },
       {
@@ -421,7 +421,7 @@ function arches(colors: ThemeColors): SceneArt {
   return {
     background: `radial-gradient(ellipse 30% 24% at 50% 96%, ${mix(colors.accent, '#fff6dc', 0.45)} 0%, ${mix(colors.primary, colors.accent, 0.3)} 55%, ${colors.primary} 100%)`,
     dark: true,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       ...walls,
       {
@@ -474,7 +474,7 @@ function lotus(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${colors.background} 0%, ${colors.background} 48%, ${mix(colors.background, water, 0.3)} 60%, ${mix(water, '#ffffff', 0.12)} 72%, ${water} 100%)`,
     dark: false,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       {
         depth: 0.3,
@@ -541,7 +541,7 @@ function mandap(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${colors.background} 0%, ${mix(colors.background, colors.accent, 0.25)} 100%)`,
     dark: false,
-    textTop: 'pt-40 sm:pt-48',
+    textTop: 'pt-40 @min-[640px]:pt-48',
     layers: [
       { depth: 0.2, node: <MandapFire /> },
       {
@@ -596,7 +596,7 @@ function noir(colors: ThemeColors, opts: { monogram: string; photo?: string }): 
   return {
     background: `radial-gradient(ellipse at 50% -10%, ${mix(colors.accent, colors.primary, 0.75)} 0%, ${colors.primary} 55%, ${mix(colors.primary, '#000000', 0.5)} 100%)`,
     dark: true,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       {
         depth: 0.15,
@@ -697,7 +697,7 @@ function floral(colors: ThemeColors): SceneArt {
   return {
     background: `radial-gradient(ellipse at 50% 45%, ${colors.background} 30%, ${mix(colors.background, colors.secondary, 0.22)} 100%)`,
     dark: false,
-    textTop: 'pt-28 sm:pt-32',
+    textTop: 'pt-28 @min-[640px]:pt-32',
     layers: [
       {
         depth: 0.3,
@@ -744,7 +744,7 @@ function balloons(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${colors.background}, ${mix(colors.background, colors.accent, 0.2)})`,
     dark: false,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       {
         depth: 0.3,
@@ -778,7 +778,7 @@ function backwaters(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${colors.background} 0%, ${colors.background} 40%, ${mix(colors.background, colors.accent, 0.45)} 71%, ${water} 71.2%, ${mix(water, '#0b2f2c', 0.4)} 100%)`,
     dark: false,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       {
         depth: 0.15,
@@ -866,7 +866,7 @@ function sarovar(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${mix(colors.primary, '#050a1f', 0.4)} 0%, ${colors.primary} 70%)`,
     dark: true,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       { depth: 0.05, node: <StarField style={{ ...at({ left: 0, right: 0, top: 0, height: '50%', width: '100%', color: colors.accent, opacity: 0.7 }), ...starMask('50%', '40%') }} count={30} /> },
       {
@@ -996,7 +996,7 @@ function vrindavan(colors: ThemeColors): SceneArt {
   return {
     background: `linear-gradient(180deg, ${mix(dusk, '#000000', 0.25)} 0%, ${dusk} 45%, ${mix(colors.primary, colors.accent, 0.35)} 78%, ${colors.primary} 100%)`,
     dark: true,
-    textTop: 'pt-12 sm:pt-16',
+    textTop: 'pt-12 @min-[640px]:pt-16',
     layers: [
       {
         depth: 0.05,
@@ -1150,7 +1150,7 @@ export function SceneHero({ art, colors, children, thumbnail }: { art: SceneArt;
   // Painted skies can be busy: a soft shadow keeps the names readable over them.
   const shadow = art.textShadow ? (art.dark ? '0 1px 14px rgba(0,0,0,0.45)' : '0 1px 12px rgba(255,255,255,0.7)') : undefined;
   return (
-    <header data-bulava-scene className={`relative isolate overflow-hidden ${thumbnail ? 'h-[720px]' : 'h-[100svh] min-h-[640px] max-h-[980px]'}`} style={{ background: art.background }}>
+    <header data-bulava-scene className={`relative isolate overflow-hidden ${thumbnail ? 'h-[720px]' : 'h-[calc(var(--bulava-screen,1svh)*100)] min-h-[640px] max-h-[980px]'}`} style={{ background: art.background }}>
       {art.layers.map((layer, i) => (
         <div key={i} data-depth={layer.depth} className="pointer-events-none absolute inset-0 will-change-transform" aria-hidden="true">
           {layer.node}

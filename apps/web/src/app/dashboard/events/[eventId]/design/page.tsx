@@ -9,9 +9,12 @@ import { canvasSectionsOf, type Customization, type RenderContext, type Template
 import { CanvasDesigner } from '@/components/design/canvas-designer';
 import { mergePhotos, previewContext as withPhotos, prune } from '@/components/design/customization';
 import { MotionPanel, PhotosPanel, SectionsPanel, StylePanel, WordsPanel } from '@/components/design/design-panels';
+import { PlanNotice } from '@/components/events/plan-notice';
+import { PhonePreview } from '@/components/editor/phone-preview';
 import { TIER_RANK, TemplatePicker } from '@/components/design/template-picker';
 import { apiPut } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
+import { can } from '@/lib/permissions';
 import { useApprovedPhotos, useDesign, useEvent, useInvalidateEvent, useTemplateDefinition, useTemplateList } from '@/lib/queries';
 import { forEvent, onePerLook } from '@/lib/template-looks';
 import { cardPreview } from '@/lib/template-previews';
@@ -218,7 +221,7 @@ function DesignEditor() {
                 {tab === 'style' ? <StylePanel {...panelProps} /> : null}
                 {tab === 'photos' ? <PhotosPanel {...panelProps} eventId={eventId} photos={photos} onUploaded={(p) => setUploaded((u) => [p, ...u])} /> : null}
                 {tab === 'words' ? <WordsPanel {...panelProps} /> : null}
-                {tab === 'motion' ? <MotionPanel {...panelProps} /> : null}
+                {tab === 'motion' ? <MotionPanel {...panelProps} musicNote={<PlanNotice eventId={eventId} feature="music.enabled" message="plan.notice.music" canPay={can(event.data, 'payment.read')} />} /> : null}
                 {tab === 'sections' ? <SectionsPanel {...panelProps} /> : null}
               </div>
             </div>
@@ -244,12 +247,10 @@ function DesignEditor() {
               ) : null}
             </div>
             {definition && previewContext ? (
-              <div className="relative mx-auto overflow-hidden rounded-[2rem] border-[7px] border-ink bg-white shadow-xl" style={{ width: 'min(100%, 360px)' }}>
-                {/* Focusable, so the preview scrolls from the keyboard too. */}
-                <div className="relative h-[620px] overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-brand-600" tabIndex={0} role="region" aria-label={t('design.livePreview')}>
-                  <TemplateRenderer definition={definition} context={previewContext} customization={custom} mode="preview" language={event.data.language} slots={{ watermark: design.data?.watermark || locked }} />
-                </div>
-              </div>
+              // On a phone-wide frame, so the design lays out exactly as on guests' phones (ADR-065).
+              <PhonePreview title={t('design.livePreview')} className="h-[660px]">
+                <TemplateRenderer definition={definition} context={previewContext} customization={custom} mode="preview" language={event.data.language} slots={{ watermark: design.data?.watermark || locked }} />
+              </PhonePreview>
             ) : null}
             {locked ? (
               // Beyond the plan: the design still saves and previews (with a watermark); publishing without it needs the upgrade.

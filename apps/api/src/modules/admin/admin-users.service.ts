@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ASSIGNABLE_PLATFORM_ROLES, platformRoleHasPermission } from '@bulava/auth';
-import type { Prisma } from '@bulava/database';
+import { ADDON_SOURCE, type Prisma } from '@bulava/database';
 import { z } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
@@ -28,7 +28,7 @@ export const ConfirmIdentitySchema = z.object({ password: z.string().min(1).max(
 export const TransferSuperAdminSchema = ConfirmIdentitySchema.extend({ userId: z.uuid() });
 export const GrantPlanSchema = z.object({
   planKey: z.string().trim().min(1).max(40),
-  /** Required for per-event plans; omitted for account (yearly) plans. */
+  /** A one-time plan for one of the person's events alone; without it, the whole account has it (every event). */
   eventId: z.uuid().optional(),
   note: z.string().trim().min(3).max(300),
 });
@@ -324,14 +324,13 @@ export class AdminUsersService {
     if (!user || user.deletedAt) throw AppError.notFound('User');
     const plan = await this.prisma.pricingPlan.findUnique({ where: { key: input.planKey }, include: { features: true } });
     if (!plan) throw AppError.notFound('Plan');
-    if (plan.interval === 'ONE_TIME') {
-      if (!input.eventId) throw new AppError('BAD_REQUEST', 'Choose the event to upgrade.');
+    // Plans belong to the account (ADR-062), as bought ones do; a one-time plan may still be given for one event alone.
+    if (input.eventId) {
+      if (plan.interval !== 'ONE_TIME') throw new AppError('BAD_REQUEST', 'This plan applies to the whole account, not one event.');
       const event = await this.prisma.event.findFirst({ where: { id: input.eventId, ownerId: userId, deletedAt: null }, select: { id: true } });
       if (!event) throw new AppError('BAD_REQUEST', 'That event does not belong to this person.');
-    } else if (input.eventId) {
-      throw new AppError('BAD_REQUEST', 'This plan applies to the whole account, not one event.');
     }
-    const eventId = plan.interval === 'ONE_TIME' ? (input.eventId ?? null) : null;
+    const eventId = input.eventId ?? null;
     const order = await this.prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
         data: { userId, eventId, planId: plan.id, amountMinor: 0, currency: plan.currency, status: 'PAID', kind: 'ADMIN_GRANT', note: input.note, grantedById: actor.id },
@@ -355,7 +354,8 @@ export class AdminUsersService {
     if (order.status !== 'PAID') throw new AppError('CONFLICT', 'This upgrade was already revoked.');
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED', note: `${order.note ?? ''}\nRevoked: ${input.note}`.trim() } });
-      await tx.entitlement.updateMany({ where: { sourceType: 'ORDER', sourceId: orderId }, data: { validUntil: new Date() } });
+      // A plan's entitlements and an add-on's alike.
+      await tx.entitlement.updateMany({ where: { sourceType: { in: ['ORDER', ADDON_SOURCE] }, sourceId: orderId }, data: { validUntil: new Date() } });
       await this.audit.record({ actorType: 'USER', actorId: actor.id, action: 'plan.grant_revoked', targetType: 'Order', targetId: orderId, eventId: order.eventId, metadata: { note: input.note }, meta }, tx);
     });
     return { revoked: true };

@@ -1,6 +1,7 @@
-import type { ComponentType } from 'react';
+import { Fragment, type ComponentType, type ReactNode } from 'react';
 import { createTranslator, formatEventDateWithWeekday, getLanguage } from '@bulava/localization';
 import {
+  canRedraw,
   effectiveColors,
   effectiveFonts,
   effectiveMotion,
@@ -76,35 +77,83 @@ export interface TemplateRendererProps {
   introKey?: string;
   /** Limit the number of sections (thumbnails). */
   maxSections?: number;
+  /** Wraps each section as it is drawn: the website's canvas editor puts its tools around the page's parts (ADR-065). */
+  wrapSection?: (instance: SectionInstance, node: ReactNode, index: number) => ReactNode;
 }
 
-/** Renders a WEBSITE template definition for a given render context. */
-export function TemplateRenderer({
-  definition: template,
-  context,
-  customization,
-  language: languageOverride,
-  slots = {},
-  mode = 'live',
-  introKey,
-  maxSections,
-}: TemplateRendererProps) {
-  // The host's own arrangement of the canvas sections, where it still fits the template (ADR-057), and the sections they added (ADR-059).
-  const definition = withCanvasCustomization(template, customization?.canvas, customization?.addedSections);
+interface PageOptions {
+  definition: TemplateDefinition;
+  context: RenderContext;
+  customization?: Customization | null;
+  language?: string;
+  slots?: RenderSlots;
+  mode?: RenderMode;
+}
+
+/** What each section of a page is drawn with: the template with the host's choices, and the event's data. */
+function pageOf({ definition: template, context, customization, language: languageOverride, slots = {}, mode = 'live' }: PageOptions) {
+  // The host's own arrangement of the canvas sections, where it still fits the template (ADR-057), the sections they added (ADR-059) and their order (ADR-065).
+  const definition = withCanvasCustomization(template, customization?.canvas, customization?.addedSections, customization?.sectionOrder);
   const language = languageOverride ?? context.event.language;
   const t = createTranslator(language);
   const timeZone = context.event.timezone;
   const ctx: RenderContext = customization?.custom ? { ...context, custom: { ...context.custom, ...customization.custom } } : context;
   const colors = effectiveColors(definition, customization);
   const fonts = effectiveFonts(definition, customization);
-  const { intro, effect } = effectiveMotion(definition, customization);
-  const hidden = hiddenSectionIds(definition, customization);
   const ornament = definition.theme.ornament as OrnamentName;
   const look = definition.theme.look ?? 'classic';
   const opts = { t, language, timeZone };
+  const hidden = hiddenSectionIds(definition, customization);
   const sections = (definition.website?.pages[0]?.sections ?? []).filter((s) => isVisible(s, ctx) && !hidden.has(s.id));
-  const shown = maxSections ? sections.slice(0, maxSections) : sections;
   const rsvpSectionId = sections.find((s) => s.section === 'rsvp')?.id;
+  const sectionProps = (instance: SectionInstance, index: number): SectionProps => ({
+    instance,
+    ctx,
+    value: (key: string) => {
+      const v = resolveValue(instance.props[key], ctx, opts);
+      return v === undefined || v === '' ? undefined : String(v);
+    },
+    t,
+    language,
+    timeZone,
+    ornament,
+    pattern: definition.theme.pattern,
+    colors,
+    heroTone: definition.theme.heroTone ?? 'light',
+    look,
+    index,
+    slots,
+    mode,
+    artworks: definition.artworks,
+    fonts,
+    rsvpSectionId,
+    drawSection,
+  });
+  // One of the template's own sections behind a host's redrawn one (ADR-065): its pictures only, never a canvas.
+  const own = template.website?.pages[0]?.sections ?? [];
+  const drawSection = (id: string, index: number): ReactNode => {
+    const instance = own.find((s) => s.id === id);
+    if (!instance || !canRedraw(instance) || !isVisible(instance, ctx)) return null;
+    const Component = REGISTRY[instance.section];
+    return <Component {...sectionProps(instance, index)} slots={{}} />;
+  };
+  return { definition, language, t, timeZone, ctx, colors, fonts, look, sections, sectionProps, drawSection };
+}
+
+/**
+ * Draws a template's own sections where its page is not drawn (ADR-065): the
+ * website's canvas editor draws a redrawn section's backdrop with it, by the
+ * section's id and its place on the page.
+ */
+export function sectionDrawer(options: PageOptions): (sectionId: string, index: number) => ReactNode {
+  return pageOf(options).drawSection;
+}
+
+/** Renders a WEBSITE template definition for a given render context. */
+export function TemplateRenderer({ definition: template, context, customization, language: languageOverride, slots = {}, mode = 'live', introKey, maxSections, wrapSection }: TemplateRendererProps) {
+  const { definition, language, t, timeZone, ctx, colors, fonts, look, sections, sectionProps } = pageOf({ definition: template, context, customization, language: languageOverride, slots, mode });
+  const { intro, effect } = effectiveMotion(definition, customization);
+  const shown = maxSections ? sections.slice(0, maxSections) : sections;
   const rootId = `bulava-t-${(introKey ?? definition.templateKey).replace(/[^A-Za-z0-9_-]/g, '')}`;
 
   return (
@@ -137,35 +186,14 @@ export function TemplateRenderer({
       {mode === 'live' && ctx.music?.url ? (
         <MusicPlayer url={ctx.music.url} title={ctx.music.title} vinyl={look === 'noir'} labels={{ play: t('template.music.play'), pause: t('template.music.pause') }} />
       ) : null}
-      {shown.map((instance, index) => {
-        const Component = REGISTRY[instance.section];
-        const value = (key: string) => {
-          const v = resolveValue(instance.props[key], ctx, opts);
-          return v === undefined || v === '' ? undefined : String(v);
-        };
-        return (
-          <Component
-            key={instance.id}
-            instance={instance}
-            ctx={ctx}
-            value={value}
-            t={t}
-            language={language}
-            timeZone={timeZone}
-            ornament={ornament}
-            pattern={definition.theme.pattern}
-            colors={colors}
-            heroTone={definition.theme.heroTone ?? 'light'}
-            look={look}
-            index={index}
-            slots={slots}
-            mode={mode}
-            artworks={definition.artworks}
-            fonts={fonts}
-            rsvpSectionId={rsvpSectionId}
-          />
-        );
-      })}
+      {/* The sections answer to the page's width (container queries), not the window's: a phone-wide frame shows the phone's layout. */}
+      <div style={{ containerType: 'inline-size' }}>
+        {shown.map((instance, index) => {
+          const Component = REGISTRY[instance.section];
+          const node = <Component key={instance.id} {...sectionProps(instance, index)} />;
+          return wrapSection ? <Fragment key={instance.id}>{wrapSection(instance, node, index)}</Fragment> : node;
+        })}
+      </div>
     </div>
   );
 }

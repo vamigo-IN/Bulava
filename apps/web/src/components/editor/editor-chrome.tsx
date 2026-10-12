@@ -101,16 +101,22 @@ export function CanvasToolbar({
 }
 
 /**
- * A phone around a website's phone artboard, so hosts see it as their guests
- * will. Nothing is clipped: the selection handles may reach over the bezel.
+ * A modern phone around a design (ADR-065): a thin even bezel, rounded screen
+ * corners and a camera dot over the screen, as guests' phones are. The screen
+ * clips its content to those corners; a page taller than a phone makes the
+ * phone as tall (the editor's page scrolls).
  */
-export function DeviceFrame({ children, show }: { children: ReactNode; show: boolean }) {
-  if (!show) return <>{children}</>;
+export function PhoneFrame({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="relative rounded-[2.75rem] border border-[var(--ed-device-rim)] bg-[var(--ed-device)] px-3 pt-9 pb-9 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)]">
-      <span aria-hidden className="absolute top-4 left-1/2 h-1.5 w-16 -translate-x-1/2 rounded-full bg-[var(--ed-device-rim)]" />
-      {children}
-      <span aria-hidden className="absolute bottom-3.5 left-1/2 h-1 w-24 -translate-x-1/2 rounded-full bg-[var(--ed-device-rim)]" />
+    <div className={cn('relative rounded-[2.85rem] bg-[var(--ed-device)] p-[5px] shadow-[0_0_0_1px_var(--ed-device-rim),0_36px_80px_-32px_rgba(0,0,0,0.6)]', className)}>
+      <div className="relative isolate overflow-hidden rounded-[2.55rem] bg-white">{children}</div>
+      <span aria-hidden className="pointer-events-none absolute top-[15px] left-1/2 z-10 size-[11px] -translate-x-1/2 rounded-full bg-[#0b0a0d] shadow-[0_0_0_2px_rgba(255,255,255,0.06)]" />
     </div>
   );
+}
+
+/** The phone around a phone-sized board (cards, film scenes), on big screens only. */
+export function DeviceFrame({ children, show }: { children: ReactNode; show: boolean }) {
+  if (!show) return <>{children}</>;
+  return <PhoneFrame>{children}</PhoneFrame>;
 }

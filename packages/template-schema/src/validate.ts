@@ -4,6 +4,7 @@ import { BINDINGS, bindingsIn, isKnownBinding, translationKeysIn } from './bindi
 import { artboardAssetIds, canvasAssetIds, type Artboard } from './canvas';
 import {
   ADDED_SECTION_WIDTH,
+  SECTION_ORDER_MAX,
   AddedSectionsSchema,
   CanvasCustomizationSchema,
   canvasSectionsOf,
@@ -37,6 +38,7 @@ import {
   type Value,
 } from './definition';
 import { fontPairing } from './fonts';
+import { canRedraw } from './section-boards';
 
 export interface ValidationIssue {
   path: string;
@@ -86,6 +88,8 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
       if (layerIds.has(layer.id)) issues.push({ path: `${path}.id`, message: `Duplicate layer id "${layer.id}"` });
       layerIds.add(layer.id);
       if (layer.kind === 'text') checkValue(layer.content, `${path}.content`);
+      // Checked with the customization that holds it (a host's redrawn section, ADR-065).
+      if (layer.kind === 'section') issues.push({ path, message: 'Only a section the host redrew draws one of the template’s sections' });
       if (layer.kind === 'image' && layer.source.type === 'binding') {
         const b = layer.source.binding;
         // Only the photo bindings: a text slot holds words anyone editing could make an address.
@@ -228,6 +232,8 @@ export const CustomizationSchema = z.object({
   canvas: CanvasCustomizationSchema.optional(),
   /** Canvas sections the customer added to the page (when layout is editable; ADR-059). */
   addedSections: AddedSectionsSchema.optional(),
+  /** The page's sections in the customer's order: the template's section ids and their own (a redrawn one by its original's id); the opening stays first and the footer last (when layout is editable; ADR-065). */
+  sectionOrder: z.array(z.string().max(64)).max(SECTION_ORDER_MAX).optional(),
   /** A film's scenes the customer redrew in the film's canvas editor, by scene id (when layout is editable; ADR-059). */
   scenes: SceneCustomizationSchema.optional(),
   /** Scenes the customer added to their film (when layout is editable; ADR-061). */
@@ -284,9 +290,16 @@ function canvasCustomizationIssues(definition: TemplateDefinition, canvas: Canva
     }
     if (a.mobile.width !== ADDED_SECTION_WIDTH || a.mobile.height < 120 || a.mobile.height > 2400) issues.push({ path: `${path}.mobile`, message: `An added section is ${ADDED_SECTION_WIDTH} wide and 120 to 2400 high` });
     issues.push(...linkIssues(a.mobile, `${path}.mobile`, ownLinks));
+    // The section it stands in for, drawn behind it (ADR-065): once, and only that one.
+    const drawn = a.mobile.layers.flatMap((layer, li) => (layer.kind === 'section' ? [{ layer, li }] : []));
+    for (const { layer, li } of drawn) {
+      if (!a.replaces || layer.section !== a.after || !canRedraw(pageSections.get(a.after) ?? { section: 'canvas' })) issues.push({ path: `${path}.mobile.layers.${li}`, message: 'A redrawn section can draw only the section it stands in for' });
+    }
+    if (drawn.length > 1) issues.push({ path: `${path}.mobile`, message: 'A section draws the template’s section once' });
   });
   for (const [id, override] of Object.entries(canvas)) {
     const own = sections.get(id);
+    if ([override.mobile, override.desktop].some((board) => board?.layers.some((layer) => layer.kind === 'section'))) issues.push({ path: `canvas.${id}`, message: 'Only a section the host redrew draws one of the template’s sections' });
     if (!own) {
       issues.push({ path: `canvas.${id}`, message: `This template has no canvas section ${id}` });
       continue;
@@ -307,7 +320,9 @@ function canvasCustomizationIssues(definition: TemplateDefinition, canvas: Canva
     }
   }
   if (issues.length) return issues;
-  const applied = validateTemplateDefinition(withCanvasCustomization(definition, canvas, added));
+  // The drawn sections were checked above (the template's own section is no longer on the merged page).
+  const plain = added.map((a) => ({ ...a, mobile: { ...a.mobile, layers: a.mobile.layers.filter((layer) => layer.kind !== 'section') } }));
+  const applied = validateTemplateDefinition(withCanvasCustomization(definition, canvas, plain));
   if (!applied.ok) issues.push(...applied.issues.map((i) => ({ path: `canvas (${i.path})`, message: i.message })));
   return issues;
 }
@@ -384,6 +399,13 @@ export function validateCustomization(definition: TemplateDefinition, input: unk
     else issues.push(...sceneCustomizationIssues(definition, c.scenes ?? {}, c.addedScenes ?? []));
   }
   if (c.filmFormat && definition.type !== 'VIDEO') issues.push({ path: 'filmFormat', message: 'Only films have a size to choose' });
+  if (c.sectionOrder?.length) {
+    // The template's sections and the customer's own, once each (a redrawn section keeps its original's id).
+    const known = new Set([...(definition.website?.pages[0]?.sections ?? []).map((s) => s.id), ...(c.addedSections ?? []).filter((a) => !a.replaces).map((a) => a.id)]);
+    if (!e.layout) issues.push({ path: 'sectionOrder', message: 'This template does not allow reordering sections' });
+    if (new Set(c.sectionOrder).size !== c.sectionOrder.length) issues.push({ path: 'sectionOrder', message: 'A section is listed twice' });
+    for (const key of c.sectionOrder) if (!known.has(key)) issues.push({ path: 'sectionOrder', message: `Unknown section ${key}` });
+  }
   if (c.hiddenSections?.length) {
     const sections = new Map((definition.website?.pages.flatMap((p) => p.sections) ?? []).map((s) => [s.id, s]));
     if (!e.layout) issues.push({ path: 'hiddenSections', message: 'This template does not allow hiding sections' });

@@ -3,6 +3,7 @@
 import { Check, Crown, Lock, Search, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TemplateRenderer } from '@bulava/template-engine';
+import { PhonePreview } from '@/components/editor/phone-preview';
 import type { Customization, RenderContext } from '@bulava/template-schema';
 import { useT } from '@/lib/i18n';
 import { useTemplateDefinition } from '@/lib/queries';
@@ -222,11 +223,10 @@ export function TemplatePicker({
                 </div>
                 <TierTag tier={focused.tier} />
               </div>
-              <div className="relative mx-auto mt-4 min-h-0 w-full max-w-[330px] flex-1 overflow-hidden rounded-[2rem] border-[7px] border-ink bg-white shadow-xl">
-                <div className="absolute inset-0 overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-brand-600" tabIndex={0} role="region" aria-label={t('picker.preview')}>
-                  <TemplateRenderer definition={focusedDefinition} context={context} customization={customization} mode="preview" language={language} slots={{ watermark: watermark || TIER_RANK[focused.tier] > maxTier }} />
-                </div>
-              </div>
+              {/* On a phone-wide frame, so the design lays out exactly as on guests' phones (ADR-065). */}
+              <PhonePreview key={focused.key} title={t('picker.preview')} maxWidth={330} className="mt-4 min-h-0 flex-1">
+                <TemplateRenderer definition={focusedDefinition} context={context} customization={customization} mode="preview" language={language} slots={{ watermark: watermark || TIER_RANK[focused.tier] > maxTier }} />
+              </PhonePreview>
               {TIER_RANK[focused.tier] > maxTier ? (
                 <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-stone-600">
                   <Crown aria-hidden className="mt-0.5 size-3.5 shrink-0 text-gold-600" />

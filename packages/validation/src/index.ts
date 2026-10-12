@@ -732,6 +732,12 @@ const purchase = {
   quantity: z.coerce.number().int().min(1).max(ADDON_MAX_QUANTITY).optional(),
   /** The offer of a hidden plan, made for this account (POST /orders/offers). */
   offerToken: z.string().trim().max(200).optional(),
+  /**
+   * Bought from one of the buyer's events: an add-on then adds to that event's
+   * plan when the event has a bigger one of its own (bought or given for it
+   * alone). Plans are always the account's.
+   */
+  eventId: IdSchema.optional(),
 };
 
 export const CreateOrderSchema = z.object({

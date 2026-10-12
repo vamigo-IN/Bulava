@@ -77,11 +77,7 @@ export class FunctionsService {
       throw AppError.forbidden('You can only manage your assigned functions.');
     }
     await this.assertGroupsInEvent(access.eventId, input.audienceGroupIds);
-    EntitlementsService.assertWithinLimit(
-      await this.entitlements.forEvent(access.eventId),
-      FEATURE_KEYS.FUNCTIONS_MAX,
-      await this.prisma.eventFunction.count({ where: { eventId: access.eventId, deletedAt: null } }),
-    );
+    if (input.startsAt) await this.assertRoomForDated(access.eventId);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const slug = await this.uniqueSlug(tx, access.eventId, input.slug ?? slugify(input.name));
@@ -127,6 +123,22 @@ export class FunctionsService {
     return toDto(created);
   }
 
+  /**
+   * The functions guests see are the plan's (ADR-054, ADR-062): a draft holds
+   * as many as the host likes, placeholders and dated ones alike (publishing
+   * checks them), and a published event takes one more function with a date
+   * only while its plan has room for it.
+   */
+  private async assertRoomForDated(eventId: string): Promise<void> {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { status: true } });
+    if (!event || event.status === 'DRAFT') return;
+    EntitlementsService.assertWithinLimit(
+      await this.entitlements.forEvent(eventId),
+      FEATURE_KEYS.FUNCTIONS_MAX,
+      await this.prisma.eventFunction.count({ where: { eventId, deletedAt: null, startsAt: { not: null } } }),
+    );
+  }
+
   async update(
     access: EventAccessContext,
     functionId: string,
@@ -143,6 +155,8 @@ export class FunctionsService {
 
     const startsAt = input.startsAt === undefined ? existing.startsAt : input.startsAt ? new Date(input.startsAt) : null;
     const endsAt = input.endsAt === undefined ? existing.endsAt : input.endsAt ? new Date(input.endsAt) : null;
+    // A placeholder given a date becomes a function guests see.
+    if (startsAt && !existing.startsAt) await this.assertRoomForDated(access.eventId);
     if (startsAt && endsAt && endsAt <= startsAt) {
       throw new AppError('VALIDATION_FAILED', 'End time must be after start time.', [
         { path: 'endsAt', message: 'End time must be after start time' },

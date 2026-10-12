@@ -218,6 +218,7 @@ export const CardDesignSchema = z
     d.board.layers.forEach((layer, i) => {
       const path = ['board', 'layers', i];
       if (layer.kind === 'widget') ctx.addIssue({ code: 'custom', path, message: 'Cards have no buttons or countdowns' });
+      if (layer.kind === 'section') ctx.addIssue({ code: 'custom', path, message: 'Cards draw only their own layers' });
       // The one condition a card keeps: a timeline item shows while its function is listed.
       const when = layer.visibleWhen;
       if (when && (when.eventTypes || !when.exists || !isCardFunctionBinding(when.exists))) {

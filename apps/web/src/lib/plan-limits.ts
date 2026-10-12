@@ -14,7 +14,15 @@ const LIMIT_KEYS: Record<string, MessageKey> = {
   'messaging.whatsapp.max': 'limit.messaging.whatsapp.max',
 };
 
-const detailsOf = (error: ApiError) => (error.details ?? {}) as { feature?: string; limit?: number | null };
+/** What a plan without the feature says (PLAN_UPGRADE_REQUIRED), by the feature the API names. */
+const UPGRADE_KEYS: Record<string, MessageKey> = {
+  'messaging.whatsapp.max': 'limit.upgrade.whatsapp',
+  'music.enabled': 'limit.upgrade.music',
+  'link.custom': 'limit.upgrade.link',
+  'domain.custom': 'limit.upgrade.domain',
+};
+
+const detailsOf = (error: ApiError) => (error.details ?? {}) as { feature?: string; limit?: number | null; tier?: string };
 
 /** A plan limit in words: which limit, and how many the plan allows (never "upgrade": plans unlock more). */
 export function planLimitMessage(t: Translator, error: ApiError): string {
@@ -25,17 +33,19 @@ export function planLimitMessage(t: Translator, error: ApiError): string {
     const key = feature ? LIMIT_KEYS[feature] : undefined;
     return key && typeof limit === 'number' ? t(key, { limit: limit.toLocaleString('en-IN') }) : t('error.PLAN_LIMIT_REACHED');
   }
-  return t('error.PLAN_UPGRADE_REQUIRED');
+  // A design of a bigger tier, or a feature the plan does not have.
+  if (detailsOf(error).tier) return t('limit.upgrade.design');
+  const upgrade = feature ? UPGRADE_KEYS[feature] : undefined;
+  return upgrade ? t(upgrade) : t('error.PLAN_UPGRADE_REQUIRED');
 }
 
 /**
- * Where to unlock more: an event's plans for an event's limits (guests,
- * functions, photos, films, designs), the plans page for the account's own
- * (how many events it can have).
+ * Where to unlock more: from an event, its plan page (the account's plans and
+ * add-ons, with what the event has; the number of events too, which the
+ * account's plan sets); elsewhere, the account's plan page.
  */
-export function unlockHref(error: ApiError, eventId?: string | null): string {
-  const { feature } = detailsOf(error);
-  return feature === 'events.max' || !eventId ? '/pricing' : `/dashboard/events/${eventId}/unlock`;
+export function unlockHref(_error: ApiError, eventId?: string | null): string {
+  return eventId ? `/dashboard/events/${eventId}/unlock` : '/dashboard/plan';
 }
 
 /** Sent by the API client when a request meets a plan limit, so the dashboard can offer to unlock it. */

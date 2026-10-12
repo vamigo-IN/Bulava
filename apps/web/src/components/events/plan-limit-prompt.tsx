@@ -28,7 +28,8 @@ export function PlanLimitPrompt({ eventId, canPay }: { eventId: string; canPay: 
   useEffect(() => setDetail(null), [pathname]);
 
   if (!detail) return null;
-  const href = detail.feature === 'events.max' ? '/pricing' : `/dashboard/events/${eventId}/unlock`;
+  // The event's plan page: the account's plans and add-ons, the number of events included.
+  const href = `/dashboard/events/${eventId}/unlock`;
   return (
     <div
       role="status"

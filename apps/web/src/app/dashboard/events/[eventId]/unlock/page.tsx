@@ -36,9 +36,9 @@ export default function UnlockPage() {
         <h2 className="font-display text-3xl">{t('upgrade.title')}</h2>
         <p className="mt-1 text-stone-600">{t('upgrade.subtitle')}</p>
       </div>
-      {owner ? (
-        <PlanOverview eventId={eventId} template={params.get('template')} />
-      ) : (
+      {/* The team sees the event's plan too; only the owner buys more. */}
+      <PlanOverview eventId={eventId} template={params.get('template')} canBuy={owner} draft={event.data?.status === 'DRAFT'} />
+      {owner ? null : (
         <div role="note" className="clay flex items-start gap-3 rounded-3xl p-5">
           <span aria-hidden className="icon-3d grid size-10 shrink-0 place-items-center rounded-xl">
             <KeyRound className="size-4.5" />
