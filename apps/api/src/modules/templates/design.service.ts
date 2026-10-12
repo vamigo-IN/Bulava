@@ -49,6 +49,9 @@ export class DesignService {
       context,
       entitlements: EntitlementsService.summary(features),
       watermark: EntitlementsService.enabled(features, FEATURE_KEYS.WATERMARK),
+      /** As guests will see it: the free plan's mark across it, and the sections the plan or the host leave out (ADR-067, ADR-068). */
+      veil: EntitlementsService.enabled(features, FEATURE_KEYS.WATERMARK) ? this.renderContext.siteAddress() : null,
+      without: EntitlementsService.invitation(features, event).without,
     };
   }
 

@@ -54,6 +54,8 @@ export interface EventSummary {
   accessMode: AccessMode;
   hasPin: boolean;
   requireOtp: boolean;
+  /** The host collects replies (RSVP) on the invitation (ADR-068); off hides replies everywhere. */
+  rsvpEnabled: boolean;
   startDate: string | null;
   endDate: string | null;
   details: Record<string, string>;
@@ -203,12 +205,16 @@ export interface GuestInvitationView {
   }>;
   eventRsvp: { status: RsvpStatus; attendeeCount: number } | null;
   eventRsvpOpen: boolean;
-  /** Whether the invitation takes replies at all (the host's plan; ADR-062). Missing from older APIs: yes. */
+  /** Whether the invitation takes replies at all (the host's plan and choice; ADR-062, ADR-068). Missing from older APIs: yes. */
   rsvp?: boolean;
   message: string | null;
   template: { key: string; definition: TemplateDefinition; customization: Customization | null } | null;
   context: RenderContext;
   watermark: boolean;
+  /** The free plan's mark across the whole invitation (the site's address; ADR-067). */
+  veil?: string | null;
+  /** Kinds of section the invitation leaves out (no replies, no gallery). */
+  without?: Array<'rsvp' | 'gallery' | 'photoShare'>;
   mediaRooms: Array<{ name: string; code: string; uploadsEnabled: boolean; canViewGallery: boolean }>;
   checkInCode: string | null;
   /** This guest's own stay and travel; the host may ask them to add travel plans. */
@@ -263,6 +269,9 @@ export interface DesignState {
   context: import('@bulava/template-schema').RenderContext;
   entitlements: Record<string, FeatureValue>;
   watermark: boolean;
+  /** As guests will see it: the free plan's mark across it (ADR-067), and the sections left out (no replies, no gallery). */
+  veil?: string | null;
+  without?: Array<'rsvp' | 'gallery' | 'photoShare'>;
 }
 
 export interface VideoJob {

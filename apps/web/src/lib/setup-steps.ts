@@ -3,9 +3,11 @@ import type { AccessMode, EventSummary } from './types';
 
 /**
  * The path from a new event to a celebration in full swing, in the order a
- * host takes it. The overview's checklist, the "next step" bar under every
- * event page, the sidebar's ticks and the home page all read it from here, so
- * they never disagree. Plain functions: server and client components may use it.
+ * host takes it (ADR-068): the design, a function, then publishing; guests,
+ * sharing and replies come after, and replies only while the host takes them.
+ * The overview's checklist, the "next step" bar under every event page, the
+ * sidebar's ticks and the home page all read it from here, so they never
+ * disagree. Plain functions: server and client components may use it.
  */
 export type SetupStepKey = 'design' | 'functions' | 'guests' | 'publish' | 'share' | 'rsvps';
 
@@ -35,6 +37,8 @@ export interface SetupFacts {
   invitationsSent: boolean;
   /** Replies received across functions. */
   responses: number;
+  /** The host takes replies on the invitation (ADR-068). */
+  rsvpEnabled: boolean;
 }
 
 /** Modes where everyone gets the same link (and may register), rather than a personal invitation. */
@@ -43,9 +47,11 @@ export const LINK_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>(['PUBLIC'
 export function setupSteps(f: SetupFacts): SetupStep[] {
   const link = LINK_MODES.has(f.accessMode);
   const published = f.status !== 'DRAFT';
-  return [
+  const steps: SetupStep[] = [
     { key: 'design', section: '/design', title: 'dash.step.design', short: 'dash.step.design.short', body: 'dash.step.design.body', action: 'dash.step.design.action', done: f.designChosen, optional: false },
     { key: 'functions', section: '/functions', title: 'dash.step.functions', short: 'dash.step.functions.short', body: 'dash.step.functions.body', action: 'dash.step.functions.action', done: f.readyFunctions > 0, optional: false },
+    { key: 'publish', section: '', title: 'dash.step.publish', short: 'dash.step.publish.short', body: 'dash.step.publish.body', action: 'dash.step.publish.action', done: published, optional: false },
+    // Guests can wait: the published link works for everyone it is shared with.
     {
       key: 'guests',
       section: '/guests',
@@ -54,9 +60,8 @@ export function setupSteps(f: SetupFacts): SetupStep[] {
       body: link ? 'dash.step.guests.bodyLink' : 'dash.step.guests.body',
       action: 'dash.step.guests.action',
       done: f.guests > 0,
-      optional: link,
+      optional: true,
     },
-    { key: 'publish', section: '', title: 'dash.step.publish', short: 'dash.step.publish.short', body: 'dash.step.publish.body', action: 'dash.step.publish.action', done: published, optional: false },
     {
       key: 'share',
       section: '/invitations',
@@ -68,8 +73,10 @@ export function setupSteps(f: SetupFacts): SetupStep[] {
       done: f.invitationsSent || (link && published && f.guests > 0),
       optional: false,
     },
-    { key: 'rsvps', section: '/rsvps', title: 'dash.step.rsvps', short: 'dash.step.rsvps.short', body: 'dash.step.rsvps.body', action: 'dash.step.rsvps.action', done: f.responses > 0, optional: false },
   ];
+  // Replies only while the host takes them.
+  if (f.rsvpEnabled) steps.push({ key: 'rsvps', section: '/rsvps', title: 'dash.step.rsvps', short: 'dash.step.rsvps.short', body: 'dash.step.rsvps.body', action: 'dash.step.rsvps.action', done: f.responses > 0, optional: false });
+  return steps;
 }
 
 /** The first step still to do, skipping optional ones; null once everything is done. */
@@ -92,5 +99,6 @@ export function summaryFacts(event: EventSummary): SetupFacts {
     guests: event.counts.guests,
     invitationsSent: false,
     responses: 0,
+    rsvpEnabled: event.rsvpEnabled,
   };
 }

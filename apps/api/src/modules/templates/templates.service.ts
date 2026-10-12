@@ -240,6 +240,7 @@ export class TemplatesService implements OnApplicationBootstrap {
         name: true,
         description: true,
         priceMinor: true,
+        listPriceMinor: true,
         currency: true,
         interval: true,
         kind: true,

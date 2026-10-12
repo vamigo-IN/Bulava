@@ -249,7 +249,15 @@ function DesignEditor() {
             {definition && previewContext ? (
               // On a phone-wide frame, so the design lays out exactly as on guests' phones (ADR-065).
               <PhonePreview title={t('design.livePreview')} className="h-[660px]">
-                <TemplateRenderer definition={definition} context={previewContext} customization={custom} mode="preview" language={event.data.language} slots={{ watermark: design.data?.watermark || locked }} />
+                <TemplateRenderer
+                  definition={definition}
+                  context={previewContext}
+                  customization={custom}
+                  mode="preview"
+                  language={event.data.language}
+                  without={design.data?.without}
+                  slots={{ watermark: design.data?.watermark || locked, veil: design.data?.veil ?? undefined }}
+                />
               </PhonePreview>
             ) : null}
             {locked ? (
@@ -281,6 +289,8 @@ function DesignEditor() {
           onUploaded={(p) => setUploaded((u) => [p, ...u])}
           language={event.data.language}
           watermark={!!design.data?.watermark || locked}
+          veil={design.data?.veil ?? undefined}
+          without={design.data?.without}
           dirty={canSave}
           saving={saving}
           onSave={() => void save()}

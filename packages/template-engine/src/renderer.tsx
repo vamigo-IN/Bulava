@@ -30,6 +30,7 @@ import { initials } from './sections/shared';
 import { CanvasSection } from './canvas/section';
 import { themeStyle } from './theme';
 import { TemplateStyles } from './styles';
+import { WatermarkVeil } from './veil';
 import type { RenderMode, RenderSlots, SectionProps } from './types';
 
 const REGISTRY: Record<SectionKey, ComponentType<SectionProps>> = {
@@ -79,6 +80,11 @@ export interface TemplateRendererProps {
   maxSections?: number;
   /** Wraps each section as it is drawn: the website's canvas editor puts its tools around the page's parts (ADR-065). */
   wrapSection?: (instance: SectionInstance, node: ReactNode, index: number) => ReactNode;
+  /**
+   * Kinds of section left out of the page: RSVP when the host takes no replies, the gallery and photo
+   * sharing when the plan has no gallery (ADR-067, ADR-068). Canvas buttons that lead to them go too.
+   */
+  without?: readonly SectionKey[];
 }
 
 interface PageOptions {
@@ -88,10 +94,11 @@ interface PageOptions {
   language?: string;
   slots?: RenderSlots;
   mode?: RenderMode;
+  without?: readonly SectionKey[];
 }
 
 /** What each section of a page is drawn with: the template with the host's choices, and the event's data. */
-function pageOf({ definition: template, context, customization, language: languageOverride, slots = {}, mode = 'live' }: PageOptions) {
+function pageOf({ definition: template, context, customization, language: languageOverride, slots = {}, mode = 'live', without = [] }: PageOptions) {
   // The host's own arrangement of the canvas sections, where it still fits the template (ADR-057), the sections they added (ADR-059) and their order (ADR-065).
   const definition = withCanvasCustomization(template, customization?.canvas, customization?.addedSections, customization?.sectionOrder);
   const language = languageOverride ?? context.event.language;
@@ -104,7 +111,7 @@ function pageOf({ definition: template, context, customization, language: langua
   const look = definition.theme.look ?? 'classic';
   const opts = { t, language, timeZone };
   const hidden = hiddenSectionIds(definition, customization);
-  const sections = (definition.website?.pages[0]?.sections ?? []).filter((s) => isVisible(s, ctx) && !hidden.has(s.id));
+  const sections = (definition.website?.pages[0]?.sections ?? []).filter((s) => isVisible(s, ctx) && !hidden.has(s.id) && !without.includes(s.section));
   const rsvpSectionId = sections.find((s) => s.section === 'rsvp')?.id;
   const sectionProps = (instance: SectionInstance, index: number): SectionProps => ({
     instance,
@@ -150,8 +157,8 @@ export function sectionDrawer(options: PageOptions): (sectionId: string, index: 
 }
 
 /** Renders a WEBSITE template definition for a given render context. */
-export function TemplateRenderer({ definition: template, context, customization, language: languageOverride, slots = {}, mode = 'live', introKey, maxSections, wrapSection }: TemplateRendererProps) {
-  const { definition, language, t, timeZone, ctx, colors, fonts, look, sections, sectionProps } = pageOf({ definition: template, context, customization, language: languageOverride, slots, mode });
+export function TemplateRenderer({ definition: template, context, customization, language: languageOverride, slots = {}, mode = 'live', introKey, maxSections, wrapSection, without }: TemplateRendererProps) {
+  const { definition, language, t, timeZone, ctx, colors, fonts, look, sections, sectionProps } = pageOf({ definition: template, context, customization, language: languageOverride, slots, mode, without });
   const { intro, effect } = effectiveMotion(definition, customization);
   const shown = maxSections ? sections.slice(0, maxSections) : sections;
   const rootId = `bulava-t-${(introKey ?? definition.templateKey).replace(/[^A-Za-z0-9_-]/g, '')}`;
@@ -186,6 +193,7 @@ export function TemplateRenderer({ definition: template, context, customization,
       {mode === 'live' && ctx.music?.url ? (
         <MusicPlayer url={ctx.music.url} title={ctx.music.title} vinyl={look === 'noir'} labels={{ play: t('template.music.play'), pause: t('template.music.pause') }} />
       ) : null}
+      {slots.veil ? <WatermarkVeil text={slots.veil} /> : null}
       {/* The sections answer to the page's width (container queries), not the window's: a phone-wide frame shows the phone's layout. */}
       <div style={{ containerType: 'inline-size' }}>
         {shown.map((instance, index) => {

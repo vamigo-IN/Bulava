@@ -17,6 +17,19 @@ import { LiveWallService } from './live-wall.service';
 
 /** The hidden album for the host's design photos: never the main album, never in guest galleries. */
 export const DESIGN_ROOM_SLUG = 'design-photos';
+
+/** Photos a design may hold on every plan (the host's own photos placed in the template; ADR-067): the plan's photo limit is the gallery's. */
+export const DESIGN_PHOTOS_MAX = 30;
+
+/** What counts against the plan's photos (media.photos.max): the gallery and albums, never the design's own photos. */
+export function galleryPhotosWhere(eventId: string) {
+  return { eventId, status: { notIn: ['DELETED' as const, 'REJECTED' as const] }, room: { slug: { not: DESIGN_ROOM_SLUG } } };
+}
+
+/** The design's own photos, held to DESIGN_PHOTOS_MAX. */
+export function designPhotosWhere(eventId: string) {
+  return { eventId, status: { notIn: ['DELETED' as const, 'REJECTED' as const] }, room: { slug: DESIGN_ROOM_SLUG } };
+}
 const SIGNED_TTL = 3600;
 const roomCode = () => randomBytes(8).toString('base64url').replace(/[-_]/g, 'x').slice(0, 10);
 
@@ -341,7 +354,7 @@ export class AlbumService {
     if (!type || (type.kind !== 'image' && type.kind !== 'video')) throw new AppError('UPLOAD_REJECTED', 'Only photos and videos can be uploaded.');
     if (input.sizeBytes > type.maxBytes) throw new AppError('UPLOAD_REJECTED', `Files must be under ${Math.round(type.maxBytes / 1024 / 1024)} MB.`);
     const features = await this.entitlements.forEvent(access.eventId);
-    const used = await this.prisma.mediaItem.count({ where: { eventId: access.eventId, status: { notIn: ['DELETED', 'REJECTED'] } } });
+    const used = await this.prisma.mediaItem.count({ where: galleryPhotosWhere(access.eventId) });
     EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.PHOTOS_MAX, used);
     const uploader = await this.prisma.user.findUnique({ where: { id: access.userId }, select: { name: true } });
     const item = await this.prisma.mediaItem.create({

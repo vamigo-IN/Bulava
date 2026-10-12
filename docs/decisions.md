@@ -360,3 +360,42 @@ A host with a complimentary Starter plan for one event saw "No plan yet" on the 
 - **Saying what a plan leaves out.** A plan without replies or music says so on the replies page and beside the music; a feature the plan does not have names itself (`PLAN_UPGRADE_REQUIRED` with its feature), and every unlock link leads to the event's plan page (or the account's).
 
 Rejected: moving existing per-event grants to the account (they were given for one event on purpose); naming plans from their features (names are rows the console edits).
+
+### ADR-067: Free and four paid plans, offer prices, and what each plan shows (2026-10-12)
+The product owner redesigned the plans: a free plan that can publish one event (with the Bulava mark across it), four paid plans only (Starter, Standard, Premium, Ultimate), each shown at an offer price against its usual price, and template tiers named Free, Premium and Signature.
+
+- **The matrix** (rows in `pricing_plans`/`plan_features`, edited in the console; migration `20261012200000_plans_redesign` moves existing databases to it, the seed makes it on new ones):
+
+  | | Free | Starter | Standard | Premium | Ultimate |
+  |---|---|---|---|---|---|
+  | Price (usual) | free | ₹299 (₹599) | ₹599 (₹1,199) | ₹999 (₹1,999) | ₹1,999 (₹3,999) |
+  | Published events | 1 | 1 | 1 | 1 | 1 |
+  | Functions with a date | 1 | 1 | 4 | 8 | unlimited |
+  | Guests | 50 | 150 | 400 | 1,000 | unlimited |
+  | Designs | Free | + Premium | + Premium | + Signature | + Signature |
+  | Bulava mark | across the invitation | none | none | none | none |
+  | RSVP | no | yes | yes | yes | yes |
+  | Photo gallery | no | 50 photos | 250 | 1,000 | 5,000 |
+  | WhatsApp invitations and RSVP updates | no | no | 300 messages | 700 | 1,500 |
+  | Music | no | no | yes | yes | yes |
+  | MP4 videos | no | add-on | add-on | 5 | 10 |
+  | Own link and domain | no | no | no | yes | yes |
+  | Watermark-free cards | 0 (₹50 each) | 0 (₹50 each) | 5 | 10 | 20 |
+
+  The hidden Lite plan, the done-for-you Grand plan, the yearly Studio plan and the no-mark add-on are retired (`active` false): never sold again, kept by those who have them. Every plan holder's entitlements were completed with the features the free baseline now switches off or that are new (replies, music, the gallery, cards), so nobody loses what they had.
+- **Offer prices.** `pricing_plans.listPriceMinor` is the usual price, shown struck through beside the price with the saving ("50% off") on the plans page, the plan pages and the checkout (`OfferPrice`); null means no offer, and it is never below the price (a check constraint and the console). Unlocking a bigger plan still pays only the difference (ADR-062: ₹599 − ₹299 = ₹300).
+- **The free plan publishes.** `events.max` is 1 on Free: one event with one function on a free design, carrying `veil`: the site's address tiled across the whole invitation (`WatermarkVeil`, a layer over every section that never takes a tap), in every payload that shows the invitation (public page, personal invitation, preview link, the dashboard's preview).
+- **A gallery switch.** `gallery.enabled`: without it, the invitation leaves out its gallery and photo-sharing sections (`without` in the payloads, `TemplateRenderer` `without`), guests get no photo rooms, and the plan's photos are 0. The plan's photo limit counts only the gallery and albums: the host's own photos placed in the design (the design-photos room) are allowed on every plan, up to 30 (`DESIGN_PHOTOS_MAX`).
+- **Cards.** `cards.included` is how many watermark-free cards a plan includes (ADR-071).
+- **Template tiers** are Free, Premium and Signature (the enum values renamed from FREE/STANDARD/PREMIUM: same order, same `templates.maxTier` numbers 0/1/2): Free designs for everyone, Premium from Starter, Signature from Premium.
+
+Rejected: a free plan that cannot publish (ADR-062; the owner wants free events live, marked); separate prices per event (plans stay the account's); a coupon as the offer price (the offer is the plan's own price, the same for everyone).
+
+### ADR-068: Design, one function, publish: guests later, replies by choice (2026-10-12)
+Hosts dropped off between creating an event and publishing it: the setup asked for guests and groups before publishing, a wedding started with six placeholder functions, and replies were always on.
+
+- **The order** (`lib/setup-steps.ts`): the design, a function (its date, time and venue), publishing; then guests (optional), sharing and, while the host takes replies, replies. A new event takes two steps (the occasion; then the names, the date and the language) and starts with the occasion's main function; groups and guests wait until the host wants them.
+- **Replies are the host's choice** (`Event.rsvpEnabled`, default on): asked in the publish dialog ("Collect replies" or "No replies"), changed in Settings. Off (or on a plan without replies), the invitation leaves out its RSVP section, canvas RSVP buttons and the registration form, guests' replies are refused (`RSVP_NOT_TAKEN`), and the dashboard hides the RSVP page and its setup step.
+- **The parents' names.** The couple's details take each partner's father and mother (`partnerOneFather`, `partnerOneMother`, `partnerTwoFather`, `partnerTwoMother`), asked when the event is made (optional) and in Settings with the couple's names. The render context carries them (`couple.partnerOneFather`…, and `couple.partnerOneParents` / `partnerTwoParents` as "Father & Mother"), and they fill the templates' family lines (`custom.partnerOneParents` / `partnerTwoParents`) unless the host wrote their own there.
+
+Rejected: asking for guests before publishing (a published link works for everyone it is shared with; personal invitations can follow); a reply limit by count (the plan's guests already bound it).

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Check, Copy, ExternalLink, Loader2, Palette, PartyPopper, Rocket, ShieldCheck, Sparkles, TriangleAlert, X } from 'lucide-react';
+import { ArrowRight, Check, ClipboardCheck, Copy, ExternalLink, Loader2, LockKeyhole, MailOpen, Palette, PartyPopper, Rocket, ShieldCheck, Sparkles, TriangleAlert, X } from 'lucide-react';
 import Link from 'next/link';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,8 @@ import { createTranslator } from '@bulava/localization';
 import { apiPatch } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { isPlanLimit, unlockHref } from '@/lib/plan-limits';
-import { keys, useMe, useShareLink } from '@/lib/queries';
+import { can } from '@/lib/permissions';
+import { keys, moreKeys, useEventPlan, useMe, useShareLink } from '@/lib/queries';
 import { LINK_MODES } from '@/lib/setup-steps';
 import type { AccessMode, EventSummary } from '@/lib/types';
 import { whatsappLink } from '@/lib/utils';
@@ -56,6 +57,10 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
   const client = useQueryClient();
   const ref = useRef<HTMLDialogElement>(null);
   const [access, setAccess] = useState<AccessMode>(event.accessMode);
+  // Replies are the host's choice (ADR-068), while the plan has them.
+  const plan = useEventPlan(event.id);
+  const repliesInPlan = plan.data?.features['rsvp.enabled']?.enabled ?? true;
+  const [rsvp, setRsvp] = useState(event.rsvpEnabled);
   const [busy, setBusy] = useState(false);
   /** `unlock`: where to unlock more when a plan stops publishing (the number of published events, or the design). */
   const [error, setError] = useState<{ text: string; unlock: string | null } | null>(null);
@@ -71,8 +76,13 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
     setBusy(true);
     setError(null);
     try {
-      await apiPatch(`/events/${event.id}`, { status: 'ACTIVE', ...(access !== event.accessMode ? { accessMode: access } : {}) });
-      await Promise.all([client.invalidateQueries({ queryKey: ['events', event.id] }), client.invalidateQueries({ queryKey: keys.events })]);
+      const replies = rsvp && repliesInPlan;
+      await apiPatch(`/events/${event.id}`, { status: 'ACTIVE', ...(access !== event.accessMode ? { accessMode: access } : {}), ...(replies !== event.rsvpEnabled ? { rsvpEnabled: replies } : {}) });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['events', event.id] }),
+        client.invalidateQueries({ queryKey: keys.events }),
+        client.invalidateQueries({ queryKey: moreKeys.eventPlan(event.id) }),
+      ]);
       setLive(true);
     } catch (err) {
       setError({ text: errorMessage(t, err), unlock: isPlanLimit(err) ? unlockHref(err, event.id) : null });
@@ -119,6 +129,23 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
             <div className="mt-3">
               <AccessOptions value={access} onChange={setAccess} disabled={busy} />
             </div>
+
+            <h3 className="mt-7 text-xs font-semibold tracking-[0.16em] text-stone-500 uppercase">{t('publish.rsvp.title')}</h3>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t('publish.rsvp.title')}>
+              <ReplyChoice icon={ClipboardCheck} title={t('publish.rsvp.on')} body={t('publish.rsvp.onBody')} checked={rsvp && repliesInPlan} disabled={busy || !repliesInPlan} onSelect={() => setRsvp(true)} />
+              <ReplyChoice icon={MailOpen} title={t('publish.rsvp.off')} body={t('publish.rsvp.offBody')} checked={!rsvp || !repliesInPlan} disabled={busy} onSelect={() => setRsvp(false)} />
+            </div>
+            {!repliesInPlan ? (
+              <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-stone-600">
+                <LockKeyhole aria-hidden className="size-3.5 text-gold-600" />
+                {t('publish.rsvp.notInPlan')}
+                {can(event, 'payment.read') ? (
+                  <Link href={`${base}/unlock`} onClick={() => ref.current?.close()} className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4">
+                    {t('unlock.cta')}
+                  </Link>
+                ) : null}
+              </p>
+            ) : null}
 
             {!event.design || event.counts.readyFunctions === 0 ? (
               <ul className="mt-5 space-y-2">
@@ -169,6 +196,26 @@ function PublishDialog({ event, onClose }: { event: EventSummary; onClose: () =>
         )}
       </div>
     </dialog>
+  );
+}
+
+/** One answer to "Do guests reply?", as a card that reads as a radio button. */
+function ReplyChoice({ icon: Icon, title, body, checked, disabled, onSelect }: { icon: typeof Palette; title: string; body: string; checked: boolean; disabled: boolean; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={onSelect}
+      className={`flex min-h-16 items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-[border-color,background-color,box-shadow] duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${checked ? 'border-brand-600 bg-white shadow-clay-sm' : 'border-gold-200 bg-white/50 hover:border-gold-300 hover:bg-white'}`}
+    >
+      <Icon aria-hidden className={`mt-0.5 size-5 shrink-0 ${checked ? 'text-brand-700' : 'text-stone-400'}`} />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-ink">{title}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-stone-600">{body}</span>
+      </span>
+    </button>
   );
 }
 

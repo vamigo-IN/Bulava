@@ -47,6 +47,8 @@ export interface EventDto {
   accessMode: string;
   hasPin: boolean;
   requireOtp: boolean;
+  /** The host collects replies on the invitation (ADR-068; the plan must allow them too). */
+  rsvpEnabled: boolean;
   startDate: Date | null;
   endDate: Date | null;
   details: unknown;
@@ -79,6 +81,7 @@ function toDto(event: EventWithPolicy, role?: string): EventDto {
     accessMode: event.accessPolicy.mode,
     hasPin: event.accessPolicy.pinHash !== null,
     requireOtp: event.accessPolicy.requireOtp,
+    rsvpEnabled: event.rsvpEnabled,
     startDate: event.startDate,
     endDate: event.endDate,
     details: event.details,
@@ -405,6 +408,9 @@ export class EventsService {
           tx,
         );
       }
+      if (input.rsvpEnabled !== undefined && input.rsvpEnabled !== event.rsvpEnabled) {
+        await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'event.rsvp_changed', targetType: 'Event', targetId: event.id, eventId: event.id, metadata: { rsvpEnabled: input.rsvpEnabled }, meta }, tx);
+      }
       if (input.status && input.status !== event.status) {
         await this.audit.record(
           {
@@ -428,6 +434,7 @@ export class EventsService {
           language: input.language,
           timezone: input.timezone,
           visibility: input.visibility,
+          rsvpEnabled: input.rsvpEnabled,
           status: input.status,
           details,
           ...(newLink ? { slug: newLink } : {}),

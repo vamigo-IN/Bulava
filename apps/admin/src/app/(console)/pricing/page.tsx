@@ -14,6 +14,7 @@ import { formatDate, formatInr, fromDateInput, toDateInput } from '@/lib/utils';
 const SWITCH_FEATURES = new Set<FeatureKey>([
   FEATURE_KEYS.VIDEO_HD,
   FEATURE_KEYS.WATERMARK,
+  FEATURE_KEYS.GALLERY,
   FEATURE_KEYS.PLANNER,
   FEATURE_KEYS.CUSTOM_DOMAIN,
   FEATURE_KEYS.RSVP,
@@ -73,6 +74,7 @@ function PlanCard({ plan, baseline, tierKeys }: { plan: Plan; baseline: Plan | n
     name: plan.name,
     description: plan.description ?? '',
     price: String(plan.priceMinor / 100),
+    listPrice: plan.listPriceMinor === null ? '' : String(plan.listPriceMinor / 100),
     active: plan.active,
     sortOrder: plan.sortOrder,
     visibility: plan.visibility,
@@ -87,6 +89,8 @@ function PlanCard({ plan, baseline, tierKeys }: { plan: Plan; baseline: Plan | n
         name: form.name.trim(),
         description: form.description.trim() || null,
         priceMinor: Math.round(Number(form.price) * 100),
+        // Empty: no offer (the price alone).
+        listPriceMinor: form.listPrice.trim() === '' ? null : Math.round(Number(form.listPrice) * 100),
         active: form.active,
         sortOrder: form.sortOrder,
         visibility: form.visibility,
@@ -111,6 +115,7 @@ function PlanCard({ plan, baseline, tierKeys }: { plan: Plan; baseline: Plan | n
           {plan.name} <span className="font-mono text-xs text-stone-400">{plan.key}</span>
         </h2>
         <div className="flex items-center gap-2">
+          {plan.listPriceMinor && plan.listPriceMinor > plan.priceMinor ? <span className="text-sm text-stone-400 tabular-nums line-through">{formatInr(plan.listPriceMinor)}</span> : null}
           <span className="text-lg font-semibold tabular-nums">{formatInr(plan.priceMinor)}</span>
           <span className="text-xs text-stone-500">{tMaybe(`pricing.interval.${plan.interval}`, plan.interval)}</span>
           {addOn ? <Badge tone="neutral">{t('pricing.kind.ADDON')}</Badge> : null}
@@ -120,10 +125,13 @@ function PlanCard({ plan, baseline, tierKeys }: { plan: Plan; baseline: Plan | n
       </div>
       <form onSubmit={submit} className="space-y-3">
         {save.isError ? <Alert>{errorMessage(save.error, t('common.error'))}</Alert> : null}
-        <div className="grid gap-3 sm:grid-cols-[1fr_140px_110px]">
+        <div className="grid gap-3 sm:grid-cols-[1fr_120px_120px_100px]">
           <Field label={t('pricing.planName')}>{(p) => <Input {...p} required maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />}</Field>
           <Field label={t('pricing.price')}>
             {(p) => <Input {...p} type="number" required min={0} step="1" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />}
+          </Field>
+          <Field label={t('pricing.listPrice')} hint={t('pricing.listPriceHint')}>
+            {(p) => <Input {...p} type="number" min={0} step="1" value={form.listPrice} onChange={(e) => setForm({ ...form, listPrice: e.target.value })} />}
           </Field>
           <Field label={t('pricing.sortOrder')}>
             {(p) => <Input {...p} type="number" min={0} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />}

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, CalendarDays, Check, CheckCheck, Languages, Loader2, LockKeyhole, Palette, Rocket, Sparkles, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Languages, Loader2, LockKeyhole, Palette, Rocket, Sparkles, UsersRound } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
@@ -20,8 +20,9 @@ import type { EventSummary, EventType } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Alert, Field, Input, Spinner } from '@/components/ui/primitives';
 
-const STEPS = ['create.step.occasion', 'create.step.details', 'create.step.functions'] as const;
-type Names = { partnerOne: string; partnerTwo: string; name: string };
+const STEPS = ['create.step.occasion', 'create.step.details'] as const;
+type Names = { partnerOne: string; partnerTwo: string; name: string; partnerOneFather: string; partnerOneMother: string; partnerTwoFather: string; partnerTwoMother: string };
+const PARENTS = ['partnerOneFather', 'partnerOneMother', 'partnerTwoFather', 'partnerTwoMother'] as const;
 
 export default function NewEventPage() {
   return (
@@ -32,10 +33,13 @@ export default function NewEventPage() {
 }
 
 /**
- * A new event in three short steps: the occasion (picked from cards), who and
- * when, and which of the usual functions are happening. A live invitation card
- * follows along. Nothing about who can open the invitation is asked here:
- * events start as one private link and the host chooses when publishing.
+ * A new event in two short steps (ADR-068): the occasion (picked from cards),
+ * then who and when (the couple's parents too, if the host likes). A live
+ * invitation card follows along. The event starts with its main function;
+ * the design, the function's date and venue, and publishing come next, and
+ * guests whenever the host likes. Nothing about who can open the invitation
+ * is asked here: events start as one private link and the host chooses when
+ * publishing.
  */
 function CreateEvent() {
   const t = useT();
@@ -51,12 +55,12 @@ function CreateEvent() {
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const [typeKey, setTypeKey] = useState<string | null>(null);
-  const [names, setNames] = useState<Names>({ partnerOne: '', partnerTwo: '', name: '' });
+  const [names, setNames] = useState<Names>({ partnerOne: '', partnerTwo: '', name: '', partnerOneFather: '', partnerOneMother: '', partnerTwoFather: '', partnerTwoMother: '' });
+  const [parentsOpen, setParentsOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [titleEdited, setTitleEdited] = useState(false);
   const [date, setDate] = useState('');
   const [language, setLanguage] = useState('en');
-  const [functions, setFunctions] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // A plan limit carries where to unlock more (the plans page for the number of events).
   const [error, setError] = useState<{ text: string; unlock: string | null } | null>(null);
@@ -87,7 +91,6 @@ function CreateEvent() {
 
   function pick(next: EventType, advance = true) {
     setTypeKey(next.key);
-    setFunctions(next.defaultFunctions.map((f) => f.slug));
     setFieldErrors({});
     if (advance) {
       setStep(1);
@@ -100,7 +103,12 @@ function CreateEvent() {
 
   const details = (): Record<string, string> =>
     type?.detailsSchemaKey === 'couple'
-      ? { partnerOne: names.partnerOne.trim(), partnerTwo: names.partnerTwo.trim() }
+      ? {
+          partnerOne: names.partnerOne.trim(),
+          partnerTwo: names.partnerTwo.trim(),
+          // The parents only when given (the invitation shows them where its design has room).
+          ...Object.fromEntries(PARENTS.flatMap((k) => (names[k].trim() ? [[k, names[k].trim()]] : []))),
+        }
       : type?.detailsSchemaKey === 'honoree'
         ? { name: names.name.trim() }
         : {};
@@ -111,8 +119,8 @@ function CreateEvent() {
     language,
     // One link for everyone until the host decides otherwise, when publishing.
     accessMode: 'PRIVATE_LINK' as const,
+    // The occasion's main function, ready for its date and venue (ADR-068); more can be added later.
     applyDefaults: true,
-    ...(type?.defaultFunctions.length ? { functionSlugs: functions } : {}),
     ...(date ? { date } : {}),
     details: details(),
   });
@@ -266,6 +274,35 @@ function CreateEvent() {
                       {(p) => <Input {...p} maxLength={120} autoComplete="off" value={names.partnerTwo} onChange={(e) => setNames({ ...names, partnerTwo: e.target.value })} />}
                     </Field>
                   </div>
+                ) : null}
+                {type.detailsSchemaKey === 'couple' ? (
+                  <div className="rounded-2xl border border-gold-200 bg-white/50">
+                    <button
+                      type="button"
+                      onClick={() => setParentsOpen((v) => !v)}
+                      aria-expanded={parentsOpen}
+                      aria-controls="create-parents"
+                      className="flex min-h-12 w-full items-center gap-2 rounded-2xl px-4 text-left text-sm font-semibold text-brand-700"
+                    >
+                      <UsersRound aria-hidden className="size-4" />
+                      <span className="flex-1">{t('create.parents.toggle')}</span>
+                      <span className="text-xs font-normal text-stone-500">{t('common.optional')}</span>
+                      <ChevronDown aria-hidden className={cn('size-4 transition-transform', parentsOpen && 'rotate-180')} />
+                    </button>
+                    {parentsOpen ? (
+                      <div id="create-parents" className="grid gap-4 border-t border-gold-100 p-4 sm:grid-cols-2">
+                        {PARENTS.map((k) => {
+                          const partner = (k.startsWith('partnerOne') ? names.partnerOne : names.partnerTwo).trim() || t(k.startsWith('partnerOne') ? 'create.preview.one' : 'create.preview.two');
+                          return (
+                            <Field key={k} label={t(k.endsWith('Father') ? 'create.parents.father' : 'create.parents.mother', { name: partner })} error={fieldErrors[`details.${k}`]}>
+                              {(p) => <Input {...p} maxLength={120} autoComplete="off" value={names[k]} onChange={(e) => setNames({ ...names, [k]: e.target.value })} />}
+                            </Field>
+                          );
+                        })}
+                        <p className="text-xs leading-relaxed text-stone-500 sm:col-span-2">{t('create.parents.hint')}</p>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : type.detailsSchemaKey === 'honoree' ? (
                   <Field label={t('event.field.honoree')} error={fieldErrors['details.name']}>
                     {(p) => <Input {...p} autoFocus maxLength={120} autoComplete="off" value={names.name} onChange={(e) => setNames({ ...names, name: e.target.value })} />}
@@ -310,69 +347,6 @@ function CreateEvent() {
                   ))}
                 </div>
               </Panel>
-            </div>
-          ) : null}
-
-          {step === 2 && type ? (
-            <div className="space-y-6">
-              {type.defaultFunctions.length ? (
-                <Panel
-                  icon={CalendarDays}
-                  title={t('create.functions')}
-                  subtitle={t('create.functionsHint')}
-                  aside={
-                    <button
-                      type="button"
-                      onClick={() => setFunctions(functions.length === type.defaultFunctions.length ? [] : type.defaultFunctions.map((f) => f.slug))}
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline"
-                    >
-                      <CheckCheck aria-hidden className="size-4" />
-                      {functions.length === type.defaultFunctions.length ? t('create.none') : t('create.all')}
-                    </button>
-                  }
-                >
-                  <ul className="grid gap-2.5 sm:grid-cols-2">
-                    {type.defaultFunctions.map((f) => {
-                      const on = functions.includes(f.slug);
-                      return (
-                        <li key={f.slug}>
-                          <button
-                            type="button"
-                            aria-pressed={on}
-                            onClick={() => setFunctions(on ? functions.filter((s) => s !== f.slug) : type.defaultFunctions.map((d) => d.slug).filter((s) => s === f.slug || functions.includes(s)))}
-                            className={cn(
-                              'flex min-h-14 w-full items-center gap-3 rounded-2xl border px-4 text-left transition-[border-color,background-color,box-shadow] duration-200',
-                              on ? 'border-brand-600 bg-white shadow-clay-sm' : 'border-gold-200 bg-white/50 text-stone-500 hover:border-gold-300 hover:bg-white',
-                            )}
-                          >
-                            <span aria-hidden className={cn('grid size-6 shrink-0 place-items-center rounded-lg border transition-colors', on ? 'border-brand-700 bg-brand-700 text-white' : 'border-stone-300 bg-white')}>
-                              {on ? <Check className="size-3.5" strokeWidth={3} /> : null}
-                            </span>
-                            <span className={cn('font-medium', on ? 'text-ink' : 'text-stone-500 line-through decoration-stone-300')}>{f.name}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <p className="mt-3 text-xs text-stone-500">{t('create.functionsLater')}</p>
-                </Panel>
-              ) : (
-                <Panel icon={CalendarDays} title={t('create.functions')}>
-                  <p className="text-sm text-stone-600">{t('create.noSuggestions')}</p>
-                </Panel>
-              )}
-
-              {type.defaultGroups.length > 1 ? (
-                <Panel icon={UsersRound} title={t('create.groups')} subtitle={t('create.groupsHint')}>
-                  <ul className="flex flex-wrap gap-2">
-                    {type.defaultGroups.map((g) => (
-                      <li key={g.slug} className="rounded-full bg-sand px-3 py-1.5 text-sm text-stone-700 ring-1 ring-gold-200/70">
-                        {g.name}
-                      </li>
-                    ))}
-                  </ul>
-                </Panel>
-              ) : null}
 
               <div className="flex items-start gap-3 rounded-3xl border border-gold-200 bg-gold-100/40 p-4 text-sm leading-relaxed text-stone-700 sm:p-5">
                 <LockKeyhole aria-hidden className="mt-0.5 size-4 shrink-0 text-gold-700" />
@@ -387,7 +361,7 @@ function CreateEvent() {
                 <ArrowLeft aria-hidden className="size-4" />
                 {t('create.back')}
               </button>
-              {step < 2 ? (
+              {step < STEPS.length - 1 ? (
                 <button type="button" onClick={() => goTo(step + 1)} className="btn-3d min-h-12 rounded-2xl px-7 text-sm">
                   {t('create.continue')}
                   <ArrowRight aria-hidden className="size-4" />
@@ -527,11 +501,12 @@ function InvitationCard({ type, names, title, date }: { type: EventType | undefi
 
 function WhatsNext({ designChosen }: { designChosen: boolean }) {
   const t = useT();
+  // The order the dashboard takes the host through (ADR-068): guests can wait until after publishing.
   const items = [
     { icon: Palette, label: designChosen ? t('create.next.designChosen') : t('create.next.design') },
     { icon: CalendarDays, label: t('create.next.functions') },
-    { icon: UsersRound, label: t('create.next.guests') },
     { icon: Rocket, label: t('create.next.publish') },
+    { icon: UsersRound, label: t('create.next.guestsLater') },
   ];
   return (
     <div className="clay-inset rounded-3xl p-5">

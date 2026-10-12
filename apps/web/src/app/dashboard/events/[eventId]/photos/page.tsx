@@ -21,6 +21,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { apiDelete, apiPatch, apiPost } from '@/lib/api';
 import { LiveWallControls } from '@/components/events/live-wall-controls';
+import { PlanNotice } from '@/components/events/plan-notice';
 import { putWithProgress } from '@/components/photos/upload-room';
 import { errorMessage, useT } from '@/lib/i18n';
 import { can } from '@/lib/permissions';
@@ -478,6 +479,7 @@ export default function PhotosPage() {
         <p className="mt-1 max-w-2xl text-stone-600">{t('photos.subtitle')}</p>
       </div>
       {error ? <Alert>{error}</Alert> : null}
+      <PlanNotice eventId={eventId} feature="gallery.enabled" message="plan.notice.gallery" canPay={can(event.data, 'payment.read')} />
       {canModerate && data.pendingCount ? <Alert tone="warning">{t(data.pendingCount === 1 ? 'album.pendingTitleOne' : 'album.pendingTitle', { count: data.pendingCount })}</Alert> : null}
 
       <AlbumCard eventId={eventId} album={data} canModerate={canModerate} onChanged={invalidate} />

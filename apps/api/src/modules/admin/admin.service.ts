@@ -50,6 +50,8 @@ export const UpdatePlanSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   description: z.string().trim().max(300).nullable().optional(),
   priceMinor: z.number().int().min(0).max(100_000_000).optional(),
+  /** The usual price shown struck through beside the price (an offer, ADR-067); null: no offer. Never below the price. */
+  listPriceMinor: z.number().int().min(0).max(100_000_000).nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(1000).optional(),
   /** On the plans page, or sold only through offers (ADR-062). */
@@ -349,6 +351,11 @@ export class AdminService {
   }
 
   async updatePlan(adminId: string, key: string, input: z.infer<typeof UpdatePlanSchema>, meta: RequestMeta) {
+    const current = await this.prisma.pricingPlan.findUnique({ where: { key }, select: { priceMinor: true, listPriceMinor: true } });
+    if (!current) throw AppError.notFound('Plan');
+    const price = input.priceMinor ?? current.priceMinor;
+    const list = input.listPriceMinor === undefined ? current.listPriceMinor : input.listPriceMinor;
+    if (list !== null && list < price) throw new AppError('VALIDATION_FAILED', 'The usual price must be at least the price.', [{ path: 'listPriceMinor', message: 'At least the price' }]);
     const plan = await this.prisma.pricingPlan.update({ where: { key }, data: input });
     await this.audit.record({ actorType: 'USER', actorId: adminId, action: 'admin.pricing_changed', targetType: 'PricingPlan', targetId: plan.id, metadata: input as Prisma.InputJsonValue, meta });
     return plan;

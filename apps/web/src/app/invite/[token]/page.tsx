@@ -112,6 +112,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       language={language}
       mode="live"
       introKey={view.checkInCode ?? view.template.key}
+      without={view.without}
       slots={{
         // Replies come with the host's plan; without them the invitation has no RSVP section (ADR-062).
         rsvp: view.rsvp === false ? undefined : <RsvpIsland token={token} initialView={view} language={language} />,
@@ -125,6 +126,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         ) : undefined,
         guestInfo: hasGuestLogistics(view) ? <GuestLogistics token={token} initialView={view} language={language} /> : undefined,
         watermark: view.watermark,
+        veil: view.veil ?? undefined,
       }}
     />
   );

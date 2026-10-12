@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { authorizedFunctions, evaluateEventAccess, hashToken, isLinkMode, verifyPassword, type Viewer } from '@bulava/auth';
-import { FEATURE_KEYS } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
@@ -139,6 +138,7 @@ export class PublicEventsService {
       this.prisma.registration.count({ where: { eventId: event.id, status: 'CONFIRMED' } }),
     ]);
     if (!template) throw new AppError('SERVICE_UNAVAILABLE', 'No template is available.');
+    const show = EntitlementsService.invitation(features, event);
 
     return {
       event: {
@@ -162,9 +162,15 @@ export class PublicEventsService {
         announcements,
         ...(await this.media.templatePhotos(event.id, template.customization)),
         // Music comes with the plan (on unless a plan says otherwise; ADR-062).
-        music: (features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true) ? await this.renderContext.resolveMusic(template) : null,
+        music: show.music ? await this.renderContext.resolveMusic(template) : null,
       }),
-      watermark: EntitlementsService.enabled(features, FEATURE_KEYS.WATERMARK),
+      watermark: show.watermark,
+      /** The free plan's mark across the whole invitation: the site's address (ADR-067). */
+      veil: show.watermark ? this.renderContext.siteAddress() : null,
+      /** Whether guests can reply here: the plan has replies and the host takes them (ADR-068). */
+      rsvp: show.rsvp,
+      /** Kinds of section the page leaves out (no replies, no gallery). */
+      without: show.without,
       registration: summarizeForPublic(registrationSettings, confirmedRegistrations, event.status === 'ACTIVE'),
     };
   }

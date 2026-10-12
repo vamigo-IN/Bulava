@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useT } from '@/lib/i18n';
 import { addOnLine, planFeatureLines } from '@/lib/plan-features';
 import { useAccountPlan, useAddOns, useEventPlan, usePlans, type PlanLine } from '@/lib/queries';
+import { OfferPrice } from '@/components/ui/offer-price';
 import { Card, Spinner } from '@/components/ui/primitives';
 
 const inr = (minor: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(minor / 100);
@@ -205,6 +206,7 @@ export function PlanOverview({ eventId, template, canBuy = true, draft = false }
                   {p.badge ? <span className="rounded-full bg-gold-100 px-2 py-0.5 text-[0.6875rem] font-semibold text-gold-800">{p.badge}</span> : null}
                 </div>
                 {p.tagline ? <p className="text-sm font-semibold text-brand-700">{p.tagline}</p> : null}
+                <OfferPrice className="mt-2" size="md" priceMinor={p.priceMinor} listPriceMinor={p.listPriceMinor} currency={p.currency} t={t} />
                 <p className="mt-1 flex-1 text-sm text-stone-600">{p.description}</p>
                 <Link href={checkout(p.key)} className="btn-3d mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm">
                   {paidFrom ? t('plan.page.unlock', { plan: p.name, price: inr(p.priceMinor - paidFrom) }) : t('plan.page.unlockFull', { plan: p.name, price: inr(p.priceMinor) })}

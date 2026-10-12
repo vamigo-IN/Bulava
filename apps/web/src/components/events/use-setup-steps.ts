@@ -13,7 +13,7 @@ import type { EventSummary } from '@/lib/types';
 export function useSetupSteps(event: EventSummary | undefined): SetupStep[] | null {
   const id = event?.id ?? '';
   const invitations = useInvitations(id, !!event && can(event, 'invitation.read'));
-  const summary = useRsvpSummary(id, !!event && can(event, 'rsvp.read'));
+  const summary = useRsvpSummary(id, !!event && event.rsvpEnabled && can(event, 'rsvp.read'));
   if (!event) return null;
   return setupSteps({
     status: event.status,
@@ -23,5 +23,6 @@ export function useSetupSteps(event: EventSummary | undefined): SetupStep[] | nu
     guests: event.counts.guests,
     invitationsSent: invitations.data?.some((i) => i.sentAt) ?? false,
     responses: summary.data?.functions.reduce((sum, f) => sum + f.attending + f.declined + f.maybe, 0) ?? 0,
+    rsvpEnabled: event.rsvpEnabled,
   });
 }

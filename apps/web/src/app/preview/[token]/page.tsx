@@ -26,6 +26,9 @@ interface PreviewView {
   template: { key: string; name: string; tier: 'FREE' | 'STANDARD' | 'PREMIUM'; definition: TemplateDefinition; customization: Customization | null };
   context: RenderContext;
   watermark: boolean;
+  /** The free plan's mark across the whole invitation (ADR-067), and the sections the plan or the host leave out. */
+  veil?: string | null;
+  without?: Array<'rsvp' | 'gallery' | 'photoShare'>;
 }
 
 async function load(token: string): Promise<PreviewView | PublishedPreview | null> {
@@ -71,7 +74,8 @@ export default async function PreviewPage({ params }: { params: Promise<{ token:
           language={view.event.language}
           mode="live"
           introKey={`preview-${view.event.id}`}
-          slots={{ watermark: true }}
+          without={view.without}
+          slots={{ watermark: true, veil: view.veil ?? undefined }}
         />
       </main>
       <PreviewBar eventId={view.event.id} language={view.event.language} status={view.event.status} />

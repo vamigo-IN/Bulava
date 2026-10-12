@@ -3,7 +3,8 @@ import { SpotlightGrid } from '@/components/effects/spotlight-grid';
 import { AuthAwareLink } from './account-links';
 import type { Translator } from '@bulava/localization';
 import { planFeatureLines, planFormats } from '@/lib/plan-features';
-import { formatInr, type Plan } from '@/lib/server-api';
+import type { Plan } from '@/lib/server-api';
+import { OfferPrice } from '@/components/ui/offer-price';
 import { cn } from '@/lib/utils';
 
 /** Clay slabs for the plan cards: the ribboned plan in maroon, the others dark on the pricing band. */
@@ -47,9 +48,7 @@ export function PricingCards({ plans, t, dark = false, headingLevel = 3 }: { pla
             <div className={cn('spotlight flex h-full flex-col rounded-[1.75rem] p-6', popular ? MAROON_SLAB : dark ? DARK_SLAB : 'clay text-ink')}>
               <Heading className="font-display text-2xl">{plan.name}</Heading>
               {plan.tagline ? <p className={cn('mt-1 text-sm font-semibold', onDark ? 'text-gold-200' : 'text-brand-700')}>{plan.tagline}</p> : null}
-              <p className="mt-4 flex items-baseline gap-1">
-                <span className="font-display text-4xl tracking-tight xl:text-[2.6rem]">{formatInr(plan.priceMinor)}</span>
-              </p>
+              <OfferPrice className="mt-4" priceMinor={plan.priceMinor} listPriceMinor={plan.listPriceMinor} currency={plan.currency} t={t} onDark={onDark} />
               <p className={cn('mt-0.5 text-sm', onDark ? 'text-ivory/70' : 'text-stone-500')}>{t('home.pricing.oneTime')}</p>
               <ul className="mt-4 flex flex-wrap gap-1" aria-label={t('pricing.compare.feature')}>
                 {format(formats.link, Link2, t('plan.format.link'))}

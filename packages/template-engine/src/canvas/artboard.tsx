@@ -710,7 +710,10 @@ function WidgetView({ layer, env }: { layer: WidgetLayer; env: LayerEnv }) {
       : w.action === 'calendar'
         ? calendarUrl(env.ctx)
         : w.action === 'rsvp'
-          ? `#${w.target ?? env.rsvpTargetId ?? 'rsvp'}`
+          ? // No RSVP on the page (the host takes no replies): the button is not shown on the live invitation.
+            w.target || env.rsvpTargetId
+            ? `#${w.target ?? env.rsvpTargetId}`
+            : null
           : w.action === 'top'
             ? '#'
             : safeUrl(resolveValue(w.url, env.ctx, env.opts));

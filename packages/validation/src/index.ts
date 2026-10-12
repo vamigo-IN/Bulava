@@ -236,6 +236,11 @@ export const eventDetailsSchemas = {
   couple: z.object({
     partnerOne: trimmed(120),
     partnerTwo: trimmed(120),
+    /** The couple's parents, as the invitation names them (optional; templates show them where the design has room). */
+    partnerOneFather: optionalText(120),
+    partnerOneMother: optionalText(120),
+    partnerTwoFather: optionalText(120),
+    partnerTwoMother: optionalText(120),
   }),
   honoree: z.object({
     name: trimmed(120),
@@ -372,6 +377,8 @@ export const UpdateEventSchema = z.object({
   pin: z.union([z.string().trim().regex(/^[0-9A-Za-z]{4,12}$/, 'Use 4–12 letters or digits'), z.null()]).optional(),
   /** The invitation's own link, /e/<slug> (plans with a custom link; the old link keeps working). */
   slug: SlugSchema.pipe(z.string().min(4, 'Use at least 4 characters').max(60, 'Use at most 60 characters')).optional(),
+  /** The host collects replies (RSVP) on the invitation (ADR-068); off hides RSVP everywhere. */
+  rsvpEnabled: z.boolean().optional(),
 });
 export type UpdateEventInput = z.infer<typeof UpdateEventSchema>;
 
@@ -698,6 +705,8 @@ export const FEATURE_KEYS = {
   GUESTS_MAX: 'guests.max',
   TEMPLATES_MAX_TIER: 'templates.maxTier',
   PHOTOS_MAX: 'media.photos.max',
+  /** The invitation's photo gallery and guests' photo sharing (ADR-067): off, the template's gallery sections are not shown. */
+  GALLERY: 'gallery.enabled',
   VIDEO_RENDERS_MAX: 'video.renders.max',
   VIDEO_HD: 'video.hd',
   WATERMARK: 'branding.watermark',

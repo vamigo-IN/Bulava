@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### New plans at launch prices, a faster way to publish, and your parents on the invitation
+
+- **Four plans, at launch prices.** Starter ₹299 (usually ₹599), Standard ₹599 (usually ₹1,199), Premium ₹999 (usually ₹1,999) and Ultimate ₹1,999 (usually ₹3,999), each shown with the saving. Pay once; moving to a bigger plan costs only the difference.
+- **Publish for free.** The free plan publishes one event with one function on a free design, with the Bulava mark across it. Plans remove the mark and add RSVP (from Starter), WhatsApp invitations and RSVP updates (from Standard), the photo gallery, music, videos and more.
+- **Designs in three collections:** Free, Premium (with any plan) and Signature (from Premium).
+- **Publish in three steps.** Choose your design, set the date, time and venue of your function, and publish your link. Add guests whenever you like.
+- **Replies are your choice.** When you publish, choose whether guests reply (RSVP). Without replies, the invitation has no reply form; you can turn them on later in Settings.
+- **Your parents on the invitation.** Add the bride's and groom's parents' names when you create your event or later in Settings; the invitation shows them where its design has room.
+- **Fix your names any time.** Settings now has the names on the invitation.
+
 ### Your invitation as one page on the canvas, and every plan shown as it is
 
 - **Your whole invitation as one page.** *Design it on the canvas* now shows your invitation exactly as guests see it on their phones, in one scrolling page. Move any section up or down, hide it, or press **+** between two sections to add one there. Switch to the desktop view to see the wide layout.

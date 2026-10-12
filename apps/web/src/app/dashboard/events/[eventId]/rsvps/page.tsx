@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useT } from '@/lib/i18n';
 import { can } from '@/lib/permissions';
@@ -19,6 +20,21 @@ export default function RsvpsPage() {
   const event = useEvent(eventId);
 
   if (summary.isPending || rsvps.isPending) return <Spinner label={t('common.loading')} />;
+
+  // Replies turned off (ADR-068): nothing to show but the way to turn them on.
+  if (event.data && !event.data.rsvpEnabled) {
+    return (
+      <Card className="max-w-2xl space-y-3 rounded-3xl">
+        <h2 className="font-display text-2xl">{t('rsvp.off.title')}</h2>
+        <p className="text-sm leading-relaxed text-stone-600">{t('rsvp.off.body')}</p>
+        {can(event.data, 'event.update') ? (
+          <Link href={`/dashboard/events/${eventId}/settings`} className="btn-3d btn-3d-light inline-flex min-h-11 rounded-2xl px-5 text-sm">
+            {t('rsvp.off.cta')}
+          </Link>
+        ) : null}
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-5">

@@ -43,7 +43,20 @@ export interface RenderContext {
     language: string;
     timezone: string;
   };
-  couple?: { partnerOne: string; partnerTwo: string; brideName: string; groomName: string };
+  couple?: {
+    partnerOne: string;
+    partnerTwo: string;
+    brideName: string;
+    groomName: string;
+    /** Their parents, when the host named them (event details). */
+    partnerOneFather?: string;
+    partnerOneMother?: string;
+    partnerTwoFather?: string;
+    partnerTwoMother?: string;
+    /** Each partner's parents in one line: "Father & Mother". */
+    partnerOneParents?: string;
+    partnerTwoParents?: string;
+  };
   honoree?: { name: string };
   functions: FunctionContext[];
   /** The "current" function for per-function scenes/sections (defaults to the first). */
@@ -67,6 +80,29 @@ export interface RenderContext {
   assets?: Record<string, string>;
 }
 
+/** The couple's parents from the event details (ADR-068): each name, and each partner's parents as one line. */
+export function coupleParents(details: Record<string, unknown>): Partial<NonNullable<RenderContext['couple']>> {
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const out: Partial<NonNullable<RenderContext['couple']>> = {};
+  for (const side of ['partnerOne', 'partnerTwo'] as const) {
+    const father = str(details[`${side}Father`]);
+    const mother = str(details[`${side}Mother`]);
+    if (father) out[`${side}Father`] = father;
+    if (mother) out[`${side}Mother`] = mother;
+    const line = [father, mother].filter(Boolean).join(' & ');
+    if (line) out[`${side}Parents`] = line;
+  }
+  return out;
+}
+
+/** The templates' family text slots (custom.partnerOneParents / partnerTwoParents), filled from the parents. */
+function parentSlots(parents: Partial<NonNullable<RenderContext['couple']>>): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (parents.partnerOneParents) out.partnerOneParents = parents.partnerOneParents;
+  if (parents.partnerTwoParents) out.partnerTwoParents = parents.partnerTwoParents;
+  return out;
+}
+
 /** Build a RenderContext from plain event data (used by API and previews). */
 export function buildRenderContext(input: {
   event: RenderContext['event'];
@@ -87,9 +123,10 @@ export function buildRenderContext(input: {
   const p2 = str(d.partnerTwo);
   const honoree = str(d.name);
   const first = input.functions[0];
+  const parents = coupleParents(d);
   return {
     event: input.event,
-    ...(p1 && p2 ? { couple: { partnerOne: p1, partnerTwo: p2, brideName: p1, groomName: p2 } } : {}),
+    ...(p1 && p2 ? { couple: { partnerOne: p1, partnerTwo: p2, brideName: p1, groomName: p2, ...parents } } : {}),
     ...(honoree ? { honoree: { name: honoree } } : {}),
     functions: input.functions,
     ...(first ? { function: first } : {}),
@@ -98,7 +135,8 @@ export function buildRenderContext(input: {
     gallery: { images: input.gallery ?? [] },
     photos: input.photos ?? [],
     ...(input.photoSlots && Object.keys(input.photoSlots).length ? { photoSlots: input.photoSlots } : {}),
-    custom: input.custom ?? {},
+    // The parents' lines fill the templates' family slots unless the host wrote their own there.
+    custom: { ...(p1 && p2 ? parentSlots(parents) : {}), ...(input.custom ?? {}) },
     ...(input.announcements ? { announcements: input.announcements } : {}),
     ...(input.music ? { music: input.music } : {}),
     ...(input.assets && Object.keys(input.assets).length ? { assets: input.assets } : {}),

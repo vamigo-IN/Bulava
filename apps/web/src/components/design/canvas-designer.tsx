@@ -26,6 +26,7 @@ import {
   type Layer,
   type RenderContext,
   type SectionInstance,
+  type SectionKey,
   type TemplateDefinition,
   type ThemeColors,
 } from '@bulava/template-schema';
@@ -83,6 +84,10 @@ export interface CanvasDesignerProps {
   onUploaded: (photo: MediaItem) => void;
   language: string;
   watermark: boolean;
+  /** The free plan's mark across the whole invitation, in the preview (ADR-067). */
+  veil?: string;
+  /** Kinds of section guests won't see (no replies, no gallery): left out of the page here too. */
+  without?: readonly SectionKey[];
   dirty: boolean;
   saving: boolean;
   onSave: () => void;
@@ -212,7 +217,9 @@ export function CanvasDesigner(props: CanvasDesignerProps) {
   const photoUrls = useMemo(() => Object.fromEntries(photos.map((p) => [p.id, p.viewUrl])), [photos]);
   const ctxBase = useMemo((): RenderContext => (custom.custom ? { ...context, custom: { ...context.custom, ...custom.custom } } : context), [context, custom.custom]);
   const template = useMemo(() => new Map((definition.website?.pages[0]?.sections ?? []).map((s) => [s.id, s])), [definition]);
-  const parts = useMemo(() => partsOf(definition, custom, ctxBase), [definition, custom, ctxBase]);
+  // Sections guests won't see (no replies, no gallery) are not parts of the page here either.
+  const without = props.without;
+  const parts = useMemo(() => partsOf(definition, custom, ctxBase).filter((p) => p.kind !== 'template' || !without?.includes(p.section.section)), [definition, custom, ctxBase, without]);
   const hidden = useMemo(() => new Set(custom.hiddenSections ?? []), [custom.hiddenSections]);
   const sectionLabel = (s: SectionInstance) => t(`design.section.${s.section}` as MessageKey);
   const full = added.length >= ADDED_SECTIONS_MAX;
@@ -496,6 +503,7 @@ export function CanvasDesigner(props: CanvasDesignerProps) {
               context={context}
               custom={pageCustom}
               language={language}
+              without={props.without}
               byId={byId}
               parts={parts}
               hidden={hidden}
@@ -525,7 +533,7 @@ export function CanvasDesigner(props: CanvasDesignerProps) {
       }}
       renderPreview={() => (
         <FrameDocument width={PAGE_WIDTH.mobile} height={760} title={t('design.livePreview')}>
-          <TemplateRenderer definition={definition} context={context} customization={custom} mode="preview" language={language} slots={{ watermark: props.watermark }} />
+          <TemplateRenderer definition={definition} context={context} customization={custom} mode="preview" language={language} without={props.without} slots={{ watermark: props.watermark, veil: props.veil }} />
         </FrameDocument>
       )}
       framed={(side) => side === 'mobile'}
@@ -556,6 +564,7 @@ function PageFlow({
   context,
   custom,
   language,
+  without,
   byId,
   parts,
   hidden,
@@ -575,6 +584,7 @@ function PageFlow({
   context: RenderContext;
   custom: Customization;
   language: string;
+  without?: readonly SectionKey[];
   byId: Map<string, Part>;
   parts: Part[];
   hidden: Set<string>;
@@ -723,7 +733,7 @@ function PageFlow({
 
   return (
     <div className="min-h-[120px] bg-white" style={{ ['--bulava-screen' as string]: SCREEN[args.side] }}>
-      <TemplateRenderer definition={definition} context={context} customization={custom} mode="preview" language={language} wrapSection={wrap} />
+      <TemplateRenderer definition={definition} context={context} customization={custom} mode="preview" language={language} without={without} wrapSection={wrap} />
     </div>
   );
 }

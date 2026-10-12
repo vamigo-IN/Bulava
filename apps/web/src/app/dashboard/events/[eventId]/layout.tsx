@@ -79,9 +79,9 @@ const GROUPS: Array<{ label: MessageKey; tabs: Tab[] }> = [
   },
 ];
 
-/** The groups and sections this member's role can use (a photographer sees only Photos). */
+/** The groups and sections this member's role can use (a photographer sees only Photos); replies only while the host takes them (ADR-068). */
 function visibleGroups(event: EventSummary | undefined) {
-  return GROUPS.map((g) => ({ ...g, tabs: g.tabs.filter((tab) => canOpenSection(event, tab.href)) })).filter((g) => g.tabs.length);
+  return GROUPS.map((g) => ({ ...g, tabs: g.tabs.filter((tab) => canOpenSection(event, tab.href) && (tab.href !== '/rsvps' || event?.rsvpEnabled !== false)) })).filter((g) => g.tabs.length);
 }
 
 /** A status chip on the dark event header. */

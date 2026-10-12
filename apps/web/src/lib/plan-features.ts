@@ -32,13 +32,17 @@ export function planFeatureLines(plan: PlanFeatures, t: Translator): string[] {
   if (guests?.enabled) lines.push(guests.limit === null ? t('plan.feature.guests.unlimited') : t('plan.feature.guests.max', { limit: count(guests.limit) }));
   const tier = f.get('templates.maxTier');
   if (tier?.enabled) lines.push(t(`plan.feature.templates.${Math.min(2, tier.limit ?? 2) as 0 | 1 | 2}`));
+  // The photo gallery comes with the plan's gallery (ADR-067).
   const photos = f.get('media.photos.max');
-  if (photos?.enabled && photos.limit !== null) lines.push(t('plan.feature.photos', { limit: count(photos.limit) }));
+  if ((f.get('gallery.enabled')?.enabled ?? true) && photos?.enabled && photos.limit !== null && photos.limit > 0) lines.push(t('plan.feature.photos', { limit: count(photos.limit) }));
   if (f.get('rsvp.enabled')?.enabled ?? true) lines.push(t('plan.feature.rsvp'));
   const wm = f.get('branding.watermark');
   if (wm) lines.push(wm.enabled ? t('plan.feature.watermark') : t('plan.feature.noWatermark'));
   if (f.get('messaging.whatsapp.max')?.enabled) lines.push(t('plan.feature.whatsappInvites'));
-  if (f.get('link.custom')?.enabled || f.get('music.enabled')?.enabled) lines.push(t('plan.feature.customLink'));
+  const cards = f.get('cards.included');
+  if (cards?.enabled && (cards.limit === null || cards.limit > 0)) lines.push(cards.limit === null ? t('plan.feature.cards.unlimited') : t('plan.feature.cards', { limit: count(cards.limit) }));
+  if (f.get('music.enabled')?.enabled) lines.push(t('plan.feature.music'));
+  if (f.get('link.custom')?.enabled) lines.push(t('plan.feature.customLink'));
   if (f.get('service.doneForYou')?.enabled) lines.push(t('plan.feature.doneForYou'));
   if (f.get('support.priority')?.enabled) lines.push(t('plan.feature.prioritySupport'));
   if (f.get('planner.workspace')?.enabled) lines.push(t('plan.feature.planner'));
@@ -68,12 +72,19 @@ export function planCompareRows(plans: PlanFeatures[], t: Translator): CompareRo
     { label: t('pricing.compare.link'), values: plans.map((p) => (planFormats(p).link ? yes : no)) },
     { label: t('pricing.compare.pdf'), values: plans.map(() => yes) },
     { label: t('pricing.compare.video'), values: plans.map((p) => (planFormats(p).video ? yes : no)) },
-    { label: t('pricing.compare.designs'), values: maps.map((f) => ((f.get('templates.maxTier')?.limit ?? 0) >= 2 ? t('pricing.compare.allDesigns') : t('pricing.compare.standardDesigns'))) },
+    {
+      label: t('pricing.compare.designs'),
+      values: maps.map((f) => {
+        const tier = f.get('templates.maxTier')?.limit ?? 0;
+        return tier >= 2 ? t('pricing.compare.allDesigns') : tier === 1 ? t('pricing.compare.standardDesigns') : t('pricing.compare.freeDesigns');
+      }),
+    },
     { label: t('pricing.compare.branding'), values: maps.map((f) => (f.get('branding.watermark')?.enabled ? t('pricing.compare.mark') : t('pricing.compare.noMark'))) },
     { label: t('pricing.compare.celebrations'), values: limit('events.max') },
     { label: t('pricing.compare.functions'), values: limit('functions.max') },
     { label: t('pricing.compare.guests'), values: limit('guests.max') },
-    { label: t('pricing.compare.photos'), values: limit('media.photos.max') },
+    { label: t('pricing.compare.photos'), values: maps.map((f, i) => ((f.get('gallery.enabled')?.enabled ?? true) && (f.get('media.photos.max')?.limit ?? 1) !== 0 ? limit('media.photos.max')[i]! : no)) },
+    { label: t('pricing.compare.cards'), values: maps.map((f, i) => (f.get('cards.included')?.enabled ? limit('cards.included')[i]! : no)) },
     { label: t('pricing.compare.rsvp'), values: flag('rsvp.enabled', true) },
     { label: t('pricing.compare.whatsapp'), values: limit('messaging.whatsapp.max') },
     { label: t('pricing.compare.videos'), values: limit('video.renders.max') },

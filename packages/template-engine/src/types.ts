@@ -15,6 +15,8 @@ export interface RenderSlots {
   guestInfo?: ReactNode;
   /** Show the "Made with Bulava" mark (free plan). */
   watermark?: boolean;
+  /** The free plan's mark across the whole invitation: this text (the site's address) tiled over every section (ADR-067). */
+  veil?: string;
   /** Heading for the RSVP section when the host app puts something else there (e.g. registration). */
   rsvpHeading?: string;
 }

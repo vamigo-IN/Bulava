@@ -9,7 +9,7 @@ import type { MessageKey } from '@bulava/localization';
 import { apiDelete, apiPatch, apiPost } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { can } from '@/lib/permissions';
-import { useDesign, useEvent, useInvalidateEvent, useLanguages } from '@/lib/queries';
+import { useDesign, useEvent, useEventPlan, useEventTypes, useInvalidateEvent, useLanguages } from '@/lib/queries';
 import type { AccessMode, EventSummary } from '@/lib/types';
 import { AccessOptions } from '@/components/events/access-options';
 import { TeamCard } from '@/components/events/team-card';
@@ -50,6 +50,8 @@ export default function SettingsPage() {
       {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
 
       <GeneralCard event={e} run={run} />
+      <NamesCard event={e} run={run} />
+      <RepliesCard event={e} run={run} />
       <LinkCard event={e} run={run} />
 
       <Card className="space-y-4 rounded-3xl">
@@ -201,6 +203,87 @@ function GeneralCard({ event, run }: { event: EventSummary; run: Run }) {
       <Button className="rounded-2xl" disabled={!dirty || !title.trim()} onClick={() => run(() => apiPatch(`/events/${event.id}`, { title: title.trim(), language }), t('common.saved'))}>
         {t('common.save')}
       </Button>
+    </Card>
+  );
+}
+
+const PARENTS = ['partnerOneFather', 'partnerOneMother', 'partnerTwoFather', 'partnerTwoMother'] as const;
+
+/** The names the invitation shows (ADR-068): the couple and their parents, or the person celebrated; fixed here at any time. */
+function NamesCard({ event, run }: { event: EventSummary; run: Run }) {
+  const t = useT();
+  const types = useEventTypes();
+  const schema = types.data?.find((x) => x.key === event.typeKey)?.detailsSchemaKey;
+  const fields: readonly string[] = schema === 'couple' ? ['partnerOne', 'partnerTwo', ...PARENTS] : schema === 'honoree' ? ['name'] : [];
+  const fromEvent = () => Object.fromEntries(fields.map((k) => [k, event.details[k] ?? '']));
+  const [values, setValues] = useState<Record<string, string>>(fromEvent);
+  useEffect(() => {
+    setValues(fromEvent());
+    // The saved names, whenever they change (or the event type's fields arrive).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event.details, schema]);
+  if (!fields.length) return null;
+  const required = schema === 'couple' ? ['partnerOne', 'partnerTwo'] : ['name'];
+  const dirty = fields.some((k) => (values[k] ?? '').trim() !== (event.details[k] ?? ''));
+  const complete = required.every((k) => (values[k] ?? '').trim());
+  const label = (k: string) => {
+    if (k === 'partnerOne' || k === 'partnerTwo') return t(k === 'partnerOne' ? 'event.field.partnerOne' : 'event.field.partnerTwo');
+    if (k === 'name') return t('event.field.honoree');
+    const partner = (k.startsWith('partnerOne') ? values.partnerOne : values.partnerTwo)?.trim() || t(k.startsWith('partnerOne') ? 'create.preview.one' : 'create.preview.two');
+    return t(k.endsWith('Father') ? 'create.parents.father' : 'create.parents.mother', { name: partner });
+  };
+  const save = () => {
+    const details = Object.fromEntries(fields.flatMap((k) => ((values[k] ?? '').trim() ? [[k, values[k]!.trim()]] : [])));
+    return run(() => apiPatch(`/events/${event.id}`, { details }), t('common.saved'));
+  };
+  return (
+    <Card className="space-y-4 rounded-3xl">
+      <div>
+        <h3 className="font-display text-2xl">{t('settings.names')}</h3>
+        <p className="mt-1 text-sm text-stone-600">{schema === 'couple' ? t('settings.names.coupleBody') : t('settings.names.body')}</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {fields.map((k) => (
+          <Field key={k} label={label(k)}>
+            {(p) => <Input {...p} maxLength={120} autoComplete="off" value={values[k] ?? ''} onChange={(ev) => setValues({ ...values, [k]: ev.target.value })} />}
+          </Field>
+        ))}
+      </div>
+      <Button className="rounded-2xl" disabled={!dirty || !complete} onClick={() => void save()}>
+        {t('common.save')}
+      </Button>
+    </Card>
+  );
+}
+
+/** Whether guests reply on the invitation (ADR-068): the host's choice, while the plan has replies. */
+function RepliesCard({ event, run }: { event: EventSummary; run: Run }) {
+  const t = useT();
+  const plan = useEventPlan(event.id);
+  const inPlan = plan.data?.features['rsvp.enabled']?.enabled ?? true;
+  return (
+    <Card className="space-y-3 rounded-3xl">
+      <div>
+        <h3 className="font-display text-2xl">{t('publish.rsvp.title')}</h3>
+        <p className="mt-1 text-sm text-stone-600">{t('settings.rsvp.body')}</p>
+      </div>
+      <Checkbox
+        label={t('settings.rsvp.on')}
+        checked={event.rsvpEnabled && inPlan}
+        disabled={!inPlan}
+        onChange={(ev) => void run(() => apiPatch(`/events/${event.id}`, { rsvpEnabled: ev.target.checked }), ev.target.checked ? t('settings.rsvp.turnedOn') : t('settings.rsvp.turnedOff'))}
+      />
+      {!inPlan ? (
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-stone-600">
+          <LockKeyhole aria-hidden className="size-4 text-gold-600" />
+          {t('publish.rsvp.notInPlan')}
+          {can(event, 'payment.read') ? (
+            <Link href={`/dashboard/events/${event.id}/unlock`} className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4">
+              {t('unlock.cta')}
+            </Link>
+          ) : null}
+        </p>
+      ) : null}
     </Card>
   );
 }

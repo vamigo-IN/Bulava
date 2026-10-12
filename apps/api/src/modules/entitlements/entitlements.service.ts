@@ -51,6 +51,23 @@ export class EntitlementsService {
     }
   }
 
+  /**
+   * What an invitation shows (ADR-067, ADR-068): replies while the plan has them and the host takes them,
+   * the gallery and guests' photo sharing while the plan has a gallery, music while the plan has it, and
+   * the free plan's mark; `without` lists the kinds of section the page leaves out.
+   */
+  static invitation(features: Map<string, FeatureValue>, event: { rsvpEnabled: boolean }) {
+    const rsvp = (features.get(FEATURE_KEYS.RSVP)?.enabled ?? true) && event.rsvpEnabled;
+    const gallery = features.get(FEATURE_KEYS.GALLERY)?.enabled ?? true;
+    return {
+      rsvp,
+      gallery,
+      music: features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true,
+      watermark: EntitlementsService.enabled(features, FEATURE_KEYS.WATERMARK),
+      without: [...(rsvp ? [] : ['rsvp' as const]), ...(gallery ? [] : ['gallery' as const, 'photoShare' as const])],
+    };
+  }
+
   /** Serializable summary for the dashboard. */
   static summary(features: Map<string, FeatureValue>) {
     return Object.fromEntries([...features].map(([k, v]) => [k, { enabled: v.enabled, limit: v.limit, source: v.source }]));

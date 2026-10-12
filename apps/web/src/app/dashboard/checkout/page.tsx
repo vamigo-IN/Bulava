@@ -11,6 +11,7 @@ import { errorMessage, useT } from '@/lib/i18n';
 import { addOnLine, planFeatureLines } from '@/lib/plan-features';
 import { moreKeys, useAccountPlan, useMe } from '@/lib/queries';
 import { track } from '@/lib/track';
+import { OfferPrice } from '@/components/ui/offer-price';
 import { Alert, Button, Input, Spinner } from '@/components/ui/primitives';
 
 const inr = (minor: number, currency = 'INR') => new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: minor % 100 ? 2 : 0 }).format(minor / 100);
@@ -24,6 +25,8 @@ interface PlanCard {
   tagline: string | null;
   stackable: boolean;
   priceMinor: number;
+  /** The usual price, struck through beside the offer price (ADR-067). */
+  listPriceMinor?: number | null;
   currency: string;
   features: Array<{ featureKey: string; enabled: boolean; limit: number | null }>;
 }
@@ -262,7 +265,7 @@ function Checkout() {
             <h2 id="checkout-plan" className="font-display text-3xl">
               {plan.name}
             </h2>
-            <p className="font-display text-3xl">{inr(plan.priceMinor, plan.currency)}</p>
+            <OfferPrice size="md" priceMinor={plan.priceMinor} listPriceMinor={plan.listPriceMinor} currency={plan.currency} t={t} />
           </div>
           {plan.tagline ? <p className="mt-0.5 text-sm font-semibold text-brand-700">{plan.tagline}</p> : null}
           <p className="mt-0.5 text-sm text-stone-500">{plan.interval === 'YEAR' ? t('checkout.yearly') : t('checkout.oneTime')}</p>

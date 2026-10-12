@@ -83,6 +83,8 @@ export interface Plan {
   name: string;
   description: string | null;
   priceMinor: number;
+  /** The usual price, shown struck through beside the offer price (ADR-067); null: no offer. */
+  listPriceMinor?: number | null;
   currency: string;
   interval: 'ONE_TIME' | 'YEAR';
   /** A tier (the account's plan) or an add-on bought on top of one (ADR-062). */

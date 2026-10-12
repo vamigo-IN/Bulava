@@ -17,6 +17,12 @@ interface PublicEventView {
   template: { key: string; definition: TemplateDefinition; customization: Customization | null };
   context: RenderContext;
   watermark: boolean;
+  /** The free plan's mark across the whole invitation (the site's address; ADR-067). */
+  veil?: string | null;
+  /** Whether guests can reply (the plan's replies and the host's choice; ADR-068). */
+  rsvp?: boolean;
+  /** Kinds of section the page leaves out (no replies, no gallery). */
+  without?: Array<'rsvp' | 'gallery' | 'photoShare'>;
   registration: PublicRegistrationInfo | null;
 }
 
@@ -101,9 +107,10 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
         language={data.event.language}
         mode="live"
         introKey={`e-${data.event.slug}`}
-        slots={{ watermark: data.watermark, rsvp: registration, rsvpHeading: registration ? tr('register.title') : undefined }}
+        without={data.without}
+        slots={{ watermark: data.watermark, veil: data.veil ?? undefined, rsvp: registration, rsvpHeading: registration ? tr('register.title') : undefined }}
       />
-      {registration && !hasRsvpSection ? (
+      {registration && !hasRsvpSection && data.rsvp !== false ? (
         // Templates without an RSVP section still get the form, after the invitation.
         <section className="bg-stone-50 px-6 py-14">
           <h2 className="mb-6 text-center font-display text-3xl">{tr('register.title')}</h2>

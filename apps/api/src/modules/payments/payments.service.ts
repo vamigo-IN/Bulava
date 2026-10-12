@@ -6,6 +6,7 @@ import { SettingsStore } from '@bulava/settings';
 import { ADDON_MAX_QUANTITY, FEATURE_KEYS, type CreateOrderInput, type OrderQuoteInput, type PlanOfferInput, type VerifyPaymentInput } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
+import { galleryPhotosWhere } from '../media/album.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import type { AuthUser, EventAccessContext } from '../../common/request-context';
@@ -63,7 +64,7 @@ const ORDER_SOURCES = ['ORDER', ADDON_SOURCE];
 /** Services the team carries out after a purchase: the inbox hears about them. */
 const SERVICES = new Set<string>([FEATURE_KEYS.DONE_FOR_YOU, FEATURE_KEYS.RUSH]);
 
-const planLine = (plan: PricingPlan) => ({ key: plan.key, name: plan.name, priceMinor: plan.priceMinor, interval: plan.interval, tagline: plan.tagline });
+const planLine = (plan: PricingPlan) => ({ key: plan.key, name: plan.name, priceMinor: plan.priceMinor, listPriceMinor: plan.listPriceMinor, interval: plan.interval, tagline: plan.tagline });
 
 const planCard = (plan: PlanWithFeatures) => ({
   key: plan.key,
@@ -74,6 +75,8 @@ const planCard = (plan: PlanWithFeatures) => ({
   tagline: plan.tagline,
   stackable: plan.stackable,
   priceMinor: plan.priceMinor,
+  /** The usual price, struck through beside the offer price (ADR-067). */
+  listPriceMinor: plan.listPriceMinor,
   currency: plan.currency,
   features: plan.features.map((f) => ({ featureKey: f.featureKey, enabled: f.enabled, limit: f.limit })),
 });
@@ -396,7 +399,7 @@ export class PaymentsService {
       // Counted as the limits count them: functions guests see (with a date), photos kept, films made or on the way.
       this.prisma.eventFunction.count({ where: { eventId, deletedAt: null, startsAt: { not: null } } }),
       this.prisma.guest.count({ where: { eventId, deletedAt: null } }),
-      this.prisma.mediaItem.count({ where: { eventId, status: { notIn: ['DELETED', 'REJECTED'] } } }),
+      this.prisma.mediaItem.count({ where: galleryPhotosWhere(eventId) }),
       this.prisma.videoJob.count({ where: { eventId, status: { in: ['QUEUED', 'PROCESSING', 'COMPLETED'] } } }),
       whatsappMessagesUsed(this.prisma, eventId),
     ]);

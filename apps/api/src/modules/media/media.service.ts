@@ -16,7 +16,7 @@ import { AuditService } from '../audit/audit.service';
 import { AudienceService, type EventAudienceFacts, type GuestAudienceFacts } from '../audience/audience.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { InvitationTokenService } from '../invitations/invitation-token.service';
-import { AlbumService, DESIGN_ROOM_SLUG, downloadPolicy, orderAlbums, suggestedAlbumId } from './album.service';
+import { AlbumService, DESIGN_PHOTOS_MAX, DESIGN_ROOM_SLUG, designPhotosWhere, downloadPolicy, galleryPhotosWhere, orderAlbums, suggestedAlbumId } from './album.service';
 
 /** A photo the host uploads straight into their design (cover, portraits…). */
 export const DesignUploadSchema = z.object({
@@ -222,7 +222,7 @@ export class MediaService {
     if (!album) throw new AppError('INVALID_REFERENCE', 'Choose one of this event’s albums.');
 
     const features = await this.entitlements.forEvent(room.eventId);
-    const used = await this.prisma.mediaItem.count({ where: { eventId: room.eventId, status: { notIn: ['DELETED', 'REJECTED'] } } });
+    const used = await this.prisma.mediaItem.count({ where: galleryPhotosWhere(room.eventId) });
     EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.PHOTOS_MAX, used);
 
     const item = await this.prisma.mediaItem.create({
@@ -259,16 +259,14 @@ export class MediaService {
 
   /**
    * Upload a photo from the design panel: a signed PUT to object storage for an
-   * image only, counted against the plan's photo limit. The worker verifies and
+   * image only, held to DESIGN_PHOTOS_MAX on every plan (the plan's photo limit is the gallery's). The worker verifies and
    * processes it like any upload; it is approved automatically (the host placed it).
    */
   async requestDesignUpload(access: EventAccessContext, input: DesignUploadInput) {
     const type = ALLOWED_UPLOAD_TYPES[input.contentType];
     if (!type || type.kind !== 'image') throw new AppError('UPLOAD_REJECTED', 'Only photos can be used in a design.');
     if (input.sizeBytes > type.maxBytes) throw new AppError('UPLOAD_REJECTED', `Files must be under ${Math.round(type.maxBytes / 1024 / 1024)} MB.`);
-    const features = await this.entitlements.forEvent(access.eventId);
-    const used = await this.prisma.mediaItem.count({ where: { eventId: access.eventId, status: { notIn: ['DELETED', 'REJECTED'] } } });
-    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.PHOTOS_MAX, used);
+    await this.assertPhotoRoom(access);
     const room = await this.designRoom(access.eventId);
     const item = await this.prisma.mediaItem.create({
       data: {
@@ -305,11 +303,13 @@ export class MediaService {
     return { status: 'PROCESSING' as const };
   }
 
-  /** Room in the plan for one more photo (design photos count like any upload). */
+  /**
+   * Room for one more of the design's own photos (an upload or a stock image placed in the template):
+   * every plan, the free one included, has DESIGN_PHOTOS_MAX of them; the plan's photo limit is the gallery's (ADR-067).
+   */
   async assertPhotoRoom(access: EventAccessContext): Promise<void> {
-    const features = await this.entitlements.forEvent(access.eventId);
-    const used = await this.prisma.mediaItem.count({ where: { eventId: access.eventId, status: { notIn: ['DELETED', 'REJECTED'] } } });
-    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.PHOTOS_MAX, used);
+    const used = await this.prisma.mediaItem.count({ where: designPhotosWhere(access.eventId) });
+    if (used >= DESIGN_PHOTOS_MAX) throw new AppError('UPLOAD_REJECTED', `A design holds up to ${DESIGN_PHOTOS_MAX} photos. Remove one you no longer use.`);
   }
 
   /**

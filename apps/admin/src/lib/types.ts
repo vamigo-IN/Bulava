@@ -183,6 +183,8 @@ export interface Plan {
   name: string;
   description: string | null;
   priceMinor: number;
+  /** The usual price shown struck through beside the price (an offer, ADR-067); null: no offer. */
+  listPriceMinor: number | null;
   currency: string;
   interval: string;
   active: boolean;

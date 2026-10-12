@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { authorizedFunctions, validateInvitationToken } from '@bulava/auth';
 import type { Prisma, RSVPQuestionType } from '@bulava/database';
-import { FEATURE_KEYS, type GuestTravelSelfInput, type RSVPSubmitInput } from '@bulava/validation';
+import type { GuestTravelSelfInput, RSVPSubmitInput } from '@bulava/validation';
 import type { Customization, RenderContext, TemplateDefinition } from '@bulava/template-schema';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
@@ -65,7 +65,7 @@ export interface GuestInvitationView {
   /** Event-level RSVP, used when the invitation covers no specific functions. */
   eventRsvp: { status: string; attendeeCount: number; respondedAt: Date } | null;
   eventRsvpOpen: boolean;
-  /** Whether the invitation takes replies at all (the host's plan; ADR-062). */
+  /** Whether the invitation takes replies at all (the host's plan and choice; ADR-062, ADR-068). */
   rsvp: boolean;
   message: string | null;
   /** Website template chosen by the host (or the free default) and its render context. */
@@ -73,6 +73,10 @@ export interface GuestInvitationView {
   context: RenderContext;
   /** Show the "Made with Bulava" mark (free plan). */
   watermark: boolean;
+  /** The free plan's mark across the whole invitation: the site's address (ADR-067). */
+  veil: string | null;
+  /** Kinds of section the invitation leaves out (no replies, no gallery). */
+  without: Array<'rsvp' | 'gallery' | 'photoShare'>;
   /** Photo rooms this guest may upload to / view. */
   mediaRooms: Array<{ name: string; code: string; uploadsEnabled: boolean; canViewGallery: boolean }>;
   /** Code for the guest check-in QR (event day). */
@@ -133,8 +137,8 @@ export class GuestInvitationService {
   async submitRsvp(token: string, input: RSVPSubmitInput, meta: RequestMeta, otpPass?: string): Promise<GuestInvitationView> {
     const ctx = await this.resolve(token, otpPass);
     if (ctx.event.status !== 'ACTIVE') throw new AppError('FUNCTION_CLOSED', 'RSVP is closed for this event.');
-    // Online replies come with the host's plan (ADR-062); on unless a plan says otherwise.
-    if (!((await this.entitlements.forEvent(ctx.event.id)).get(FEATURE_KEYS.RSVP)?.enabled ?? true)) {
+    // Online replies come with the host's plan (ADR-062) and their choice to take them (ADR-068).
+    if (!EntitlementsService.invitation(await this.entitlements.forEvent(ctx.event.id), ctx.event).rsvp) {
       throw new AppError('RSVP_NOT_TAKEN', 'This invitation does not take replies online. Please reply to your host directly.');
     }
 
@@ -399,11 +403,12 @@ export class GuestInvitationService {
       ctx.functions.map((f) => f.id),
     );
     const seatByFunction = new Map(seats.map((s) => [s.functionId, { tableLabel: s.tableLabel, seatLabel: s.seatLabel }]));
-    // Replies and music come with the host's plan (ADR-062); on unless a plan says otherwise.
-    const repliesTaken = features.get(FEATURE_KEYS.RSVP)?.enabled ?? true;
+    // Replies, the gallery and music come with the host's plan (ADR-062, ADR-067); replies also with their choice (ADR-068).
+    const show = EntitlementsService.invitation(features, ctx.event);
+    const repliesTaken = show.rsvp;
     const [{ photos, photoSlots }, music] = await Promise.all([
       this.media.templatePhotos(ctx.event.id, template?.customization),
-      (features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true) ? this.renderContext.resolveMusic(template) : Promise.resolve(null),
+      show.music ? this.renderContext.resolveMusic(template) : Promise.resolve(null),
     ]);
     const context = await this.renderContext.build({
       event: ctx.event,
@@ -411,7 +416,7 @@ export class GuestInvitationService {
       guestName: ctx.guest.name,
       customization: template?.customization,
       announcements,
-      gallery,
+      gallery: show.gallery ? gallery : [],
       photos,
       photoSlots,
       language,
@@ -465,8 +470,11 @@ export class GuestInvitationService {
       message: rsvps.find((r) => r.message)?.message ?? null,
       template: template ? { key: template.templateKey, definition: template.definition, customization: template.customization } : null,
       context,
-      watermark: EntitlementsService.enabled(features, FEATURE_KEYS.WATERMARK),
-      mediaRooms,
+      watermark: show.watermark,
+      veil: show.watermark ? this.renderContext.siteAddress() : null,
+      without: show.without,
+      // Guests' photo sharing comes with the gallery.
+      mediaRooms: show.gallery ? mediaRooms : [],
       checkInCode,
       logistics,
     };

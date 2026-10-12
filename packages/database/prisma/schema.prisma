@@ -266,6 +266,9 @@ model Event {
   collectGuestTravel Boolean     @default(false)
   /// Guests get a QR entry pass on their invitation, scanned at the entrance. Off unless the host turns it on.
   entryPasses        Boolean     @default(false)
+  /// The host collects replies (RSVP) on the invitation (ADR-068). Off: the invitation has no RSVP section or
+  /// buttons, guests cannot reply and the dashboard hides replies. The plan must also allow it (rsvp.enabled).
+  rsvpEnabled        Boolean     @default(true)
   /// The host's shareable preview link (/preview/<token>): the invitation with a watermark,
   /// before the event is published and whatever its access mode. Unguessable, replaceable.
   previewToken       String      @unique
@@ -1348,29 +1351,32 @@ model QRCode {
 // ───────────────────────────── Commerce ─────────────────────────────
 
 model PricingPlan {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  key         String   @unique
-  name        String
-  description String?
-  priceMinor  Int
-  currency    String   @default("INR")
-  interval    String   @default("ONE_TIME")
-  active      Boolean  @default(true)
-  sortOrder   Int      @default(0)
+  id             String   @id @default(uuid(7)) @db.Uuid
+  key            String   @unique
+  name           String
+  description    String?
+  priceMinor     Int
+  /// The usual price (MRP) shown struck through beside `priceMinor`, the offer price, with the saving (ADR-067).
+  /// Null: no offer, the price is just the price. Never below `priceMinor`.
+  listPriceMinor Int?
+  currency       String   @default("INR")
+  interval       String   @default("ONE_TIME")
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
   /// PLAN (a tier: the account's plan) or ADDON (one thing more, bought on top of a plan; ADR-062).
-  kind        String   @default("PLAN")
+  kind           String   @default("PLAN")
   /// PUBLIC (on the plans page) or HIDDEN (only through an offer link, or granted by staff).
-  visibility  String   @default("PUBLIC")
+  visibility     String   @default("PUBLIC")
   /// A short ribbon on the plan card ("Most popular").
-  badge       String?
+  badge          String?
   /// What sets the plan apart, in a few words ("+ MP4 video").
-  tagline     String?
+  tagline        String?
   /// An add-on that can be bought more than once (each one adds its limits again).
-  stackable   Boolean  @default(false)
+  stackable      Boolean  @default(false)
   /// The plans an add-on is offered to (keys); empty: every paid plan.
-  offeredTo   String[] @default([])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  offeredTo      String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   features PlanFeature[]
   orders   Order[]

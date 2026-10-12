@@ -14,6 +14,7 @@ import type { ObjectStorage } from '@bulava/storage';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { STORAGE } from '../../infrastructure/storage/storage.module';
 import { SETTINGS_STORE } from '../settings/settings.service';
+import { APP_CONFIG, type AppConfig } from '../../config/env';
 
 type FunctionWithVenue = Prisma.EventFunctionGetPayload<{ include: { venue: true } }>;
 
@@ -41,7 +42,13 @@ export class RenderContextService {
     private readonly prisma: PrismaService,
     @Inject(STORAGE) private readonly storage: ObjectStorage,
     @Inject(SETTINGS_STORE) private readonly settings: SettingsStore,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
+
+  /** The site's address, as the free plan's mark across an invitation shows it (ADR-067). */
+  siteAddress(): string {
+    return new URL(this.config.WEB_ORIGIN).hostname.replace(/^www\./, '');
+  }
 
   /**
    * Website background music: the host's choice (validated against the template's
