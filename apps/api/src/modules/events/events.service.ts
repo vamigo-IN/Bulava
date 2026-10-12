@@ -294,11 +294,37 @@ export class EventsService {
     const eventId = event.id;
     await assertVerifiedAccount(this.prisma, userId);
     if (counted) await this.assertPublishAllowance(event.ownerId, eventId);
-    const selection = await this.prisma.eventTemplateSelection.findUnique({
-      where: { eventId_output: { eventId, output: 'WEBSITE' } },
-      include: { templateVersion: { include: { template: { select: { tier: true } } } } },
-    });
-    if (selection) EntitlementsService.assertTemplateTier(await this.entitlements.forEvent(eventId), selection.templateVersion.template.tier);
+    const [selection, features, functions, guests] = await Promise.all([
+      this.prisma.eventTemplateSelection.findUnique({
+        where: { eventId_output: { eventId, output: 'WEBSITE' } },
+        include: { templateVersion: { include: { template: { select: { tier: true } } } } },
+      }),
+      this.entitlements.forEvent(eventId),
+      // Functions without a date are placeholders guests never see (a new wedding starts with six).
+      this.prisma.eventFunction.count({ where: { eventId, deletedAt: null, startsAt: { not: null } } }),
+      this.prisma.guest.count({ where: { eventId, deletedAt: null } }),
+    ]);
+    if (selection) EntitlementsService.assertTemplateTier(features, selection.templateVersion.template.tier);
+    // Drafts may hold more than the plan; guests see an event within it (ADR-062: one more function is an add-on away).
+    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.FUNCTIONS_MAX, functions, 0);
+    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.GUESTS_MAX, guests, 0);
+  }
+
+  /**
+   * The invitation's own link (ADR-062, plans with a custom link): /e/<slug>.
+   * The old link becomes an alias that keeps opening the invitation, and no
+   * link, old or new, is ever given to another event. Taking back one of the
+   * event's own old links works.
+   */
+  private async changeLink(tx: Prisma.TransactionClient, event: { id: string; slug: string }, slug: string, access: EventAccessContext, meta: RequestMeta): Promise<void> {
+    const [taken, alias] = await Promise.all([
+      tx.event.findFirst({ where: { slug, id: { not: event.id } }, select: { id: true } }),
+      tx.eventSlugAlias.findUnique({ where: { slug } }),
+    ]);
+    if (taken || (alias && alias.eventId !== event.id)) throw new AppError('SLUG_TAKEN', 'This link is taken. Try another.');
+    if (alias) await tx.eventSlugAlias.delete({ where: { slug } });
+    await tx.eventSlugAlias.upsert({ where: { slug: event.slug }, create: { slug: event.slug, eventId: event.id }, update: {} });
+    await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'event.link_changed', targetType: 'Event', targetId: event.id, eventId: event.id, metadata: { from: event.slug, to: slug }, meta }, tx);
   }
 
   /** A new preview link; the old one stops working at once. */
@@ -331,6 +357,14 @@ export class EventsService {
     if (input.language && !isSupportedLanguage(input.language)) {
       throw new AppError('UNSUPPORTED_LANGUAGE', 'Unsupported language.');
     }
+    const newLink = input.slug && input.slug !== event.slug ? input.slug : null;
+    if (newLink) {
+      // The link is the owner's plan's to give (it is bought by the account that owns the event).
+      if (!access.permissions.includes('billing.manage')) throw AppError.forbidden('Only the event’s owner can change its link.');
+      if (!EntitlementsService.enabled(await this.entitlements.forEvent(event.id), FEATURE_KEYS.CUSTOM_LINK)) {
+        throw new AppError('PLAN_UPGRADE_REQUIRED', 'Choosing your own link comes with a bigger plan.', { feature: FEATURE_KEYS.CUSTOM_LINK });
+      }
+    }
     let details: Prisma.InputJsonValue | undefined;
     if (input.details) {
       const parsed = validateEventDetails(event.type.detailsSchemaKey, input.details);
@@ -339,6 +373,7 @@ export class EventsService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      if (newLink) await this.changeLink(tx, event, newLink, access, meta);
       if (input.requireOtp !== undefined && input.requireOtp !== event.accessPolicy.requireOtp) {
         await tx.accessPolicy.update({ where: { id: event.accessPolicyId }, data: { requireOtp: input.requireOtp } });
         await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'event.otp_policy_changed', targetType: 'Event', targetId: event.id, eventId: event.id, metadata: { requireOtp: input.requireOtp }, meta }, tx);
@@ -397,6 +432,7 @@ export class EventsService {
           visibility: input.visibility,
           status: input.status,
           details,
+          ...(newLink ? { slug: newLink } : {}),
         },
         include: eventInclude,
       });

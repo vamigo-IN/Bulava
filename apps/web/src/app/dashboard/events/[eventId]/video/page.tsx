@@ -3,8 +3,8 @@
 import { Lock, MousePointer2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { backdropArt, backdropTitleTop } from '@bulava/template-engine';
 import type { MessageKey } from '@bulava/localization';
 import type { Customization } from '@bulava/template-schema';
@@ -19,6 +19,7 @@ import { PhotosPanel, StylePanel } from '@/components/design/design-panels';
 import { FilmDesigner } from '@/components/design/film-designer';
 import { ScenePoster } from '@/components/design/scene-poster';
 import { FilmPosterView } from '@/components/marketing/live-template';
+import { readFilmDraft, writeFilmDraft } from '@/lib/design-drafts';
 import { isCanvasFilm } from '@/lib/films';
 import { Alert, Badge, Button, Card, EmptyState, Spinner } from '@/components/ui/primitives';
 
@@ -26,28 +27,19 @@ const Preview = dynamic(() => import('@/components/events/video-preview').then((
 
 const TIER_RANK = { FREE: 0, STANDARD: 1, PREMIUM: 2 } as const;
 
-/** A film's design is kept on this device until the video is made (and after), so canvas work survives a refresh. */
-const draftKey = (eventId: string, key: string) => `bulava.film.${eventId}.${key}`;
-function readDraft(eventId: string, key: string): Customization | null {
-  try {
-    const raw = localStorage.getItem(draftKey(eventId, key));
-    return raw ? (JSON.parse(raw) as Customization) : null;
-  } catch {
-    return null;
-  }
-}
-function writeDraft(eventId: string, key: string, custom: Customization) {
-  try {
-    if (Object.keys(custom).length) localStorage.setItem(draftKey(eventId, key), JSON.stringify(custom));
-    else localStorage.removeItem(draftKey(eventId, key));
-  } catch {
-    // Private windows and full storage: the design stays for this visit.
-  }
+export default function VideoPage() {
+  return (
+    <Suspense>
+      <VideoEditor />
+    </Suspense>
+  );
 }
 
-export default function VideoPage() {
+function VideoEditor() {
   const t = useT();
   const { eventId } = useParams<{ eventId: string }>();
+  // ?template=: the film the design page sent here (ADR-063), opened with the design made there.
+  const wanted = useSearchParams().get('template');
   const event = useEvent(eventId);
   const design = useDesign(eventId);
   const eventType = event.data?.typeKey ?? 'WEDDING';
@@ -72,16 +64,23 @@ export default function VideoPage() {
   const firstKey = videos.data?.[0]?.key ?? cards.data?.[0]?.key ?? null;
   const choiceKey = selected?.key ?? firstKey;
 
+  // The film asked for, once the catalog is here.
+  useEffect(() => {
+    if (!wanted || selected) return;
+    const found = [...(videos.data ?? []), ...(cards.data ?? [])].find((x) => x.key === wanted);
+    if (found) setSelected(found);
+  }, [wanted, selected, videos.data, cards.data]);
+
   // A film opens with its design from this device, else with the photo carried over from the last one.
   useEffect(() => {
     if (!choiceKey || draftFor === choiceKey) return;
     setDraftFor(choiceKey);
-    const draft = readDraft(eventId, choiceKey);
+    const draft = readFilmDraft(eventId, choiceKey);
     setCustom((c) => draft ?? (c.photoSlots ? { photoSlots: c.photoSlots } : {}));
   }, [choiceKey, draftFor, eventId]);
   useEffect(() => {
     if (!choiceKey || draftFor !== choiceKey) return;
-    const id = setTimeout(() => writeDraft(eventId, choiceKey, custom), 400);
+    const id = setTimeout(() => writeFilmDraft(eventId, choiceKey, custom), 400);
     return () => clearTimeout(id);
   }, [custom, choiceKey, draftFor, eventId]);
 
@@ -185,14 +184,26 @@ export default function VideoPage() {
         {choice?.definition ? (
           <Card className="space-y-4 rounded-3xl xl:sticky xl:top-24 xl:self-start">
             <h3 className="font-display text-2xl">{choice.name}</h3>
-            <div className="mx-auto overflow-hidden rounded-[1.6rem] border-[6px] border-ink" style={{ width: 'min(100%, 270px)', aspectRatio: choice.outputs.includes('VIDEO') ? '9 / 16' : '4 / 5' }}>
+            {/* The film at the size the host chose on the canvas (tall, square or wide). */}
+            <div
+              className="mx-auto overflow-hidden rounded-[1.6rem] border-[6px] border-ink"
+              style={
+                choice.outputs.includes('VIDEO')
+                  ? custom.filmFormat === 'wide'
+                    ? { width: '100%', aspectRatio: '16 / 9' }
+                    : custom.filmFormat === 'square'
+                      ? { width: 'min(100%, 360px)', aspectRatio: '1 / 1' }
+                      : { width: 'min(100%, 270px)', aspectRatio: '9 / 16' }
+                  : { width: 'min(100%, 270px)', aspectRatio: '4 / 5' }
+              }
+            >
               <Preview definition={choice.definition} context={context} customization={custom} />
             </div>
             {design.data.watermark ? <p className="text-xs text-stone-500">{t('video.watermark')}</p> : null}
             {choice.outputs.includes('VIDEO') && editable?.layout ? (
               <button type="button" onClick={() => setDesigning(true)} className="btn-3d btn-3d-light min-h-11 w-full gap-2 rounded-2xl text-sm">
                 <MousePointer2 aria-hidden className="size-4" />
-                {custom.scenes ? t('film.canvas.continue') : t('film.canvas.open')}
+                {custom.scenes || custom.addedScenes || custom.filmFormat ? t('film.canvas.continue') : t('film.canvas.open')}
               </button>
             ) : null}
             {tabs.length ? (

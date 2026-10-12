@@ -67,70 +67,142 @@ interface PlanSeed {
   priceMinor: number;
   interval: 'ONE_TIME' | 'YEAR';
   sortOrder: number;
+  /** A tier (the account's plan) or an add-on bought on top of one (ADR-062). */
+  kind?: 'PLAN' | 'ADDON';
+  /** Hidden plans are sold only through an offer link (or granted by staff). */
+  visibility?: 'PUBLIC' | 'HIDDEN';
+  badge?: string;
+  tagline?: string;
+  stackable?: boolean;
+  /** The plans an add-on is offered to; empty: every paid plan. */
+  offeredTo?: string[];
   features: Array<{ featureKey: string; enabled: boolean; limit?: number | null }>;
 }
 
 const F = FEATURE_KEYS;
 
-/** Initial plans. Prices and limits are editable by admins; code never reads them from here at runtime. */
+/** A tier's features, in the order the plans page reads them. */
+function tier(o: {
+  functions: number | null;
+  guests: number | null;
+  designs: 1 | 2;
+  photos: number;
+  renders: number;
+  watermark: boolean;
+  whatsapp: number;
+  rsvp: boolean;
+  premium: boolean;
+  doneForYou?: boolean;
+}): PlanSeed['features'] {
+  return [
+    { featureKey: F.EVENTS_MAX, enabled: true, limit: 1 },
+    { featureKey: F.FUNCTIONS_MAX, enabled: true, limit: o.functions },
+    { featureKey: F.GUESTS_MAX, enabled: true, limit: o.guests },
+    { featureKey: F.TEMPLATES_MAX_TIER, enabled: true, limit: o.designs },
+    { featureKey: F.PHOTOS_MAX, enabled: true, limit: o.photos },
+    { featureKey: F.VIDEO_RENDERS_MAX, enabled: o.renders > 0, limit: o.renders },
+    { featureKey: F.VIDEO_HD, enabled: o.renders > 0 },
+    { featureKey: F.WATERMARK, enabled: o.watermark },
+    { featureKey: F.CUSTOM_DOMAIN, enabled: o.premium },
+    { featureKey: F.WHATSAPP_MESSAGES, enabled: o.whatsapp > 0, limit: o.whatsapp },
+    { featureKey: F.RSVP, enabled: o.rsvp },
+    { featureKey: F.MUSIC, enabled: o.premium },
+    { featureKey: F.CUSTOM_LINK, enabled: o.premium },
+    ...(o.doneForYou ? [{ featureKey: F.DONE_FOR_YOU, enabled: true }, { featureKey: F.PRIORITY_SUPPORT, enabled: true }] : []),
+  ];
+}
+
+/**
+ * Initial plans and add-ons: one-time tiers, each for one celebration, and
+ * add-ons on top (ADR-062). Prices and limits are editable by admins; code
+ * never reads them from here at runtime.
+ */
 const PLANS: PlanSeed[] = [
   {
     key: 'FREE',
     name: 'Free',
-    description: 'Everything you need to invite and track RSVPs for one event.',
+    description: 'Design and preview your invitation, video and cards as much as you like. Choose a plan to publish and download.',
     priceMinor: 0,
     interval: 'ONE_TIME',
     sortOrder: 0,
     features: [
-      { featureKey: F.EVENTS_MAX, enabled: true, limit: 1 },
+      { featureKey: F.EVENTS_MAX, enabled: true, limit: 0 },
       { featureKey: F.FUNCTIONS_MAX, enabled: true, limit: 6 },
       { featureKey: F.GUESTS_MAX, enabled: true, limit: 100 },
       { featureKey: F.TEMPLATES_MAX_TIER, enabled: true, limit: 0 },
       { featureKey: F.PHOTOS_MAX, enabled: true, limit: 50 },
-      { featureKey: F.VIDEO_RENDERS_MAX, enabled: true, limit: 1 },
+      { featureKey: F.VIDEO_RENDERS_MAX, enabled: false, limit: 0 },
       { featureKey: F.VIDEO_HD, enabled: false },
       { featureKey: F.WATERMARK, enabled: true },
       { featureKey: F.CUSTOM_DOMAIN, enabled: false },
       { featureKey: F.WHATSAPP_MESSAGES, enabled: false },
+      // On in the baseline so invitations published for free before plans were one-time keep working.
+      { featureKey: F.RSVP, enabled: true },
+      { featureKey: F.MUSIC, enabled: true },
+      { featureKey: F.CUSTOM_LINK, enabled: false },
     ],
+  },
+  {
+    key: 'LITE',
+    name: 'Lite',
+    description: 'Your invitation live and as a PDF, with a small Bulava mark: two functions and 100 guests.',
+    priceMinor: 15900,
+    interval: 'ONE_TIME',
+    sortOrder: 1,
+    visibility: 'HIDDEN',
+    tagline: 'Start small',
+    features: tier({ functions: 2, guests: 100, designs: 1, photos: 100, renders: 0, watermark: true, whatsapp: 0, rsvp: false, premium: false }),
+  },
+  {
+    key: 'STARTER',
+    name: 'Starter',
+    description: 'A clean invitation without branding, live and as a PDF: five functions and 250 guests.',
+    priceMinor: 29900,
+    interval: 'ONE_TIME',
+    sortOrder: 2,
+    tagline: 'No branding',
+    features: tier({ functions: 5, guests: 250, designs: 1, photos: 250, renders: 0, watermark: false, whatsapp: 150, rsvp: true, premium: false }),
   },
   {
     key: 'STANDARD',
     name: 'Standard',
-    description: 'Standard templates, more guests and no watermark, for a one-time payment.',
-    priceMinor: 99900,
+    description: 'Up to 8 functions and 500 guests, RSVP for each function, no branding.',
+    priceMinor: 59900,
     interval: 'ONE_TIME',
-    sortOrder: 1,
-    features: [
-      { featureKey: F.FUNCTIONS_MAX, enabled: true, limit: 10 },
-      { featureKey: F.GUESTS_MAX, enabled: true, limit: 500 },
-      { featureKey: F.TEMPLATES_MAX_TIER, enabled: true, limit: 1 },
-      { featureKey: F.PHOTOS_MAX, enabled: true, limit: 500 },
-      { featureKey: F.VIDEO_RENDERS_MAX, enabled: true, limit: 3 },
-      { featureKey: F.VIDEO_HD, enabled: true },
-      { featureKey: F.WATERMARK, enabled: false },
-      { featureKey: F.CUSTOM_DOMAIN, enabled: false },
-      { featureKey: F.WHATSAPP_MESSAGES, enabled: true, limit: 300 },
-    ],
+    sortOrder: 3,
+    tagline: 'Guest RSVP',
+    features: tier({ functions: 8, guests: 500, designs: 1, photos: 500, renders: 0, watermark: false, whatsapp: 300, rsvp: true, premium: false }),
   },
   {
     key: 'PREMIUM',
     name: 'Premium',
-    description: 'Any template, unlimited functions and guests, video invites and a large photo gallery.',
+    description: 'The shareable MP4 video, premium designs, your own link and music, 12 functions and 1,000 guests.',
+    priceMinor: 99900,
+    interval: 'ONE_TIME',
+    sortOrder: 4,
+    badge: 'Most popular',
+    tagline: '+ MP4 video',
+    features: tier({ functions: 12, guests: 1000, designs: 2, photos: 1000, renders: 5, watermark: false, whatsapp: 700, rsvp: true, premium: true }),
+  },
+  {
+    key: 'ULTIMATE',
+    name: 'Ultimate',
+    description: 'Everything for one big wedding: unlimited functions and guests, every design and a 5,000-photo gallery.',
+    priceMinor: 199900,
+    interval: 'ONE_TIME',
+    sortOrder: 5,
+    tagline: 'All designs',
+    features: tier({ functions: null, guests: null, designs: 2, photos: 5000, renders: 10, watermark: false, whatsapp: 1500, rsvp: true, premium: true }),
+  },
+  {
+    key: 'GRAND',
+    name: 'Grand',
+    description: 'We set it up for you: everything in Ultimate, our team building your invitation, and priority support.',
     priceMinor: 299900,
     interval: 'ONE_TIME',
-    sortOrder: 2,
-    features: [
-      { featureKey: F.FUNCTIONS_MAX, enabled: true, limit: null },
-      { featureKey: F.GUESTS_MAX, enabled: true, limit: null },
-      { featureKey: F.TEMPLATES_MAX_TIER, enabled: true, limit: 2 },
-      { featureKey: F.PHOTOS_MAX, enabled: true, limit: 5000 },
-      { featureKey: F.VIDEO_RENDERS_MAX, enabled: true, limit: 10 },
-      { featureKey: F.VIDEO_HD, enabled: true },
-      { featureKey: F.WATERMARK, enabled: false },
-      { featureKey: F.CUSTOM_DOMAIN, enabled: true },
-      { featureKey: F.WHATSAPP_MESSAGES, enabled: true, limit: 1000 },
-    ],
+    sortOrder: 6,
+    tagline: 'Done-for-you',
+    features: tier({ functions: null, guests: null, designs: 2, photos: 5000, renders: 20, watermark: false, whatsapp: 3000, rsvp: true, premium: true, doneForYou: true }),
   },
   {
     key: 'STUDIO',
@@ -138,7 +210,8 @@ const PLANS: PlanSeed[] = [
     description: 'For planners, photographers and designers managing many client events.',
     priceMinor: 599900,
     interval: 'YEAR',
-    sortOrder: 3,
+    sortOrder: 9,
+    visibility: 'HIDDEN',
     features: [
       { featureKey: F.EVENTS_MAX, enabled: true, limit: 50 },
       { featureKey: F.FUNCTIONS_MAX, enabled: true, limit: null },
@@ -151,7 +224,91 @@ const PLANS: PlanSeed[] = [
       { featureKey: F.PLANNER, enabled: true },
       { featureKey: F.CUSTOM_DOMAIN, enabled: true },
       { featureKey: F.WHATSAPP_MESSAGES, enabled: true, limit: 1000 },
+      { featureKey: F.RSVP, enabled: true },
+      { featureKey: F.MUSIC, enabled: true },
+      { featureKey: F.CUSTOM_LINK, enabled: true },
     ],
+  },
+  // Add-ons: one thing more for a plan, without buying the next one. A limit adds to the plan's.
+  {
+    key: 'ADDON_VIDEO',
+    name: 'MP4 video invite',
+    description: 'A video your family can forward on WhatsApp, made from your invitation.',
+    priceMinor: 30000,
+    interval: 'ONE_TIME',
+    sortOrder: 20,
+    kind: 'ADDON',
+    offeredTo: ['LITE', 'STARTER', 'STANDARD'],
+    features: [
+      { featureKey: F.VIDEO_RENDERS_MAX, enabled: true, limit: 5 },
+      { featureKey: F.VIDEO_HD, enabled: true },
+    ],
+  },
+  {
+    key: 'ADDON_NO_MARK',
+    name: 'Remove the Bulava mark',
+    description: 'Your invitation, video and cards without the small Bulava mark.',
+    priceMinor: 14900,
+    interval: 'ONE_TIME',
+    sortOrder: 21,
+    kind: 'ADDON',
+    offeredTo: ['LITE'],
+    features: [{ featureKey: F.WATERMARK, enabled: false }],
+  },
+  {
+    key: 'ADDON_FUNCTION',
+    name: 'One more function',
+    description: 'Room for another function (a haldi, a sangeet, a reception…) on your invitation.',
+    priceMinor: 19900,
+    interval: 'ONE_TIME',
+    sortOrder: 22,
+    kind: 'ADDON',
+    stackable: true,
+    offeredTo: ['LITE', 'STARTER', 'STANDARD', 'PREMIUM'],
+    features: [{ featureKey: F.FUNCTIONS_MAX, enabled: true, limit: 1 }],
+  },
+  {
+    key: 'ADDON_EVENT',
+    name: 'One more celebration',
+    description: 'Publish another event (a sibling’s wedding, a birthday) with everything your plan includes.',
+    priceMinor: 19900,
+    interval: 'ONE_TIME',
+    sortOrder: 23,
+    kind: 'ADDON',
+    stackable: true,
+    features: [{ featureKey: F.EVENTS_MAX, enabled: true, limit: 1 }],
+  },
+  {
+    key: 'ADDON_PHOTOS',
+    name: '1,000 more guest photos',
+    description: 'A bigger photo gallery for everything your guests share.',
+    priceMinor: 14900,
+    interval: 'ONE_TIME',
+    sortOrder: 24,
+    kind: 'ADDON',
+    stackable: true,
+    features: [{ featureKey: F.PHOTOS_MAX, enabled: true, limit: 1000 }],
+  },
+  {
+    key: 'ADDON_DONE_FOR_YOU',
+    name: 'Done-for-you setup',
+    description: 'Our team sets up your invitation, functions and guest list with you.',
+    priceMinor: 49900,
+    interval: 'ONE_TIME',
+    sortOrder: 25,
+    kind: 'ADDON',
+    offeredTo: ['LITE', 'STARTER', 'STANDARD', 'PREMIUM', 'ULTIMATE'],
+    features: [{ featureKey: F.DONE_FOR_YOU, enabled: true }],
+  },
+  {
+    key: 'ADDON_RUSH',
+    name: 'Same-day delivery',
+    description: 'What our team makes for you, delivered the same day.',
+    priceMinor: 19900,
+    interval: 'ONE_TIME',
+    sortOrder: 26,
+    kind: 'ADDON',
+    features: [{ featureKey: F.RUSH, enabled: true }],
   },
 ];
 
@@ -190,6 +347,12 @@ export async function seedReferenceData(prisma: PrismaClient): Promise<void> {
           priceMinor: plan.priceMinor,
           interval: plan.interval,
           sortOrder: plan.sortOrder,
+          kind: plan.kind ?? 'PLAN',
+          visibility: plan.visibility ?? 'PUBLIC',
+          badge: plan.badge ?? null,
+          tagline: plan.tagline ?? null,
+          stackable: plan.stackable ?? false,
+          offeredTo: plan.offeredTo ?? [],
           features: { create: plan.features.map((f) => ({ featureKey: f.featureKey, enabled: f.enabled, limit: f.limit ?? null })) },
         },
       });

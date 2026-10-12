@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, FileLock2, KeyRound, Mail, Phone, ReceiptIndianRupee, ShieldCheck, ShieldAlert, UserRound, type LucideIcon } from 'lucide-react';
+import { Check, Crown, FileLock2, KeyRound, Mail, Phone, ReceiptIndianRupee, ShieldCheck, ShieldAlert, UserRound, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 const NAV: Array<{ href: string; label: MessageKey; hint: MessageKey; icon: LucideIcon; exact?: boolean }> = [
   { href: '/dashboard/account', label: 'account.nav.profile', hint: 'account.nav.profile.hint', icon: UserRound, exact: true },
   { href: '/dashboard/account/security', label: 'account.nav.security', hint: 'account.nav.security.hint', icon: ShieldCheck },
+  { href: '/dashboard/plan', label: 'account.nav.plan', hint: 'account.nav.plan.hint', icon: Crown },
   { href: '/dashboard/payments', label: 'account.nav.payments', hint: 'account.nav.payments.hint', icon: ReceiptIndianRupee },
   { href: '/dashboard/account/privacy', label: 'account.nav.privacy', hint: 'account.nav.privacy.hint', icon: FileLock2 },
 ];

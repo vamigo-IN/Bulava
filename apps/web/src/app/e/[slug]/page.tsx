@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { cache } from 'react';
 import { createTranslator } from '@bulava/localization';
 import { TemplateRenderer } from '@bulava/template-engine';
@@ -20,8 +20,11 @@ interface PublicEventView {
   registration: PublicRegistrationInfo | null;
 }
 
-/** `hadKey`: the visitor brought a secret link's key (so a refusal means that link no longer works). */
-type Result = { ok: true; data: PublicEventView } | { ok: false; code: string; hadKey: boolean };
+/**
+ * `hadKey`: the visitor brought a secret link's key (so a refusal means that link no longer works).
+ * `moved`: the host chose a new link for the invitation (ADR-062); the old one leads to it.
+ */
+type Result = { ok: true; data: PublicEventView } | { ok: false; code: string; hadKey: boolean; linkKey?: string; moved?: string };
 
 const load = cache(async (slug: string): Promise<Result> => {
   const jar = await cookies();
@@ -34,9 +37,10 @@ const load = cache(async (slug: string): Promise<Result> => {
       cache: 'no-store',
       headers: { accept: 'application/json', ...(pass ? { 'x-bulava-pin-pass': pass } : {}), ...(linkKey ? { 'x-bulava-link-key': linkKey } : {}) },
     });
-    const body = (await res.json().catch(() => null)) as { success: true; data: PublicEventView } | { success: false; error: { code: string } } | null;
+    const body = (await res.json().catch(() => null)) as { success: true; data: PublicEventView } | { success: false; error: { code: string; details?: { slug?: unknown } } } | null;
     if (body?.success) return { ok: true, data: body.data };
-    return { ok: false, code: body && !body.success ? body.error.code : 'INTERNAL_ERROR', hadKey: !!linkKey };
+    const moved = body && !body.success && body.error.code === 'EVENT_MOVED' && typeof body.error.details?.slug === 'string' ? body.error.details.slug : undefined;
+    return { ok: false, code: body && !body.success ? body.error.code : 'INTERNAL_ERROR', hadKey: !!linkKey, linkKey, moved };
   } catch {
     return { ok: false, code: 'INTERNAL_ERROR', hadKey: !!linkKey };
   }
@@ -65,6 +69,8 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
   const result = await load(slug);
   const t = createTranslator('en');
   if (!result.ok) {
+    // The old link of an invitation whose host chose a new one: the key of a secret link comes along.
+    if (result.moved && /^[a-z0-9-]{1,80}$/.test(result.moved)) permanentRedirect(`/e/${result.moved}${result.linkKey ? `?k=${encodeURIComponent(result.linkKey)}` : ''}`);
     if (result.code === 'PIN_REQUIRED') return <PinGate slug={slug} />;
     if (result.code === 'INVITATION_REQUIRED' || result.code === 'EVENT_LINK_EXPIRED') {
       // Expired secret link; a secret link that was replaced (or mistyped); or no way in at all.

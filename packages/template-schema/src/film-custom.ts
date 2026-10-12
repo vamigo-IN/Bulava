@@ -156,3 +156,95 @@ export function fittingSceneCustomization(definition: Pick<TemplateDefinition, '
   }
   return Object.keys(kept).length ? kept : undefined;
 }
+
+// ─────────────────────────── Scenes the host adds, and the film's size ───────────────────────────
+
+/**
+ * The film's size (ADR-061): 9:16 for statuses and phones (as designed),
+ * square for posts, wide for screens. Scenes stay designed at 9:16: in the
+ * other sizes their art and particles fill the frame, and the words, photos
+ * and decorations stay together in the middle, as they were designed.
+ */
+export const FILM_FORMATS = ['story', 'square', 'wide'] as const;
+export type FilmFormat = (typeof FILM_FORMATS)[number];
+export const FILM_FORMAT_SIZE: Record<FilmFormat, { width: number; height: number }> = {
+  story: { width: 1080, height: 1920 },
+  square: { width: 1080, height: 1080 },
+  wide: { width: 1920, height: 1080 },
+};
+
+/** Scenes a host may add to a film, how long each plays, and how long a film may run with them (one function). */
+export const ADDED_SCENES_MAX = 8;
+export const ADDED_SCENE_SECONDS = { min: 2, max: 10, default: 4 } as const;
+export const FILM_MAX_SECONDS = 180;
+
+/**
+ * A scene the host added to their film (ADR-061), after one of its scenes
+ * (`after`; empty: at the end), designed on a 9:16 board. It plays over the
+ * look of the scene before it (its illustrated backdrop, particles and
+ * background), so the film stays one piece; a board with its own background
+ * covers that.
+ */
+export const AddedSceneSchema = z.object({
+  id: z.string().regex(/^my-[a-z0-9]{1,24}$/),
+  after: z.string().max(64),
+  board: ArtboardSchema,
+  durationSec: z.number().min(ADDED_SCENE_SECONDS.min).max(ADDED_SCENE_SECONDS.max).default(ADDED_SCENE_SECONDS.default),
+  /** Played once per function, with function.* bound to each. */
+  perFunction: z.boolean().optional(),
+});
+export type AddedScene = z.infer<typeof AddedSceneSchema>;
+export const AddedScenesSchema = z.array(AddedSceneSchema).max(ADDED_SCENES_MAX);
+
+/** An added scene as the film plays it: the host's board over the look of the scene it follows. */
+export function addedSceneOf(added: AddedScene, follows: Scene | undefined): Scene {
+  return {
+    id: added.id,
+    durationSec: added.durationSec,
+    background: follows?.background ?? 'background',
+    transition: 'fade',
+    repeatPerFunction: added.perFunction ?? false,
+    ...(follows?.backdrop ? { backdrop: follows.backdrop } : {}),
+    particles: follows?.particles ?? 'none',
+    canvas: { board: added.board, stagger: 0.14, camera: 'still', intensity: 0 },
+    elements: [],
+  };
+}
+
+/** The scene an added scene plays after (the last scene when its place is gone or was never named). */
+export function sceneBefore(definition: Pick<TemplateDefinition, 'scenes'>, added: Pick<AddedScene, 'after'>): Scene | undefined {
+  const scenes = definition.scenes ?? [];
+  return scenes.find((s) => s.id === added.after) ?? scenes[scenes.length - 1];
+}
+
+/**
+ * The film as the host designed it: their redrawn scenes in place of the
+ * film's own (where they fit), and the scenes they added, each after the scene
+ * it names (at the end when that scene is gone or none is named).
+ */
+export function withFilmCustomization<D extends Pick<TemplateDefinition, 'scenes'>>(
+  definition: D,
+  custom: { scenes?: SceneCustomization | null; addedScenes?: readonly AddedScene[] | null } | null | undefined,
+): D {
+  const redrawn = withSceneCustomization(definition, custom?.scenes);
+  const added = custom?.addedScenes;
+  if (!added?.length || !redrawn.scenes?.length) return redrawn;
+  const scenes = redrawn.scenes;
+  const ids = new Set(scenes.map((s) => s.id));
+  const out: Scene[] = [];
+  for (const scene of scenes) {
+    out.push(scene);
+    for (const a of added) if (a.after === scene.id) out.push(addedSceneOf(a, scene));
+  }
+  const last = scenes[scenes.length - 1];
+  for (const a of added) if (!a.after || !ids.has(a.after)) out.push(addedSceneOf(a, last));
+  return { ...redrawn, scenes: out };
+}
+
+/** Added scenes re-anchored to this film: a scene that is gone means at the end; boards at another size are dropped. */
+export function fittingAddedScenes(definition: Pick<TemplateDefinition, 'scenes'>, added: readonly AddedScene[] | undefined | null): AddedScene[] | undefined {
+  if (!added?.length) return undefined;
+  const ids = new Set((definition.scenes ?? []).map((s) => s.id));
+  const kept = added.filter((a) => a.board.width === FILM_BOARD.width && a.board.height === FILM_BOARD.height).map((a) => (a.after && !ids.has(a.after) ? { ...a, after: '' } : a));
+  return kept.length ? kept : undefined;
+}

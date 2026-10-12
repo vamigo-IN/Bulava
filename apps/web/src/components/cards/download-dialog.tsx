@@ -53,6 +53,8 @@ export function DownloadDialog({
 }) {
   const { design, t, config, template } = editor;
   const plan = config?.account?.planDownload ? config.account : null;
+  // The watermarked card: for anyone while free downloads are on, else with any paid plan (ADR-062).
+  const freeOffered = Boolean(config?.freeDownloads || config?.account?.paidPlan);
   const [step, setStep] = useState<Step>(plan ? { kind: 'starting' } : paidOrder ? { kind: 'order', orderToken: paidOrder.orderToken } : { kind: 'choose' });
   const [phone, setPhone] = useState(config?.account?.phone ?? '');
   const [offers, setOffers] = useState(false);
@@ -263,17 +265,32 @@ export function DownloadDialog({
           {/* Phones: one small preview above the two choices, so both fit on the screen. */}
           <div className="sm:hidden">{preview(true, 'mx-auto w-24')}</div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <OptionCard
-              title={t('cards.download.freeTitle')}
-              price={t('cards.download.freePrice')}
-              points={[t('cards.download.freePoint1'), t('cards.download.freePoint2'), t('cards.download.freePoint3')]}
-              preview={preview(true, 'mx-auto hidden w-28 sm:block')}
-              action={
-                <button type="button" onClick={() => setStep({ kind: 'free' })} className={cn('btn-3d btn-3d-light min-h-12 w-full justify-center rounded-xl text-sm', ACCENT)}>
-                  {t('cards.download.freeButton')}
-                </button>
-              }
-            />
+            {freeOffered ? (
+              <OptionCard
+                title={config?.freeDownloads ? t('cards.download.freeTitle') : t('cards.download.markTitle')}
+                price={config?.freeDownloads ? t('cards.download.freePrice') : t('cards.download.markPrice')}
+                points={[t('cards.download.freePoint1'), t('cards.download.freePoint2'), t('cards.download.freePoint3')]}
+                preview={preview(true, 'mx-auto hidden w-28 sm:block')}
+                action={
+                  <button type="button" onClick={() => setStep({ kind: 'free' })} className={cn('btn-3d btn-3d-light min-h-12 w-full justify-center rounded-xl text-sm', ACCENT)}>
+                    {t('cards.download.freeButton')}
+                  </button>
+                }
+              />
+            ) : (
+              // Downloads come with a plan: the invitation, the card as a PDF and more, paid once.
+              <OptionCard
+                title={t('cards.download.withPlanTitle')}
+                price={t('cards.download.withPlanPrice', { price: formatRupees(config?.planFromMinor ?? 0) })}
+                points={[t('cards.download.withPlanPoint1'), t('cards.download.withPlanPoint2'), t('cards.download.withPlanPoint3')]}
+                preview={preview(false, 'mx-auto hidden w-28 sm:block')}
+                action={
+                  <Link href="/pricing" className={cn('btn-3d btn-3d-light min-h-12 w-full justify-center rounded-xl text-sm', ACCENT)}>
+                    {t('cards.download.withPlanButton')}
+                  </Link>
+                }
+              />
+            )}
             <OptionCard
               highlight
               title={t('cards.download.paidTitle')}

@@ -1,13 +1,15 @@
 'use client';
 
-import { Download } from 'lucide-react';
+import { Download, LockKeyhole } from 'lucide-react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { MessageKey } from '@bulava/localization';
 import { apiDelete, apiPatch, apiPost } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
-import { useEvent, useInvalidateEvent, useLanguages } from '@/lib/queries';
+import { can } from '@/lib/permissions';
+import { useDesign, useEvent, useInvalidateEvent, useLanguages } from '@/lib/queries';
 import type { AccessMode, EventSummary } from '@/lib/types';
 import { AccessOptions } from '@/components/events/access-options';
 import { TeamCard } from '@/components/events/team-card';
@@ -48,6 +50,7 @@ export default function SettingsPage() {
       {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
 
       <GeneralCard event={e} run={run} />
+      <LinkCard event={e} run={run} />
 
       <Card className="space-y-4 rounded-3xl">
         <div>
@@ -221,5 +224,75 @@ function AccessCard({ event, run }: { event: EventSummary; run: Run }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+const LINK_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * The invitation's own link (ADR-062): plans with a custom link let the owner
+ * choose /e/<their-name>; the old link keeps opening the invitation. Others see
+ * what unlocks it, or who can.
+ */
+function LinkCard({ event, run }: { event: EventSummary; run: (fn: () => Promise<unknown>, success?: string) => Promise<void> }) {
+  const t = useT();
+  const design = useDesign(event.id);
+  const [name, setName] = useState(event.slug);
+  useEffect(() => setName(event.slug), [event.slug]);
+  const owner = can(event, 'billing.manage');
+  const included = design.data?.entitlements['link.custom']?.enabled ?? false;
+  const valid = name.length >= 4 && name.length <= 60 && LINK_NAME.test(name);
+  return (
+    <Card className="space-y-3 rounded-3xl">
+      <div>
+        <h3 className="font-display text-2xl">{t('settings.link.title')}</h3>
+        <p className="mt-1 text-sm text-stone-600">{t('settings.link.hint')}</p>
+      </div>
+      {owner && included ? (
+        <form
+          className="space-y-2"
+          onSubmit={(ev) => {
+            ev.preventDefault();
+            if (valid && name !== event.slug) void run(() => apiPatch(`/events/${event.id}`, { slug: name }), t('settings.link.saved'));
+          }}
+        >
+          <Field label={t('settings.link.label')} hint={valid || !name ? t('settings.link.rules') : t('settings.link.invalid')}>
+            {(p) => (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-stone-500">/e/</span>
+                <Input
+                  {...p}
+                  className="max-w-72 min-w-0 flex-1"
+                  value={name}
+                  maxLength={60}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  onChange={(ev) => setName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-{2,}/g, '-'))}
+                  aria-invalid={name && !valid ? true : undefined}
+                />
+                <Button type="submit" className="rounded-full" disabled={!valid || name === event.slug}>
+                  {t('common.save')}
+                </Button>
+              </div>
+            )}
+          </Field>
+          <p className="text-xs text-stone-500">{t('settings.link.oldKeeps')}</p>
+        </form>
+      ) : (
+        <div className="flex items-start gap-3 rounded-2xl bg-sand/60 p-4 text-sm">
+          <LockKeyhole aria-hidden className="mt-0.5 size-4 shrink-0 text-brand-700" />
+          <p className="text-stone-700">
+            {t('settings.link.current', { link: `/e/${event.slug}` })}{' '}
+            {owner ? (
+              <Link href={`/dashboard/events/${event.id}/unlock`} className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4">
+                {t('settings.link.unlock')}
+              </Link>
+            ) : (
+              t('upgrade.ownerOnly.short')
+            )}
+          </p>
+        </div>
+      )}
+    </Card>
   );
 }

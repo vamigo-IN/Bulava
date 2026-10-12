@@ -2,6 +2,7 @@ export * from './definition';
 export * from './canvas';
 export * from './canvas-custom';
 export * from './film-custom';
+export * from './section-boards';
 export * from './context';
 export * from './bindings';
 export * from './validate';

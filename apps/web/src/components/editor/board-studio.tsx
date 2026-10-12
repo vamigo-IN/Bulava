@@ -31,16 +31,21 @@ export interface StudioTarget {
   /** What the host calls it: "Opening", "Function card", "Section 3". */
   label: string;
   sides: readonly StudioSide[];
-  /** The board as the design draws it now. */
-  board: (side: StudioSide) => Artboard;
+  /** The board as the design draws it now (none: a part of the design shown as it is, see `view`). */
+  board?: (side: StudioSide) => Artboard;
   /** The data its layers read (a per-function section or scene reads the first function). */
   ctx: RenderContext;
+  /**
+   * A part of the design that is not a board here (a website template's own
+   * section): drawn as the design draws it, `width` design units wide in a
+   * `height` tall screen, with what can be done with it beside it.
+   */
+  view?: { width: number; height: number; render: () => ReactNode; aside: (controls: StudioControls) => ReactNode };
 }
 
-/** What a panel gets: the board editor the inspector uses, and the studio's own state. */
-export interface StudioApi {
-  editor: BoardEditorApi;
-  target: StudioTarget;
+/** The studio's own state, for every target (a board or a view). */
+export interface StudioControls {
+  target: StudioTarget | null;
   side: StudioSide;
   custom: Customization;
   /** A change to the whole customization, as one undo step. */
@@ -48,11 +53,17 @@ export interface StudioApi {
   selectTarget: (id: string) => void;
 }
 
+/** What a panel gets while a board is on the stage: the board editor the inspector uses, and the studio's own state. */
+export interface StudioApi extends StudioControls {
+  editor: BoardEditorApi;
+  target: StudioTarget;
+}
+
 export interface StudioPanel {
   key: string;
   label: string;
   icon: ReactNode;
-  render: (api: StudioApi | null) => ReactNode;
+  render: (api: StudioApi | null, controls: StudioControls) => ReactNode;
 }
 
 export interface BoardStudioProps {
@@ -79,9 +90,10 @@ export interface BoardStudioProps {
   /** Draw the phone around this side's board (on big screens). */
   framed: (side: StudioSide) => boolean;
   photoUrls: Record<string, string>;
-  uploadPhoto: (file: File) => Promise<string>;
+  /** Without one (the design page, before signing in), adding a photo says how to get there. */
+  uploadPhoto?: (file: File) => Promise<string>;
   /** Buttons before the theme switch (Restore). */
-  actions?: (api: StudioApi | null) => ReactNode;
+  actions?: (api: StudioApi | null, controls: StudioControls) => ReactNode;
   primary: { label: string; onClick: () => void; disabled?: boolean; busy?: boolean };
   onClose: () => void;
 }
@@ -217,7 +229,8 @@ export function BoardStudio(props: BoardStudioProps) {
   }, [history, setCustom]);
 
   // ── The board on the stage, as a design the shared panels and inspector understand ──
-  const board = target?.board(side) ?? null;
+  const board = target?.board?.(side) ?? null;
+  const view = board ? null : (target?.view ?? null);
   const photoMap = useMemo(() => photosOf(custom), [custom]);
   const design: BoardDesign | null = useMemo(() => (board ? { board, colors, fonts, language, photos: photoMap } : null), [board, colors, fonts, language, photoMap]);
   const designRef = useRef(design);
@@ -264,6 +277,10 @@ export function BoardStudio(props: BoardStudioProps) {
   const { uploadPhoto: upload } = props;
   const uploadPhoto = useCallback(
     async (file: File): Promise<string | null> => {
+      if (!upload) {
+        setToast(t('studio.photos.signIn'));
+        return null;
+      }
       if (!PHOTO_TYPES.includes(file.type)) {
         setToast(t('cards.photos.type'));
         return null;
@@ -304,7 +321,8 @@ export function BoardStudio(props: BoardStudioProps) {
     design && ctx
       ? { kind: props.kind, design, t, cardT: designT, ctx, selectedId, select, change, changeLayer, addLayer, removeLayer, uploadPhoto, uploading, photoUrls: props.photoUrls, focusText }
       : null;
-  const api: StudioApi | null = editor && target ? { editor, target, side, custom, commit, selectTarget } : null;
+  const controls: StudioControls = { target: target ?? null, side, custom, commit, selectTarget };
+  const api: StudioApi | null = editor && target ? { ...controls, editor, target } : null;
 
   // ── Layout ──
   const stageBox = useRef<HTMLDivElement>(null);
@@ -317,8 +335,8 @@ export function BoardStudio(props: BoardStudioProps) {
     return () => observer.disconnect();
   }, []);
   const framed = desktop && props.framed(side);
-  const W = board?.width ?? 390;
-  const H = board?.height ?? 844;
+  const W = board?.width ?? view?.width ?? 390;
+  const H = board?.height ?? view?.height ?? 844;
   // The phone around a board takes about 26 px a side and 72 px of height.
   const fit = Math.max(0.1, Math.min((box.w - (desktop ? 64 : 24) - (framed ? 26 : 0)) / W, (box.h - (desktop ? 168 : 40) - (framed ? 72 : 0)) / H, 2));
   const [zoomMode, setZoomMode] = useState<'fit' | number>('fit');
@@ -416,7 +434,7 @@ export function BoardStudio(props: BoardStudioProps) {
           <IconButton label={t('cards.editor.redo')} onClick={redo} disabled={!history.canRedo} tone="plain">
             <Redo2 aria-hidden className="size-5" />
           </IconButton>
-          {desktop ? props.actions?.(api) : null}
+          {desktop ? props.actions?.(api, controls) : null}
           <ThemeToggle theme={theme} onChange={setTheme} labels={{ dark: t('editor.theme.dark'), light: t('editor.theme.light') }} />
           <IconButton label={previewing ? t('design.canvas.edit') : t('design.canvas.preview')} onClick={() => setPreviewing((v) => !v)} active={previewing} tone="plain">
             {previewing ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
@@ -447,7 +465,7 @@ export function BoardStudio(props: BoardStudioProps) {
             </nav>
             <div className="min-w-0 flex-1 overflow-y-auto p-4 [scrollbar-width:thin]">
               <h2 className="mb-4 font-display text-xl">{current?.label}</h2>
-              {current?.render(api)}
+              {current?.render(api, controls)}
             </div>
           </aside>
         ) : null}
@@ -488,12 +506,30 @@ export function BoardStudio(props: BoardStudioProps) {
                   </DeviceFrame>
                   {desktop || sheet ? null : <p className="editor-chrome max-w-sm text-center text-xs text-stone-500">{props.labels.hint}</p>}
                 </div>
+              ) : view && target ? (
+                <div className="flex flex-col items-center gap-3">
+                  <DeviceFrame show={framed}>
+                    {/* The part as the design draws it, scrolled like a phone; `zoom` scales its layout, so its height follows. */}
+                    <div
+                      className="overflow-y-auto overscroll-contain bg-white [scrollbar-width:thin]"
+                      style={{ width: Math.round(W * zoom), height: Math.round(H * zoom) }}
+                      tabIndex={0}
+                      role="region"
+                      aria-label={target.label}
+                    >
+                      <div className="pointer-events-none" style={{ width: W, zoom }}>
+                        {view.render()}
+                      </div>
+                    </div>
+                  </DeviceFrame>
+                  {desktop ? null : <div className="editor-chrome w-full max-w-sm">{view.aside(controls)}</div>}
+                </div>
               ) : (
                 <div className="editor-chrome clay max-w-sm rounded-2xl p-6 text-center text-sm leading-relaxed text-stone-600">{props.labels.empty}</div>
               )}
             </div>
           </main>
-          {desktop && !previewing && board ? (
+          {desktop && !previewing && (board || view) ? (
             <CanvasToolbar
               className="absolute bottom-5 left-1/2 z-10 -translate-x-1/2"
               zoom={zoom}
@@ -507,7 +543,7 @@ export function BoardStudio(props: BoardStudioProps) {
 
         {desktop ? (
           <aside className="editor-chrome w-[20rem] shrink-0 overflow-y-auto border-l border-[var(--ed-line)] bg-[var(--ed-panel)] p-4 text-ink [scrollbar-width:thin]" aria-label={t('cards.editor.inspector')}>
-            {editor ? <LayerInspector editor={editor} /> : null}
+            {editor ? <LayerInspector editor={editor} /> : view ? view.aside(controls) : null}
           </aside>
         ) : null}
 
@@ -539,7 +575,7 @@ export function BoardStudio(props: BoardStudioProps) {
                 </button>
               </div>
             </div>
-            {sheetFolded ? null : sheet === 'panel' ? current?.render(api) : editor ? <LayerInspector editor={editor} onClose={() => select(null)} /> : null}
+            {sheetFolded ? null : sheet === 'panel' ? current?.render(api, controls) : editor ? <LayerInspector editor={editor} onClose={() => select(null)} /> : null}
           </section>
         ) : null}
       </div>

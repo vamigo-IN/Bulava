@@ -1,6 +1,7 @@
 import type { ArtboardInput, LayerInput } from '@bulava/template-schema';
 import { palette, TITLE } from './builder';
 import { CARD_SPECS } from './canvas-cards';
+import { BLANK_SPEC } from './blank';
 import { at, b, canvasWebsite, eyebrows, t, text, type CanvasSpec } from './canvas-kit';
 import { FACTORY_SPECS } from './factory/collection';
 import { LOOKALIKES } from './lookalikes';
@@ -258,5 +259,5 @@ export function foldLookalikes(specs: CanvasSpec[], lookalikes: Readonly<Record<
     });
 }
 
-/** Sort after the standard website templates (index.ts passes the offset). */
-export const canvasTemplates = (offset: number) => foldLookalikes([...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]).map((spec, i) => canvasWebsite(spec, offset + i));
+/** Sort after the standard website templates (index.ts passes the offset); the blank canvas comes last, so no other template moves. */
+export const canvasTemplates = (offset: number) => [...foldLookalikes([...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]), BLANK_SPEC].map((spec, i) => canvasWebsite(spec, offset + i));

@@ -5,6 +5,7 @@ export { seedSitePages, SITE_PAGES, type SeedSitePage } from './site-pages';
 export { seedPlatformAdmin, type PlatformAdminSeed, type PlatformAdminSeedResult } from './admin-seed';
 export { loadEventAudienceFacts, loadGuestAudienceFacts, type EventAudienceFacts, type GuestAudienceFacts } from './audience-facts';
 export {
+  ADDON_SOURCE,
   featureLimit,
   loadEventFeatures,
   loadUserFeatures,
@@ -12,6 +13,7 @@ export {
   moreGenerous,
   whatsappMessagesLeft,
   whatsappMessagesUsed,
+  withAddOns,
   type FeatureValue,
 } from './features';
 export { recordWhatsAppDelivery, type WhatsAppDeliveryReport } from './whatsapp-delivery';

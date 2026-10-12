@@ -56,9 +56,17 @@ export class TemplatesController {
     return this.templates.testimonials();
   }
 
+  /** The plans on the plans page (one-time tiers; hidden plans are sold through offers only; ADR-062). */
   @Get('meta/plans')
   @Header('Cache-Control', 'public, max-age=300')
   plans() {
     return this.templates.plans();
+  }
+
+  /** Add-ons: one thing more for a plan, bought on its own (ADR-062). */
+  @Get('meta/add-ons')
+  @Header('Cache-Control', 'public, max-age=300')
+  addOns() {
+    return this.templates.addOns();
   }
 }

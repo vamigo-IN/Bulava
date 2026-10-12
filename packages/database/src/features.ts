@@ -13,8 +13,12 @@ export interface FeatureValue {
   enabled: boolean;
   /** null = unlimited. */
   limit: number | null;
-  source: 'FREE_PLAN' | 'EVENT_PURCHASE' | 'SUBSCRIPTION';
+  /** SUBSCRIPTION: the account's plan (one-time or yearly); ADDON: an add-on bought on top of it (ADR-062). */
+  source: 'FREE_PLAN' | 'EVENT_PURCHASE' | 'SUBSCRIPTION' | 'ADDON';
 }
+
+/** Entitlements from add-ons (ADR-062): they add to the plan instead of replacing it. */
+export const ADDON_SOURCE = 'ADDON';
 
 type Db = Pick<PrismaClient, 'event' | 'pricingPlan' | 'entitlement'>;
 
@@ -29,6 +33,28 @@ export function moreGenerous(key: string, a: FeatureValue, b: FeatureValue): Fea
   if (a.limit === null) return a;
   if (b.limit === null) return b;
   return a.limit >= b.limit ? a : b;
+}
+
+/**
+ * Add-ons on top of the features so far (ADR-062): a limit adds to the plan's
+ * (an unlimited one stays unlimited, a switched-off one starts from nothing),
+ * a switch is set as generously as the plan allows (the watermark goes off,
+ * HD comes on).
+ */
+export function withAddOns(features: Map<string, FeatureValue>, addOns: ReadonlyArray<{ featureKey: string; enabled: boolean; limit: number | null }>): Map<string, FeatureValue> {
+  if (!addOns.length) return features;
+  const out = new Map(features);
+  for (const a of addOns) {
+    const current = out.get(a.featureKey);
+    if (a.limit !== null) {
+      const base = current?.enabled ? current.limit : 0;
+      out.set(a.featureKey, { enabled: true, limit: base === null ? null : base + a.limit, source: 'ADDON' });
+      continue;
+    }
+    const value: FeatureValue = { enabled: a.enabled, limit: null, source: 'ADDON' };
+    out.set(a.featureKey, current && current.source !== 'FREE_PLAN' ? moreGenerous(a.featureKey, current, value) : value);
+  }
+  return out;
 }
 
 async function freePlan(prisma: Db): Promise<Map<string, FeatureValue>> {
@@ -52,11 +78,15 @@ export async function loadEventFeatures(prisma: Db, eventId: string, now: Date =
   ]);
   const granted = new Map<string, FeatureValue>();
   for (const g of grants) {
+    if (g.sourceType === ADDON_SOURCE) continue;
     const value: FeatureValue = { enabled: g.enabled, limit: g.limit, source: g.eventId ? 'EVENT_PURCHASE' : 'SUBSCRIPTION' };
     const current = granted.get(g.featureKey);
     granted.set(g.featureKey, current ? moreGenerous(g.featureKey, current, value) : value);
   }
-  return new Map([...base, ...granted]);
+  return withAddOns(
+    new Map([...base, ...granted]),
+    grants.filter((g) => g.sourceType === ADDON_SOURCE),
+  );
 }
 
 /** Features for creating new events (user-level): FREE baseline + subscription. */
@@ -69,11 +99,15 @@ export async function loadUserFeatures(prisma: Db, userId: string, now: Date = n
   ]);
   const merged = new Map(base);
   for (const g of grants) {
+    if (g.sourceType === ADDON_SOURCE) continue;
     const value: FeatureValue = { enabled: g.enabled, limit: g.limit, source: 'SUBSCRIPTION' };
     const current = merged.get(g.featureKey);
     merged.set(g.featureKey, current && current.source !== 'FREE_PLAN' ? moreGenerous(g.featureKey, current, value) : value);
   }
-  return merged;
+  return withAddOns(
+    merged,
+    grants.filter((g) => g.sourceType === ADDON_SOURCE),
+  );
 }
 
 /** A count limit: 0 when the feature is off, null when unlimited. */

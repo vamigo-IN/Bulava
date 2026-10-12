@@ -4,7 +4,7 @@ Prices and limits are data. Admins change them in the console (Plans & coupons) 
 
 ## Plans and features
 
-Seeded plans (editable): **Free** (₹0), **Standard** (₹999, one-time), **Premium** (₹2,999, one-time), **Studio** (₹5,999 per year, planners). Paid plans belong to the account ([ADR-053](decisions.md)): every event of the buyer's gets them, and `events.max` (the Free plan's 1 unless a plan sets its own) says how many events it may have published at once. Drafts are never limited ([ADR-054](decisions.md)). Each plan has `PlanFeature` rows:
+Seeded plans (editable, [ADR-062](decisions.md)), all paid once, GST included: **Lite** ₹159 (hidden: sold only through an offer), **Starter** ₹299, **Standard** ₹599, **Premium** ₹999 (*Most popular*, the first with the MP4 video), **Ultimate** ₹1,999 and **Grand** ₹2,999 (done-for-you, priority support); **Studio** (₹5,999 per year, planners) is hidden from the consumer pages. **Free** (₹0) designs and previews but never publishes (`events.max` 0). Paid plans belong to the account ([ADR-053](decisions.md)): every event of the buyer's gets them, and `events.max` says how many events it may have published at once. Drafts are never limited ([ADR-054](decisions.md)). Each plan has `PlanFeature` rows:
 
 | Feature key | Meaning |
 |---|---|
@@ -14,8 +14,13 @@ Seeded plans (editable): **Free** (₹0), **Standard** (₹999, one-time), **Pre
 | `video.renders.max`, `video.hd` | render quota and full resolution |
 | `branding.watermark` | "Made with Bulava" mark |
 | `planner.workspace` | planner features (Studio) |
+| `rsvp.enabled`, `music.enabled` | online replies, and music on the invitation and in the video (on in the Free baseline, so invitations published before keep them) |
+| `link.custom` | the owner's own link, `/e/<their-name>` (old links answer `EVENT_MOVED`) |
+| `service.doneForYou`, `service.rush`, `support.priority` | services the team carries out (a purchase tells the inbox) |
 
 `limit: null` means unlimited; `enabled: false` switches a feature off.
+
+**Add-ons** are `pricing_plans` rows with `kind = ADDON`: one thing more for a plan, bought on its own (MP4 video, remove the mark, one more function or celebration, more photos, done-for-you, same-day delivery). `offeredTo` names the plans they go with (empty: every plan), `stackable` ones are bought as many times as wanted (`quantity`, at most 20 at once). Their entitlements (`sourceType` ADDON, the limit times the quantity) add to the plan's limits instead of replacing them (`withAddOns`).
 
 ## Entitlements
 
@@ -24,6 +29,7 @@ Seeded plans (editable): **Free** (₹0), **Standard** (₹999, one-time), **Pre
 1. Start from the **Free plan's** features (the baseline for everyone).
 2. Overlay **grants**: `Entitlement` rows created by paid orders, for the owner's account (one-time plans, without an end, and yearly ones such as Studio; reported as `SUBSCRIPTION`) or, for older orders and complimentary grants, for one event (`EVENT_PURCHASE`).
 3. When several grants cover a feature, the more generous one wins.
+4. Add **add-ons** on top: their limits add up, their switches turn a feature on (or the watermark off).
 
 Limits are enforced where the action happens (creating guests or functions, starting renders, uploading photos, registering), and publishing checks the rest: the design's tier and the number of published events (any `PATCH /events/:id { status }` out of `DRAFT`, since guests can open every event that is not a draft, and any return to `ACTIVE` or `COMPLETED`). Creating, copying and quick-starting events are never refused for the plan. A limit returns `PLAN_LIMIT_REACHED` (402, with `details.feature` and `details.limit`) and a locked template returns `PLAN_UPGRADE_REQUIRED`. The web app says which limit in words (`lib/plan-limits.ts`: "Your plan allows up to 100 guests per event.") and offers **Click here to unlock**: the event's plans for an event's limits, the plans page for the number of events. `lib/api.ts` announces every such answer (`bulava:plan-limit`), and the event pages show the prompt wherever it happened. Customer copy says *unlock*, never *upgrade* ([ADR-052](decisions.md)); the event's plans page is `/dashboard/events/:id/unlock` (`/upgrade` redirects there).
 
@@ -33,6 +39,8 @@ Plans are chosen on the pricing page or an event's plans page, and bought on `/d
 
 - **The plan** with its features (`planFeatureLines`, the same lines as the pricing cards).
 - **Price details** from `POST /orders/quote` `{ planKey, couponCode? }` (signed in, 20 a minute; nothing is bought): the plan's price, the coupon's discount, the total with GST, and `included` when the account has the plan (or a higher one) already, which the page shows instead of a Pay button. **Apply** checks a coupon and shows the saving, or the reason beside the field (`COUPON_INVALID`); **Remove** takes it off.
+- **A bigger plan for the difference**: the quote's `upgradeFrom` and `creditMinor` take the account's one-time plan off the price; a smaller one is `included`. **Add-ons** show a quantity stepper when stackable, and need a plan they are offered to (`ADDON_NEEDS_PLAN`, `ADDON_NOT_OFFERED`, `ADDON_ALREADY_OWNED`).
+- **The exit offer**: leaving the checkout without a plan opens the hidden plan's offer (`POST /orders/offers`, a token for this account for 24 hours, first plans only).
 - **The terms box** (below), unticked, then **Pay**. `POST /orders` refuses a one-time plan the account has already (`PLAN_ALREADY_ACTIVE`). Closing Razorpay and paying again reopens the same order (`POST /orders/:id/checkout`) rather than placing another. A provisional account is asked to secure itself first (`/dashboard/claim?next=` back to the checkout).
 
 `POST /events/:id/orders` still buys a one-time plan for one event (API clients; orders from before ADR-053 keep their event).

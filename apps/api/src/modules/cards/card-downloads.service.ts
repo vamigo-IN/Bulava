@@ -31,9 +31,16 @@ export class CardDownloadsService {
     @Inject(STORAGE) private readonly storage: ObjectStorage,
   ) {}
 
-  /** The free card: the number is saved as a contact (one per number), then the watermarked image is made. */
-  async free(token: string, input: CardFreeDownloadInput) {
-    await this.cards.requireEnabled();
+  /**
+   * The watermarked card: the number is saved as a contact (one per number),
+   * then the image is made. For anyone while free downloads are on; otherwise
+   * for a signed-in customer with a paid plan (ADR-062).
+   */
+  async free(token: string, input: CardFreeDownloadInput, user: AuthUser | null = null) {
+    const options = await this.cards.requireEnabled();
+    if (!options.freeDownloads && !(user && (await this.cards.hasPaidPlan(user.id)))) {
+      throw new AppError('CARD_PLAN_REQUIRED', 'Downloading a card comes with a plan. Choose a plan, or buy this card on its own.');
+    }
     const session = await this.cards.session(token);
     const lead = await this.prisma.$transaction(async (tx) => {
       const contact = await this.cards.upsertLead(tx, input.phone, { choice: 'FREE', marketingConsent: input.marketingConsent, source: `card-free:${session.id}` });

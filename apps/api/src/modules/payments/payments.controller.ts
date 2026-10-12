@@ -2,7 +2,16 @@ import { Controller, Get, HttpCode, Param, Post, Req, type RawBodyRequest } from
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
-import { CreateOrderSchema, OrderQuoteSchema, VerifyPaymentSchema, type CreateOrderInput, type OrderQuoteInput, type VerifyPaymentInput } from '@bulava/validation';
+import {
+  CreateOrderSchema,
+  OrderQuoteSchema,
+  PlanOfferSchema,
+  VerifyPaymentSchema,
+  type CreateOrderInput,
+  type OrderQuoteInput,
+  type PlanOfferInput,
+  type VerifyPaymentInput,
+} from '@bulava/validation';
 import { CurrentUser, EventAccess, Public, ReqMeta, RequireEventPermission, SkipCsrf, type RequestMeta } from '../../common/decorators/auth.decorators';
 import { ApiZodBody, ZodBody } from '../../common/decorators/zod.decorators';
 import { ParseIdPipe } from '../../common/pipes/zod-validation.pipe';
@@ -38,7 +47,22 @@ export class PaymentsController {
     return this.payments.listForUser(user);
   }
 
-  /** The checkout page's price breakdown: the plan, a coupon's discount and the total (nothing is bought). */
+  /** The account's plan and add-ons, and what they add up to (the dashboard's Plan page, the checkout). */
+  @Get('orders/plan')
+  account(@CurrentUser() user: AuthUser) {
+    return this.payments.account(user);
+  }
+
+  /** A hidden plan offered to this account for a day (a host about to leave the checkout; ADR-062). */
+  @Post('orders/offers')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiZodBody(PlanOfferSchema)
+  offer(@CurrentUser() user: AuthUser, @ZodBody(PlanOfferSchema) body: PlanOfferInput, @ReqMeta() meta: RequestMeta) {
+    return this.payments.offer(user, body, meta);
+  }
+
+  /** The checkout page's price breakdown: the plan or add-on, the plan already owned, a coupon's discount and the total (nothing is bought). */
   @Post('orders/quote')
   @HttpCode(200)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
@@ -47,7 +71,7 @@ export class PaymentsController {
     return this.payments.quote(user, body);
   }
 
-  /** Plans for the account (ADR-053): one-time plans and yearly ones (Studio); every event of the buyer's gets them. */
+  /** Plans and add-ons for the account (ADR-053, ADR-062): every event of the buyer's gets them. */
   @Post('orders')
   @ApiZodBody(CreateOrderSchema)
   createForUser(@CurrentUser() user: AuthUser, @ZodBody(CreateOrderSchema) body: CreateOrderInput, @ReqMeta() meta: RequestMeta) {

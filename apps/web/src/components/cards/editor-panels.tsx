@@ -42,6 +42,7 @@ import {
   textLayer,
   type TextPreset,
 } from './editor-model';
+import { StockSearch, type StockSource } from '@/components/editor/stock-search';
 import type { BoardDesign, BoardEditorApi, CardEditorApi } from './editor-types';
 
 export type PanelKey = 'details' | 'text' | 'colors' | 'photos' | 'elements' | 'size';
@@ -367,23 +368,40 @@ export function PhotosPanel({ editor }: { editor: CardEditorApi }) {
     setTarget(binding);
     input.current?.click();
   };
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    const id = await editor.uploadPhoto(file);
-    if (!id) return;
-    if (target) {
-      editor.change((d) => ({ ...d, photos: { ...d.photos, [target]: id } }));
-      return;
+  /** A photo that arrived: into the spot it was chosen for, else a new photo on the card. */
+  const place = (id: string, spot: string | null): boolean => {
+    if (spot) {
+      editor.change((d) => ({ ...d, photos: { ...d.photos, [spot]: id } }));
+      return true;
     }
     const binding = freePhotoBinding(design);
     if (!binding) {
       window.alert(t('cards.photos.full'));
-      return;
+      return false;
     }
     const layer = photoLayer(design.board, binding, 1);
     editor.change((d) => ({ ...d, photos: { ...d.photos, [binding]: id }, board: { ...d.board, layers: [...d.board.layers, layer] } }));
     editor.select(layer.id);
+    return true;
   };
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    const id = await editor.uploadPhoto(file);
+    if (id) place(id, target);
+  };
+  // A stock image goes into the selected photo, else onto the card as a new one.
+  const selected = design.board.layers.find((l) => l.id === editor.selectedId);
+  const selectedSpot = selected?.kind === 'image' && selected.source.type === 'binding' ? selected.source.binding : null;
+  const stock = editor.stock;
+  const stockSource: StockSource | null = stock
+    ? {
+        search: stock.search,
+        use: async (result) => {
+          const id = await stock.import(result.id);
+          return id ? place(id, selectedSpot) : false;
+        },
+      }
+    : null;
 
   return (
     <div className="space-y-6">
@@ -439,6 +457,7 @@ export function PhotosPanel({ editor }: { editor: CardEditorApi }) {
           })}
         </ul>
       </PanelSection>
+      {stockSource ? <StockSearch source={stockSource} t={t} /> : null}
       <p className="text-xs leading-relaxed text-stone-500">{t('cards.photos.private')}</p>
     </div>
   );

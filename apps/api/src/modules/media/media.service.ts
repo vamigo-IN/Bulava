@@ -305,6 +305,45 @@ export class MediaService {
     return { status: 'PROCESSING' as const };
   }
 
+  /** Room in the plan for one more photo (design photos count like any upload). */
+  async assertPhotoRoom(access: EventAccessContext): Promise<void> {
+    const features = await this.entitlements.forEvent(access.eventId);
+    const used = await this.prisma.mediaItem.count({ where: { eventId: access.eventId, status: { notIn: ['DELETED', 'REJECTED'] } } });
+    EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.PHOTOS_MAX, used);
+  }
+
+  /**
+   * A stock image brought in by the server (ADR-064): stored as a design photo
+   * and processed like an upload (re-encoded, EXIF removed), with its credit.
+   * The design panel then waits for it as for an upload.
+   */
+  async importDesignPhoto(access: EventAccessContext, image: { data: Buffer; contentType: string; credit: string }, meta: RequestMeta) {
+    const type = ALLOWED_UPLOAD_TYPES[image.contentType];
+    if (!type || type.kind !== 'image') throw new AppError('UPLOAD_REJECTED', 'Only photos can be used in a design.');
+    await this.assertPhotoRoom(access);
+    const room = await this.designRoom(access.eventId);
+    const item = await this.prisma.mediaItem.create({
+      data: {
+        roomId: room.id,
+        eventId: access.eventId,
+        uploaderUserId: access.userId,
+        uploaderName: image.credit.slice(0, 160),
+        kind: 'image',
+        originalKey: `pending-${randomBytes(12).toString('hex')}`,
+        mimeType: image.contentType,
+        sizeBytes: BigInt(image.data.length),
+        privacy: 'PRIVATE',
+        status: 'UPLOADING',
+      },
+    });
+    const key = StorageKeys.mediaOriginal(access.eventId, item.id, type.ext);
+    await this.storage.put(key, image.data, image.contentType);
+    await this.prisma.mediaItem.update({ where: { id: item.id }, data: { originalKey: key, status: 'PROCESSING' } });
+    await this.queues.add('media-processing', { mediaItemId: item.id }, { jobId: `media-${item.id}` });
+    await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'media.stock_imported', targetType: 'MediaItem', targetId: item.id, eventId: access.eventId, metadata: { credit: image.credit }, meta });
+    return { itemId: item.id, status: 'PROCESSING' as const };
+  }
+
   /** Status of a design upload (the panel waits for processing before placing it). */
   async designUploadStatus(access: EventAccessContext, itemId: string) {
     const item = await this.prisma.mediaItem.findFirst({ where: { id: itemId, eventId: access.eventId } });

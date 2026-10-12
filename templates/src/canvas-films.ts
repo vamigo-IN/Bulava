@@ -35,6 +35,8 @@ export const CANVAS_FILM_SOURCES = [
   'champagne-wreath',
   'genda-phool-haldi',
   'sangeet-sandhya',
+  // The blank canvas (blank.ts): a film to draw from nothing.
+  'blank-canvas',
 ] as const;
 
 /** 9:16, the shape phones play films in (1080 × 1920 is 2.4 times this). */

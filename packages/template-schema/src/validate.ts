@@ -7,11 +7,22 @@ import {
   AddedSectionsSchema,
   CanvasCustomizationSchema,
   canvasSectionsOf,
+  replaceable,
   withCanvasCustomization,
   type AddedSection,
   type CanvasCustomization,
 } from './canvas-custom';
-import { SceneCustomizationSchema, sceneBoardSize, withSceneCustomization, type SceneCustomization } from './film-custom';
+import {
+  AddedScenesSchema,
+  FILM_BOARD,
+  FILM_FORMATS,
+  FILM_MAX_SECONDS,
+  SceneCustomizationSchema,
+  sceneBoardSize,
+  withFilmCustomization,
+  type AddedScene,
+  type SceneCustomization,
+} from './film-custom';
 import {
   EFFECTS,
   INTROS,
@@ -219,6 +230,10 @@ export const CustomizationSchema = z.object({
   addedSections: AddedSectionsSchema.optional(),
   /** A film's scenes the customer redrew in the film's canvas editor, by scene id (when layout is editable; ADR-059). */
   scenes: SceneCustomizationSchema.optional(),
+  /** Scenes the customer added to their film (when layout is editable; ADR-061). */
+  addedScenes: AddedScenesSchema.optional(),
+  /** The film's size: 9:16 as designed, square or wide (films only; ADR-061). */
+  filmFormat: z.enum(FILM_FORMATS).optional(),
 });
 export type Customization = z.infer<typeof CustomizationSchema>;
 
@@ -251,14 +266,22 @@ function canvasCustomizationIssues(definition: TemplateDefinition, canvas: Canva
   const issues: ValidationIssue[] = [];
   const sections = new Map(canvasSectionsOf(definition).map((s) => [s.id, s.canvas]));
   const ownLinks = ownLinksOf([...sections.values()].flatMap((own) => [own.mobile, own.desktop]));
-  // Sections the host added: unique, after a section of the template (or at the end), phone-wide.
-  const pageIds = new Set((definition.website?.pages[0]?.sections ?? []).map((sec) => sec.id));
+  // Sections the host added: unique, after a section of the template (or at the end), phone-wide;
+  // a redrawn one stands in for one of the template's own sections, never twice for the same one.
+  const pageSections = new Map((definition.website?.pages[0]?.sections ?? []).map((sec) => [sec.id, sec]));
+  const pageIds = new Set(pageSections.keys());
   const addedIds = new Set<string>();
+  const standIns = new Set<string>();
   added.forEach((a, i) => {
     const path = `addedSections.${i}`;
     if (addedIds.has(a.id) || pageIds.has(a.id)) issues.push({ path: `${path}.id`, message: `Section id ${a.id} is taken` });
     addedIds.add(a.id);
     if (a.after && !pageIds.has(a.after)) issues.push({ path: `${path}.after`, message: `This template has no section ${a.after}` });
+    if (a.replaces) {
+      if (!replaceable(pageSections.get(a.after))) issues.push({ path: `${path}.replaces`, message: 'Only a section of the template (not one of its canvases or the footer) can be redrawn' });
+      else if (standIns.has(a.after)) issues.push({ path: `${path}.replaces`, message: `Section ${a.after} is redrawn already` });
+      standIns.add(a.after);
+    }
     if (a.mobile.width !== ADDED_SECTION_WIDTH || a.mobile.height < 120 || a.mobile.height > 2400) issues.push({ path: `${path}.mobile`, message: `An added section is ${ADDED_SECTION_WIDTH} wide and 120 to 2400 high` });
     issues.push(...linkIssues(a.mobile, `${path}.mobile`, ownLinks));
   });
@@ -294,11 +317,21 @@ function canvasCustomizationIssues(definition: TemplateDefinition, canvas: Canva
  * scenes, each board at its scene's size, links to the event's own details,
  * and otherwise what any film may hold.
  */
-function sceneCustomizationIssues(definition: TemplateDefinition, scenes: SceneCustomization): ValidationIssue[] {
+function sceneCustomizationIssues(definition: TemplateDefinition, scenes: SceneCustomization, added: readonly AddedScene[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  if (definition.type !== 'VIDEO') return [{ path: 'scenes', message: 'Only films have scenes to redraw' }];
+  if (definition.type !== 'VIDEO') return [{ path: added.length ? 'addedScenes' : 'scenes', message: 'Only films have scenes to redraw or add' }];
   const byId = new Map((definition.scenes ?? []).map((sc) => [sc.id, sc]));
   const ownLinks = ownLinksOf((definition.scenes ?? []).map((sc) => sc.canvas?.board));
+  // Scenes the host added: unique, after one of the film's scenes (or at the end), on a 9:16 board.
+  const addedIds = new Set<string>();
+  added.forEach((a, i) => {
+    const path = `addedScenes.${i}`;
+    if (addedIds.has(a.id) || byId.has(a.id)) issues.push({ path: `${path}.id`, message: `Scene id ${a.id} is taken` });
+    addedIds.add(a.id);
+    if (a.after && !byId.has(a.after)) issues.push({ path: `${path}.after`, message: `This film has no scene ${a.after}` });
+    if (a.board.width !== FILM_BOARD.width || a.board.height !== FILM_BOARD.height) issues.push({ path: `${path}.board`, message: `An added scene is ${FILM_BOARD.width} × ${FILM_BOARD.height}` });
+    issues.push(...linkIssues(a.board, `${path}.board`, ownLinks));
+  });
   for (const [id, mine] of Object.entries(scenes)) {
     const scene = byId.get(id);
     const path = `scenes.${id}`;
@@ -311,8 +344,10 @@ function sceneCustomizationIssues(definition: TemplateDefinition, scenes: SceneC
     issues.push(...linkIssues(mine.board, `${path}.board`, ownLinks));
   }
   if (issues.length) return issues;
-  const applied = validateTemplateDefinition(withSceneCustomization(definition, scenes));
+  const film = withFilmCustomization(definition, { scenes, addedScenes: added });
+  const applied = validateTemplateDefinition(film);
   if (!applied.ok) issues.push(...applied.issues.map((i) => ({ path: `scenes (${i.path})`, message: i.message })));
+  else if (videoDurationSec(applied.definition, 1) > FILM_MAX_SECONDS) issues.push({ path: 'addedScenes', message: `A film may run ${FILM_MAX_SECONDS} seconds at most` });
   return issues;
 }
 
@@ -344,10 +379,11 @@ export function validateCustomization(definition: TemplateDefinition, input: unk
     if (!e.layout) issues.push({ path: c.canvas ? 'canvas' : 'addedSections', message: 'This template does not allow layout changes' });
     else issues.push(...canvasCustomizationIssues(definition, c.canvas ?? {}, c.addedSections ?? []));
   }
-  if (c.scenes && Object.keys(c.scenes).length) {
-    if (!e.layout) issues.push({ path: 'scenes', message: 'This film does not allow layout changes' });
-    else issues.push(...sceneCustomizationIssues(definition, c.scenes));
+  if ((c.scenes && Object.keys(c.scenes).length) || c.addedScenes?.length) {
+    if (!e.layout) issues.push({ path: c.scenes ? 'scenes' : 'addedScenes', message: 'This film does not allow layout changes' });
+    else issues.push(...sceneCustomizationIssues(definition, c.scenes ?? {}, c.addedScenes ?? []));
   }
+  if (c.filmFormat && definition.type !== 'VIDEO') issues.push({ path: 'filmFormat', message: 'Only films have a size to choose' });
   if (c.hiddenSections?.length) {
     const sections = new Map((definition.website?.pages.flatMap((p) => p.sections) ?? []).map((s) => [s.id, s]));
     if (!e.layout) issues.push({ path: 'hiddenSections', message: 'This template does not allow hiding sections' });

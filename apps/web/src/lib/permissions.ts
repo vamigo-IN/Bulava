@@ -22,6 +22,7 @@ export type EventPermission =
   | 'media.delete'
   | 'media.moderate'
   | 'payment.read'
+  | 'billing.manage'
   | 'audit.read';
 
 /**

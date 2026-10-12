@@ -16,14 +16,14 @@ import { googleRedirectUri } from '../auth/google-redirect';
 import { escapeHtml } from '../guest-access/otp.service';
 import { SETTINGS_STORE } from './settings.service';
 
-export const CHECKABLE = ['payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'storage'] as const;
+export const CHECKABLE = ['payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'stock', 'storage'] as const;
 export type Checkable = (typeof CHECKABLE)[number];
 export const RunCheckSchema = z.object({ to: z.string().trim().max(200).optional() });
 
 const TIMEOUT = 10_000;
 
 /** External APIs; tests and staging can point them elsewhere. */
-function apiBase(name: 'RAZORPAY_API_BASE' | 'CLOUDFLARE_API_BASE' | 'WHATSAPP_API_BASE' | 'GETGABS_API_BASE', fallback: string): string {
+function apiBase(name: 'RAZORPAY_API_BASE' | 'CLOUDFLARE_API_BASE' | 'WHATSAPP_API_BASE' | 'GETGABS_API_BASE' | 'PEXELS_API_BASE' | 'PIXABAY_API_BASE', fallback: string): string {
   return (process.env[name] || fallback).replace(/\/$/, '');
 }
 
@@ -136,6 +136,9 @@ export class SettingsChecksService {
           break;
         case 'domains':
           await this.domains(steps);
+          break;
+        case 'stock':
+          await this.stock(steps);
           break;
         case 'storage':
           await this.storageCheck(steps);
@@ -440,6 +443,29 @@ export class SettingsChecksService {
       ok: null,
       detail: 'Google checks a restricted key against the page showing the map, so it can only be tested in a browser: the preview below uses it.',
     });
+  }
+
+  /** Stock images (ADR-064): each library's key, with a real search. */
+  private async stock(steps: SettingCheckStep[]) {
+    const s = await this.store.get('stock');
+    steps.push({ label: 'Stock images switched on', ok: s.value.enabled ? true : null, detail: s.value.enabled ? undefined : 'Off: the editors offer uploads only.' });
+    const libraries = [
+      { on: s.value.pexels, key: s.secrets.pexelsApiKey, label: 'Pexels', where: 'Create a free key at pexels.com/api.', url: (key: string) => ({ url: `${apiBase('PEXELS_API_BASE', 'https://api.pexels.com')}/v1/search?query=wedding&per_page=3`, headers: { authorization: key } }) },
+      { on: s.value.pixabay, key: s.secrets.pixabayApiKey, label: 'Pixabay', where: 'Your key is on pixabay.com/api/docs once signed in.', url: (key: string) => ({ url: `${apiBase('PIXABAY_API_BASE', 'https://pixabay.com')}/api/?${new URLSearchParams({ key, q: 'wedding', per_page: '3' })}`, headers: {} }) },
+    ];
+    for (const lib of libraries) {
+      if (!lib.on) {
+        steps.push({ label: lib.label, ok: null, detail: 'Not used.' });
+        continue;
+      }
+      if (!lib.key) {
+        steps.push({ label: `${lib.label} API key`, ok: false, detail: lib.where });
+        continue;
+      }
+      const { url, headers } = lib.url(lib.key);
+      const res = await requestJson(url, { method: 'GET', headers });
+      steps.push(res.status === 200 ? { label: `${lib.label} accepted the key and answered a search`, ok: true } : { label: `${lib.label} accepted the key`, ok: false, detail: errorText(res.body) ?? `${lib.label} answered ${res.status}.` });
+    }
   }
 
   private async domains(steps: SettingCheckStep[]) {

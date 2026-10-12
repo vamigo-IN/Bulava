@@ -10,6 +10,7 @@ import { formatEventDateWithWeekday } from '@bulava/localization';
 import { FloralCorner, Mandala } from '@bulava/template-engine/src/ornaments';
 import { CreateEventSchema } from '@bulava/validation';
 import { ApiError, apiPost, apiPut } from '@/lib/api';
+import { clearStudioDraft, readStudioDraft, writeFilmDraft } from '@/lib/design-drafts';
 import { errorMessage, useT } from '@/lib/i18n';
 import { isPlanLimit, unlockHref } from '@/lib/plan-limits';
 import { occasionIcon, occasionShortName } from '@/lib/occasions';
@@ -41,6 +42,8 @@ function CreateEvent() {
   const router = useRouter();
   const params = useSearchParams();
   const templateKey = params.get('template');
+  // Sent by the design page (ADR-063): the website or film designed there goes on the new event.
+  const studio = params.get('studio') === 'website' || params.get('studio') === 'video' ? (params.get('studio') as 'website' | 'video') : null;
   const client = useQueryClient();
   const types = useEventTypes();
   const languages = useLanguages();
@@ -144,10 +147,26 @@ function CreateEvent() {
     try {
       const event = await apiPost<EventSummary>('/events', payload());
       await client.invalidateQueries({ queryKey: keys.events });
-      // Came from 'Use this template': apply it, or offer to unlock paid designs.
+      // A film from the design page: the video page opens it with the design made there.
+      if (templateKey && studio === 'video') {
+        const draft = readStudioDraft('video', templateKey);
+        if (draft) writeFilmDraft(event.id, templateKey, draft.custom);
+        clearStudioDraft('video', templateKey);
+        router.push(`/dashboard/events/${event.id}/video?template=${encodeURIComponent(templateKey)}`);
+        return;
+      }
+      // Came from 'Use this template' (or the design page, with what was designed there): apply it, or offer to unlock paid designs.
       if (templateKey) {
         try {
-          await apiPut(`/events/${event.id}/design/website`, { templateKey });
+          const draft = studio === 'website' ? readStudioDraft('website', templateKey) : null;
+          try {
+            await apiPut(`/events/${event.id}/design/website`, { templateKey, ...(draft ? { customization: draft.custom } : {}) });
+          } catch (err) {
+            // A design the template no longer takes (it changed since): the template, as it is.
+            if (!draft || !(err instanceof ApiError) || err.code !== 'CUSTOMIZATION_INVALID') throw err;
+            await apiPut(`/events/${event.id}/design/website`, { templateKey });
+          }
+          if (draft) clearStudioDraft('website', templateKey);
           router.push(`/dashboard/events/${event.id}/design`);
         } catch (err) {
           const locked = err instanceof ApiError && err.code === 'PLAN_UPGRADE_REQUIRED';
@@ -393,7 +412,19 @@ function CreateEvent() {
         <aside className="hidden lg:block">
           <div className="sticky top-24 space-y-5">
             <InvitationCard type={type} names={names} title={finalTitle} date={date} />
-            {templateKey && cardPreview(templateKey) ? (
+            {studio ? (
+              // Came from the design page: what was designed there goes on this event.
+              <div className="clay flex items-center gap-4 rounded-3xl p-4">
+                {templateKey && cardPreview(templateKey) ? (
+                  <img src={cardPreview(templateKey)!} alt="" className="h-24 w-12 shrink-0 rounded-lg object-cover object-top ring-1 ring-gold-200" />
+                ) : (
+                  <span aria-hidden className="icon-3d size-12 shrink-0">
+                    <Palette className="size-5" />
+                  </span>
+                )}
+                <p className="text-sm leading-relaxed text-stone-600">{t(studio === 'video' ? 'create.fromStudio.video' : 'create.fromStudio.website')}</p>
+              </div>
+            ) : templateKey && cardPreview(templateKey) ? (
               // Came from a template page: the design the event will start with.
               <div className="clay flex items-center gap-4 rounded-3xl p-4">
                 <img src={cardPreview(templateKey)!} alt="" className="h-24 w-12 shrink-0 rounded-lg object-cover object-top ring-1 ring-gold-200" />

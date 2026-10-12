@@ -33,12 +33,18 @@ export type CanvasCustomization = z.infer<typeof CanvasCustomizationSchema>;
  * A canvas section the host added to their page (ADR-059), after one of the
  * template's sections (`after`; empty: at the end, before the footer). It is
  * drawn like the template's canvas sections, on wide screens as its phone
- * artboard centred.
+ * artboard centred. A template section the host redrew on the canvas
+ * (`replaces`) takes that section's place: the template's own is not drawn
+ * while it exists, and removing it brings the template's back.
  */
 export const AddedSectionSchema = z.object({
   id: z.string().regex(/^my-[a-z0-9]{1,24}$/),
   after: z.string().max(64),
   mobile: ArtboardSchema,
+  /** Stands in for the section named in `after` (a redrawn template section). */
+  replaces: z.boolean().optional(),
+  /** Drawn once per function the viewer may see, with function.* bound to each (a redrawn timeline). */
+  perFunction: z.boolean().optional(),
 });
 export type AddedSection = z.infer<typeof AddedSectionSchema>;
 export const AddedSectionsSchema = z.array(AddedSectionSchema).max(ADDED_SECTIONS_MAX);
@@ -47,7 +53,19 @@ export type CanvasSectionInstance = SectionInstance & { section: 'canvas'; canva
 
 /** An added section as the page draws it. */
 export function addedSectionInstance(added: AddedSection): CanvasSectionInstance {
-  return { id: added.id, section: 'canvas', variant: 'default', props: {}, canvas: { mobile: added.mobile, desktopMaxWidth: 480, repeatPerFunction: false } };
+  return { id: added.id, section: 'canvas', variant: 'default', props: {}, canvas: { mobile: added.mobile, desktopMaxWidth: 480, repeatPerFunction: added.perFunction ?? false } };
+}
+
+/** Template sections a host may redraw on the canvas in their place: any but its own canvases and the footer. */
+export const replaceable = (section: Pick<SectionInstance, 'section'> | undefined): boolean => Boolean(section && section.section !== 'canvas' && section.section !== 'footer');
+
+/** The template sections the host's redrawn sections stand in for, by section id: the id of the section drawn instead. */
+export function replacedSections(definition: Pick<TemplateDefinition, 'website'>, added: readonly AddedSection[] | undefined | null): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!added?.length) return out;
+  const byId = new Map((definition.website?.pages[0]?.sections ?? []).map((s) => [s.id, s]));
+  for (const a of added) if (a.replaces && a.after && replaceable(byId.get(a.after)) && !out.has(a.after)) out.set(a.after, a.id);
+  return out;
 }
 
 /** The canvas sections of a website template's page, in order: what the canvas editor offers. */
@@ -82,10 +100,15 @@ export function withCanvasCustomization<D extends Pick<TemplateDefinition, 'webs
   let sections: SectionInstance[] = hasCanvas ? first.sections.map((s) => (s.section === 'canvas' && s.canvas && canvas![s.id] ? { ...s, canvas: canvasWithOverride(s.canvas, canvas![s.id]) } : s)) : first.sections;
   if (added?.length) {
     const ids = new Set(sections.map((s) => s.id));
+    // A redrawn section takes its original's place; the host's other sections follow it.
+    const replaced = replacedSections(definition, added);
     const out: SectionInstance[] = [];
     for (const s of sections) {
-      out.push(s);
-      for (const a of added) if (a.after === s.id) out.push(addedSectionInstance(a));
+      const standIn = replaced.get(s.id);
+      const mine = added.filter((a) => a.after === s.id);
+      if (standIn) out.push(...mine.filter((a) => a.id === standIn).map(addedSectionInstance));
+      else out.push(s);
+      for (const a of mine) if (a.id !== standIn) out.push(addedSectionInstance(a));
     }
     // Added sections whose place is gone (or was never named) go before the footer.
     const loose = added.filter((a) => !a.after || !ids.has(a.after)).map(addedSectionInstance);
@@ -98,11 +121,27 @@ export function withCanvasCustomization<D extends Pick<TemplateDefinition, 'webs
   return { ...definition, website: { ...definition.website, pages: [{ ...first, sections }, ...rest] } };
 }
 
-/** Added sections re-anchored to this template: a section that is gone means at the end. */
+/** Added sections re-anchored to this template: a section that is gone means at the end (and replaces nothing). */
 export function fittingAddedSections(definition: Pick<TemplateDefinition, 'website'>, added: readonly AddedSection[] | undefined | null): AddedSection[] | undefined {
   if (!added?.length) return undefined;
-  const ids = new Set((definition.website?.pages[0]?.sections ?? []).map((s) => s.id));
-  return added.filter((a) => a.mobile.width === ADDED_SECTION_WIDTH).map((a) => (a.after && !ids.has(a.after) ? { ...a, after: '' } : a));
+  const byId = new Map((definition.website?.pages[0]?.sections ?? []).map((s) => [s.id, s]));
+  const taken = new Set<string>();
+  return added
+    .filter((a) => a.mobile.width === ADDED_SECTION_WIDTH)
+    .map((a) => {
+      if (a.after && !byId.has(a.after)) {
+        const { replaces: _gone, ...rest } = a;
+        return { ...rest, after: '' };
+      }
+      if (!a.replaces) return a;
+      // One stand-in per section, and only for sections that can have one.
+      if (!replaceable(byId.get(a.after)) || taken.has(a.after)) {
+        const { replaces: _no, ...rest } = a;
+        return rest;
+      }
+      taken.add(a.after);
+      return a;
+    });
 }
 
 /**

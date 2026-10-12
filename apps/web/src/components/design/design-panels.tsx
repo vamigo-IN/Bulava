@@ -1,12 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { StockSearch, type StockSource } from '@/components/editor/stock-search';
 import { fontStack } from '@bulava/template-engine';
 import type { MessageKey } from '@bulava/localization';
 import { EFFECTS, FONT_PAIRINGS, INTROS, type Customization, type EffectName, type IntroName, type PhotoSlot, type TemplateDefinition, type ThemeColors } from '@bulava/template-schema';
 import { MusicPicker } from '@/components/events/music-picker';
 import { Alert, Input, Textarea } from '@/components/ui/primitives';
 import { useT } from '@/lib/i18n';
+import { importEventStock, searchEventStock } from '@/lib/stock';
 import type { MediaItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { uploadDesignPhoto } from './upload-design-photo';
@@ -136,11 +138,44 @@ function FontCard({ label, selected, onClick, heading, script, sample }: { label
 
 // ─────────────────────────── Photos: named places and the gallery ───────────────────────────
 
-export function PhotosPanel({ definition, custom, setCustom, eventId, photos, onUploaded }: PanelProps & { eventId: string; photos: MediaItem[]; onUploaded: (p: MediaItem) => void }) {
+export function PhotosPanel({ definition, custom, setCustom, eventId, photos, onUploaded }: PanelProps & { eventId?: string; photos: MediaItem[]; onUploaded: (p: MediaItem) => void }) {
   const t = useT();
   const caps = definition.capabilities;
   const slots = caps.photoSlots ?? [];
   const byId = new Map(photos.map((p) => [p.id, p]));
+  // The design as it is when a stock image arrives (it may have changed while the image was brought in).
+  const latest = useRef(custom);
+  latest.current = custom;
+
+  // The design page before signing in (ADR-063): photos are kept with an event, so they come after signing in.
+  if (!eventId) {
+    return (
+      <div className="space-y-3 rounded-2xl bg-[var(--ed-dot,#f5efe4)] p-4 text-sm">
+        <p className="leading-relaxed text-stone-700">{t('studio.photos.signIn')}</p>
+        {/* Signing in comes back here, to the design kept on this device. */}
+        <button
+          type="button"
+          onClick={() => window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
+          className="btn-3d btn-3d-light inline-flex min-h-10 items-center rounded-xl px-4 text-sm"
+        >
+          {t('studio.signIn')}
+        </button>
+      </div>
+    );
+  }
+
+  // Stock images (ADR-064): brought in as a design photo, into the first photo place still empty.
+  const stock: StockSource = {
+    search: (q, kind, page) => searchEventStock(eventId, q, kind, page),
+    use: async (result) => {
+      const photo = await importEventStock(eventId, result.id);
+      onUploaded(photo);
+      const now = latest.current;
+      const empty = slots.find((s) => !now.photoSlots?.[s]);
+      if (empty) setCustom({ ...now, photoSlots: { ...now.photoSlots, [empty]: photo.id } });
+      return true;
+    },
+  };
 
   return (
     <div className="space-y-6">
@@ -194,6 +229,7 @@ export function PhotosPanel({ definition, custom, setCustom, eventId, photos, on
           </div>
         </fieldset>
       ) : null}
+      <StockSearch source={stock} t={t} />
     </div>
   );
 }

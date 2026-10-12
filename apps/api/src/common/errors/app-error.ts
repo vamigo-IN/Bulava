@@ -57,6 +57,13 @@ export const ErrorCode = {
   COUPON_INVALID: HttpStatus.BAD_REQUEST,
   /** A one-time plan the account already has (or a higher one): it is not sold again. */
   PLAN_ALREADY_ACTIVE: HttpStatus.CONFLICT,
+  ADDON_NEEDS_PLAN: HttpStatus.CONFLICT,
+  ADDON_NOT_OFFERED: HttpStatus.CONFLICT,
+  ADDON_ALREADY_OWNED: HttpStatus.CONFLICT,
+  OFFER_NOT_AVAILABLE: HttpStatus.CONFLICT,
+  SLUG_TAKEN: HttpStatus.CONFLICT,
+  EVENT_MOVED: HttpStatus.GONE,
+  RSVP_NOT_TAKEN: HttpStatus.FORBIDDEN,
   ALREADY_CHECKED_IN: HttpStatus.CONFLICT,
   REGISTRATION_NOT_AVAILABLE: HttpStatus.BAD_REQUEST,
   REGISTRATION_CLOSED: HttpStatus.CONFLICT,
@@ -102,6 +109,8 @@ export const ErrorCode = {
   CARD_NOT_READY: HttpStatus.CONFLICT,
   /** A watermark-free download without paying needs a plan that covers it. */
   CARD_PLAN_REQUIRED: HttpStatus.FORBIDDEN,
+  /** Stock image search is switched off, its library did not answer, or it is busy (ADR-064). */
+  STOCK_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   SERVICE_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   INTERNAL_ERROR: HttpStatus.INTERNAL_SERVER_ERROR,
 } as const;

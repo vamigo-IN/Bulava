@@ -203,6 +203,8 @@ export interface GuestInvitationView {
   }>;
   eventRsvp: { status: RsvpStatus; attendeeCount: number } | null;
   eventRsvpOpen: boolean;
+  /** Whether the invitation takes replies at all (the host's plan; ADR-062). Missing from older APIs: yes. */
+  rsvp?: boolean;
   message: string | null;
   template: { key: string; definition: TemplateDefinition; customization: Customization | null } | null;
   context: RenderContext;
@@ -340,15 +342,8 @@ export interface AttendanceRow {
   expectedHeadcount: number;
 }
 
-export interface Plan {
-  key: string;
-  name: string;
-  description: string | null;
-  priceMinor: number;
-  currency: string;
-  interval: 'ONE_TIME' | 'YEAR';
-  features: Array<{ featureKey: string; enabled: boolean; limit: number | null }>;
-}
+/** A plan or an add-on as GET /meta/plans and /meta/add-ons list them (ADR-062); the same shape as server-api's. */
+export type { Plan } from './server-api';
 
 export interface OrderRow {
   id: string;

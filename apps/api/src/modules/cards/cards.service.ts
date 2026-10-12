@@ -77,16 +77,20 @@ export class CardsService {
    */
   async publicConfig(user: AuthUser | null) {
     const options = await this.options();
-    const [watermark, paymentsReady, account] = await Promise.all([
+    const [watermark, paymentsReady, account, cheapest] = await Promise.all([
       this.watermarkText(),
       this.payments.checkoutReady(),
       user ? this.account(user, options.planDownloads) : Promise.resolve(null),
+      this.prisma.pricingPlan.findFirst({ where: { active: true, kind: 'PLAN', visibility: 'PUBLIC', priceMinor: { gt: 0 } }, orderBy: { priceMinor: 'asc' }, select: { priceMinor: true } }),
     ]);
     return {
       enabled: options.enabled,
       priceMinor: options.priceMinor,
       currency: 'INR',
       paymentsReady,
+      /** The watermarked card for a mobile number, for anyone (else for plan holders only). */
+      freeDownloads: options.freeDownloads,
+      planFromMinor: cheapest?.priceMinor ?? null,
       watermark,
       formats: Object.fromEntries(Object.entries(CARD_FORMATS).map(([key, f]) => [key, { width: f.width, height: f.height, pixels: cardPixelSize(key as keyof typeof CARD_FORMATS) }])),
       account,
@@ -94,13 +98,24 @@ export class CardsService {
   }
 
   private async account(user: AuthUser, mode: 'any' | 'subscription' | 'off') {
-    const [profile, coverage] = await Promise.all([
+    const [profile, coverage, paidPlan] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: user.id }, select: { name: true, email: true, phone: true, phoneVerifiedAt: true } }),
       this.planCoverage(user.id, mode),
+      this.hasPaidPlan(user.id),
     ]);
     if (!profile) return null;
     // Prefill only what the account has confirmed.
-    return { name: profile.name, email: profile.email, phone: profile.phoneVerifiedAt ? profile.phone : null, planDownload: coverage.eligible, planName: coverage.planName };
+    return { name: profile.name, email: profile.email, phone: profile.phoneVerifiedAt ? profile.phone : null, planDownload: coverage.eligible, planName: coverage.planName, paidPlan };
+  }
+
+  /** Whether the customer has a paid plan in force (any: one with the watermark still downloads cards with it). */
+  async hasPaidPlan(userId: string): Promise<boolean> {
+    const now = new Date();
+    const grant = await this.prisma.entitlement.findFirst({
+      where: { userId, sourceType: 'ORDER', validFrom: { lte: now }, OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
+      select: { id: true },
+    });
+    return Boolean(grant);
   }
 
   /**
@@ -316,6 +331,23 @@ export class CardsService {
     const key = StorageKeys.cardUploadOriginal(session.id, upload.id, UPLOAD_EXT[input.contentType]);
     await this.prisma.cardUpload.update({ where: { id: upload.id }, data: { originalKey: key } });
     return { uploadId: upload.id, uploadUrl: await this.storage.presignUpload(key, input.contentType, 900), headers: { 'Content-Type': input.contentType }, expiresInSeconds: 900 };
+  }
+
+  /**
+   * A stock image the server brought in for this card (ADR-064): stored like an
+   * upload that arrived, then cleaned by the media worker; the editor waits for
+   * it as for an upload.
+   */
+  async importUpload(token: string, image: { data: Buffer; contentType: CardUploadInput['contentType'] }) {
+    const session = await this.session(token);
+    const count = await this.prisma.cardUpload.count({ where: { sessionId: session.id } });
+    if (count >= MAX_UPLOADS_PER_CARD) throw new AppError('UPLOAD_REJECTED', 'This card has had a lot of photos. Remove some and use the ones already added.');
+    const upload = await this.prisma.cardUpload.create({ data: { sessionId: session.id, contentType: image.contentType, originalKey: 'pending' } });
+    const key = StorageKeys.cardUploadOriginal(session.id, upload.id, UPLOAD_EXT[image.contentType]);
+    await this.storage.put(key, image.data, image.contentType);
+    const processing = await this.prisma.cardUpload.update({ where: { id: upload.id }, data: { originalKey: key, status: 'PROCESSING', bytes: image.data.length } });
+    await this.queues.add('media-processing', { cardUploadId: upload.id }, { jobId: `card-upload-${upload.id}` });
+    return this.uploadView(processing);
   }
 
   /** The browser finished its upload: check what arrived, then have the media worker clean it. */

@@ -15,6 +15,7 @@ type WhatsApp = SettingValues['whatsapp'];
 type Google = SettingValues['google'];
 type Maps = SettingValues['maps'];
 type Domains = SettingValues['domains'];
+type Stock = SettingValues['stock'];
 type Status = { tone: 'success' | 'warning' | 'neutral'; label: string };
 
 const SECURITY: Array<{ value: Email['security']; label: AdminMessageKey }> = [
@@ -53,6 +54,7 @@ export default function IntegrationsPage() {
           <WhatsAppForm view={overview.groups.whatsapp} origins={overview.origins} />
           <GoogleForm view={overview.groups.google} redirectUri={overview.origins.googleRedirect} />
           <MapsForm view={overview.groups.maps} />
+          <StockForm view={overview.groups.stock} />
           <DomainsForm view={overview.groups.domains} webHost={new URL(overview.origins.web).hostname} />
           <StorageCard storage={overview.storage} />
         </>
@@ -422,6 +424,32 @@ function MapsForm({ view }: { view: SettingGroupView }) {
         onChange={(v) => set('embedKey', v)}
       />
       <Checkbox label={t('int.maps.showOnInvitations')} checked={draft.showOnInvitations} onChange={(e) => set('showOnInvitations', e.target.checked)} />
+    </SettingsCard>
+  );
+}
+
+/** Stock images in the editors (ADR-064): licensed libraries only, each with its own key. */
+function StockForm({ view }: { view: SettingGroupView }) {
+  const editor = useGroupEditor<Stock>('stock', view);
+  const { draft, set } = editor;
+  const saved = view.value as Stock;
+  const ready = (saved.pexels && view.secrets.pexelsApiKey?.set) || (saved.pixabay && view.secrets.pixabayApiKey?.set);
+  return (
+    <SettingsCard
+      title={t('int.stock')}
+      description={t('int.stock.hint')}
+      view={view}
+      editor={editor}
+      status={status(saved.enabled, Boolean(ready))}
+      savedMessage={t('settings.savedIntegration')}
+      after={<CheckPanel target="stock" lastCheck={view.lastCheck} dirty={editor.dirty} />}
+    >
+      <Checkbox label={t('int.stock.enabled')} checked={draft.enabled} onChange={(e) => set('enabled', e.target.checked)} />
+      <Checkbox label={t('int.stock.pexels')} checked={draft.pexels} onChange={(e) => set('pexels', e.target.checked)} />
+      <GroupSecret editor={editor} view={view} name="pexelsApiKey" label={t('int.stock.pexelsKey')} hint={t('int.stock.pexelsHint')} />
+      <Checkbox label={t('int.stock.pixabay')} checked={draft.pixabay} onChange={(e) => set('pixabay', e.target.checked)} />
+      <GroupSecret editor={editor} view={view} name="pixabayApiKey" label={t('int.stock.pixabayKey')} hint={t('int.stock.pixabayHint')} />
+      <Checkbox label={t('int.stock.safeSearch')} checked={draft.safeSearch} onChange={(e) => set('safeSearch', e.target.checked)} />
     </SettingsCard>
   );
 }

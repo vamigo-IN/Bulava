@@ -1,38 +1,34 @@
 'use client';
 
-import { ArrowRight, Check, ChevronRight } from 'lucide-react';
+import { ChevronRight, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
+import { PlanOverview } from '@/components/account/plan-overview';
 import { paymentStatusPath } from '@/lib/checkout';
 import { useT } from '@/lib/i18n';
-import { planFeatureLines, planTier } from '@/lib/plan-features';
-import { useDesign, useOrders, usePlans } from '@/lib/queries';
-import { cn } from '@/lib/utils';
-import { Badge, Card, Spinner } from '@/components/ui/primitives';
+import { can } from '@/lib/permissions';
+import { useEvent, useOrders } from '@/lib/queries';
+import { Badge, Spinner } from '@/components/ui/primitives';
 
 const inr = (minor: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(minor / 100);
 
 const ORDER_TONE = { PAID: 'success', FAILED: 'danger', REFUNDED: 'warning', CANCELLED: 'neutral', CREATED: 'neutral' } as const;
 
 /**
- * The plans, from an event. Choosing one leads to the checkout
- * (/dashboard/checkout), which shows the price, takes a coupon and the purchase
- * terms, and pays. Plans belong to the account (ADR-053); the event only comes
- * along for the way back and for a template chosen before unlocking.
+ * Unlocking more from an event (ADR-053, ADR-062): the owner's plan and its
+ * add-ons, the add-ons it can take and the bigger plans at the difference.
+ * Plans belong to the owner's account, so only the owner buys them
+ * (billing.manage); the rest of the team sees who to ask instead.
  */
 export default function UnlockPage() {
   const t = useT();
   const { eventId } = useParams<{ eventId: string }>();
   const params = useSearchParams();
-  const plans = usePlans();
-  const design = useDesign(eventId);
+  const event = useEvent(eventId);
   const orders = useOrders(eventId);
 
-  if (plans.isPending || design.isPending) return <Spinner label={t('common.loading')} />;
-  const perEvent = (plans.data ?? []).filter((p) => p.interval === 'ONE_TIME' && p.priceMinor > 0);
-  const currentTier = design.data?.entitlements['templates.maxTier']?.limit ?? 0;
-  const template = params.get('template');
-  const checkout = (planKey: string) => `/dashboard/checkout?${new URLSearchParams({ plan: planKey, event: eventId, ...(template ? { template } : {}) }).toString()}`;
+  if (event.isPending) return <Spinner label={t('common.loading')} />;
+  const owner = can(event.data, 'billing.manage');
 
   return (
     <div className="space-y-6">
@@ -40,43 +36,19 @@ export default function UnlockPage() {
         <h2 className="font-display text-3xl">{t('upgrade.title')}</h2>
         <p className="mt-1 text-stone-600">{t('upgrade.subtitle')}</p>
       </div>
-      <div className="grid gap-5 md:grid-cols-2">
-        {perEvent.map((plan) => {
-          const owned = currentTier >= planTier(plan);
-          return (
-            <Card key={plan.key} className={cn('flex flex-col rounded-3xl', plan.key === 'PREMIUM' && 'border-gold-500 shadow-lg')}>
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-3xl">{plan.name}</h3>
-                {plan.key === 'PREMIUM' ? <Badge tone="warning">{t('home.pricing.popular')}</Badge> : null}
-              </div>
-              <p className="mt-1 text-sm text-stone-600">{plan.description}</p>
-              <p className="mt-4 font-display text-5xl">{inr(plan.priceMinor)}</p>
-              <p className="text-sm text-stone-500">{t('home.pricing.oneTime')}</p>
-              <ul className="mt-4 flex-1 space-y-2 text-sm">
-                {planFeatureLines(plan, t).map((line) => (
-                  <li key={line} className="flex gap-2">
-                    <span aria-hidden className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-gold-100 text-gold-700">
-                      <Check className="size-3" strokeWidth={3} />
-                    </span>
-                    {line}
-                  </li>
-                ))}
-              </ul>
-              {owned ? (
-                <p className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-emerald-50 px-6 text-base font-semibold text-emerald-800 ring-1 ring-emerald-200">
-                  <Check aria-hidden className="size-4.5" />
-                  {t('upgrade.included')}
-                </p>
-              ) : (
-                <Link href={checkout(plan.key)} className="btn-3d mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-base">
-                  {t('upgrade.choose', { plan: plan.name })}
-                  <ArrowRight aria-hidden className="size-4.5" />
-                </Link>
-              )}
-            </Card>
-          );
-        })}
-      </div>
+      {owner ? (
+        <PlanOverview eventId={eventId} template={params.get('template')} />
+      ) : (
+        <div role="note" className="clay flex items-start gap-3 rounded-3xl p-5">
+          <span aria-hidden className="icon-3d grid size-10 shrink-0 place-items-center rounded-xl">
+            <KeyRound className="size-4.5" />
+          </span>
+          <div>
+            <h3 className="font-display text-xl">{t('upgrade.ownerOnly.title')}</h3>
+            <p className="mt-1 text-sm leading-relaxed text-stone-600">{t('upgrade.ownerOnly.body')}</p>
+          </div>
+        </div>
+      )}
       {orders.data?.length ? (
         <section>
           <h3 className="mb-2 font-display text-2xl">{t('upgrade.history')}</h3>

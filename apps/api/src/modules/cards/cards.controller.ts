@@ -14,6 +14,8 @@ import {
   CardStatsQuerySchema,
   CardTokenSchema,
   CardUploadSchema,
+  StockImportSchema,
+  StockSearchSchema,
   VerifyPaymentSchema,
   z,
   type CardCheckoutEventInput,
@@ -23,6 +25,8 @@ import {
   type CardOrderInput,
   type CardRecoverInput,
   type CardUploadInput,
+  type StockImportInput,
+  type StockSearchInput,
   type VerifyPaymentInput,
 } from '@bulava/validation';
 import { CurrentUser, OptionalUser, Public, ReqMeta, RequirePlatformPermission, type RequestMeta } from '../../common/decorators/auth.decorators';
@@ -33,6 +37,7 @@ import type { AuthUser } from '../../common/request-context';
 import { CardAdminService } from './card-admin.service';
 import { CardDownloadsService } from './card-downloads.service';
 import { CardOrdersService } from './card-orders.service';
+import { StockService } from '../stock/stock.service';
 import { CardsService } from './cards.service';
 
 /** Headers that carry the tokens, so they never appear in a URL (Nginx and the API log paths). */
@@ -64,6 +69,7 @@ export class PublicCardsController {
     private readonly cards: CardsService,
     private readonly downloads: CardDownloadsService,
     private readonly orders: CardOrdersService,
+    private readonly stock: StockService,
   ) {}
 
   /** Price, payments, the watermark text, and for a signed-in visitor what their account covers. */
@@ -121,13 +127,31 @@ export class PublicCardsController {
     return this.cards.uploadStatus(sessionToken(token), uploadId);
   }
 
+  /** Stock photos and illustrations for this card (ADR-064): only for a card being made here. */
+  @Get('session/stock')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async stockSearch(@Headers(CARD_SESSION_HEADER) token: string | undefined, @ZodQuery(StockSearchSchema) query: StockSearchInput) {
+    await this.cards.session(sessionToken(token));
+    return this.stock.search(query);
+  }
+
+  /** One of them brought in as this card's photo; the editor then waits for it as for an upload. */
+  @Post('session/stock')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiZodBody(StockImportSchema)
+  async stockImport(@Headers(CARD_SESSION_HEADER) token: string | undefined, @ZodBody(StockImportSchema) body: StockImportInput) {
+    const session = sessionToken(token);
+    await this.cards.session(session);
+    return this.cards.importUpload(session, await this.stock.fetchImage(body.id));
+  }
+
   /** The free card: a mobile number, then the watermarked image is made (once per design). */
   @Post('session/free-download')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiZodBody(CardFreeDownloadSchema)
-  freeDownload(@Headers(CARD_SESSION_HEADER) token: string | undefined, @ZodBody(CardFreeDownloadSchema) body: CardFreeDownloadInput) {
-    return this.downloads.free(sessionToken(token), body);
+  freeDownload(@Headers(CARD_SESSION_HEADER) token: string | undefined, @ZodBody(CardFreeDownloadSchema) body: CardFreeDownloadInput, @OptionalUser() user: AuthUser | null) {
+    return this.downloads.free(sessionToken(token), body, user);
   }
 
   @Get('session/exports/:exportId')

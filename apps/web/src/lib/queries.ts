@@ -96,6 +96,8 @@ export const moreKeys = {
   orders: (id: string) => ['events', id, 'orders'] as const,
   catalog: (type: string, eventType: string) => ['catalog', type, eventType] as const,
   plans: ['meta', 'plans'] as const,
+  addOns: ['meta', 'add-ons'] as const,
+  accountPlan: ['orders', 'plan'] as const,
   notifications: ['notifications'] as const,
 };
 
@@ -127,6 +129,16 @@ export const useAttendance = (id: string) =>
   useQuery({ queryKey: moreKeys.attendance(id), queryFn: () => apiGet<AttendanceRow[]>(`/events/${id}/check-ins/summary`), refetchInterval: 10_000 });
 export const useOrders = (id: string) => useQuery({ queryKey: moreKeys.orders(id), queryFn: () => apiGet<OrderRow[]>(`/events/${id}/orders`) });
 export const usePlans = () => useQuery({ queryKey: moreKeys.plans, queryFn: () => apiGet<Plan[]>('/meta/plans'), staleTime: 300_000 });
+export const useAddOns = () => useQuery({ queryKey: moreKeys.addOns, queryFn: () => apiGet<Plan[]>('/meta/add-ons'), staleTime: 300_000 });
+/** The signed-in account's plan and add-ons (ADR-062); refetched after a payment. */
+export const useAccountPlan = (enabled = true) => useQuery({ queryKey: moreKeys.accountPlan, queryFn: () => apiGet<AccountPlan>('/orders/plan'), enabled, staleTime: 30_000 });
+
+/** GET /orders/plan: the account's plan (its biggest one-time plan), its add-ons and what they add up to. */
+export interface AccountPlan {
+  plan: { key: string; name: string; priceMinor: number; interval: 'ONE_TIME' | 'YEAR'; tagline: string | null } | null;
+  addOns: Array<{ key: string; name: string; quantity: number }>;
+  features: Record<string, { enabled: boolean; limit: number | null; source: string }>;
+}
 export const useCatalog = (type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', eventType: string) =>
   useQuery({
     queryKey: moreKeys.catalog(type, eventType),

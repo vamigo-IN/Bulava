@@ -1,5 +1,5 @@
 import { getSiteConfig } from '@/lib/site-config';
-import { getSitePages, getTemplates } from '@/lib/server-api';
+import { getSitePages, getTemplates, isBlankTemplate } from '@/lib/server-api';
 
 export const revalidate = 300;
 
@@ -17,7 +17,7 @@ export async function GET(): Promise<Response> {
   let body = seo.llmsTxt.trim();
   if (!body) {
     const [allTemplates, pages] = await Promise.all([getTemplates(), getSitePages()]);
-    const templates = allTemplates.slice(0, 40);
+    const templates = allTemplates.filter((t) => !isBlankTemplate(t)).slice(0, 40);
     const line = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
     const contact = [
       site.supportEmail ? `- Email: ${site.supportEmail}` : null,

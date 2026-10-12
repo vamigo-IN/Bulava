@@ -85,6 +85,16 @@ export interface Plan {
   priceMinor: number;
   currency: string;
   interval: 'ONE_TIME' | 'YEAR';
+  /** A tier (the account's plan) or an add-on bought on top of one (ADR-062). */
+  kind?: 'PLAN' | 'ADDON';
+  /** A ribbon on the card ("Most popular"). */
+  badge?: string | null;
+  /** What sets it apart, in a few words ("+ MP4 video"). */
+  tagline?: string | null;
+  /** An add-on bought more than once. */
+  stackable?: boolean;
+  /** The plans an add-on is offered to; empty: every paid plan. */
+  offeredTo?: string[];
   features: Array<{ featureKey: string; enabled: boolean; limit: number | null }>;
 }
 
@@ -108,6 +118,9 @@ export interface Testimonial {
 /** Every published template, without definitions. */
 export const getTemplates = () => serverApi<TemplateSummary[]>('/public/templates').then((t) => t ?? []);
 
+/** The blank canvas and its film (ADR-063): offered by the design page and the editors, never shown in galleries. */
+export const isBlankTemplate = (t: { tags: string[] }) => t.tags.includes('blank');
+
 /** Definitions for a few templates (the API serves at most 60 at a time). */
 export async function getTemplateDefinitions(keys: string[]): Promise<Map<string, TemplateDefinition>> {
   const out = new Map<string, TemplateDefinition>();
@@ -128,7 +141,7 @@ const hasImage = (t: TemplateSummary) => (t.outputs.includes('WEBSITE') ? cardPr
  * Studio, or not yet photographed).
  */
 export async function getGalleryTemplates(): Promise<TemplateSummary[]> {
-  const list = await getTemplates();
+  const list = (await getTemplates()).filter((t) => !isBlankTemplate(t));
   const live = list.filter((t) => !hasImage(t)).map((t) => t.key);
   if (!live.length) return list;
   const defs = await getTemplateDefinitions(live.slice(0, 120));
@@ -136,6 +149,8 @@ export async function getGalleryTemplates(): Promise<TemplateSummary[]> {
 }
 export const getTemplate = (key: string) => serverApi<TemplateSummary>(`/public/templates/${encodeURIComponent(key)}`);
 export const getPlans = () => serverApi<Plan[]>('/meta/plans', { revalidate: 300 }).then((p) => p ?? []);
+/** Add-ons: one thing more for a plan, bought on its own (ADR-062). */
+export const getAddOns = () => serverApi<Plan[]>('/meta/add-ons', { revalidate: 300 }).then((p) => p ?? []);
 export const getStats = () => serverApi<SiteStats>('/public/site-stats', { revalidate: 300 });
 export const getTestimonials = () => serverApi<Testimonial[]>('/public/testimonials', { revalidate: 300 }).then((t) => t ?? []);
 /** The templates staff chose for the home page's sections and the card gallery (console: Home page); sections without picks are left out. */
@@ -145,9 +160,12 @@ export function formatInr(minor: number): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(minor / 100);
 }
 
-/** Price label for a template tier, from the admin-managed plans. */
+/** Price label for a template tier: the first plan whose designs include it (admin-managed plans). */
 export function tierPrice(tier: TemplateSummary['tier'], plans: Plan[]): string | null {
   if (tier === 'FREE') return null;
-  const plan = plans.find((p) => p.key === tier);
+  const rank = tier === 'PREMIUM' ? 2 : 1;
+  const plan = plans
+    .filter((p) => p.priceMinor > 0 && (p.features.find((f) => f.featureKey === 'templates.maxTier')?.limit ?? 0) >= rank)
+    .sort((a, b) => a.priceMinor - b.priceMinor)[0];
   return plan ? formatInr(plan.priceMinor) : null;
 }

@@ -370,6 +370,8 @@ export const UpdateEventSchema = z.object({
   requireOtp: z.boolean().optional(),
   /** PIN for PRIVATE_LINK events; null removes it. */
   pin: z.union([z.string().trim().regex(/^[0-9A-Za-z]{4,12}$/, 'Use 4–12 letters or digits'), z.null()]).optional(),
+  /** The invitation's own link, /e/<slug> (plans with a custom link; the old link keeps working). */
+  slug: SlugSchema.pipe(z.string().min(4, 'Use at least 4 characters').max(60, 'Use at most 60 characters')).optional(),
 });
 export type UpdateEventInput = z.infer<typeof UpdateEventSchema>;
 
@@ -703,26 +705,49 @@ export const FEATURE_KEYS = {
   CUSTOM_DOMAIN: 'domain.custom',
   /** WhatsApp Business messages per event (invitations and reminders sent from the platform's number). */
   WHATSAPP_MESSAGES: 'messaging.whatsapp.max',
+  /** Guests can reply (RSVP) on the invitation. */
+  RSVP: 'rsvp.enabled',
+  /** Background music on the invitation and in the video. */
+  MUSIC: 'music.enabled',
+  /** The host chooses the invitation's link (/e/their-name); old links keep working. */
+  CUSTOM_LINK: 'link.custom',
+  /** The team sets the invitation up for the host. */
+  DONE_FOR_YOU: 'service.doneForYou',
+  /** Same-day delivery of what the team makes. */
+  RUSH: 'service.rush',
+  PRIORITY_SUPPORT: 'support.priority',
 } as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
 
 /** Template tiers as numbers for templates.maxTier comparisons. */
 export const TEMPLATE_TIER_RANK = { FREE: 0, STANDARD: 1, PREMIUM: 2 } as const;
 
-export const CreateOrderSchema = z.object({
+/** The most of one stackable add-on in one purchase (ADR-062). */
+export const ADDON_MAX_QUANTITY = 20;
+
+const purchase = {
   planKey: z.string().trim().min(1).max(40),
   couponCode: z.string().trim().toUpperCase().max(40).optional(),
+  /** How many of a stackable add-on (one of anything else). */
+  quantity: z.coerce.number().int().min(1).max(ADDON_MAX_QUANTITY).optional(),
+  /** The offer of a hidden plan, made for this account (POST /orders/offers). */
+  offerToken: z.string().trim().max(200).optional(),
+};
+
+export const CreateOrderSchema = z.object({
+  ...purchase,
   /** The Terms of Service and the Refund and Cancellation Policy, ticked for this purchase. */
   acceptTerms: agreed('Please accept the Terms of Service and the Refund and Cancellation Policy'),
 });
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 
-/** POST /orders/quote: what a plan costs with a coupon, before anything is bought (the checkout page's price breakdown). */
-export const OrderQuoteSchema = z.object({
-  planKey: z.string().trim().min(1).max(40),
-  couponCode: z.string().trim().toUpperCase().max(40).optional(),
-});
+/** POST /orders/quote: what a plan or an add-on costs (less the plan already owned, with a coupon), before anything is bought. */
+export const OrderQuoteSchema = z.object(purchase);
 export type OrderQuoteInput = z.infer<typeof OrderQuoteSchema>;
+
+/** POST /orders/offers: a hidden plan offered to the signed-in account for a day (ADR-062); without a key, the first-plan offer. */
+export const PlanOfferSchema = z.object({ planKey: z.string().trim().min(1).max(40).optional() });
+export type PlanOfferInput = z.infer<typeof PlanOfferSchema>;
 
 export const VerifyPaymentSchema = z.object({
   razorpayOrderId: z.string().min(1).max(100),
@@ -1055,6 +1080,21 @@ export type CardDesignBody = z.infer<typeof CardDesignBodySchema>;
 
 export const CARD_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const CARD_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+
+// ───────────────────────────── Stock images (ADR-064) ─────────────────────────────
+
+/** Photos (Pexels and Pixabay) or illustrations (Pixabay). */
+export const STOCK_KINDS = ['photo', 'illustration'] as const;
+export type StockKind = (typeof STOCK_KINDS)[number];
+export const StockSearchSchema = z.object({
+  q: z.string().trim().min(2).max(80),
+  kind: z.enum(STOCK_KINDS).default('photo'),
+  page: z.coerce.number().int().min(1).max(10).default(1),
+});
+export type StockSearchInput = z.infer<typeof StockSearchSchema>;
+/** A search result, by its library and its id there: the server finds the file itself. */
+export const StockImportSchema = z.object({ id: z.string().regex(/^(pexels|pixabay):[1-9]\d{0,14}$/) });
+export type StockImportInput = z.infer<typeof StockImportSchema>;
 
 export const CardUploadSchema = z.object({
   contentType: z.enum(CARD_UPLOAD_TYPES),

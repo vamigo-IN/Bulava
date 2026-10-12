@@ -253,6 +253,10 @@ function CardsSettingsForm({ view }: { view: SettingGroupView }) {
       status={saved.enabled ? { tone: 'success', label: t('cards.settings.on') } : { tone: 'neutral', label: t('cards.settings.offLabel') }}
     >
       <Checkbox label={t('cards.settings.enabled')} checked={draft.enabled} onChange={(e) => set('enabled', e.target.checked)} />
+      <div>
+        <Checkbox label={t('cards.settings.freeDownloads')} checked={draft.freeDownloads} onChange={(e) => set('freeDownloads', e.target.checked)} />
+        <p className="ml-6.5 text-xs text-stone-500">{t('cards.settings.freeDownloadsHint')}</p>
+      </div>
       <Field label={t('cards.settings.price')} hint={t('cards.settings.priceHint')} className="max-w-xs">
         {(p) => <Input {...p} type="number" min={50} max={10000} step={1} value={Math.round(draft.priceMinor / 100)} onChange={(e) => set('priceMinor', Math.round(Number(e.target.value || 0) * 100))} />}
       </Field>

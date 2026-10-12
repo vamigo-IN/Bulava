@@ -4,14 +4,25 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { FEATURE_KEYS, type FeatureKey } from '@bulava/validation';
 import { RequirePermission, useInvalidate } from '@/components/shell';
-import { Alert, Badge, Button, Card, CardTitle, Checkbox, EmptyState, ErrorNotice, Field, Input, PageHeader, Spinner, Table, Td, Textarea, Th } from '@/components/ui';
+import { Alert, Badge, Button, Card, CardTitle, Checkbox, EmptyState, ErrorNotice, Field, Input, PageHeader, Select, Spinner, Table, Td, Textarea, Th } from '@/components/ui';
 import { apiGet, apiPatch, apiPut, errorMessage } from '@/lib/api';
 import { t, tMaybe, type AdminMessageKey } from '@/lib/i18n';
 import type { Coupon, Plan, PlanFeature } from '@/lib/types';
 import { formatDate, formatInr, fromDateInput, toDateInput } from '@/lib/utils';
 
 /** Features that are on/off only; the rest carry a numeric limit. */
-const SWITCH_FEATURES = new Set<FeatureKey>([FEATURE_KEYS.VIDEO_HD, FEATURE_KEYS.WATERMARK, FEATURE_KEYS.PLANNER, FEATURE_KEYS.CUSTOM_DOMAIN]);
+const SWITCH_FEATURES = new Set<FeatureKey>([
+  FEATURE_KEYS.VIDEO_HD,
+  FEATURE_KEYS.WATERMARK,
+  FEATURE_KEYS.PLANNER,
+  FEATURE_KEYS.CUSTOM_DOMAIN,
+  FEATURE_KEYS.RSVP,
+  FEATURE_KEYS.MUSIC,
+  FEATURE_KEYS.CUSTOM_LINK,
+  FEATURE_KEYS.DONE_FOR_YOU,
+  FEATURE_KEYS.RUSH,
+  FEATURE_KEYS.PRIORITY_SUPPORT,
+]);
 const ALL_FEATURES = Object.values(FEATURE_KEYS);
 
 export default function PricingPage() {
@@ -25,24 +36,51 @@ export default function PricingPage() {
 function Pricing() {
   const plans = useQuery({ queryKey: ['admin', 'plans'], queryFn: () => apiGet<Plan[]>('/admin/plans') });
   const free = plans.data?.find((p) => p.key === 'FREE');
+  const tiers = plans.data?.filter((p) => p.kind !== 'ADDON') ?? [];
+  const addOns = plans.data?.filter((p) => p.kind === 'ADDON') ?? [];
+  const tierKeys = tiers.filter((p) => p.priceMinor > 0).map((p) => p.key);
   return (
     <>
       <PageHeader title={t('pricing.title')} subtitle={t('pricing.subtitle')} />
       {plans.isPending ? <Spinner /> : null}
       {plans.isError ? <ErrorNotice error={plans.error} /> : null}
+      <h2 className="mt-2 mb-3 text-lg font-semibold">{t('pricing.plans')}</h2>
       <div className="grid gap-5 xl:grid-cols-2">
-        {plans.data?.map((plan) => (
-          <PlanCard key={`${plan.id}-${plan.priceMinor}-${plan.active}`} plan={plan} baseline={plan.key === 'FREE' ? null : free ?? null} />
+        {tiers.map((plan) => (
+          <PlanCard key={`${plan.id}-${plan.priceMinor}-${plan.active}-${plan.visibility}`} plan={plan} baseline={plan.key === 'FREE' ? null : free ?? null} tierKeys={tierKeys} />
         ))}
       </div>
+      {addOns.length ? (
+        <>
+          <h2 className="mt-8 mb-1 text-lg font-semibold">{t('pricing.addOns')}</h2>
+          <p className="mb-3 text-sm text-stone-500">{t('pricing.addOnsHint')}</p>
+          <div className="grid gap-5 xl:grid-cols-2">
+            {addOns.map((plan) => (
+              <PlanCard key={`${plan.id}-${plan.priceMinor}-${plan.active}-${plan.offeredTo.join()}`} plan={plan} baseline={null} tierKeys={tierKeys} />
+            ))}
+          </div>
+        </>
+      ) : null}
       <Coupons />
     </>
   );
 }
 
-function PlanCard({ plan, baseline }: { plan: Plan; baseline: Plan | null }) {
+function PlanCard({ plan, baseline, tierKeys }: { plan: Plan; baseline: Plan | null; tierKeys: string[] }) {
   const invalidate = useInvalidate();
-  const [form, setForm] = useState({ name: plan.name, description: plan.description ?? '', price: String(plan.priceMinor / 100), active: plan.active, sortOrder: plan.sortOrder });
+  const addOn = plan.kind === 'ADDON';
+  const [form, setForm] = useState({
+    name: plan.name,
+    description: plan.description ?? '',
+    price: String(plan.priceMinor / 100),
+    active: plan.active,
+    sortOrder: plan.sortOrder,
+    visibility: plan.visibility,
+    badge: plan.badge ?? '',
+    tagline: plan.tagline ?? '',
+    stackable: plan.stackable,
+    offeredTo: plan.offeredTo,
+  });
   const save = useMutation({
     mutationFn: () =>
       apiPatch(`/admin/plans/${plan.key}`, {
@@ -51,6 +89,10 @@ function PlanCard({ plan, baseline }: { plan: Plan; baseline: Plan | null }) {
         priceMinor: Math.round(Number(form.price) * 100),
         active: form.active,
         sortOrder: form.sortOrder,
+        visibility: form.visibility,
+        badge: form.badge.trim() || null,
+        tagline: form.tagline.trim() || null,
+        ...(addOn ? { stackable: form.stackable, offeredTo: form.offeredTo } : {}),
       }),
     onSuccess: () => invalidate(['admin', 'plans']),
   });
@@ -71,6 +113,8 @@ function PlanCard({ plan, baseline }: { plan: Plan; baseline: Plan | null }) {
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold tabular-nums">{formatInr(plan.priceMinor)}</span>
           <span className="text-xs text-stone-500">{tMaybe(`pricing.interval.${plan.interval}`, plan.interval)}</span>
+          {addOn ? <Badge tone="neutral">{t('pricing.kind.ADDON')}</Badge> : null}
+          {plan.visibility === 'HIDDEN' ? <Badge tone="warning">{t('pricing.visibility.HIDDEN')}</Badge> : null}
           {!plan.active ? <Badge tone="danger">{t('common.inactive')}</Badge> : null}
         </div>
       </div>
@@ -88,6 +132,39 @@ function PlanCard({ plan, baseline }: { plan: Plan; baseline: Plan | null }) {
         <Field label={t('pricing.planDescription')}>
           {(p) => <Textarea {...p} rows={2} maxLength={300} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />}
         </Field>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label={t('pricing.tagline')} hint={t('pricing.taglineHint')}>
+            {(p) => <Input {...p} maxLength={60} value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} />}
+          </Field>
+          <Field label={t('pricing.badge')} hint={t('pricing.badgeHint')}>
+            {(p) => <Input {...p} maxLength={40} value={form.badge} onChange={(e) => setForm({ ...form, badge: e.target.value })} />}
+          </Field>
+          <Field label={t('pricing.visibility')} hint={t('pricing.visibilityHint')}>
+            {(p) => (
+              <Select {...p} value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value as Plan['visibility'] })}>
+                <option value="PUBLIC">{t('pricing.visibility.PUBLIC')}</option>
+                <option value="HIDDEN">{t('pricing.visibility.HIDDEN')}</option>
+              </Select>
+            )}
+          </Field>
+        </div>
+        {addOn ? (
+          <div className="space-y-2 rounded-lg border border-stone-200 p-3">
+            <Checkbox label={t('pricing.stackable')} checked={form.stackable} onChange={(e) => setForm({ ...form, stackable: e.target.checked })} />
+            <p className="text-xs font-semibold text-stone-700">{t('pricing.offeredTo')}</p>
+            <div className="flex flex-wrap gap-x-4">
+              {tierKeys.map((key) => (
+                <Checkbox
+                  key={key}
+                  label={key}
+                  checked={form.offeredTo.includes(key)}
+                  onChange={(e) => setForm({ ...form, offeredTo: e.target.checked ? [...form.offeredTo, key] : form.offeredTo.filter((k) => k !== key) })}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-stone-500">{t('pricing.offeredToHint')}</p>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between">
           <Checkbox label={t('pricing.planActive')} checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
           <Button type="submit" size="sm" disabled={save.isPending}>
@@ -97,7 +174,7 @@ function PlanCard({ plan, baseline }: { plan: Plan; baseline: Plan | null }) {
       </form>
 
       <h3 className="mt-5 mb-2 text-sm font-semibold">{t('pricing.features')}</h3>
-      <p className="mb-2 text-xs text-stone-500">{t('pricing.limitHint')}</p>
+      <p className="mb-2 text-xs text-stone-500">{addOn ? t('pricing.addOnLimitHint') : t('pricing.limitHint')}</p>
       <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200">
         {ALL_FEATURES.map((key) => (
           <FeatureRow key={`${key}-${byKey.get(key)?.enabled}-${byKey.get(key)?.limit}`} planKey={plan.key} featureKey={key} value={byKey.get(key) ?? null} inherited={baseByKey.get(key) ?? null} />

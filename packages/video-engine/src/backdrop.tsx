@@ -96,8 +96,10 @@ export function SceneBackdrop({
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   usePreloadedImages(backdropImageUrls(definition, backdrop, ctx));
-  const scale = width / STAGE_WIDTH;
-  const w = STAGE_WIDTH;
+  // Scenes are designed 9:16. In a square or wide film (ADR-061) the art keeps the size it has on that
+  // stage fitted to the frame's height, and widens to fill the frame, so its drawn details keep their proportions.
+  const scale = Math.min(width / STAGE_WIDTH, height / ((STAGE_WIDTH * 16) / 9));
+  const w = width / scale;
   const h = height / scale;
   const art = backdropArt(definition, backdrop, colors, { ctx, monogram, photo });
   const p = interpolate(frame, [0, Math.max(1, frames)], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(0.33, 0, 0.25, 1) });
@@ -135,8 +137,11 @@ export function Particles({ effect, colors }: { effect: EffectName; colors: Them
   const { fps, width, height } = useVideoConfig();
   if (effect === 'none') return null;
   const t = frame / fps;
-  const s = width / STAGE_WIDTH;
-  const count = { petals: 26, marigold: 30, goldDust: 60, fireflies: 28, confetti: 46, lanterns: 9, snow: 60, none: 0 }[effect];
+  // Sized for the 9:16 stage that fits the frame; a square or wide frame gets more of them, not bigger ones.
+  const stage = Math.min(width, (height * 9) / 16);
+  const s = stage / STAGE_WIDTH;
+  const spread = Math.min(2.5, width / stage);
+  const count = Math.round({ petals: 26, marigold: 30, goldDust: 60, fireflies: 28, confetti: 46, lanterns: 9, snow: 60, none: 0 }[effect] * spread);
   const palette =
     effect === 'petals'
       ? [colors.primary, colors.secondary, '#f8bbd0', '#f48fb1']

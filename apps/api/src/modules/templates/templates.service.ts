@@ -216,16 +216,25 @@ export class TemplatesService implements OnApplicationBootstrap {
     });
   }
 
-  /** Active plans for pricing pages. WhatsApp allowances are listed only while WhatsApp sending is set up. */
+  /** Active public plans for pricing pages. WhatsApp allowances are listed only while WhatsApp sending is set up. */
   async plans() {
-    const [plans, messaging] = await Promise.all([this.activePlans(), this.settings.messaging()]);
+    return this.withoutUnusedWhatsApp(await this.activePlans('PLAN'));
+  }
+
+  /** Active add-ons, for the plans page and the dashboard (ADR-062). */
+  async addOns() {
+    return this.withoutUnusedWhatsApp(await this.activePlans('ADDON'));
+  }
+
+  private async withoutUnusedWhatsApp<T extends { features: Array<{ featureKey: string }> }>(plans: T[]): Promise<T[]> {
+    const messaging = await this.settings.messaging();
     if (messaging.whatsappInvitations || messaging.whatsappReminders) return plans;
     return plans.map((p) => ({ ...p, features: p.features.filter((f) => f.featureKey !== FEATURE_KEYS.WHATSAPP_MESSAGES) }));
   }
 
-  private activePlans() {
+  private activePlans(kind: 'PLAN' | 'ADDON') {
     return this.prisma.pricingPlan.findMany({
-      where: { active: true },
+      where: { active: true, kind, visibility: 'PUBLIC' },
       select: {
         key: true,
         name: true,
@@ -233,6 +242,11 @@ export class TemplatesService implements OnApplicationBootstrap {
         priceMinor: true,
         currency: true,
         interval: true,
+        kind: true,
+        badge: true,
+        tagline: true,
+        stackable: true,
+        offeredTo: true,
         features: { select: { featureKey: true, enabled: true, limit: true } },
       },
       orderBy: { sortOrder: 'asc' },

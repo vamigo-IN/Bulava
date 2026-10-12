@@ -65,6 +65,10 @@ export class VideosService {
 
     const features = await this.entitlements.forEvent(event.id);
     EntitlementsService.assertTemplateTier(features, template.tier);
+    // Music comes with the plan (ADR-062); on unless a plan says otherwise.
+    if (input.musicId && !(features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true)) {
+      throw new AppError('PLAN_UPGRADE_REQUIRED', 'Music comes with a bigger plan.', { feature: FEATURE_KEYS.MUSIC });
+    }
     const used = await this.prisma.videoJob.count({ where: { eventId: event.id, status: { in: ['QUEUED', 'PROCESSING', 'COMPLETED'] } } });
     EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.VIDEO_RENDERS_MAX, used);
 

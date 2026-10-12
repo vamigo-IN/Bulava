@@ -68,8 +68,13 @@ export class PublicEventsService {
       where: { slug, deletedAt: null, status: { in: ['ACTIVE', 'COMPLETED', 'ARCHIVED'] } },
       include: { accessPolicy: true },
     });
-    if (!event) throw AppError.notFound('Event');
-    return event;
+    if (event) return event;
+    // A link the host replaced with one of their own (ADR-062) keeps opening the invitation.
+    const alias = await this.prisma.eventSlugAlias.findUnique({ where: { slug }, select: { event: { select: { slug: true, deletedAt: true, status: true } } } });
+    if (alias && !alias.event.deletedAt && ['ACTIVE', 'COMPLETED', 'ARCHIVED'].includes(alias.event.status)) {
+      throw new AppError('EVENT_MOVED', 'This invitation has a new link.', { slug: alias.event.slug });
+    }
+    throw AppError.notFound('Event');
   }
 
   async verifyPin(slug: string, pin: string) {
@@ -156,7 +161,8 @@ export class PublicEventsService {
         customization: template.customization,
         announcements,
         ...(await this.media.templatePhotos(event.id, template.customization)),
-        music: await this.renderContext.resolveMusic(template),
+        // Music comes with the plan (on unless a plan says otherwise; ADR-062).
+        music: (features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true) ? await this.renderContext.resolveMusic(template) : null,
       }),
       watermark: EntitlementsService.enabled(features, FEATURE_KEYS.WATERMARK),
       registration: summarizeForPublic(registrationSettings, confirmedRegistrations, event.status === 'ACTIVE'),

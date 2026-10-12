@@ -113,7 +113,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       mode="live"
       introKey={view.checkInCode ?? view.template.key}
       slots={{
-        rsvp: <RsvpIsland token={token} initialView={view} language={language} />,
+        // Replies come with the host's plan; without them the invitation has no RSVP section (ADR-062).
+        rsvp: view.rsvp === false ? undefined : <RsvpIsland token={token} initialView={view} language={language} />,
         photoShare: view.mediaRooms.length ? <PhotoRooms rooms={view.mediaRooms} token={token} language={language} /> : undefined,
         checkIn: view.checkInCode ? (
           <div className="rounded-2xl bg-white p-4 text-center text-stone-800">

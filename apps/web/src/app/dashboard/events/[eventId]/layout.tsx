@@ -265,7 +265,7 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
         </div>
       </div>
       {/* A plan limit met on any of the event's pages: the way to unlock more. */}
-      <PlanLimitPrompt eventId={event.id} canPay={can(event, 'payment.read')} />
+      <PlanLimitPrompt eventId={event.id} canPay={can(event, 'billing.manage')} />
     </div>
   );
 }

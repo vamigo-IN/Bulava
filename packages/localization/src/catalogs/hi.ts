@@ -207,6 +207,8 @@ export const hi: Catalog = {
   'error.INVITATION_REVOKED': 'यह निमंत्रण अब सक्रिय नहीं है।',
   'error.INVITATION_INVALID': 'यह निमंत्रण लिंक मान्य नहीं है।',
   'error.RATE_LIMITED': 'बहुत अधिक प्रयास। कृपया थोड़ी देर बाद फिर से प्रयास करें।',
+  'error.EVENT_MOVED': 'इस निमंत्रण का लिंक बदल गया है।',
+  'error.RSVP_NOT_TAKEN': 'यह निमंत्रण ऑनलाइन जवाब नहीं लेता। कृपया सीधे अपने मेज़बान को जवाब दें।',
   'error.PAYLOAD_TOO_LARGE': 'एक बार में भेजने के लिए यह बहुत बड़ा है। इसे छोटा करके फिर से प्रयास करें।',
   'error.PHONE_TAKEN': 'इस WhatsApp नंबर से पहले से एक खाता है। उसी से साइन इन करें।',
   'error.ACCOUNT_UNVERIFIED': 'पहले अपना खाता सुरक्षित करें: WhatsApp नंबर सत्यापित करें, या ईमेल और पासवर्ड जोड़ें।',

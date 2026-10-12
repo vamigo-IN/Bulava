@@ -1,14 +1,17 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { Order, PricingPlan, Prisma } from '@bulava/database';
+import { planOfferToken, verifyPlanOfferToken } from '@bulava/auth';
+import { ADDON_SOURCE, type Order, type PricingPlan, type Prisma } from '@bulava/database';
 import { SettingsStore } from '@bulava/settings';
-import { FEATURE_KEYS, type CreateOrderInput, type OrderQuoteInput, type VerifyPaymentInput } from '@bulava/validation';
+import { ADDON_MAX_QUANTITY, FEATURE_KEYS, type CreateOrderInput, type OrderQuoteInput, type PlanOfferInput, type VerifyPaymentInput } from '@bulava/validation';
+import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import type { AuthUser, EventAccessContext } from '../../common/request-context';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditService } from '../audit/audit.service';
+import { ContactService } from '../contact/contact.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { assertVerifiedAccount } from '../users/account-gate';
@@ -28,11 +31,46 @@ export interface GatewayPayment {
 /** Settles a webhook for a gateway order that is not a plan purchase; true when it was its own. */
 export type OtherPaymentHandler = (event: string | undefined, payment: GatewayPayment & { id: string; order_id: string }, raw: Prisma.InputJsonValue) => Promise<boolean>;
 
+type PlanWithFeatures = PricingPlan & { features: Array<{ featureKey: string; enabled: boolean; limit: number | null }> };
+
+/** What buying a plan or an add-on means for an account, before a coupon (ADR-062). */
+interface Purchase {
+  plan: PlanWithFeatures;
+  /** How many of a stackable add-on (one of anything else). */
+  quantity: number;
+  /** The account's plan, when a bigger one is unlocked: its price comes off. */
+  upgradeFrom: PricingPlan | null;
+  creditMinor: number;
+  subtotalMinor: number;
+  /** The account has it already (the plan or a bigger one; an add-on bought once). */
+  included: boolean;
+}
+
+/** Entitlements from orders: plans (ORDER) and add-ons (ADDON). */
+const ORDER_SOURCES = ['ORDER', ADDON_SOURCE];
+
+/** Services the team carries out after a purchase: the inbox hears about them. */
+const SERVICES = new Set<string>([FEATURE_KEYS.DONE_FOR_YOU, FEATURE_KEYS.RUSH]);
+
+const planCard = (plan: PlanWithFeatures) => ({
+  key: plan.key,
+  name: plan.name,
+  description: plan.description,
+  interval: plan.interval,
+  kind: plan.kind,
+  tagline: plan.tagline,
+  stackable: plan.stackable,
+  priceMinor: plan.priceMinor,
+  currency: plan.currency,
+  features: plan.features.map((f) => ({ featureKey: f.featureKey, enabled: f.enabled, limit: f.limit })),
+});
+
 /**
- * Plan purchases. The browser never decides that a payment succeeded:
- * entitlements are granted only after a verified Razorpay signature
- * (checkout callback) or a verified webhook. Granting is idempotent, so the
- * callback and the webhook can race safely.
+ * Plans and add-ons, paid once (ADR-053, ADR-062). The browser never decides
+ * that a payment succeeded: entitlements are granted only after a verified
+ * Razorpay signature (checkout callback) or a verified webhook. Granting is
+ * idempotent, so the callback and the webhook can race safely. Nothing here
+ * renews: Razorpay Orders only, never subscriptions.
  */
 @Injectable()
 export class PaymentsService {
@@ -48,6 +86,8 @@ export class PaymentsService {
     private readonly notifications: NotificationsService,
     private readonly consents: ConsentService,
     private readonly entitlements: EntitlementsService,
+    private readonly contact: ContactService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     /** Set by tests only; production reads Razorpay from the Super Admin's settings. */
     @Optional() @Inject(PAYMENT_PROVIDER) private readonly override: PaymentProvider | null,
     @Inject(SETTINGS_STORE) private readonly settings: SettingsStore,
@@ -86,8 +126,8 @@ export class PaymentsService {
     this.otherPayments.push(handler);
   }
 
-  private async priceWithCoupon(plan: PricingPlan, couponCode?: string) {
-    if (!couponCode) return { amountMinor: plan.priceMinor, couponId: null as string | null };
+  private async withCoupon(amountMinor: number, couponCode?: string) {
+    if (!couponCode) return { amountMinor, couponId: null as string | null };
     const now = new Date();
     const coupon = await this.prisma.coupon.findUnique({ where: { code: couponCode } });
     const valid =
@@ -96,71 +136,143 @@ export class PaymentsService {
       (!coupon.validUntil || coupon.validUntil > now) &&
       (coupon.maxRedemptions === null || coupon.redemptions < coupon.maxRedemptions);
     if (!coupon || !valid) throw new AppError('COUPON_INVALID', 'This coupon code is not valid.');
-    const off = coupon.percentOff ? Math.round((plan.priceMinor * coupon.percentOff) / 100) : (coupon.amountOffMinor ?? 0);
-    return { amountMinor: Math.max(0, plan.priceMinor - off), couponId: coupon.id };
+    const off = coupon.percentOff ? Math.round((amountMinor * coupon.percentOff) / 100) : (coupon.amountOffMinor ?? 0);
+    return { amountMinor: Math.max(0, amountMinor - off), couponId: coupon.id };
+  }
+
+  private async planForSale(key: string): Promise<PlanWithFeatures> {
+    const plan = await this.prisma.pricingPlan.findUnique({ where: { key }, include: { features: true } });
+    if (!plan || !plan.active || plan.priceMinor <= 0) throw new AppError('NOT_FOUND', 'Plan not found.');
+    return plan;
+  }
+
+  /** The plans the account bought or was given, in force: one-time ones always, yearly ones for their year. */
+  async accountPlans(userId: string): Promise<PricingPlan[]> {
+    const orders = await this.prisma.order.findMany({ where: { userId, eventId: null, status: 'PAID', plan: { kind: 'PLAN' } }, select: { id: true, plan: true } });
+    if (!orders.length) return [];
+    const now = new Date();
+    const live = await this.prisma.entitlement.findMany({
+      where: { sourceType: 'ORDER', sourceId: { in: orders.map((o) => o.id) }, OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
+      select: { sourceId: true },
+      distinct: ['sourceId'],
+    });
+    const inForce = new Set(live.map((e) => e.sourceId));
+    return orders.filter((o) => inForce.has(o.id)).map((o) => o.plan);
+  }
+
+  /** The plan a bigger one is paid against: the account's biggest one-time plan. */
+  private currentPlan(plans: PricingPlan[]): PricingPlan | null {
+    return [...plans].filter((p) => p.interval === 'ONE_TIME').sort((a, b) => b.priceMinor - a.priceMinor)[0] ?? null;
   }
 
   /**
-   * Does the account already have what this one-time plan unlocks? Compared by
-   * the design tier it gives (templates.maxTier), from any plan on the account
-   * (one-time or yearly). A plan without a tier is never "already there".
+   * What buying `plan` means for this account (ADR-062). A plan: included when
+   * the account has it or a bigger one, else the price less the plan it has
+   * (unlocking pays the difference); a hidden plan only through an offer made
+   * for this account. An add-on: only with a plan it is offered to, once (or
+   * as many as wanted when stackable).
    */
-  private async accountHas(userId: string, plan: PricingPlan & { features: Array<{ featureKey: string; limit: number | null }> }): Promise<boolean> {
-    if (plan.interval !== 'ONE_TIME') return false;
-    const row = plan.features.find((f) => f.featureKey === FEATURE_KEYS.TEMPLATES_MAX_TIER);
-    if (!row) return false;
-    const own = (await this.entitlements.forUser(userId)).get(FEATURE_KEYS.TEMPLATES_MAX_TIER);
-    if (!own || own.source === 'FREE_PLAN' || !own.enabled) return false;
-    return (own.limit ?? 2) >= (row.limit ?? 2);
+  private async purchase(userId: string, plan: PlanWithFeatures, input: { quantity?: number; offerToken?: string }): Promise<Purchase> {
+    const plans = await this.accountPlans(userId);
+    const current = this.currentPlan(plans);
+    if (plan.kind === 'ADDON') {
+      if (!plans.length) throw new AppError('ADDON_NEEDS_PLAN', 'Add-ons go with a plan: choose your plan first.');
+      if (plan.offeredTo.length && !(current && plan.offeredTo.includes(current.key))) {
+        throw new AppError('ADDON_NOT_OFFERED', 'This add-on is not offered with your plan.', { plan: current?.key ?? null });
+      }
+      const owned = !plan.stackable && (await this.prisma.order.count({ where: { userId, planId: plan.id, status: 'PAID' } })) > 0;
+      const quantity = plan.stackable ? Math.min(ADDON_MAX_QUANTITY, Math.max(1, input.quantity ?? 1)) : 1;
+      return { plan, quantity, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor * quantity, included: owned };
+    }
+    if (plan.visibility === 'HIDDEN' && !(input.offerToken && verifyPlanOfferToken(input.offerToken, userId, plan.key, this.config.TOKEN_ENCRYPTION_KEY))) {
+      throw new AppError('NOT_FOUND', 'Plan not found.');
+    }
+    // A yearly plan (Studio) is sold whole, never against a one-time plan.
+    if (plan.interval !== 'ONE_TIME') return { plan, quantity: 1, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor, included: false };
+    const included = Boolean(current && current.priceMinor >= plan.priceMinor);
+    const upgradeFrom = current && !included ? current : null;
+    const creditMinor = upgradeFrom?.priceMinor ?? 0;
+    return { plan, quantity: 1, upgradeFrom, creditMinor, subtotalMinor: plan.priceMinor - creditMinor, included };
   }
 
   /**
-   * The checkout page's price breakdown: a plan's price, a coupon's discount
-   * and the total, before anything is bought, and whether the account has the
-   * plan already (`included`). A code that is not valid answers COUPON_INVALID,
-   * so the page can say so beside the field.
+   * The checkout page's price breakdown before anything is bought: the plan or
+   * add-on, how many, the plan already owned (taken off a bigger one), a
+   * coupon's discount and the total, and whether the account has it already.
+   * A code that is not valid answers COUPON_INVALID, so the page can say so.
    */
   async quote(user: AuthUser, input: OrderQuoteInput) {
-    const plan = await this.prisma.pricingPlan.findUnique({ where: { key: input.planKey }, include: { features: true } });
-    if (!plan || !plan.active || plan.priceMinor <= 0) throw new AppError('NOT_FOUND', 'Plan not found.');
-    const [{ amountMinor }, included] = await Promise.all([this.priceWithCoupon(plan, input.couponCode || undefined), this.accountHas(user.id, plan)]);
+    const plan = await this.planForSale(input.planKey);
+    const p = await this.purchase(user.id, plan, input);
+    const { amountMinor } = await this.withCoupon(p.subtotalMinor, input.couponCode || undefined);
     return {
-      plan: { key: plan.key, name: plan.name, description: plan.description, interval: plan.interval },
+      plan: planCard(plan),
       couponCode: input.couponCode || null,
       priceMinor: plan.priceMinor,
-      discountMinor: plan.priceMinor - amountMinor,
+      quantity: p.quantity,
+      upgradeFrom: p.upgradeFrom ? { key: p.upgradeFrom.key, name: p.upgradeFrom.name, priceMinor: p.upgradeFrom.priceMinor } : null,
+      creditMinor: p.creditMinor,
+      subtotalMinor: p.subtotalMinor,
+      discountMinor: p.subtotalMinor - amountMinor,
       totalMinor: amountMinor,
       currency: plan.currency,
-      included,
+      included: p.included,
     };
   }
 
   /**
-   * Plans belong to the account (ADR-053): `POST /orders` buys a one-time or a
-   * yearly plan, and every event of the buyer's gets it. `POST /events/:id/orders`
-   * still buys a one-time plan for that event alone (API clients; older orders).
+   * Plans and add-ons belong to the account (ADR-053, ADR-062): `POST /orders`
+   * buys one for the buyer's account, and every event of theirs gets it.
+   * `POST /events/:id/orders` still buys a one-time plan for that event alone
+   * (API clients; older orders).
    */
   async createOrder(user: AuthUser, access: EventAccessContext | null, input: CreateOrderInput, meta: RequestMeta) {
     // Receipts and refunds need a reachable account, not a number alone.
     await assertVerifiedAccount(this.prisma, user.id);
-    const plan = await this.prisma.pricingPlan.findUnique({ where: { key: input.planKey }, include: { features: true } });
-    if (!plan || !plan.active || plan.priceMinor <= 0) throw new AppError('NOT_FOUND', 'Plan not found.');
-    if (access && plan.interval !== 'ONE_TIME') throw new AppError('BAD_REQUEST', 'This plan is not purchased per event.');
-    // Never sold twice: a one-time plan the account already has (or a higher one).
-    if (!access && (await this.accountHas(user.id, plan))) throw new AppError('PLAN_ALREADY_ACTIVE', 'Your account already has this plan.');
+    const plan = await this.planForSale(input.planKey);
+    let p: Purchase;
+    if (access) {
+      if (plan.kind !== 'PLAN' || plan.interval !== 'ONE_TIME' || plan.visibility === 'HIDDEN') throw new AppError('BAD_REQUEST', 'This is not bought for one event.');
+      p = { plan, quantity: 1, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor, included: false };
+    } else {
+      p = await this.purchase(user.id, plan, input);
+    }
+    // Never sold twice: a plan the account already has (or a bigger one), an add-on bought once.
+    if (p.included) {
+      throw plan.kind === 'ADDON' ? new AppError('ADDON_ALREADY_OWNED', 'Your account already has this add-on.') : new AppError('PLAN_ALREADY_ACTIVE', 'Your account already has this plan.');
+    }
 
-    const { amountMinor, couponId } = await this.priceWithCoupon(plan, input.couponCode);
+    const { amountMinor, couponId } = await this.withCoupon(p.subtotalMinor, input.couponCode);
     const versions = await this.consents.versions(['terms', 'refund']);
     const order = await this.prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
-        data: { userId: user.id, eventId: access?.eventId ?? null, planId: plan.id, couponId, amountMinor, currency: plan.currency, termsAcceptedAt: new Date() },
+        data: {
+          userId: user.id,
+          eventId: access?.eventId ?? null,
+          planId: plan.id,
+          couponId,
+          amountMinor,
+          currency: plan.currency,
+          quantity: p.quantity,
+          creditMinor: p.creditMinor,
+          termsAcceptedAt: new Date(),
+        },
       });
       // The buyer's ticked box (an explicit action, as the e-commerce rules require), kept with the order.
       await tx.consent.create({ data: { userId: user.id, kind: 'purchase_terms', granted: true, version: `${versions.terms};${versions.refund}`, source: `order:${created.id}` } });
       return created;
     });
     this.analytics.track('checkout_started', { eventId: access?.eventId, userId: user.id }, { plan: plan.key, amountMinor });
-    await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'order.created', targetType: 'Order', targetId: order.id, eventId: access?.eventId ?? null, metadata: { plan: plan.key, amountMinor }, meta });
+    await this.audit.record({
+      actorType: 'USER',
+      actorId: user.id,
+      action: 'order.created',
+      targetType: 'Order',
+      targetId: order.id,
+      eventId: access?.eventId ?? null,
+      metadata: { plan: plan.key, kind: plan.kind, amountMinor, quantity: p.quantity, creditMinor: p.creditMinor, ...(p.upgradeFrom ? { from: p.upgradeFrom.key } : {}) },
+      meta,
+    });
 
     if (amountMinor === 0) {
       // Fully discounted: no gateway involved.
@@ -169,6 +281,50 @@ export class PaymentsService {
     }
 
     return this.checkoutSession(user, { ...order, plan });
+  }
+
+  /**
+   * A hidden plan offered to this account for a day (ADR-062): the ₹159 plan,
+   * offered to a host about to leave the checkout or arriving from an ad. Only
+   * for a first plan: an account with one unlocks more from it instead.
+   */
+  async offer(user: AuthUser, input: PlanOfferInput, meta: RequestMeta) {
+    // Without a key: the first-plan offer, the cheapest hidden one-time plan.
+    const offerable = { active: true, kind: 'PLAN', visibility: 'HIDDEN', interval: 'ONE_TIME', priceMinor: { gt: 0 } } as const;
+    const plan = input.planKey
+      ? await this.prisma.pricingPlan.findFirst({ where: { key: input.planKey, ...offerable }, include: { features: true } })
+      : await this.prisma.pricingPlan.findFirst({ where: offerable, include: { features: true }, orderBy: { priceMinor: 'asc' } });
+    if (!plan) throw new AppError('NOT_FOUND', 'Offer not found.');
+    if ((await this.accountPlans(user.id)).length) throw new AppError('OFFER_NOT_AVAILABLE', 'This offer is for your first plan.');
+    const ttl = 86_400;
+    const token = planOfferToken(user.id, plan.key, this.config.TOKEN_ENCRYPTION_KEY, ttl);
+    this.analytics.track('offer_made', { userId: user.id }, { plan: plan.key });
+    await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'plan.offer_made', targetType: 'PricingPlan', targetId: plan.id, metadata: { plan: plan.key }, meta });
+    return { token, expiresAt: new Date(Date.now() + ttl * 1000), plan: planCard(plan) };
+  }
+
+  /**
+   * The signed-in account's plan and add-ons, and what they add up to: the
+   * dashboard's Plan page and the checkout's "your plan" line.
+   */
+  async account(user: AuthUser) {
+    const [plans, addOns, features] = await Promise.all([
+      this.accountPlans(user.id),
+      this.prisma.order.findMany({ where: { userId: user.id, eventId: null, status: 'PAID', plan: { kind: 'ADDON' } }, select: { quantity: true, createdAt: true, plan: { select: { key: true, name: true } } }, orderBy: { createdAt: 'asc' } }),
+      this.entitlements.forUser(user.id),
+    ]);
+    const plan = this.currentPlan(plans) ?? plans[0] ?? null;
+    const owned = new Map<string, { key: string; name: string; quantity: number }>();
+    for (const a of addOns) {
+      const row = owned.get(a.plan.key) ?? { key: a.plan.key, name: a.plan.name, quantity: 0 };
+      row.quantity += a.quantity;
+      owned.set(a.plan.key, row);
+    }
+    return {
+      plan: plan ? { key: plan.key, name: plan.name, priceMinor: plan.priceMinor, interval: plan.interval, tagline: plan.tagline } : null,
+      addOns: [...owned.values()],
+      features: EntitlementsService.summary(features),
+    };
   }
 
   /**
@@ -185,7 +341,7 @@ export class PaymentsService {
           amountMinor: order.amountMinor,
           currency: order.currency,
           receipt: order.id,
-          notes: { orderId: order.id, plan: order.plan.key, ...(order.eventId ? { eventId: order.eventId } : {}) },
+          notes: { orderId: order.id, plan: order.plan.key, ...(order.quantity > 1 ? { quantity: String(order.quantity) } : {}), ...(order.eventId ? { eventId: order.eventId } : {}) },
         });
         providerOrderId = created.providerOrderId;
         await this.prisma.order.update({ where: { id: order.id }, data: { providerOrderId } });
@@ -196,7 +352,7 @@ export class PaymentsService {
         status: 'CREATED' as const,
         amountMinor: order.amountMinor,
         currency: order.currency,
-        planName: order.plan.name,
+        planName: order.quantity > 1 ? `${order.plan.name} × ${order.quantity}` : order.plan.name,
         keyId: provider.publicKey,
         providerOrderId,
         prefill: { name: profile?.name ?? '', email: profile?.email ?? '', contact: profile?.phone ?? '' },
@@ -216,7 +372,7 @@ export class PaymentsService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId: user.id },
       include: {
-        plan: { select: { key: true, name: true, interval: true } },
+        plan: { select: { key: true, name: true, interval: true, kind: true } },
         coupon: { select: { code: true } },
         payments: { where: { status: { in: ['CAPTURED', 'REFUNDED'] } }, orderBy: { createdAt: 'desc' }, take: 1, select: { provider: true, providerPaymentId: true, verifiedAt: true } },
       },
@@ -224,7 +380,7 @@ export class PaymentsService {
     if (!order) throw AppError.notFound('Order');
     const [event, entitlement] = await Promise.all([
       order.eventId ? this.prisma.event.findFirst({ where: { id: order.eventId, deletedAt: null }, select: { id: true, title: true } }) : null,
-      order.status === 'PAID' ? this.prisma.entitlement.findFirst({ where: { sourceType: 'ORDER', sourceId: order.id }, select: { validUntil: true } }) : null,
+      order.status === 'PAID' ? this.prisma.entitlement.findFirst({ where: { sourceType: { in: ORDER_SOURCES }, sourceId: order.id }, select: { validUntil: true } }) : null,
     ]);
     const payment = order.payments[0];
     return {
@@ -233,6 +389,8 @@ export class PaymentsService {
       kind: order.kind,
       amountMinor: order.amountMinor,
       currency: order.currency,
+      quantity: order.quantity,
+      creditMinor: order.creditMinor,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       plan: order.plan,
@@ -254,6 +412,11 @@ export class PaymentsService {
     }
     if (order.eventId && !(await this.prisma.event.findFirst({ where: { id: order.eventId, deletedAt: null }, select: { id: true } }))) {
       throw new AppError('ORDER_NOT_PAYABLE', 'The event for this order was deleted.');
+    }
+    // A plan paid against another (pay the difference) is only payable while the account still has that one and not more.
+    if (!order.eventId && order.plan.kind === 'PLAN' && order.plan.interval === 'ONE_TIME') {
+      const current = this.currentPlan(await this.accountPlans(user.id));
+      if ((current?.priceMinor ?? 0) !== order.creditMinor) throw new AppError('ORDER_NOT_PAYABLE', 'Your plan changed since this order. Choose a plan to start again.');
     }
     if (order.status === 'FAILED') await this.prisma.order.update({ where: { id: order.id }, data: { status: 'CREATED' } });
     await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'order.checkout_resumed', targetType: 'Order', targetId: order.id, eventId: order.eventId, metadata: { from: order.status }, meta });
@@ -320,7 +483,7 @@ export class PaymentsService {
       if (order.couponId) await tx.coupon.update({ where: { id: order.couponId }, data: { redemptions: { increment: 1 } } });
       await this.grant(tx, order);
       await this.audit.record(
-        { actorType: 'SYSTEM', action: 'payment.captured', targetType: 'Order', targetId: orderId, eventId: order.eventId, metadata: { plan: order.plan.key, amountMinor: payment.amountMinor, provider: payment.provider } },
+        { actorType: 'SYSTEM', action: 'payment.captured', targetType: 'Order', targetId: orderId, eventId: order.eventId, metadata: { plan: order.plan.key, amountMinor: payment.amountMinor, provider: payment.provider, quantity: order.quantity } },
         tx,
       );
       return order;
@@ -334,12 +497,35 @@ export class PaymentsService {
         eventId: granted.eventId,
         payload: { orderId, plan: granted.plan.name, amountMinor: payment.amountMinor },
       });
+      await this.tellTheTeam(granted);
     }
   }
 
-  /** Entitlements from the order's plan, exactly once (purchases and admin grants). */
+  /** A purchase the team carries out (done-for-you setup, same-day delivery): a note in the console's inbox, which also emails support. */
+  private async tellTheTeam(order: Order & { plan: PlanWithFeatures }) {
+    const services = order.plan.features.filter((f) => f.enabled && SERVICES.has(f.featureKey)).map((f) => f.featureKey);
+    if (!services.length) return;
+    try {
+      const buyer = await this.prisma.user.findUnique({ where: { id: order.userId }, select: { name: true, email: true, phone: true } });
+      const site = (await this.settings.get('site')).value;
+      await this.contact.submit({
+        name: buyer?.name?.slice(0, 80) || 'Bulava customer',
+        email: buyer?.email ?? site.supportEmail,
+        phone: buyer?.phone ?? undefined,
+        topic: 'BILLING',
+        message: `Paid for ${order.plan.name} (order ${order.id}). Please contact this customer to start: ${services.join(', ')}.${buyer?.email ? '' : ' They have no email address; use their WhatsApp number.'}`,
+      });
+    } catch (error) {
+      // The payment stands; the order is in the console's order list either way.
+      this.logger.error({ err: error, orderId: order.id }, 'Could not tell the team about a service purchase');
+    }
+  }
+
+  /** Entitlements from the order's plan or add-on, exactly once (purchases and admin grants). An add-on's limits count once per add-on bought. */
   async grant(tx: Tx, order: Order & { plan: PricingPlan & { features: Array<{ featureKey: string; enabled: boolean; limit: number | null }> } }) {
-    const existing = await tx.entitlement.count({ where: { sourceType: 'ORDER', sourceId: order.id } });
+    const addOn = order.plan.kind === 'ADDON';
+    const sourceType = addOn ? ADDON_SOURCE : 'ORDER';
+    const existing = await tx.entitlement.count({ where: { sourceType, sourceId: order.id } });
     if (existing) return;
     const validUntil = order.plan.interval === 'YEAR' ? new Date(Date.now() + 365 * 86_400_000) : null;
     await tx.entitlement.createMany({
@@ -348,8 +534,8 @@ export class PaymentsService {
         eventId: order.eventId,
         featureKey: f.featureKey,
         enabled: f.enabled,
-        limit: f.limit,
-        sourceType: 'ORDER',
+        limit: addOn && f.limit !== null ? f.limit * order.quantity : f.limit,
+        sourceType,
         sourceId: order.id,
         validUntil,
       })),
@@ -363,7 +549,7 @@ export class PaymentsService {
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: {
-        plan: { select: { key: true, name: true, interval: true } },
+        plan: { select: { key: true, name: true, interval: true, kind: true } },
         coupon: { select: { code: true } },
         payments: { where: { status: { in: ['CAPTURED', 'REFUNDED'] } }, orderBy: { createdAt: 'desc' }, take: 1, select: { provider: true, providerPaymentId: true, verifiedAt: true } },
       },
@@ -379,6 +565,8 @@ export class PaymentsService {
         kind: o.kind,
         amountMinor: o.amountMinor,
         currency: o.currency,
+        quantity: o.quantity,
+        creditMinor: o.creditMinor,
         createdAt: o.createdAt,
         plan: o.plan,
         couponCode: o.coupon?.code ?? null,
@@ -408,7 +596,7 @@ export class PaymentsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({ where: { id: orderId }, data: { status: 'REFUNDED' } });
       if (payment) await tx.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
-      await tx.entitlement.updateMany({ where: { sourceType: 'ORDER', sourceId: orderId }, data: { validUntil: new Date() } });
+      await tx.entitlement.updateMany({ where: { sourceType: { in: ORDER_SOURCES }, sourceId: orderId }, data: { validUntil: new Date() } });
       await this.audit.record({ actorType: 'USER', actorId: adminId, action: 'payment.refunded', targetType: 'Order', targetId: orderId, eventId: order.eventId, meta }, tx);
     });
     return { refunded: true };

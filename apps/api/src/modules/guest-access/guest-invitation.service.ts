@@ -65,6 +65,8 @@ export interface GuestInvitationView {
   /** Event-level RSVP, used when the invitation covers no specific functions. */
   eventRsvp: { status: string; attendeeCount: number; respondedAt: Date } | null;
   eventRsvpOpen: boolean;
+  /** Whether the invitation takes replies at all (the host's plan; ADR-062). */
+  rsvp: boolean;
   message: string | null;
   /** Website template chosen by the host (or the free default) and its render context. */
   template: { key: string; definition: TemplateDefinition; customization: Customization | null } | null;
@@ -131,6 +133,10 @@ export class GuestInvitationService {
   async submitRsvp(token: string, input: RSVPSubmitInput, meta: RequestMeta, otpPass?: string): Promise<GuestInvitationView> {
     const ctx = await this.resolve(token, otpPass);
     if (ctx.event.status !== 'ACTIVE') throw new AppError('FUNCTION_CLOSED', 'RSVP is closed for this event.');
+    // Online replies come with the host's plan (ADR-062); on unless a plan says otherwise.
+    if (!((await this.entitlements.forEvent(ctx.event.id)).get(FEATURE_KEYS.RSVP)?.enabled ?? true)) {
+      throw new AppError('RSVP_NOT_TAKEN', 'This invitation does not take replies online. Please reply to your host directly.');
+    }
 
     const functionsById = new Map(ctx.functions.map((f) => [f.id, f]));
     const questions = await this.prisma.rSVPQuestion.findMany({
@@ -393,9 +399,11 @@ export class GuestInvitationService {
       ctx.functions.map((f) => f.id),
     );
     const seatByFunction = new Map(seats.map((s) => [s.functionId, { tableLabel: s.tableLabel, seatLabel: s.seatLabel }]));
+    // Replies and music come with the host's plan (ADR-062); on unless a plan says otherwise.
+    const repliesTaken = features.get(FEATURE_KEYS.RSVP)?.enabled ?? true;
     const [{ photos, photoSlots }, music] = await Promise.all([
       this.media.templatePhotos(ctx.event.id, template?.customization),
-      this.renderContext.resolveMusic(template),
+      (features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true) ? this.renderContext.resolveMusic(template) : Promise.resolve(null),
     ]);
     const context = await this.renderContext.build({
       event: ctx.event,
@@ -435,7 +443,7 @@ export class GuestInvitationService {
             ? { name: fn.venue.name, address: fn.venue.address, city: fn.venue.city, mapUrl: fn.venue.mapUrl }
             : null,
           attendeeLimit: AudienceService.attendeeLimit(ctx.guestFacts, fn.id),
-          rsvpOpen: eventOpen && OPEN_FOR_RSVP.has(fn.status),
+          rsvpOpen: repliesTaken && eventOpen && OPEN_FOR_RSVP.has(fn.status),
           rsvp: rsvp
             ? {
                 status: rsvp.status,
@@ -451,7 +459,9 @@ export class GuestInvitationService {
       eventRsvp: eventRsvp
         ? { status: eventRsvp.status, attendeeCount: eventRsvp.attendeeCount, respondedAt: eventRsvp.respondedAt }
         : null,
-      eventRsvpOpen: eventOpen && ctx.invitation.functionId === null,
+      eventRsvpOpen: repliesTaken && eventOpen && ctx.invitation.functionId === null,
+      /** Whether the invitation takes replies at all (the host's plan). */
+      rsvp: repliesTaken,
       message: rsvps.find((r) => r.message)?.message ?? null,
       template: template ? { key: template.templateKey, definition: template.definition, customization: template.customization } : null,
       context,

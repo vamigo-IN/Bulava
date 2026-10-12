@@ -1,6 +1,7 @@
 import { CardDesignSchema, type CardDesign, type CardFormat } from '@bulava/template-schema';
 import { api, ApiError } from './api';
 import { readStore, recentCards, RECENT_KEY, writeStore } from './card-store';
+import { stockQuery, type StockKind, type StockPage } from './stock';
 
 /**
  * The digital card editor's browser side (docs/cards.md). A card's session
@@ -17,11 +18,15 @@ export interface CardConfig {
   priceMinor: number;
   currency: string;
   paymentsReady: boolean;
+  /** Anyone may download the card with the watermark (else plan holders only; ADR-062). */
+  freeDownloads: boolean;
+  /** The plans page's first price, for "from …". */
+  planFromMinor: number | null;
   /** The free card's watermark, exactly as the export draws it. */
   watermark: string;
   formats: Record<CardFormat, { width: number; height: number; pixels: { width: number; height: number } }>;
   /** Signed in: prefill, and whether their plan covers watermark-free cards. */
-  account: { name: string; email: string | null; phone: string | null; planDownload: boolean; planName: string | null } | null;
+  account: { name: string; email: string | null; phone: string | null; planDownload: boolean; planName: string | null; paidPlan: boolean } | null;
 }
 
 export interface CardUpload {
@@ -108,6 +113,8 @@ export const cardApi = {
     api<{ uploadId: string; uploadUrl: string; headers: Record<string, string> }>('/public/cards/session/uploads', { method: 'POST', body: { contentType, size }, headers: withSession(token) }),
   completeUpload: (token: string, id: string) => api<CardUpload>(`/public/cards/session/uploads/${id}/complete`, { method: 'POST', body: {}, headers: withSession(token) }),
   upload: (token: string, id: string) => api<CardUpload>(`/public/cards/session/uploads/${id}`, { headers: withSession(token) }),
+  stockSearch: (token: string, q: string, kind: StockKind, page: number) => api<StockPage>(`/public/cards/session/stock?${stockQuery(q, kind, page)}`, { headers: withSession(token) }),
+  stockImport: (token: string, id: string) => api<CardUpload>('/public/cards/session/stock', { method: 'POST', body: { id }, headers: withSession(token) }),
   freeDownload: (token: string, body: { phone: string; marketingConsent: boolean }) => api<CardExportView>('/public/cards/session/free-download', { method: 'POST', body, headers: withSession(token) }),
   planDownload: (token: string) => api<CardExportView>('/cards/session/plan-download', { method: 'POST', body: {}, headers: withSession(token) }),
   exportStatus: (token: string, id: string) => api<CardExportView>(`/public/cards/session/exports/${id}`, { headers: withSession(token) }),

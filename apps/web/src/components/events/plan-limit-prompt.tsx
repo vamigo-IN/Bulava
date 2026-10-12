@@ -11,7 +11,9 @@ import { PLAN_LIMIT_EVENT, type PlanLimitDetail } from '@/lib/plan-limits';
  * When a request inside an event meets a plan limit (more guests, photos,
  * functions, films or WhatsApp messages than its plan allows), the page says
  * which limit, and this offers the way to unlock more: the event's plans, or the
- * plans page for the number of events. It stays until dismissed or the page changes.
+ * plans page for the number of events. Plans belong to the owner's account
+ * (ADR-062): the rest of the team is told who unlocks more instead of being
+ * shown a way to pay. It stays until dismissed or the page changes.
  */
 export function PlanLimitPrompt({ eventId, canPay }: { eventId: string; canPay: boolean }) {
   const t = useT();
@@ -25,7 +27,7 @@ export function PlanLimitPrompt({ eventId, canPay }: { eventId: string; canPay: 
   }, []);
   useEffect(() => setDetail(null), [pathname]);
 
-  if (!detail || !canPay) return null;
+  if (!detail) return null;
   const href = detail.feature === 'events.max' ? '/pricing' : `/dashboard/events/${eventId}/unlock`;
   return (
     <div
@@ -35,12 +37,16 @@ export function PlanLimitPrompt({ eventId, canPay }: { eventId: string; canPay: 
       <span className="icon-3d size-9 shrink-0 rounded-xl">
         <LockOpen aria-hidden className="size-4.5" />
       </span>
-      <p className="min-w-0 flex-1 text-sm text-stone-700">
-        {t('unlock.prompt')}{' '}
-        <Link href={href} className="font-semibold whitespace-nowrap text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700">
-          {t('unlock.cta')}
-        </Link>
-      </p>
+      {canPay ? (
+        <p className="min-w-0 flex-1 text-sm text-stone-700">
+          {t('unlock.prompt')}{' '}
+          <Link href={href} className="font-semibold whitespace-nowrap text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700">
+            {t('unlock.cta')}
+          </Link>
+        </p>
+      ) : (
+        <p className="min-w-0 flex-1 text-sm text-stone-700">{t('upgrade.ownerOnly.short')}</p>
+      )}
       <button
         type="button"
         onClick={() => setDetail(null)}

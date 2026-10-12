@@ -1,12 +1,13 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { AbsoluteFill, Audio, Easing, Img, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { createTranslator } from '@bulava/localization';
 import {
   effectiveColors,
   effectiveFonts,
+  FILM_FORMAT_SIZE,
   resolveValue,
   videoDurationSec,
-  withSceneCustomization,
+  withFilmCustomization,
   type Customization,
   type Element,
   type RenderContext,
@@ -53,15 +54,33 @@ export function planScenes(definition: TemplateDefinition, context: RenderContex
   return out;
 }
 
+/** The size scenes are designed at (a film's 9:16 frame). */
+const stageOf = (definition: TemplateDefinition) => ({ width: definition.canvas?.width ?? 1080, height: definition.canvas?.height ?? 1920 });
+
+/** The film's length (with the host's added scenes) and frame (the size they chose, ADR-061). */
 export function templateVideoMetadata(props: TemplateVideoProps) {
   const fps = props.definition.canvas?.fps ?? 30;
-  const seconds = Math.max(1, videoDurationSec(props.definition, props.context.functions.length));
-  return {
-    durationInFrames: Math.max(1, Math.round(seconds * fps)),
-    fps,
-    width: props.definition.canvas?.width ?? 1080,
-    height: props.definition.canvas?.height ?? 1920,
-  };
+  const film = withFilmCustomization(props.definition, props.customization);
+  const seconds = Math.max(1, videoDurationSec(film, props.context.functions.length));
+  const format = props.definition.type === 'VIDEO' ? props.customization?.filmFormat : undefined;
+  const size = format && format !== 'story' ? FILM_FORMAT_SIZE[format] : stageOf(props.definition);
+  return { durationInFrames: Math.max(1, Math.round(seconds * fps)), fps, width: size.width, height: size.height };
+}
+
+/**
+ * Elements are placed on the 9:16 stage the scene was designed at. In a square
+ * or wide film that stage is scaled to the frame's height and centred, so the
+ * words and photos keep their places while the art fills the whole frame.
+ */
+function Stage({ stage, children }: { stage: { width: number; height: number }; children: ReactNode }) {
+  const { width, height } = useVideoConfig();
+  if (width === stage.width && height === stage.height) return <>{children}</>;
+  const k = Math.min(width / stage.width, height / stage.height);
+  return (
+    <div style={{ position: 'absolute', left: (width - stage.width * k) / 2, top: (height - stage.height * k) / 2, width: stage.width, height: stage.height, transform: `scale(${k})`, transformOrigin: '0 0' }}>
+      {children}
+    </div>
+  );
 }
 
 function color(value: string | undefined, colors: ThemeColors, fallback: string): string {
@@ -293,9 +312,13 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
       {overlay ? null : board}
       <Particles effect={planned.scene.particles} colors={colors} />
       {overlay ? board : null}
-      {planned.scene.elements.map((el) => (
-        <ElementView key={el.id} el={el} ctx={planned.ctx} colors={colors} fonts={definition.fonts} language={language} sceneFrames={planned.frames} />
-      ))}
+      {planned.scene.elements.length ? (
+        <Stage stage={stageOf(definition)}>
+          {planned.scene.elements.map((el) => (
+            <ElementView key={el.id} el={el} ctx={planned.ctx} colors={colors} fonts={definition.fonts} language={language} sceneFrames={planned.frames} />
+          ))}
+        </Stage>
+      ) : null}
     </AbsoluteFill>
   );
 }
@@ -304,8 +327,9 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
 export function TemplateVideo(props: TemplateVideoProps) {
   const { fps, durationInFrames } = useVideoConfig();
   const colors = effectiveColors(props.definition, props.customization);
-  // A customer's font pairing replaces the template fonts wherever scenes read them, and their redrawn scenes replace the film's (ADR-059).
-  const definition = { ...withSceneCustomization(props.definition, props.customization?.scenes), fonts: effectiveFonts(props.definition, props.customization) };
+  // A customer's font pairing replaces the template fonts wherever scenes read them; their redrawn scenes replace the film's
+  // and the scenes they added play where they put them (ADR-059, ADR-061).
+  const definition = { ...withFilmCustomization(props.definition, props.customization), fonts: effectiveFonts(props.definition, props.customization) };
   const ctx: RenderContext = props.customization?.custom ? { ...props.context, custom: { ...props.context.custom, ...props.customization.custom } } : props.context;
   const scenes = planScenes(definition, ctx, fps);
   return (

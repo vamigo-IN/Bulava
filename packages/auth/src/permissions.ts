@@ -23,6 +23,8 @@ export const EVENT_PERMISSIONS = [
   'media.delete',
   'media.moderate',
   'payment.read',
+  /** Unlock plans and add-ons for the event: they belong to the owner's account (ADR-053, ADR-062), so only the owner buys them. */
+  'billing.manage',
   'audit.read',
 ] as const;
 
@@ -79,7 +81,7 @@ const ALL_EVENT: readonly EventPermission[] = EVENT_PERMISSIONS;
 
 export const EVENT_ROLE_PERMISSIONS: Record<EventRole, readonly EventPermission[]> = {
   OWNER: ALL_EVENT,
-  ADMIN: ALL_EVENT.filter((p) => p !== 'event.delete'),
+  ADMIN: ALL_EVENT.filter((p) => p !== 'event.delete' && p !== 'billing.manage'),
   CO_HOST: [
     'event.read',
     'event.update',

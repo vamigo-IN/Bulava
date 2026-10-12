@@ -119,6 +119,8 @@ import { CardAdminService } from './modules/cards/card-admin.service';
 import { CardDownloadsService } from './modules/cards/card-downloads.service';
 import { CardOrdersService } from './modules/cards/card-orders.service';
 import { CardsService } from './modules/cards/cards.service';
+import { StockController } from './modules/stock/stock.controller';
+import { StockService } from './modules/stock/stock.service';
 
 /** Invitation tokens, card render tokens and the GetGabs webhook token travel in URLs; keep them out of logs. */
 function redactUrl(url: string | undefined): string | undefined {
@@ -238,6 +240,7 @@ const bootConfig = loadConfig();
     PublicCardsController,
     CardsController,
     AdminCardsController,
+    StockController,
   ],
   providers: [
     // Guards run in this order: rate limit -> authenticate -> CSRF -> event permission.
@@ -312,6 +315,7 @@ const bootConfig = loadConfig();
     AccountService,
     CardsService,
     CardDownloadsService,
+    StockService,
     CardOrdersService,
     CardAdminService,
     { provide: DNS_RESOLVER, useValue: systemResolver },

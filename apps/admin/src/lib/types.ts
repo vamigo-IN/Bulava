@@ -187,6 +187,13 @@ export interface Plan {
   interval: string;
   active: boolean;
   sortOrder: number;
+  /** PLAN (a tier) or ADDON (bought on top of a plan; ADR-062). */
+  kind: 'PLAN' | 'ADDON';
+  visibility: 'PUBLIC' | 'HIDDEN';
+  badge: string | null;
+  tagline: string | null;
+  stackable: boolean;
+  offeredTo: string[];
   features: PlanFeature[];
 }
 
@@ -344,7 +351,7 @@ export interface StaffOverview {
 
 // ───── Site settings ─────
 
-export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'google' | 'maps' | 'domains' | 'cards' | 'likes';
+export type SettingGroup = 'site' | 'seo' | 'tracking' | 'code' | 'payments' | 'email' | 'whatsapp' | 'google' | 'maps' | 'domains' | 'cards' | 'likes' | 'stock';
 
 export interface SettingCheckStep {
   label: string;

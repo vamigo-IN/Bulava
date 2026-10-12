@@ -7,7 +7,7 @@ import { z } from 'zod';
  * browser: the console only sees whether each secret is set.
  */
 
-export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'cards', 'likes'] as const;
+export const SETTING_GROUPS = ['site', 'seo', 'tracking', 'code', 'payments', 'email', 'whatsapp', 'google', 'maps', 'domains', 'cards', 'likes', 'stock'] as const;
 export type SettingGroup = (typeof SETTING_GROUPS)[number];
 
 const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
@@ -285,6 +285,12 @@ export const CardsSettingsSchema = z.object({
   /** The watermark-free download of one card, in paise (₹50 at least). */
   priceMinor: z.coerce.number().int().min(CARD_MIN_PRICE_MINOR, 'At least ₹50 (5000 paise)').max(1_000_000).default(CARD_MIN_PRICE_MINOR),
   planDownloads: z.enum(CARD_PLAN_DOWNLOADS).default('any'),
+  /**
+   * Anyone downloads a card with the watermark after a mobile number. Off (as
+   * plans are one-time, ADR-062): downloads come with a plan, with the plan's
+   * mark or without it, or with the card bought alone.
+   */
+  freeDownloads: z.boolean().default(false),
 });
 
 /**
@@ -295,6 +301,20 @@ export const CardsSettingsSchema = z.object({
 export const LikesSettingsSchema = z.object({
   showCounts: z.boolean().default(false),
   minimum: z.coerce.number().int().min(0).max(10_000).default(10),
+});
+
+/**
+ * Stock photos and illustrations in the editors (ADR-064): searched in
+ * licensed libraries (Pexels: photos; Pixabay: photos and illustrations) with
+ * the platform's API keys, and brought in by the server as the host's own
+ * photos. Never a web image search: those images come with no licence.
+ */
+export const StockSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  pexels: z.boolean().default(true),
+  pixabay: z.boolean().default(true),
+  /** Pixabay's safe search (Pexels has no adult content). */
+  safeSearch: z.boolean().default(true),
 });
 
 export const SETTING_SCHEMAS = {
@@ -310,6 +330,7 @@ export const SETTING_SCHEMAS = {
   domains: DomainSettingsSchema,
   cards: CardsSettingsSchema,
   likes: LikesSettingsSchema,
+  stock: StockSettingsSchema,
 } as const;
 
 export type SettingValues = { [G in SettingGroup]: z.infer<(typeof SETTING_SCHEMAS)[G]> };
@@ -329,6 +350,7 @@ export const SETTING_SECRETS = {
   domains: ['cloudflareApiToken'],
   cards: [],
   likes: [],
+  stock: ['pexelsApiKey', 'pixabayApiKey'],
 } as const satisfies Record<SettingGroup, readonly string[]>;
 export type SettingSecretName<G extends SettingGroup> = (typeof SETTING_SECRETS)[G][number];
 

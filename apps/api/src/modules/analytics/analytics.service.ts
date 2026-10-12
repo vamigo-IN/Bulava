@@ -20,7 +20,8 @@ export type AnalyticsEventName =
   | 'video_downloaded'
   | 'checkout_started'
   | 'payment_success'
-  | 'payment_failed';
+  | 'payment_failed'
+  | 'offer_made';
 
 /**
  * Enqueues analytics events; the worker stores them (AnalyticsEvent) and

@@ -52,6 +52,14 @@ export const UpdatePlanSchema = z.object({
   priceMinor: z.number().int().min(0).max(100_000_000).optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(1000).optional(),
+  /** On the plans page, or sold only through offers (ADR-062). */
+  visibility: z.enum(['PUBLIC', 'HIDDEN']).optional(),
+  badge: z.string().trim().max(40).nullable().optional(),
+  tagline: z.string().trim().max(60).nullable().optional(),
+  /** Add-ons: bought more than once. */
+  stackable: z.boolean().optional(),
+  /** Add-ons: the plans they are offered to (none: every paid plan). */
+  offeredTo: z.array(z.string().trim().regex(/^[A-Z0-9_]{1,40}$/)).max(20).optional(),
 });
 export const PlanFeatureSchema = z.object({ enabled: z.boolean(), limit: z.number().int().min(0).nullable() });
 export const CouponSchema = z.object({

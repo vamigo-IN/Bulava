@@ -1,6 +1,7 @@
 import type { Translator } from '@bulava/localization';
 import type { Artboard, CardDesign, CardFormat, Fonts, Layer, RenderContext, TemplateDefinition, ThemeColors } from '@bulava/template-schema';
 import type { CardConfig } from '@/lib/cards';
+import type { StockKind, StockPage } from '@/lib/stock';
 
 export interface CardTemplateInfo {
   key: string;
@@ -48,6 +49,8 @@ export interface BoardEditorApi<D extends BoardDesign = BoardDesign> {
   uploading: boolean;
   /** Links of the design's photos, by photo id. */
   photoUrls: Record<string, string>;
+  /** Stock images (ADR-064): a search, and one brought in as a photo of the design (its id, or null when it failed and was said). */
+  stock?: { search: (q: string, kind: StockKind, page: number) => Promise<StockPage>; import: (id: string) => Promise<string | null> };
   /** Puts the cursor in a text layer's box (after a double click on the canvas). */
   focusText: (id: string) => void;
 }

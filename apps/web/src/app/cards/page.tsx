@@ -7,7 +7,7 @@ import { LikeButton } from '@/components/marketing/like-button';
 import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { type ExplorerFilters, type ExplorerItem } from '@/components/marketing/template-explorer';
 import { TemplateGallery, type FilterGroup } from '@/components/marketing/template-gallery';
-import { getShowcase, getTemplates, serverApi, type TemplateSummary } from '@/lib/server-api';
+import { getShowcase, getTemplates, isBlankTemplate, serverApi, type TemplateSummary } from '@/lib/server-api';
 import { onePerLook } from '@/lib/template-looks';
 import { cardPreview } from '@/lib/template-previews';
 
@@ -17,7 +17,7 @@ const t = createTranslator('en');
 
 export const metadata: Metadata = {
   title: 'Digital invitation cards: design online, download free',
-  description: 'Personalise a wedding, engagement, haldi, mehendi, birthday or puja invitation card in your browser. Download it free with a small watermark, or without it for ₹50. No sign-up.',
+  description: 'Personalise a wedding, engagement, haldi, mehendi, birthday or puja invitation card in your browser: free to design, with no sign-up, ready for WhatsApp, Instagram or print.',
   alternates: { canonical: '/cards' },
 };
 
@@ -51,9 +51,11 @@ function tint(hex: string | undefined, amount: number): string {
 export default async function CardsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
-  const [templates, config, showcase] = await Promise.all([getTemplates(), serverApi<{ enabled: boolean; priceMinor: number }>('/public/cards/config', { revalidate: 60 }), getShowcase()]);
+  const [templates, config, showcase] = await Promise.all([getTemplates(), serverApi<{ enabled: boolean; priceMinor: number; freeDownloads?: boolean }>('/public/cards/config', { revalidate: 60 }), getShowcase()]);
   const price = `₹${Math.round((config?.priceMinor ?? 5000) / 100)}`;
-  const cards = templates.filter((tpl) => tpl.preview?.heroSection === 'canvas');
+  // Free downloads only when the console offers them (ADR-062).
+  const free = config?.freeDownloads === true;
+  const cards = templates.filter((tpl) => tpl.preview?.heroSection === 'canvas' && !isBlankTemplate(tpl));
   const present = [...new Set(cards.map((c) => c.category))];
   const categories = [...CATEGORY_ORDER.filter((c) => present.includes(c)), ...present.filter((c) => !CATEGORY_ORDER.includes(c)).sort()];
 
@@ -141,13 +143,13 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
             <div className="mx-auto max-w-3xl text-center">
               <p className="eyebrow text-brand-700">{cards.length ? t('cards.gallery.eyebrow', { count: designs }) : t('cards.recover.eyebrow')}</p>
               <h1 className="mt-4 animate-settle-up font-display text-4xl leading-[1.08] text-ink sm:text-5xl lg:text-6xl">{t('cards.gallery.title')}</h1>
-              <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-stone-600">{t('cards.gallery.subtitle', { price })}</p>
+              <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-stone-600">{t(free ? 'cards.gallery.subtitle' : 'cards.gallery.subtitle.paid', { price })}</p>
             </div>
             <ol className="mx-auto mt-8 grid max-w-4xl grid-cols-3 gap-2 sm:mt-10 sm:gap-4">
               {[
                 { icon: <Sparkles aria-hidden className="size-5" />, title: t('cards.gallery.step1'), body: t('cards.gallery.step1Body') },
                 { icon: <Paintbrush aria-hidden className="size-5" />, title: t('cards.gallery.step2'), body: t('cards.gallery.step2Body') },
-                { icon: <Download aria-hidden className="size-5" />, title: t('cards.gallery.step3'), body: t('cards.gallery.step3Body', { price }) },
+                { icon: <Download aria-hidden className="size-5" />, title: t('cards.gallery.step3'), body: t(free ? 'cards.gallery.step3Body' : 'cards.gallery.step3Body.paid', { price }) },
               ].map((step, i) => (
                 <li key={step.title} className="clay flex flex-col items-center gap-2 rounded-2xl p-3 text-center sm:flex-row sm:items-start sm:gap-3 sm:rounded-3xl sm:p-4 sm:text-left">
                   <span className="icon-3d grid size-10 shrink-0 place-items-center rounded-xl">{step.icon}</span>

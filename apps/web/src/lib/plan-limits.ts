@@ -20,6 +20,8 @@ const detailsOf = (error: ApiError) => (error.details ?? {}) as { feature?: stri
 export function planLimitMessage(t: Translator, error: ApiError): string {
   const { feature, limit } = detailsOf(error);
   if (error.code === 'PLAN_LIMIT_REACHED') {
+    // A plan without videos: they come with a bigger plan or as an add-on (ADR-062).
+    if (feature === 'video.renders.max' && limit === 0) return t('limit.video.none');
     const key = feature ? LIMIT_KEYS[feature] : undefined;
     return key && typeof limit === 'number' ? t(key, { limit: limit.toLocaleString('en-IN') }) : t('error.PLAN_LIMIT_REACHED');
   }

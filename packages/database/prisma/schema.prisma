@@ -305,6 +305,7 @@ model Event {
   reminderSettings     EventReminderSettings?
   domain               EventDomain?
   memberInvites        EventMemberInvite[]
+  slugAliases          EventSlugAlias[]
 
   @@index([ownerId, deletedAt])
   @@index([organizationId])
@@ -1356,6 +1357,18 @@ model PricingPlan {
   interval    String   @default("ONE_TIME")
   active      Boolean  @default(true)
   sortOrder   Int      @default(0)
+  /// PLAN (a tier: the account's plan) or ADDON (one thing more, bought on top of a plan; ADR-062).
+  kind        String   @default("PLAN")
+  /// PUBLIC (on the plans page) or HIDDEN (only through an offer link, or granted by staff).
+  visibility  String   @default("PUBLIC")
+  /// A short ribbon on the plan card ("Most popular").
+  badge       String?
+  /// What sets the plan apart, in a few words ("+ MP4 video").
+  tagline     String?
+  /// An add-on that can be bought more than once (each one adds its limits again).
+  stackable   Boolean  @default(false)
+  /// The plans an add-on is offered to (keys); empty: every paid plan.
+  offeredTo   String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1421,6 +1434,10 @@ model Order {
   grantedById     String?     @db.Uuid
   /// When the buyer ticked the Terms and the Refund Policy for this purchase (also kept as a Consent).
   termsAcceptedAt DateTime?
+  /// How many of a stackable add-on (each adds its limits again).
+  quantity        Int         @default(1)
+  /// What the plan the account already had was worth, taken off the price (unlocking a bigger plan pays the difference).
+  creditMinor     Int         @default(0)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -1448,6 +1465,19 @@ model Payment {
   order Order @relation(fields: [orderId], references: [id])
 
   @@map("payments")
+}
+
+/// An event's earlier link names (ADR-062): after the host chooses a link of their own, the old
+/// one keeps opening the invitation (it redirects to the new one) and is never given to anyone else.
+model EventSlugAlias {
+  slug      String   @id
+  eventId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("event_slug_aliases")
 }
 
 model Entitlement {

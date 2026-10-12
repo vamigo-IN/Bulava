@@ -326,6 +326,38 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
     [ensureSession, t],
   );
 
+  // Stock images (ADR-064): searched for this card, and brought in by the server like an upload.
+  const stock = useMemo<CardEditorApi['stock']>(
+    () => ({
+      search: async (q, kind, page) => cardApi.stockSearch(await ensureSession(), q, kind, page),
+      import: async (id) => {
+        setUploading(true);
+        try {
+          const session = await ensureSession();
+          let upload = await cardApi.stockImport(session, id);
+          const started = Date.now();
+          while ((upload.status === 'PROCESSING' || upload.status === 'UPLOADING') && Date.now() - started < 60_000) {
+            await sleep(1000);
+            upload = await cardApi.upload(session, upload.id);
+          }
+          if (upload.status !== 'READY' || !upload.url) {
+            setToast(upload.error ?? t('cards.photos.failed'));
+            return null;
+          }
+          const url = upload.url;
+          setPhotoUrls((m) => ({ ...m, [upload.id]: url }));
+          return upload.id;
+        } catch (error) {
+          setToast(errorMessage(t, error));
+          return null;
+        } finally {
+          setUploading(false);
+        }
+      },
+    }),
+    [ensureSession, t],
+  );
+
   // ── What the card draws ──
   const cardT = useMemo(() => createTranslator(design.language), [design.language]);
   const photoByBinding = useMemo(() => Object.fromEntries(Object.entries(design.photos).flatMap(([binding, id]) => (id && photoUrls[id] ? [[binding, photoUrls[id]]] : []))), [design.photos, photoUrls]);
@@ -471,6 +503,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
     uploadPhoto,
     uploading,
     photoUrls,
+    stock,
     setFormat,
     restart,
     focusText,
