@@ -59,6 +59,9 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
   const designs = make ? onePerLook(templates.filter((tpl) => fits(make, tpl) && (!event || tpl.eventTypes.includes(event))), (tpl) => tpl.preview?.look, forEvent(event || undefined)) : [];
   const shown = designs.slice(0, pages * PAGE_SIZE);
   const query = (extra: Record<string, string>) => `/design?${new URLSearchParams(Object.fromEntries(Object.entries({ make: make ?? '', event, ...extra }).filter(([, v]) => v))).toString()}`;
+  // Each choice lands on the next step (#occasion, with the designs under it). Without the anchor the page
+  // goes back to its top and, on a phone, the step that just appeared is a screen below: nothing seems to happen.
+  const NEXT_STEP = '#occasion';
 
   return (
     <>
@@ -82,7 +85,7 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
                 return (
                   <li key={kind}>
                     <Link
-                      href={`/design?${new URLSearchParams({ make: kind, ...(event ? { event } : {}) }).toString()}`}
+                      href={`/design?${new URLSearchParams({ make: kind, ...(event ? { event } : {}) }).toString()}${NEXT_STEP}`}
                       aria-current={active ? 'true' : undefined}
                       className={cn('clay clay-lift flex h-full items-start gap-4 rounded-3xl p-5 transition-shadow', active && 'ring-2 ring-brand-600')}
                     >
@@ -104,12 +107,14 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
 
             {make ? (
               <>
-                <h2 className="mt-12 text-center text-sm font-semibold tracking-[0.18em] text-stone-500 uppercase">{t('studio.step.occasion')}</h2>
+                <h2 id="occasion" className="mt-12 scroll-mt-24 text-center text-sm font-semibold tracking-[0.18em] text-stone-500 uppercase">
+                  {t('studio.step.occasion')}
+                </h2>
                 <ul className="mx-auto mt-5 flex max-w-5xl flex-wrap justify-center gap-2">
                   {[{ key: '', name: t('studio.occasion.all') }, ...occasions].map((o) => (
                     <li key={o.key || 'all'}>
                       <Link
-                        href={query({ event: o.key, page: '' })}
+                        href={`${query({ event: o.key, page: '' })}${NEXT_STEP}`}
                         aria-current={event === o.key ? 'true' : undefined}
                         className={cn('inline-flex min-h-10 items-center rounded-full px-4 text-sm font-medium transition-colors', event === o.key ? 'bg-brand-700 text-ivory shadow-clay-sm' : 'clay text-stone-700 hover:text-ink')}
                       >

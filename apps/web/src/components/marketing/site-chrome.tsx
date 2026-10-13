@@ -229,7 +229,8 @@ function WhatsAppChatButton({ number, message }: { number: string; message: stri
       rel="noopener"
       aria-label={t('footer.whatsappChat')}
       title={t('footer.whatsappChat')}
-      className="btn-3d btn-3d-green fixed right-4 bottom-4 z-50 size-14 rounded-full sm:right-6 sm:bottom-6"
+      // Above a page's bottom bar while one shows (--sticky-cta, the template page on phones).
+      className="btn-3d btn-3d-green fixed right-4 bottom-[calc(1rem+var(--sticky-cta,0px))] z-50 size-14 rounded-full transition-[bottom] duration-300 sm:right-6 sm:bottom-[calc(1.5rem+var(--sticky-cta,0px))]"
     >
       <WhatsAppMark className="size-7" />
     </a>

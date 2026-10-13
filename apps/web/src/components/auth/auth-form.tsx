@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, CalendarHeart, CheckCircle2, Eye, KeyRound, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CalendarHeart, CheckCircle2, Eye, KeyRound, RotateCcw, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, apiPost } from '@/lib/api';
@@ -82,6 +82,16 @@ function AuthFormInner() {
     router.replace(target);
     router.refresh();
   };
+  // Why this sign-in: a design made on /design (kept on the device until now), a template, or a plan's checkout.
+  const context: MessageKey | null = target.startsWith('/dashboard/checkout')
+    ? 'auth.context.checkout'
+    : target.startsWith('/dashboard/events/new')
+      ? /[?&]studio=/.test(target)
+        ? 'auth.context.design'
+        : /[?&]template=/.test(target)
+          ? 'auth.context.template'
+          : null
+      : null;
 
   /** After any step: the restore offer, the authenticator step, someone new, or in. */
   const next = (result: StepResult, email?: string) => {
@@ -214,6 +224,12 @@ function AuthFormInner() {
       <>
         <h1 className="font-display text-5xl leading-[1.05] tracking-[-0.02em]">{t('auth.unified.title')}</h1>
         <p className="mt-3 text-lg leading-relaxed text-stone-600">{t('auth.unified.lead')}</p>
+        {context ? (
+          <p className="mt-5 flex items-start gap-2.5 rounded-2xl bg-gold-100/70 px-4 py-3 text-[0.9375rem] leading-relaxed text-ink ring-1 ring-gold-200">
+            <Sparkles aria-hidden className="mt-0.5 size-4 shrink-0 text-gold-700" />
+            {t(context)}
+          </p>
+        ) : null}
         {deletedOn ? (
           <div className="mt-6">
             <Alert tone="info">{t('auth.deleted.notice', { date: deletedOn })}</Alert>
@@ -233,15 +249,16 @@ function AuthFormInner() {
               {busy ? t('common.loading') : t('auth.unified.continue')}
             </Button>
           </form>
-          {providers.google ? (
-            <>
+          {providers.google || !providers.loaded ? (
+            // Until the API says whether Google is on, its place is kept, so the form does not jump under a thumb.
+            <div className={providers.google ? undefined : 'invisible'} aria-hidden={providers.google ? undefined : true}>
               <div className="my-5 flex items-center gap-3 text-xs tracking-widest text-stone-500 uppercase">
                 <span className="h-px flex-1 bg-gold-200" />
                 {t('auth.or')}
                 <span className="h-px flex-1 bg-gold-200" />
               </div>
-              <GoogleButton next={target} label={t('auth.google')} />
-            </>
+              {providers.google ? <GoogleButton next={target} label={t('auth.google')} /> : <span className="block min-h-12" />}
+            </div>
           ) : null}
         </div>
         <p className="mt-6 text-center text-sm leading-relaxed text-stone-600">{t('auth.unified.newHere')}</p>
@@ -293,6 +310,7 @@ function PasswordStep({ email, onResult, onCode, onBack }: { email: string; onRe
   const t = useT();
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<'password' | 'code' | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
@@ -301,6 +319,8 @@ function PasswordStep({ email, onResult, onCode, onBack }: { email: string; onRe
     setError(null);
     try {
       onResult(await apiPost<StepResult>('/auth/email/password', { email, password }));
+      // Busy stays on (the button says so) until the next step or page replaces this one.
+      setSignedIn(true);
     } catch (err) {
       // The address is known here: say what went wrong with the password, and that a code works.
       const code = err instanceof ApiError ? err.code : null;
@@ -340,7 +360,7 @@ function PasswordStep({ email, onResult, onCode, onBack }: { email: string; onRe
         {(p) => <Input {...p} type="password" autoComplete="current-password" autoFocus required maxLength={128} value={password} onChange={(e) => setPassword(e.target.value)} />}
       </Field>
       <Button type="submit" size="lg" className="min-h-13 w-full rounded-2xl" disabled={busy !== null || !password}>
-        {busy === 'password' ? t('common.loading') : t('auth.login.submit')}
+        {signedIn ? t('auth.done.signingIn') : busy === 'password' ? t('common.loading') : t('auth.login.submit')}
       </Button>
       <button
         type="button"
@@ -361,6 +381,7 @@ function SecondFactorStep({ challengeToken, onDone, onRestart }: { challengeToke
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -368,13 +389,14 @@ function SecondFactorStep({ challengeToken, onDone, onRestart }: { challengeToke
     setError(null);
     try {
       await apiPost('/auth/login/mfa', useRecovery ? { challengeToken, recoveryCode: value } : { challengeToken, code: value });
+      // Signed in: stay busy until the next page arrives (a code works once).
+      setDone(true);
       onDone();
     } catch (err) {
+      setBusy(false);
       // An expired or exhausted challenge means starting again from the start.
       if (err instanceof ApiError && err.code === 'MFA_CHALLENGE_EXPIRED') onRestart(errorMessage(t, err));
       else setError(errorMessage(t, err));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -400,7 +422,7 @@ function SecondFactorStep({ challengeToken, onDone, onRestart }: { challengeToke
         )}
       </Field>
       <Button type="submit" size="lg" className="min-h-13 w-full rounded-2xl" disabled={busy || !value.trim()}>
-        {busy ? t('common.loading') : t('auth.mfa.verify')}
+        {done ? t('auth.done.signingIn') : busy ? t('common.loading') : t('auth.mfa.verify')}
       </Button>
       <div className="flex flex-wrap justify-between gap-2 text-sm">
         <button
@@ -438,12 +460,12 @@ function RestoreStep({ token, until, onRestored, onCancel }: { token: string; un
     setError(null);
     try {
       const result = await apiPost<{ mfaRequired?: boolean; challengeToken?: string }>('/auth/restore', { token });
+      // Stay busy: the next step or page is on its way, and the restore token works once.
       onRestored(result.mfaRequired && result.challengeToken ? result.challengeToken : null);
     } catch (err) {
+      setBusy(false);
       if (err instanceof ApiError && err.code === 'RESTORE_EXPIRED') onCancel(errorMessage(t, err));
       else setError(errorMessage(t, err));
-    } finally {
-      setBusy(false);
     }
   }
 

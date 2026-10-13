@@ -38,8 +38,19 @@ export function useOptionalT(): Translator {
   return useContext(I18nContext)?.t ?? ENGLISH;
 }
 
+/**
+ * A request that never got an answer: the browser is offline, or fetch failed on the way
+ * ("Failed to fetch" in Chrome, "Load failed" in Safari, "NetworkError…" in Firefox).
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  return error instanceof TypeError && /failed to fetch|load failed|networkerror|network request failed/i.test(error.message);
+}
+
 /** Map an API error code to a translated message, falling back to the generic error. */
 export function errorMessage(t: Translator, error: unknown): string {
+  // No signal on the way to a function or a venue is common: say so, so people try again rather than give up.
+  if (isNetworkError(error)) return t(typeof navigator !== 'undefined' && navigator.onLine === false ? 'common.offline' : 'common.network');
   // Plan limits in their own words (how many the plan allows), never "upgrade".
   if (isPlanLimit(error)) return planLimitMessage(t, error);
   if (error instanceof ApiError) {

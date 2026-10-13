@@ -169,6 +169,13 @@ export const enDashboard = {
   'auth.unified.continue': 'Continue',
   'auth.unified.newHere': 'New to Bulava? The same steps create your free account.',
   'auth.unified.whatsappOff': 'Signing in with WhatsApp is not available right now. Use your email or Google instead.',
+  // Why someone is signing in, when they came from a design, a template or a plan.
+  'auth.context.design': 'Your design is saved on this device. Sign in or create your free account to publish it.',
+  'auth.context.template': 'Sign in or create your free account to start with this design.',
+  'auth.context.checkout': 'Sign in to continue to checkout. The plan you chose stays selected.',
+  // A code or password was right and the next page is loading: the button says so and stays busy.
+  'auth.done.signingIn': 'Signing you in…',
+  'auth.done.wait': 'One moment…',
   'auth.password.title': 'Welcome back',
   'auth.password.body': 'Enter your password to sign in.',
   'auth.password.useCode': 'Forgot it? Email me a sign-in code',
@@ -1271,6 +1278,10 @@ export const enDashboard = {
   'home.how.invite.body': 'Share one link on WhatsApp, or send personal invitations.',
   'home.how.celebrate': 'Celebrate together',
   'home.how.celebrate.body': 'Track replies, share updates and collect everyone’s photos.',
+  // A read that failed: never shown as an empty list.
+  'load.failed.title': 'This did not load',
+  'load.failed.body': 'We could not reach Bulava just now. It is usually back in a moment.',
+  'load.failed.safe': 'Your events, guests and designs are safe.',
   'events.subtitle': 'Every celebration you are planning or helping with.',
   'events.filter.label': 'Filter events',
   'events.filter.all': 'All',

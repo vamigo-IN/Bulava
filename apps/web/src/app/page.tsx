@@ -51,7 +51,7 @@ import { TemplateCard, TemplatePhone } from '@/components/marketing/template-car
 import { TemplateExplorer, type ExplorerItem } from '@/components/marketing/template-explorer';
 import { VideoShowcase } from '@/components/marketing/video-showcase';
 import { MagneticButton } from '@/lib/motion/magnetic-button';
-import { getGalleryTemplates, getPlans, getShowcase, getStats, getTemplate, getTemplateDefinitions, getTestimonials, tierPrice, type TemplateSummary } from '@/lib/server-api';
+import { formatInr, getGalleryTemplates, getPlans, getShowcase, getStats, getTemplate, getTemplateDefinitions, getTestimonials, tierPrice, type Plan, type TemplateSummary } from '@/lib/server-api';
 import { getSiteConfig } from '@/lib/site-config';
 import { onePerLook } from '@/lib/template-looks';
 import { fullPreview } from '@/lib/template-previews';
@@ -98,8 +98,9 @@ const STEPS: Array<{ n: 1 | 2 | 3 | 4; icon: LucideIcon }> = [
 ];
 
 type Mark = 'yes' | 'no' | 'partly';
-const COMPARE_ROWS: Array<{ key: MessageKey; values: [Mark | string, Mark | string, Mark | string] }> = [
-  { key: 'home.compare.cost', values: [t('home.compare.cost.bulava'), t('home.compare.cost.print'), t('home.compare.cost.video')] },
+type CompareRow = { key: MessageKey; values: [Mark | string, Mark | string, Mark | string] };
+/** The cost row comes first, priced from the plans themselves (see `costRow`). */
+const COMPARE_ROWS: CompareRow[] = [
   { key: 'home.compare.edit', values: ['yes', 'no', 'no'] },
   { key: 'home.compare.rsvp', values: ['yes', 'no', 'no'] },
   { key: 'home.compare.perGuest', values: ['yes', 'partly', 'no'] },
@@ -107,6 +108,26 @@ const COMPARE_ROWS: Array<{ key: MessageKey; values: [Mark | string, Mark | stri
   { key: 'home.compare.photos', values: ['yes', 'no', 'no'] },
   { key: 'home.compare.languages', values: ['yes', 'partly', 'partly'] },
 ];
+
+/** How many guests the comparison's cost row is for (its label says so). */
+const COMPARE_GUESTS = 300;
+
+/**
+ * "Cost for 300 guests": the cheapest one-time plan whose guest limit covers them, as the
+ * plans page sells it. Free designs, but publishing needs a plan (ADR-062), so "free" here
+ * would be untrue. Without a fitting plan the row is left out rather than guessed.
+ */
+function costRow(plans: Plan[]): CompareRow | null {
+  const fits = plans
+    .filter((p) => (p.kind ?? 'PLAN') === 'PLAN' && p.interval === 'ONE_TIME' && p.priceMinor > 0)
+    .filter((p) => {
+      const guests = p.features.find((f) => f.featureKey === 'guests.max');
+      return !!guests?.enabled && (guests.limit === null || guests.limit >= COMPARE_GUESTS);
+    })
+    .sort((a, b) => a.priceMinor - b.priceMinor)[0];
+  if (!fits) return null;
+  return { key: 'home.compare.cost', values: [t('home.compare.cost.once', { price: formatInr(fits.priceMinor) }), t('home.compare.cost.print'), t('home.compare.cost.video')] };
+}
 
 /** The main call to action: a maroon 3D button. */
 const PRIMARY_CTA = 'btn-3d group/cta min-h-14 rounded-2xl px-7 text-base';
@@ -211,10 +232,13 @@ export default async function HomePage() {
   );
   const heroImage = heroLive ? fullPreview(heroLive.key) : null;
   const films = withPicks(showcase.videos, videos, videos, 3);
-  // Definitions only where the live renderer draws: the hero phone without its image, and the films.
-  const [heroDefinition, videoDefinitions] = await Promise.all([
+  const [spotlight] = withPicks(showcase.spotlight, websites, [websites.find((w) => w.featured && w.tier === 'PREMIUM'), websites[0]], 1);
+  // Definitions only where the live renderer draws (the hero phone without its image, and the films),
+  // and the spotlight's, whose points describe its own opening.
+  const [heroDefinition, videoDefinitions, spotlightDefinition] = await Promise.all([
     heroLive && !heroImage ? (heroLive.definition ?? getTemplate(heroLive.key).then((t) => t?.definition ?? null)) : null,
     getTemplateDefinitions(films.map((v) => v.key)),
+    spotlight ? (spotlight.definition ?? getTemplate(spotlight.key).then((t) => t?.definition ?? null)) : null,
   ]);
   // Illustrated 3D scene templates, found from their data (the hero section's variant), flagships first.
   const sceneNames = new Set<string>(SCENES);
@@ -227,7 +251,16 @@ export default async function HomePage() {
     blurb: w.description ?? '',
     node: <TemplatePhone template={w} width={250} height={470} sections={1} />,
   }));
-  const [spotlight] = withPicks(showcase.spotlight, websites, [websites.find((w) => w.featured && w.tier === 'PREMIUM'), websites[0]], 1);
+  // What the spotlight design does, from the design itself: a fixed "opens like a sealed envelope"
+  // beside a design that opens behind curtains told visitors two different things.
+  const spotlightIntro = spotlightDefinition?.website?.intro;
+  const spotlightPoints = [
+    spotlightIntro && spotlightIntro !== 'none' ? t('signature.opens', { intro: t(`intro.name.${spotlightIntro}` as MessageKey) }) : null,
+    t('home.spotlight.point2'),
+    t('home.spotlight.point3'),
+    spotlight?.languages.includes('hi') ? t('home.spotlight.point4') : null,
+  ].filter((point): point is string => point !== null);
+  const compareRows = [costRow(plans), ...COMPARE_ROWS].filter((row): row is CompareRow => row !== null);
   // Each design once: a design made for several occasions shows its picked or main version.
   const designs = onePerLook(withPicks(showcase.collection, websites, websites), (w) => w.preview?.look);
   // Every design once, in every format: the number the templates page shows, which "View all" leads to.
@@ -423,12 +456,12 @@ export default async function HomePage() {
                     </h2>
                     {spotlight.description ? <p className="mt-4 text-lg leading-relaxed text-stone-600">{spotlight.description}</p> : null}
                     <ul className="mt-8 space-y-4">
-                      {(['home.spotlight.point1', 'home.spotlight.point2', 'home.spotlight.point3', 'home.spotlight.point4'] as const).map((k) => (
-                        <li key={k} className="flex gap-3 text-stone-700">
+                      {spotlightPoints.map((point) => (
+                        <li key={point} className="flex gap-3 text-stone-700">
                           <span aria-hidden className="icon-3d mt-0.5 size-6 shrink-0 rounded-full">
                             <Check className="size-3.5" strokeWidth={3} />
                           </span>
-                          {t(k)}
+                          {point}
                         </li>
                       ))}
                     </ul>
@@ -530,29 +563,31 @@ export default async function HomePage() {
                   scroll box they escape it and widen the whole page on phones. Focusable and named,
                   so keyboard users can scroll it sideways. */}
               <div role="group" aria-labelledby="compare-title" tabIndex={0} className="clay relative overflow-x-auto rounded-[2rem]">
-                <table className="w-full min-w-[600px] text-left text-sm">
+                {/* Four columns fit a phone (smaller type and padding): the comparison is the point,
+                    and on phones the other two columns used to sit off-screen to the right. */}
+                <table className="w-full text-left text-xs sm:min-w-[600px] sm:text-sm">
                   <thead>
                     <tr>
-                      <td className="p-5" />
-                      <th scope="col" className="bg-gradient-to-b from-[#a83a47] via-brand-600 to-brand-700 p-5 text-center font-display text-xl font-normal text-ivory">
+                      <td className="p-2.5 sm:p-5" />
+                      <th scope="col" className="bg-gradient-to-b from-[#a83a47] via-brand-600 to-brand-700 p-2.5 text-center font-display text-base font-normal text-ivory sm:p-5 sm:text-xl">
                         {t('home.compare.bulava')}
                       </th>
-                      <th scope="col" className="p-5 text-center font-medium text-stone-600">
+                      <th scope="col" className="p-2.5 text-center font-medium text-stone-600 sm:p-5">
                         {t('home.compare.print')}
                       </th>
-                      <th scope="col" className="p-5 text-center font-medium text-stone-600">
+                      <th scope="col" className="p-2.5 text-center font-medium text-stone-600 sm:p-5">
                         {t('home.compare.video')}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {COMPARE_ROWS.map((row) => (
+                    {compareRows.map((row) => (
                       <tr key={row.key} className="border-t border-gold-100 transition-colors duration-200 hover:bg-gold-100/30">
-                        <th scope="row" className="p-5 font-medium text-ink">
+                        <th scope="row" className="p-2.5 font-medium text-ink sm:p-5">
                           {t(row.key)}
                         </th>
                         {row.values.map((v, i) => (
-                          <td key={i} className={cn('p-5 text-center', i === 0 ? 'bg-brand-50/70 font-semibold text-brand-700' : 'text-stone-600')}>
+                          <td key={i} className={cn('p-2.5 text-center sm:p-5', i === 0 ? 'bg-brand-50/70 font-semibold text-brand-700' : 'text-stone-600')}>
                             <CompareMark value={v} lead={i === 0} />
                           </td>
                         ))}
@@ -637,7 +672,7 @@ export default async function HomePage() {
                 <p className="mx-auto mt-5 max-w-xl text-lg text-ivory/85">{t('home.final.subtitle')}</p>
                 <div className="mt-10 flex flex-wrap justify-center gap-4">
                   <MagneticButton strength={0.25}>
-                    <AuthAwareLink signedOutHref="/login" signedInHref="/dashboard" className="btn-3d btn-3d-gold group/cta min-h-14 rounded-2xl px-8 text-base">
+                    <AuthAwareLink signedOutHref="/design" signedInHref="/dashboard" className="btn-3d btn-3d-gold group/cta min-h-14 rounded-2xl px-8 text-base">
                       {t('nav.getStarted')}
                       <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
                     </AuthAwareLink>

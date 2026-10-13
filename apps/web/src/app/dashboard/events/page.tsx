@@ -10,6 +10,7 @@ import { useEvents, useEventTypes } from '@/lib/queries';
 import type { EventSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { EventCard } from '@/components/dashboard/event-card';
+import { LoadError } from '@/components/dashboard/load-error';
 import { Spinner } from '@/components/ui/primitives';
 
 const FILTERS: Array<{ key: 'all' | 'draft' | 'live' | 'past'; label: MessageKey; match: (e: EventSummary) => boolean }> = [
@@ -28,6 +29,8 @@ export default function EventsPage() {
   const typeName = useMemo(() => new Map((types.data ?? []).map((x) => [x.key, x.name])), [types.data]);
 
   if (events.isPending) return <Spinner label={t('common.loading')} />;
+  // A failed read is not an empty list: "You have not created any events yet" would alarm a host.
+  if (events.isError && !events.data) return <LoadError error={events.error} onRetry={() => void events.refetch()} retrying={events.isFetching} />;
   const list = [...(events.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const current = FILTERS.find((f) => f.key === filter)!;
   const shown = list.filter(current.match);

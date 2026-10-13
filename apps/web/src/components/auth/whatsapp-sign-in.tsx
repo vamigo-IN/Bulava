@@ -47,6 +47,8 @@ export function WhatsAppSignIn({ phone, google, next, onDone, onChallenge, onRes
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The code signed in: the next page is on its way. */
+  const [done, setDone] = useState(false);
   const [resendIn, setResendIn] = useCountdown(0);
   const [waitedLong, setWaitedLong] = useState(false);
   const delivery = useWhatsAppDelivery(sent?.sendId ?? null);
@@ -99,12 +101,13 @@ export function WhatsAppSignIn({ phone, google, next, onDone, onChallenge, onRes
       if (result.signupRequired && result.signupToken) return setSignup(result.signupToken);
       if (result.restoreRequired && result.restoreToken) return onRestore(result.restoreToken, result.deleteAt ?? null);
       if (result.mfaRequired && result.challengeToken) return onChallenge(result.challengeToken);
+      // Signed in: stay busy until the next page arrives (the code is used up; a second tap would fail).
+      setDone(true);
       onDone();
     } catch (err) {
+      setBusy(false);
       setError(errorMessage(t, err));
       setCode('');
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -174,7 +177,7 @@ export function WhatsAppSignIn({ phone, google, next, onDone, onChallenge, onRes
       {notice ? <Alert tone="success">{notice}</Alert> : null}
       <Field label={t('auth.code.label')}>{(p) => <CodeInput {...p} autoFocus value={code} onChange={setCode} />}</Field>
       <Button type="submit" variant="whatsapp" size="lg" className="min-h-13 w-full rounded-2xl" disabled={busy || code.length !== 6}>
-        {busy ? t('common.loading') : t('auth.phone.verify')}
+        {done ? t('auth.done.signingIn') : busy ? t('common.loading') : t('auth.phone.verify')}
       </Button>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
         <button

@@ -27,6 +27,9 @@ const core = {
   'common.copy': 'Copy',
   'common.copied': 'Copied',
   'common.error': 'Something went wrong. Please try again.',
+  // A request that never reached Bulava (no signal, a dropped connection): say so, not "something went wrong".
+  'common.offline': 'You seem to be offline. Check your internet connection and try again.',
+  'common.network': 'We could not reach Bulava just now. Check your internet connection and try again.',
   'common.language': 'Language',
   'common.loadMore': 'Load more',
 

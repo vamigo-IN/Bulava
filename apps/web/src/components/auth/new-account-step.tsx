@@ -45,6 +45,8 @@ export function NewAccountStep({
   const [accepted, setAccepted] = useState(false);
   const [updates, setUpdates] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** The account exists: the next page is on its way, and the one-use token is spent. */
+  const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [consentError, setConsentError] = useState<string | undefined>();
   const passwordShort = password.length > 0 && password.length < 10;
@@ -66,12 +68,13 @@ export function NewAccountStep({
             ? { signupToken: token, name: name.trim(), acceptTerms: true, whatsappUpdates: updates }
             : { signupToken: token, name: name.trim(), acceptTerms: true };
       await apiPost(SIGNUP_PATH[via], body);
+      // Stay busy until the next page replaces this one: a second tap would spend the used token.
+      setDone(true);
       onDone();
     } catch (err) {
+      setBusy(false);
       if (err instanceof ApiError && err.code === 'VERIFICATION_EXPIRED') onExpired(errorMessage(t, err));
       else setError(errorMessage(t, err));
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -103,7 +106,7 @@ export function NewAccountStep({
         }}
       />
       <Button type="submit" size="lg" className="min-h-13 w-full rounded-2xl" disabled={busy || !name.trim() || passwordShort}>
-        {busy ? t('common.loading') : t('auth.new.submit')}
+        {done ? t('auth.done.signingIn') : busy ? t('common.loading') : t('auth.new.submit')}
       </Button>
     </form>
   );

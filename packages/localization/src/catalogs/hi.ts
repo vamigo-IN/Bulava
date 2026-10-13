@@ -14,6 +14,8 @@ export const hi: Catalog = {
   'common.yes': 'हाँ',
   'common.no': 'नहीं',
   'common.error': 'कुछ गड़बड़ हो गई। कृपया फिर से प्रयास करें।',
+  'common.offline': 'लगता है आप ऑफ़लाइन हैं। अपना इंटरनेट कनेक्शन जाँचें और फिर से प्रयास करें।',
+  'common.network': 'अभी Bulava से संपर्क नहीं हो पाया। अपना इंटरनेट कनेक्शन जाँचें और फिर से प्रयास करें।',
   'common.language': 'भाषा',
 
   'invitation.welcome': 'स्वागत है',

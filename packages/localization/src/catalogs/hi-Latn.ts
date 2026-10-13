@@ -2,6 +2,8 @@ import type { Catalog } from './en';
 
 /** Hinglish (Hindi in Latin script). Falls back to English. */
 export const hiLatn: Catalog = {
+  'common.offline': 'Lagta hai aap offline hain. Apna internet connection check karke phir koshish kijiye.',
+  'common.network': 'Abhi Bulava se sampark nahi ho paaya. Apna internet connection check karke phir koshish kijiye.',
   'invitation.welcome': 'Swagat hai',
   'invitation.dear': 'Priya {guestName},',
   'invitation.youAreInvited': 'Aap saadar aamantrit hain',

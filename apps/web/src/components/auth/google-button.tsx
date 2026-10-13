@@ -23,11 +23,12 @@ export function loadProviders(): Promise<Providers> {
   return providers;
 }
 
-export function useProviders(): Providers {
-  const [state, setState] = useState<Providers>(NONE);
+/** `loaded`: the API has answered (until then, places for buttons that may appear can be kept). */
+export function useProviders(): Providers & { loaded: boolean } {
+  const [state, setState] = useState<Providers & { loaded: boolean }>({ ...NONE, loaded: false });
   useEffect(() => {
     let alive = true;
-    void loadProviders().then((p) => alive && setState(p));
+    void loadProviders().then((p) => alive && setState({ ...p, loaded: true }));
     return () => {
       alive = false;
     };

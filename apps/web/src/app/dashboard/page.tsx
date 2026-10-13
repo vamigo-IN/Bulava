@@ -34,6 +34,7 @@ import type { EventSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CountUp, ProgressRing } from '@/components/dashboard/count-up';
 import { daysUntil, DesignCover, EventCard } from '@/components/dashboard/event-card';
+import { LoadError } from '@/components/dashboard/load-error';
 import { notificationView, relativeTime } from '@/components/dashboard/notification-text';
 import { useSetupSteps } from '@/components/events/use-setup-steps';
 import { Spinner } from '@/components/ui/primitives';
@@ -70,6 +71,8 @@ export default function HomePage() {
   const typeName = useMemo(() => new Map((types.data ?? []).map((x) => [x.key, x.name])), [types.data]);
 
   if (events.isPending) return <Spinner label={t('common.loading')} />;
+  // A failed read is not "no events yet": the first-event welcome would tell a host their event is gone.
+  if (events.isError && !events.data) return <LoadError error={events.error} onRetry={() => void events.refetch()} retrying={events.isFetching} />;
   const list = events.data ?? [];
   const active = inProgress(list);
   const focus = active[0] ?? null;

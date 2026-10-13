@@ -1,7 +1,7 @@
 'use client';
 
 import { AtSign, Mail, Phone } from 'lucide-react';
-import { forwardRef, type ComponentProps } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, type ComponentProps } from 'react';
 import { readIdentifier } from '@/lib/identifier';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +25,16 @@ export function IndiaFlag({ className = 'h-3.5 w-5' }: { className?: string }) {
  */
 export const IdentifierInput = forwardRef<HTMLInputElement, Omit<ComponentProps<'input'>, 'value' | 'onChange'> & { value: string; onChange: (value: string) => void }>(
   ({ value, onChange, className, ...props }, ref) => {
+    const input = useRef<HTMLInputElement>(null);
+    useImperativeHandle(ref, () => input.current!, []);
+    // On a slow phone the form is on screen before its script runs, and people type at once.
+    // Hydration leaves what they typed in the field; take it, or the next render would wipe it
+    // (and Continue would stay disabled with a number on screen).
+    useEffect(() => {
+      const typed = input.current?.value ?? '';
+      if (typed && typed !== value) onChange(typed);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const read = readIdentifier(value);
     const india = read.kind === 'phone' && read.india;
     return (
@@ -45,7 +55,7 @@ export const IdentifierInput = forwardRef<HTMLInputElement, Omit<ComponentProps<
           )}
         </span>
         <input
-          ref={ref}
+          ref={input}
           type="text"
           // The email keyboard has @ and the digits are a tap away; a number needs no other keyboard.
           inputMode="email"

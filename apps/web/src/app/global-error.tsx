@@ -3,9 +3,11 @@
 /**
  * Last resort when the root layout itself fails (app/error.tsx covers every
  * page below it). It replaces the layout, so the stylesheet and fonts aren't
- * loaded: inline styles in the brand's cream and maroon.
+ * loaded: inline styles in the brand's cream and maroon. "Try again" loads the
+ * page afresh: re-rendering a layout that failed on the server (or a script of
+ * an older release, after a deploy) would only fail again.
  */
-export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ error }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <html lang="en">
       <body style={{ margin: 0, minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#f6eee5', color: '#1c1917', fontFamily: 'Georgia, "Times New Roman", serif' }}>
@@ -16,7 +18,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           </p>
           <button
             type="button"
-            onClick={reset}
+            onClick={() => window.location.reload()}
             style={{ minHeight: 48, padding: '0 24px', border: 0, borderRadius: 16, background: 'linear-gradient(180deg,#a83a47,#7a1d27 58%,#611420)', color: '#fff8f1', fontSize: 16, fontWeight: 600, fontFamily: 'system-ui, sans-serif', cursor: 'pointer' }}
           >
             Try again

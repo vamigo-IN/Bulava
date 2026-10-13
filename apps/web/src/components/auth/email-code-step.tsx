@@ -43,6 +43,8 @@ export function EmailCodeStep<R>({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The code was right: the next page is on its way. The button stays busy, since the code is used up. */
+  const [done, setDone] = useState(false);
   const [resendIn, setResendIn] = useCountdown(challenge.resendAfter);
   const tried = useRef('');
 
@@ -52,16 +54,18 @@ export function EmailCodeStep<R>({
     setError(null);
     setNotice(null);
     try {
-      await onVerified(await apiPost<R>(VERIFY_PATH[purpose], { challengeToken: challenge.challengeToken, code: value }));
+      const result = await apiPost<R>(VERIFY_PATH[purpose], { challengeToken: challenge.challengeToken, code: value });
+      setDone(true);
+      await onVerified(result);
     } catch (err) {
+      setDone(false);
+      setBusy(false);
       if (err instanceof ApiError && err.code === 'VERIFICATION_EXPIRED') {
         onRestart(errorMessage(t, err));
         return;
       }
       setError(errorMessage(t, err));
       setCode('');
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -105,13 +109,13 @@ export function EmailCodeStep<R>({
       {notice ? <Alert tone="success">{notice}</Alert> : null}
       <Field label={t('auth.code.label')}>{(p) => <CodeInput {...p} autoFocus value={code} onChange={setCode} />}</Field>
       <Button type="submit" size="lg" className="min-h-13 w-full rounded-2xl" disabled={busy || code.length !== 6}>
-        {busy ? t('common.loading') : t(`auth.code.${purpose}.submit`)}
+        {done ? t(purpose === 'claim' ? 'auth.done.wait' : 'auth.done.signingIn') : busy ? t('common.loading') : t(`auth.code.${purpose}.submit`)}
       </Button>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
         <button
           type="button"
           className="font-medium text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700 disabled:cursor-default disabled:text-stone-500 disabled:no-underline"
-          disabled={resendIn > 0}
+          disabled={resendIn > 0 || busy}
           onClick={() => void resend()}
         >
           {resendIn > 0 ? t('auth.code.resendIn', { seconds: resendIn }) : t('auth.code.resend')}

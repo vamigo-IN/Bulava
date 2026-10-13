@@ -6,13 +6,17 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { apiPost } from '@/lib/api';
+import { ApiError, apiPost } from '@/lib/api';
 import { I18nProvider, useT } from '@/lib/i18n';
 import { useMe, useNotifications } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/primitives';
 import { BrandLogo } from '@/components/marketing/brand-logo';
+import { LoadError } from './load-error';
 import { notificationView } from './notification-text';
+
+/** The session ended: lib/api is already taking the browser to the sign-in page. */
+const sessionGone = (error: unknown) => error instanceof ApiError && error.status === 401 && (error.code === 'UNAUTHENTICATED' || error.code === 'SESSION_EXPIRED');
 
 const MENU_MOTION = {
   initial: { opacity: 0, y: -6, scale: 0.97 },
@@ -251,7 +255,15 @@ function Shell({ children }: { children: ReactNode }) {
         // Nothing inside may widen the page on a phone: wide content is clipped, not scrolled.
         className="mx-auto max-w-7xl overflow-x-clip px-4 pt-4 pb-16 sm:px-6 sm:pt-6"
       >
-        {me.isPending ? <Spinner label={t('common.loading')} /> : me.isError ? null : children}
+        {me.isPending || (me.isError && sessionGone(me.error)) ? (
+          // A lost session is on its way to the sign-in page (lib/api): wait rather than flash an error.
+          <Spinner label={t('common.loading')} />
+        ) : me.isError && !me.data ? (
+          // Anything else (no signal, the API down for a moment) says so and retries, never a blank page.
+          <LoadError error={me.error} onRetry={() => void me.refetch()} retrying={me.isFetching} />
+        ) : (
+          children
+        )}
       </motion.main>
     </div>
   );

@@ -13,6 +13,9 @@ const t = createTranslator('en');
 /** The header's call to action: a maroon 3D button (it reads on the cream and the dark header). */
 const HEADER_CTA = 'btn-3d group/cta min-h-11 rounded-xl px-5 text-sm';
 
+/** Where "Get started" leads someone signed out: the design page, open to everyone, not a sign-in wall. */
+const START_HREF = '/design';
+
 function initial(name: string): string {
   return (name.trim()[0] ?? '?').toUpperCase();
 }
@@ -47,13 +50,14 @@ export function AccountLinks({ variant }: { variant: 'desktop' | 'mobile' }) {
     );
   }
 
-  // Signed out, or still checking: the same markup the server rendered.
+  // Signed out, or still checking: the same markup the server rendered. "Get started" starts a design
+  // (ADR-063: designing and previewing need no account); signing in is asked for when publishing.
   return variant === 'desktop' ? (
     <div className={cn('flex items-center gap-2', session.status === 'unknown' && 'opacity-90')}>
       <Link href="/login" className="rounded-full px-4 py-2 text-sm font-medium text-[var(--hdr-muted)] transition-colors duration-300 hover:bg-[var(--hdr-hover)] hover:text-[var(--hdr-text)]">
         {t('nav.signIn')}
       </Link>
-      <Link href="/login" className={HEADER_CTA}>
+      <Link href={START_HREF} className={HEADER_CTA}>
         {t('nav.getStarted')} <Arrow />
       </Link>
     </div>
@@ -62,7 +66,7 @@ export function AccountLinks({ variant }: { variant: 'desktop' | 'mobile' }) {
       <Link href="/login" className="block rounded-2xl px-4 py-3 text-base font-medium transition-colors duration-200 hover:bg-gold-100/70">
         {t('nav.signIn')}
       </Link>
-      <Link href="/login" className={buttonVariants({ className: 'group/cta mt-1 w-full' })}>
+      <Link href={START_HREF} className={buttonVariants({ className: 'group/cta mt-1 w-full' })}>
         {t('nav.getStarted')} <Arrow />
       </Link>
     </>

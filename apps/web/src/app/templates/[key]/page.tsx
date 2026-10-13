@@ -8,7 +8,9 @@ import { SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
 import { TemplateCard } from '@/components/marketing/template-card';
 import { TemplatePreviewSwitcher } from '@/components/marketing/template-preview-switcher';
 import { UseTemplateButton } from '@/components/marketing/quick-start';
+import { StickyCta } from '@/components/marketing/sticky-cta';
 import { getGalleryTemplates, getPlans, getTemplate, tierPrice } from '@/lib/server-api';
+import { getSiteConfig } from '@/lib/site-config';
 import { LikeButton } from '@/components/marketing/like-button';
 
 export const revalidate = 60;
@@ -17,12 +19,19 @@ const t = createTranslator('en');
 
 export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
   const { key } = await params;
-  const tpl = await getTemplate(key);
+  const [tpl, { site }] = await Promise.all([getTemplate(key), getSiteConfig()]);
   if (!tpl) return { title: 'Template not found' };
+  const title = `${tpl.name} · ${tpl.category} invitation template`;
+  const description = tpl.description ?? undefined;
+  // Shared on WhatsApp or Instagram, the link shows this design rather than the site's generic card.
+  // (A page's openGraph replaces the site's, so the site name and locale are repeated.)
+  const images = [{ url: `/templates/${tpl.key}/og.jpg`, width: 1200, height: 630, alt: t('share.template.alt', { name: tpl.name, occasion: tpl.category.toLowerCase(), site: site.name }) }];
   return {
-    title: `${tpl.name} · ${tpl.category} invitation template`,
-    description: tpl.description ?? undefined,
+    title,
+    description,
     alternates: { canonical: `/templates/${tpl.key}` },
+    openGraph: { siteName: site.name, locale: 'en_IN', type: 'website', url: `/templates/${tpl.key}`, title, description, images },
+    twitter: { card: 'summary_large_image', title, description, images },
   };
 }
 
@@ -33,6 +42,29 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
   const price = tierPrice(tpl.tier, plans);
   const related = all.filter((x) => x.key !== tpl.key && x.outputs.some((o) => tpl.outputs.includes(o)) && x.tags.some((g) => tpl.tags.includes(g))).slice(0, 4);
   const chip = 'inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 font-medium text-brand-700 shadow-clay-sm';
+  const occasion = tpl.eventTypes[0] ? `?event=${tpl.eventTypes[0]}` : '';
+
+  /**
+   * "Use this template". Websites start with the quick start (a preview with the host's names
+   * before any sign-up); films open on the canvas before any sign-up (ADR-063); other designs
+   * start a new event. Signed-in hosts go straight to a new event with the design.
+   */
+  const useTemplate = (className: string) =>
+    tpl.definition!.type === 'WEBSITE' ? (
+      <UseTemplateButton template={{ key: tpl.key, name: tpl.name, eventTypes: tpl.eventTypes }} className={className}>
+        {t('template.use')}
+        <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
+      </UseTemplateButton>
+    ) : (
+      <AuthAwareLink
+        signedOutHref={tpl.definition!.type === 'VIDEO' ? `/design/video/${tpl.key}${occasion}` : `/login?template=${tpl.key}`}
+        signedInHref={`/dashboard/events/new?template=${tpl.key}${tpl.eventTypes[0] ? `&type=${tpl.eventTypes[0]}` : ''}`}
+        className={className}
+      >
+        {t('template.use')}
+        <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
+      </AuthAwareLink>
+    );
 
   return (
     <>
@@ -79,32 +111,28 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
                     ) : null}
                   </ul>
                 ) : null}
-                <div className="mt-7 flex items-baseline gap-3 border-t border-gold-100 pt-6">
-                  <p className="font-display text-4xl">{price ?? t('template.free')}</p>
-                  {price ? <p className="text-sm text-stone-500">{t('template.included', { plan: t(`filter.tier.${tpl.tier}`) })}</p> : null}
+                {/* The phone bar below steps aside while this is in view. */}
+                <div id="template-cta">
+                  <div className="mt-7 flex items-baseline gap-3 border-t border-gold-100 pt-6">
+                    <p className="font-display text-4xl">{price ?? t('template.free')}</p>
+                    {price ? <p className="text-sm text-stone-500">{t('template.included', { plan: t(`filter.tier.${tpl.tier}`) })}</p> : null}
+                  </div>
+                  {useTemplate('btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base')}
+                  {tpl.definition.type === 'WEBSITE' ? (
+                    <>
+                      <Link href={`/templates/${tpl.key}/demo`} className="btn-3d btn-3d-light mt-3 min-h-12 w-full rounded-2xl text-brand-700">
+                        <Play aria-hidden className="size-3.5 fill-current" />
+                        {t('templates.detail.demo')}
+                      </Link>
+                      {/* For people who would rather not give a number yet: the canvas keeps the design on their phone (ADR-063). */}
+                      <p className="mt-4 text-center text-sm text-stone-600">
+                        <Link href={`/design/website/${tpl.key}${occasion}`} className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700">
+                          {t('templates.detail.designFree')}
+                        </Link>
+                      </p>
+                    </>
+                  ) : null}
                 </div>
-                {tpl.definition.type === 'WEBSITE' ? (
-                  // Websites start with the quick start: a preview with the host's names before any sign-up.
-                  <UseTemplateButton template={{ key: tpl.key, name: tpl.name, eventTypes: tpl.eventTypes }} className="btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base">
-                    {t('template.use')}
-                    <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
-                  </UseTemplateButton>
-                ) : (
-                  <AuthAwareLink
-                    signedOutHref={`/login?template=${tpl.key}`}
-                    signedInHref={`/dashboard/events/new?template=${tpl.key}${tpl.eventTypes[0] ? `&type=${tpl.eventTypes[0]}` : ''}`}
-                    className="btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base"
-                  >
-                    {t('template.use')}
-                    <ArrowRight aria-hidden className="size-4 transition-transform duration-300 group-hover/cta:translate-x-1" />
-                  </AuthAwareLink>
-                )}
-                {tpl.definition.type === 'WEBSITE' ? (
-                  <Link href={`/templates/${tpl.key}/demo`} className="btn-3d btn-3d-light mt-3 min-h-12 w-full rounded-2xl text-brand-700">
-                    <Play aria-hidden className="size-3.5 fill-current" />
-                    {t('templates.detail.demo')}
-                  </Link>
-                ) : null}
               </div>
               <dl className="clay-inset mt-5 space-y-5 rounded-[2rem] p-7 text-sm">
                 {tpl.tags.length ? (
@@ -156,6 +184,13 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
             </section>
           ) : null}
         </div>
+        <StickyCta watch="template-cta">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-stone-500">{tpl.name}</p>
+            <p className="font-display text-xl leading-tight text-ink">{price ?? t('template.free')}</p>
+          </div>
+          {useTemplate('btn-3d group/cta min-h-12 shrink-0 rounded-2xl px-5 text-sm')}
+        </StickyCta>
       </main>
       <SiteFooter />
     </>

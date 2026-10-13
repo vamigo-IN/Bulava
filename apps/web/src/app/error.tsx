@@ -6,11 +6,13 @@ import { createTranslator } from '@bulava/localization';
 // Straight from its module: this boundary ships with every page, and the package's
 // entry point would bring the whole template engine (and Zod, ~450 KB) along.
 import { Mandala } from '@bulava/template-engine/src/ornaments';
+import { useRecover } from '@/lib/recover';
 
 const t = createTranslator('en');
 
 /** Last-resort boundary for public pages: a calm cream screen with a retry, never a stack trace. */
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const retry = useRecover(error, reset);
   return (
     <main className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-canvas px-4 text-center text-ink">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
@@ -21,7 +23,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
         <h1 className="font-display text-4xl leading-[1.08] tracking-[-0.015em] sm:text-5xl">{t('errorPage.title')}</h1>
         <p className="mt-4 text-lg text-stone-600">{t('errorPage.body')}</p>
         <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <button type="button" onClick={reset} className="btn-3d min-h-12 rounded-2xl px-6">
+          <button type="button" onClick={retry} className="btn-3d min-h-12 rounded-2xl px-6">
             <RotateCcw aria-hidden className="size-4" />
             {t('errorPage.retry')}
           </button>
