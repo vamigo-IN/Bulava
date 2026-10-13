@@ -46,7 +46,7 @@ export default function UpdatesPage() {
       setMessage({
         tone: 'success',
         text: [
-          t('updates.sent', { count: res.recipients }),
+          t(res.recipients === 1 ? 'updates.sentOne' : 'updates.sent', { count: res.recipients }),
           ...(d ? [t('updates.delivery', { email: d.email, whatsapp: d.whatsapp })] : []),
           ...(d?.whatsappSkipped ? [t('updates.whatsappSkipped', { count: d.whatsappSkipped })] : []),
         ].join(' '),

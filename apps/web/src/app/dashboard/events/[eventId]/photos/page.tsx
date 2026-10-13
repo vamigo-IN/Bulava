@@ -86,7 +86,7 @@ function ShareAlbum({ eventId, album, published, onChanged }: { eventId: string;
       setResult({
         tone: 'success',
         lines: [
-          t('photos.share.sent', { count: r.guests, email: r.email, whatsapp: r.whatsapp }),
+          t(r.guests === 1 ? 'photos.share.sentOne' : 'photos.share.sent', { count: r.guests, email: r.email, whatsapp: r.whatsapp }),
           ...(r.whatsappSkipped ? [t('photos.share.skipped', { count: r.whatsappSkipped })] : []),
         ],
       });
