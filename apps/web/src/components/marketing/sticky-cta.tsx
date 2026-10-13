@@ -34,7 +34,9 @@ export function StickyCta({ watch, children }: { watch: string; children: ReactN
     const root = document.documentElement;
     if (shown) root.style.setProperty('--sticky-cta', '5.75rem');
     else root.style.removeProperty('--sticky-cta');
-    return () => root.style.removeProperty('--sticky-cta');
+    return () => {
+      root.style.removeProperty('--sticky-cta');
+    };
   }, [shown]);
 
   return (
