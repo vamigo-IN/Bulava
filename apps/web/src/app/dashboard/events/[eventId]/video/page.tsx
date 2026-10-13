@@ -25,7 +25,7 @@ import { Alert, Badge, Button, Card, EmptyState, Spinner } from '@/components/ui
 
 const Preview = dynamic(() => import('@/components/events/video-preview').then((m) => m.VideoPreview), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
 
-const TIER_RANK = { FREE: 0, STANDARD: 1, PREMIUM: 2 } as const;
+const TIER_RANK = { FREE: 0, PREMIUM: 1, SIGNATURE: 2 } as const;
 
 export default function VideoPage() {
   return (

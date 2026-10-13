@@ -232,7 +232,7 @@ export default async function HomePage() {
   );
   const heroImage = heroLive ? fullPreview(heroLive.key) : null;
   const films = withPicks(showcase.videos, videos, videos, 3);
-  const [spotlight] = withPicks(showcase.spotlight, websites, [websites.find((w) => w.featured && w.tier === 'PREMIUM'), websites[0]], 1);
+  const [spotlight] = withPicks(showcase.spotlight, websites, [websites.find((w) => w.featured && w.tier === 'SIGNATURE'), websites[0]], 1);
   // Definitions only where the live renderer draws (the hero phone without its image, and the films),
   // and the spotlight's, whose points describe its own opening.
   const [heroDefinition, videoDefinitions, spotlightDefinition] = await Promise.all([
@@ -425,7 +425,7 @@ export default async function HomePage() {
                 <TemplateExplorer
                   items={explorerItems}
                   traditions={[{ value: '', label: t('filter.all') }, ...TRADITIONS.map((v) => ({ value: v, label: t(`tag.${v}` as MessageKey) }))]}
-                  tiers={[{ value: '', label: t('filter.all') }, ...(['FREE', 'STANDARD', 'PREMIUM'] as const).map((v) => ({ value: v, label: t(`filter.tier.${v}`) }))]}
+                  tiers={[{ value: '', label: t('filter.all') }, ...(['FREE', 'PREMIUM', 'SIGNATURE'] as const).map((v) => ({ value: v, label: t(`filter.tier.${v}`) }))]}
                   limit={12}
                   phoneLimit={6}
                   moreHref="/templates"

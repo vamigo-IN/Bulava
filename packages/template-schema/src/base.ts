@@ -54,9 +54,45 @@ export type SceneNameValue = (typeof SCENE_NAMES)[number];
 /** Scenes drawn on the primary colour: text over them uses light inks. */
 export const DARK_SCENE_NAMES: readonly SceneNameValue[] = ['palace', 'toran', 'arches', 'noir', 'sarovar', 'vrindavan'];
 
-/** Decorative motifs the engine draws itself (no external assets). */
-export const ORNAMENTS = ['none', 'mandala', 'paisley', 'floral', 'geometric', 'confetti', 'lotus', 'peacock', 'stars', 'laurel'] as const;
-export const PATTERNS = ['none', 'dots', 'jaali', 'waves', 'rangoli', 'damask'] as const;
+/**
+ * Decorative motifs the engine draws itself (no external assets). A theme's
+ * ornament is also its sections' suite (template-engine sections/suites.ts):
+ * the art every section below the hero is dressed in (dividers, corners,
+ * borders, seals, frames, the footer), so the page reads as one design.
+ * The later ones are suites first: temple (South Indian temple borders and
+ * kolam), kasavu (Kerala's gold-bordered ivory), jaali (Mughal arches and
+ * lattice), marigold (genda swags and wreaths), bagh (Punjabi phulkari),
+ * rangoli (diyas and the threshold rangoli), deco (art deco fans and steps),
+ * clouds (a soft nursery sky) and chapel (a church: lancet arches and a rose
+ * window).
+ */
+export const ORNAMENTS = ['none', 'mandala', 'paisley', 'floral', 'geometric', 'confetti', 'lotus', 'peacock', 'stars', 'laurel', 'temple', 'kasavu', 'jaali', 'marigold', 'bagh', 'rangoli', 'deco', 'clouds', 'chapel'] as const;
+export type OrnamentNameValue = (typeof ORNAMENTS)[number];
+
+/**
+ * The pieces of a suite a theme may swap for another (`theme.dress`), so two
+ * designs in one suite still differ below the hero (docs/templates.md#section-suites).
+ *  frame   – photo frames and shaped cards: a jharokha, a temple niche, a mihrab, a lancet…
+ *  edge    – the border along the top of a band: a toran, a temple border, a laal paar…
+ *  seal    – the round emblem behind monograms, numbers and the closing
+ *  skyline – the art at the foot of the closing band
+ *  corner  – mirrored pieces in a band's corners
+ *  divider – the rule under every heading
+ */
+export const SUITE_FRAMES = ['jharokha', 'niche', 'mihrab', 'lancet', 'arch', 'oval', 'circle', 'scallop', 'ticket', 'deco', 'double', 'cloud', 'rounded'] as const;
+export const SUITE_EDGES = ['none', 'toran', 'marigoldSwag', 'floralGarland', 'bunting', 'fairyLights', 'templeBorder', 'zariBand', 'laalPaar', 'phulkari', 'arches', 'lancets', 'deco', 'bandhani', 'scallop'] as const;
+export const SUITE_SEALS = ['emblem', 'medallion', 'kolam', 'arabesque', 'rangoliBloom', 'marigoldWreath', 'botanicalWreath', 'alpana', 'mandala', 'crest', 'sunburst', 'moon', 'sticker', 'phulkari', 'jaali', 'roseWindow'] as const;
+export const SUITE_SKYLINES = ['none', 'domes', 'diyaRow', 'lamps', 'peacocks', 'roses', 'balloons', 'clouds', 'lotuses', 'elephants', 'kalash', 'lanterns', 'sunburst', 'phulkari', 'doves', 'moonrise'] as const;
+export const SUITE_CORNERS = ['none', 'filigreeCorner', 'paisleyOrnate', 'roseCluster', 'peacockFeather', 'decoCorner'] as const;
+export const SUITE_DIVIDERS = ['glyph', 'flourish', 'triple', 'rule', 'laurel', 'lotus'] as const;
+export type SuiteFrame = (typeof SUITE_FRAMES)[number];
+export type SuiteEdge = (typeof SUITE_EDGES)[number];
+export type SuiteSeal = (typeof SUITE_SEALS)[number];
+export type SuiteSkyline = (typeof SUITE_SKYLINES)[number];
+export type SuiteCorner = (typeof SUITE_CORNERS)[number];
+export type SuiteDivider = (typeof SUITE_DIVIDERS)[number];
+/** Background patterns (theme paper and canvas pattern fills), drawn as small repeating SVGs. */
+export const PATTERNS = ['none', 'dots', 'jaali', 'waves', 'rangoli', 'damask', 'confetti', 'bandhani', 'stars', 'paisley', 'kolam', 'scales'] as const;
 /** Ambient particle effects drawn over a live invitation (off for reduced-motion users). */
 export const EFFECTS = ['none', 'petals', 'marigold', 'goldDust', 'fireflies', 'confetti', 'lanterns', 'snow'] as const;
 export type EffectName = (typeof EFFECTS)[number];

@@ -19,6 +19,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'garden',
+    suite: 'floral',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -34,7 +35,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       motif: { name: 'rings', tint: 'secondary' },
       card: 'garland',
     },
-    layouts: [L('floral', 'Gulab', undefined, 'STANDARD', true), L('couple', 'Ishq'), L('minimal', 'Vachan'), L('photo', 'Pal'), L('arch', 'Kamaan'), L('split', 'Ada'), L('mandap', 'Kunj')],
+    layouts: [L('floral', 'Gulab', undefined, 'PREMIUM', true), L('couple', 'Ishq'), L('minimal', 'Vachan'), L('photo', 'Pal'), L('arch', 'Kamaan'), L('split', 'Ada'), L('mandap', 'Kunj')],
   },
   {
     key: 'sagai',
@@ -50,6 +51,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'regal',
     look: 'royal',
+    suite: 'marigold',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -72,7 +74,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       card: 'framed',
     },
     layouts: [
-      L('couple', 'Shagun', undefined, 'STANDARD', true),
+      L('couple', 'Shagun', undefined, 'PREMIUM', true),
       L('jharokha', 'Haveli', { pair: { name: 'elephant', tint: 'accent' } }),
       L('mandap', 'Dwar'),
       L('arch', 'Tilak'),
@@ -95,6 +97,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'modern',
+    suite: 'laurel',
     effect: 'goldDust',
     intro: 'seal',
     kit: {
@@ -133,6 +136,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'bagh',
     effect: 'marigold',
     intro: 'petals',
     kit: {
@@ -166,6 +170,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'royal',
+    suite: 'mandala',
     effect: 'petals',
     intro: 'doors',
     kit: {
@@ -200,6 +205,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'temple',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -235,6 +241,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'marigold',
     effect: 'marigold',
     intro: 'petals',
     kit: {
@@ -254,7 +261,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       card: 'garland',
     },
     layouts: [
-      L('home', 'Urli', undefined, 'STANDARD', true),
+      L('home', 'Urli', undefined, 'PREMIUM', true),
       L('couple', 'Ubtan', { hero: { name: 'coupleHindu', tint: 'secondary' } }),
       L('split', 'Genda'),
       L('arch', 'Kesar'),
@@ -277,6 +284,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'temple',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -312,6 +320,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'celebration',
+    suite: 'paisley',
     effect: 'petals',
     intro: 'petals',
     kit: {
@@ -330,7 +339,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       card: 'garland',
     },
     layouts: [
-      L('split', 'Haath', undefined, 'STANDARD', true),
+      L('split', 'Haath', undefined, 'PREMIUM', true),
       L('arch', 'Bel'),
       L('couple', 'Dulhan', { hero: { name: 'brideBust', tint: 'primary' } }),
       L('floral', 'Patti'),
@@ -353,6 +362,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'royal',
+    suite: 'jaali',
     effect: 'lanterns',
     intro: 'lanterns',
     kit: {
@@ -388,6 +398,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'bagh',
     effect: 'confetti',
     intro: 'curtain',
     kit: {
@@ -408,7 +419,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       card: 'header',
     },
     layouts: [
-      L('split', 'Thaap', undefined, 'STANDARD', true),
+      L('split', 'Thaap', undefined, 'PREMIUM', true),
       L('couple', 'Nach', { hero: { name: 'coupleHindu', tint: 'primary' } }),
       L('party', 'Baaja'),
       L('arch', 'Taal'),
@@ -430,6 +441,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'royal',
+    suite: 'deco',
     effect: 'lanterns',
     intro: 'lanterns',
     kit: {
@@ -447,7 +459,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       sky: { name: 'stars', tint: 'accent' },
       card: 'framed',
     },
-    layouts: [L('night', 'Mehfil', { hero: undefined }, 'PREMIUM', true), L('couple', 'Jhankar'), L('split', 'Thumka', { hero: { name: 'dhol' } }), L('arch', 'Raag'), L('photo', 'Taal'), L('minimal', 'Sur')],
+    layouts: [L('night', 'Mehfil', { hero: undefined }, 'SIGNATURE', true), L('couple', 'Jhankar'), L('split', 'Thumka', { hero: { name: 'dhol' } }), L('arch', 'Raag'), L('photo', 'Taal'), L('minimal', 'Sur')],
   },
 
   // ─────────────────────────── Reception ───────────────────────────
@@ -465,6 +477,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'modern',
+    suite: 'stars',
     effect: 'goldDust',
     intro: 'curtain',
     kit: {
@@ -485,7 +498,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       card: 'minimal',
     },
     layouts: [
-      L('night', 'Shaam', { hero: { name: 'champagne' } }, 'PREMIUM', true),
+      L('night', 'Shaam', { hero: { name: 'champagne' } }, 'SIGNATURE', true),
       L('couple', 'Jashn'),
       L('minimal', 'Toast', { hero: { name: 'champagne' } }),
       L('photo', 'Pal'),
@@ -507,6 +520,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'regal',
     look: 'royal',
+    suite: 'deco',
     effect: 'goldDust',
     intro: 'seal',
     kit: {
@@ -543,6 +557,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'classic',
     look: 'classic',
+    suite: 'laurel',
     effect: 'goldDust',
     intro: 'seal',
     kit: {
@@ -560,7 +575,7 @@ export const CELEBRATION_THEMES: Theme[] = [
       card: 'framed',
     },
     layouts: [
-      L('couple', 'Varsh', undefined, 'STANDARD', true),
+      L('couple', 'Varsh', undefined, 'PREMIUM', true),
       L('arch', 'Saath'),
       L('floral', 'Bagiya', { corner: { name: 'roseCluster', tint: '#7f9a83' } }),
       L('minimal', 'Sutra'),
@@ -582,6 +597,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'modern',
+    suite: 'geometric',
     effect: 'goldDust',
     intro: 'envelope',
     kit: {
@@ -613,6 +629,8 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'garden',
+    suite: 'floral',
+    dress: { frame: 'circle', seal: 'medallion', edge: 'none' },
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -647,6 +665,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'floral',
     effect: 'petals',
     kit: {
       dark: false,
@@ -677,6 +696,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'classic',
     look: 'garden',
+    suite: 'chapel',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -708,6 +728,7 @@ export const CELEBRATION_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'heritage',
+    suite: 'mandala',
     effect: 'marigold',
     intro: 'doors',
     kit: {

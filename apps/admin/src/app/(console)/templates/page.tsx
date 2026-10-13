@@ -149,7 +149,7 @@ function TemplateList() {
                   </Td>
                   <Td>
                     <div className="flex flex-wrap gap-1">
-                      <Badge tone={tpl.tier === 'PREMIUM' ? 'gold' : tpl.tier === 'STANDARD' ? 'brand' : 'neutral'}>{t(`tier.${tpl.tier}`)}</Badge>
+                      <Badge tone={tpl.tier === 'SIGNATURE' ? 'gold' : tpl.tier === 'PREMIUM' ? 'brand' : 'neutral'}>{t(`tier.${tpl.tier}`)}</Badge>
                       {tpl.badge ? <Badge>{t(`badge.${tpl.badge}`)}</Badge> : null}
                       {tpl.featured ? (
                         <Badge tone="gold" aria-label={t('details.featured')}>

@@ -1,21 +1,29 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { LookName, ThemeColors } from '@bulava/template-schema';
+import { getLanguage } from '@bulava/localization';
+import type { LookName, ThemeColors, ThemeDress } from '@bulava/template-schema';
 import { Marigold, Toran } from '../art/motifs';
 import { Divider, FloralCorner, patternStyle, type OrnamentName } from '../ornaments';
+import { StarField } from '../ornaments-signature';
 import type { SectionProps } from '../types';
+import { dressOf, EDGE_HEIGHT, onDark, SuiteCorners, SuiteDivider, SuiteEdge, SWAG_EDGES, type Band, type Dress } from './dress';
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ');
 }
 
-type Band = 'plain' | 'surface' | 'primary' | 'accent';
+export type { Band, Dress };
+
+/** Looks whose sections follow a dark hero onto the dark stock (heritage and celebration keep their colour bands; noir pages are dark already). */
+const DARK_STOCK_LOOKS = new Set<LookName>(['royal', 'classic', 'garden', 'modern']);
 
 /**
  * Which band a section sits on. Looks alternate bands by position, so a page
  * reads as a sequence of distinct panels (heritage: crimson, saffron, ivory…);
- * the classic look keeps each section's own preference.
+ * the classic look keeps each section's own preference. A design on dark
+ * stock (heroTone "dark") alternates the primary band with a deeper one.
  */
-function bandFor(look: LookName, index: number, tone: 'plain' | 'surface' | 'inverse'): Band {
+export function bandFor(look: LookName, index: number, tone: 'plain' | 'surface' | 'inverse', dark = false): Band {
+  if (dark && DARK_STOCK_LOOKS.has(look)) return index % 2 ? 'deep' : 'primary';
   switch (look) {
     case 'heritage':
       return (['surface', 'primary', 'accent'] as const)[index % 3]!;
@@ -32,19 +40,68 @@ function bandFor(look: LookName, index: number, tone: 'plain' | 'surface' | 'inv
   }
 }
 
-const BAND_CLASS: Record<Band, string> = {
+export const BAND_CLASS: Record<Band, string> = {
   plain: '',
   surface: 'bg-[var(--t-surface)]',
   primary: 'bulava-band-primary',
   accent: 'bulava-band-accent',
+  deep: 'bulava-band-deep',
+};
+
+/** The colour a band's own background is, for scalloped edges rising into the band above. */
+export const BAND_FILL: Record<Band, string> = {
+  plain: 'var(--t-bg)',
+  surface: 'var(--t-surface)',
+  primary: 'var(--t-primary)',
+  accent: 'var(--t-accent)',
+  deep: 'var(--t-deep)',
 };
 
 /** Common shell props from a section's props. */
 export function shell(p: SectionProps) {
-  return { id: p.instance.id, ornament: p.ornament, look: p.look, index: p.index, colors: p.colors };
+  return { id: p.instance.id, ornament: p.ornament, look: p.look, index: p.index, colors: p.colors, dark: p.heroTone === 'dark', pattern: p.pattern, themeDress: p.dress };
 }
 
-/** Ornamental rule under headings, in the look's own vocabulary. */
+/**
+ * The dress a section's pieces are drawn in: its band (from the look and its place
+ * on the page, or the band it always takes), the look, the palette and the suite
+ * with the theme's own pieces. Sections render on the server, so they hand it to
+ * the shell and to every piece.
+ */
+export function dressFor(p: SectionProps, tone: 'plain' | 'surface' | 'inverse' = 'plain', band?: Band): Dress {
+  return dressOf(p.ornament, p.look, p.colors, band ?? bandFor(p.look, p.index, tone, p.heroTone === 'dark'), p.dress);
+}
+
+/** Heading faces loaded with a true italic (the others would be slanted by the browser). */
+const TRUE_ITALIC = new Set<string>(['Cormorant Garamond']);
+/** Heading faces that read well in a paragraph (the rest are display faces: Cinzel's capitals, Yeseva, Rozha…). */
+const BOOK_FACES = new Set<string>(['Cormorant Garamond', 'Playfair Display', 'Marcellus', 'Noto Serif']);
+
+/**
+ * The faces printed lines take: `name` for short lines (the parents' names, a
+ * name in a profile), `prose` for paragraphs set like print (a letter, the
+ * blessings, a verse). Both use the heading face where it is a book face, in
+ * italic only where it has a true italic; under a display heading (Cinzel's
+ * capitals, Yeseva, Rozha, a rounded face) they take the body face, which
+ * keeps two names on two lines in a narrow column.
+ */
+export function faces(p: Pick<SectionProps, 'fonts'>): { name: string; prose: string } {
+  const heading = p.fonts?.heading?.family ?? '';
+  const italic = TRUE_ITALIC.has(heading) ? ' italic' : '';
+  const face = BOOK_FACES.has(heading) ? `[font-family:var(--t-heading)]${italic}` : '[font-family:var(--t-body)]';
+  return { name: face, prose: face };
+}
+
+/**
+ * A small label over a line of names ("Daughter of", "Ananya's family"): spaced
+ * capitals in Latin script; Devanagari and the other Indic scripts have no
+ * capitals and lose their joins when spaced, so they are set a little larger, unspaced.
+ */
+export function labelClass(language: string): string {
+  return getLanguage(language).script === 'Latn' ? 'text-[0.62rem] font-semibold tracking-[0.3em] uppercase' : 'text-[0.8rem] font-semibold';
+}
+
+/** Ornamental rule under headings, in the look's own vocabulary (templates without a suite). */
 export function LookDivider({ look, ornament }: { look: LookName; ornament: OrnamentName }) {
   switch (look) {
     case 'heritage':
@@ -101,9 +158,42 @@ function Filigree({ className, style }: { className?: string; style?: CSSPropert
   );
 }
 
+/** The section's heading in the look's type, with the suite's rule (or the look's own) beneath it. */
+export function Heading({ d, heading, eyebrow, look, index, align = 'center' }: { d: Dress; heading: string; eyebrow?: string; look: LookName; index: number; align?: 'center' | 'left' }) {
+  const modernNumber = look === 'modern' ? String(index).padStart(2, '0') : null;
+  const left = look === 'modern' || align === 'left';
+  return (
+    <div className={cx(look === 'modern' ? 'mb-10' : 'mb-9', left ? 'text-left' : 'text-center')}>
+      {modernNumber ? <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-[var(--t-accent-ink)]">{modernNumber}</p> : null}
+      {eyebrow ? <p className="mb-2 text-xs font-semibold tracking-[0.35em] uppercase text-[var(--t-secondary-ink)]">{eyebrow}</p> : null}
+      <h2
+        className={cx(
+          'leading-tight text-balance',
+          look === 'heritage' && 'text-5xl [font-family:var(--t-script)] text-[var(--t-heading-ink)] @min-[640px]:text-6xl',
+          look === 'noir' && 'text-4xl italic [font-family:var(--t-heading)] @min-[640px]:text-5xl',
+          look === 'royal' && 'text-3xl tracking-[0.14em] uppercase [font-family:var(--t-heading)] text-[var(--t-heading-ink)] @min-[640px]:text-4xl',
+          look === 'garden' && 'text-5xl [font-family:var(--t-script)] text-[var(--t-heading-ink)]',
+          look === 'celebration' && 'text-4xl font-bold [font-family:var(--t-heading)] @min-[640px]:text-5xl',
+          look === 'modern' && 'text-4xl tracking-tight [font-family:var(--t-heading)] @min-[640px]:text-6xl',
+          look === 'classic' && 'text-3xl [font-family:var(--t-heading)] @min-[640px]:text-4xl',
+        )}
+      >
+        {heading}
+      </h2>
+      <div className={cx('mt-4', left && 'flex')}>{d.suite.name === 'none' ? <LookDivider look={look} ornament="none" /> : <SuiteDivider d={d} className={left ? 'justify-start' : undefined} />}</div>
+    </div>
+  );
+}
+
 /**
  * Standard section shell: consistent rhythm, reveal animation, a heading in
- * the look's style, and the look's band and decoration.
+ * the look's style, the look's band, and the suite's dress (the rule under the
+ * heading, corner pieces or a border along the top, the paper's pattern, stars
+ * over a dark band). A section that draws suite pieces itself passes the dress
+ * it drew them in (`dress`, from dressFor), so the shell's band and the pieces agree.
+ *
+ * Restraint: a band takes a border or corners, never both; swags (a toran, a
+ * garland, bunting) hang over every third band, strips over every other one.
  */
 export function SectionShell({
   id,
@@ -117,6 +207,12 @@ export function SectionShell({
   index = 1,
   colors,
   wide,
+  dark = false,
+  pattern = 'none',
+  band: bandOverride,
+  dress: given,
+  themeDress,
+  bare = false,
 }: {
   id: string;
   heading?: string;
@@ -130,10 +226,28 @@ export function SectionShell({
   /** Palette (patterns are images, so they need real colours, not variables). */
   colors?: ThemeColors;
   wide?: boolean;
+  /** The design is on dark stock (heroTone "dark"). */
+  dark?: boolean;
+  /** The theme's paper pattern (the suite's when none). */
+  pattern?: string;
+  /** A band this section always takes (the footer's). */
+  band?: Band;
+  /** The dress the section's own pieces were drawn in (its band wins over `band` and the look's). */
+  dress?: Dress;
+  /** The theme's own suite pieces (theme.dress), when the shell makes the dress itself. */
+  themeDress?: ThemeDress;
+  /** No corners or border (sections that frame themselves). */
+  bare?: boolean;
 }) {
-  const band = bandFor(look, index, tone);
-  const toran = look === 'heritage' && band === 'accent';
-  const bandPattern: CSSProperties | undefined = !colors
+  const dress = given ?? dressOf(ornament, look, colors, bandOverride ?? bandFor(look, index, tone, dark), themeDress);
+  const band = dress.band;
+  const suite = dress.suite;
+  const suited = suite.name !== 'none';
+  const darkBand = onDark(dress);
+
+  // The look's own decoration, for templates without a suite.
+  const toran = !suited && look === 'heritage' && band === 'accent';
+  const lookPattern: CSSProperties | undefined = !colors
     ? undefined
     : look === 'heritage' && band === 'primary'
       ? patternStyle('rangoli', colors.accent, 1)
@@ -144,33 +258,19 @@ export function SectionShell({
           : look === 'royal' && band === 'surface'
             ? patternStyle('damask', colors.secondary, 1)
             : undefined;
-  const modernNumber = look === 'modern' ? String(index).padStart(2, '0') : null;
+  // A suite prints the theme's pattern (else its own) on every band but the plain page.
+  const paper = pattern && pattern !== 'none' ? pattern : suite.pattern;
+  const suitePattern: CSSProperties | undefined = colors && band !== 'plain' && paper !== 'none' ? patternStyle(paper, band === 'accent' ? colors.primary : darkBand ? colors.accent : colors.secondary, 1) : undefined;
+  const bandPattern = suited ? suitePattern : lookPattern;
 
-  const headingBlock = heading ? (
-    <div className={cx(look === 'modern' ? 'mb-10 text-left' : 'mb-9 text-center')}>
-      {modernNumber ? <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-[var(--t-accent-ink)]">{modernNumber}</p> : null}
-      {eyebrow ? <p className={cx('mb-2 text-xs font-semibold tracking-[0.35em] uppercase text-[var(--t-secondary-ink)]', look === 'modern' ? '' : 'text-center')}>{eyebrow}</p> : null}
-      <h2
-        className={cx(
-          'leading-tight',
-          look === 'heritage' && 'text-5xl [font-family:var(--t-script)] text-[var(--t-heading-ink)] @min-[640px]:text-6xl',
-          look === 'noir' && 'text-4xl italic [font-family:var(--t-heading)] @min-[640px]:text-5xl',
-          look === 'royal' && 'text-3xl tracking-[0.14em] uppercase [font-family:var(--t-heading)] text-[var(--t-heading-ink)] @min-[640px]:text-4xl',
-          look === 'garden' && 'text-5xl [font-family:var(--t-script)] text-[var(--t-heading-ink)]',
-          look === 'celebration' && 'text-4xl font-bold [font-family:var(--t-heading)] @min-[640px]:text-5xl',
-          look === 'modern' && 'text-4xl tracking-tight [font-family:var(--t-heading)] @min-[640px]:text-6xl',
-          look === 'classic' && 'text-3xl [font-family:var(--t-heading)] @min-[640px]:text-4xl',
-        )}
-      >
-        {heading}
-      </h2>
-      <div className={cx('mt-4', look === 'modern' && 'flex')}>
-        <LookDivider look={look} ornament={ornament} />
-      </div>
-    </div>
-  ) : eyebrow ? (
-    <p className="mb-6 text-center text-xs font-semibold tracking-[0.35em] uppercase text-[var(--t-secondary-ink)]">{eyebrow}</p>
-  ) : null;
+  const swag = SWAG_EDGES.has(suite.edge);
+  const edge = suited && !bare && suite.edge !== 'none' && (swag ? index % 3 === 2 : index % 2 === 0);
+  const edgeRoom = edge && swag ? EDGE_HEIGHT[suite.edge] : 0;
+  const corners = suited && !bare && !edge && suite.corner !== 'none' && look !== 'royal' && index % 2 === 1;
+  // Stars over every other dark band (the deep ones), over every one for a night-sky suite.
+  const sky = suited && darkBand && (suite.sky === 'stars' || suite.sky === 'sparkles') && (band === 'deep' || suite.name === 'stars');
+
+  const headingBlock = heading ? <Heading d={dress} heading={heading} eyebrow={eyebrow} look={look} index={index} /> : eyebrow ? <p className="mb-6 text-center text-xs font-semibold tracking-[0.35em] uppercase text-[var(--t-secondary-ink)]">{eyebrow}</p> : null;
 
   const body = (
     <>
@@ -180,26 +280,39 @@ export function SectionShell({
   );
 
   return (
-    <section id={id} className={cx('bulava-reveal relative overflow-hidden px-6', toran ? 'pt-28 pb-16 @min-[640px]:pt-32' : 'py-16 @min-[640px]:py-24', BAND_CLASS[band], className)}>
-      {bandPattern ? <div className="pointer-events-none absolute inset-0 opacity-[0.12]" style={bandPattern} aria-hidden="true" /> : null}
+    <section
+      id={id}
+      className={cx('bulava-reveal relative overflow-hidden px-6', toran ? 'pt-28 pb-16 @min-[640px]:pt-32' : 'py-16 @min-[640px]:py-24', BAND_CLASS[band], className)}
+      style={{ ['--t-band' as string]: BAND_FILL[band], ...(edgeRoom ? { paddingTop: `calc(${edgeRoom}px + 3rem)` } : {}) }}
+    >
+      {bandPattern ? <div className={cx('pointer-events-none absolute inset-0', darkBand ? 'opacity-[0.09]' : 'opacity-[0.12]')} style={bandPattern} aria-hidden="true" /> : null}
+      {sky ? <StarField className="pointer-events-none absolute inset-x-0 top-0 h-56 w-full text-[var(--t-orn)] opacity-40" count={suite.sky === 'sparkles' ? 12 : 22} /> : null}
       {toran ? <Toran className="pointer-events-none absolute inset-x-0 top-0 mx-auto w-full max-w-[760px] bulava-sway-soft" swags={4} /> : null}
-      {look === 'garden' ? (
+      {edge ? <SuiteEdge d={dress} name={suite.edge} /> : null}
+      {corners ? <SuiteCorners d={dress} /> : null}
+      {!suited && look === 'garden' ? (
         <>
           <FloralCorner className="pointer-events-none absolute top-0 left-0 w-32 text-[var(--t-secondary)] opacity-50 @min-[640px]:w-44" />
           <FloralCorner className="pointer-events-none absolute top-0 right-0 w-32 -scale-x-100 text-[var(--t-secondary)] opacity-50 @min-[640px]:w-44" />
         </>
       ) : null}
-      {look === 'noir' ? (
+      {look === 'noir' || (suited && darkBand) ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-48 max-w-xl rounded-full opacity-25 blur-3xl" style={{ background: 'var(--t-accent)' }} aria-hidden="true" />
       ) : null}
       <div className={cx('relative mx-auto', wide ? 'max-w-5xl' : 'max-w-3xl')}>
-        {look === 'royal' ? (
+        {look === 'royal' && !bare ? (
           <div className="relative border border-[var(--t-line)] px-5 py-12 @min-[640px]:px-12">
             <div className="pointer-events-none absolute inset-2 border border-[var(--t-line)] opacity-60" aria-hidden="true" />
-            <Filigree className="absolute -top-px -left-px w-12 text-[var(--t-accent)]" />
-            <Filigree className="absolute -top-px -right-px w-12 -scale-x-100 text-[var(--t-accent)]" />
-            <Filigree className="absolute -bottom-px -left-px w-12 -scale-y-100 text-[var(--t-accent)]" />
-            <Filigree className="absolute -right-px -bottom-px w-12 -scale-100 text-[var(--t-accent)]" />
+            {suited && suite.corner !== 'none' ? (
+              <SuiteCorners d={dress} bottom inset={-1} size="sm" />
+            ) : (
+              <>
+                <Filigree className="absolute -top-px -left-px w-12 text-[var(--t-accent)]" />
+                <Filigree className="absolute -top-px -right-px w-12 -scale-x-100 text-[var(--t-accent)]" />
+                <Filigree className="absolute -bottom-px -left-px w-12 -scale-y-100 text-[var(--t-accent)]" />
+                <Filigree className="absolute -right-px -bottom-px w-12 -scale-100 text-[var(--t-accent)]" />
+              </>
+            )}
             <div className="relative">{body}</div>
           </div>
         ) : (
@@ -230,7 +343,7 @@ export function cardClass(look: LookName): string {
   }
 }
 
-/** Splits "Riya & Aman" so the ampersand can be set in the script face. */
+/** Splits "Ananya & Vihaan" so the ampersand can be set in the script face. */
 export function Names({ text, className, ampersandClassName }: { text: string; className?: string; ampersandClassName?: string }) {
   const parts = text.split(/\s+&\s+/);
   if (parts.length !== 2) return <span className={className}>{text}</span>;

@@ -61,6 +61,12 @@ export interface Kit {
   sky?: Art;
   /** A Devanagari invocation above everything (Hindu themes). */
   invocation?: string;
+  /**
+   * The faith emblem crowning the opening (Ganesha, the crescent and star, the
+   * Khanda, the cross): set from the theme's faith in collection.ts, placed by
+   * each composition at the very top, upright, never behind words.
+   */
+  emblem?: Art;
   card: CardStyle;
 }
 
@@ -147,6 +153,18 @@ const ASPECT: Partial<Record<OrnamentLayerName, number>> = {
   peacock: 1,
   mandala: 1,
   geometric: 1,
+  ganesha: 200 / 212,
+  crescentStar: 1,
+  khanda: 200 / 216,
+  cross: 160 / 200,
+  girih: 1,
+  jaaliArch: 300 / 440,
+  fanoos: 120 / 260,
+  goldenTemple: 400 / 306,
+  phulkariBagh: 1,
+  lancetWindow: 260 / 440,
+  lilies: 240 / 300,
+  weddingBells: 220 / 190,
 };
 
 export const aspectOf = (name: OrnamentLayerName) => ASPECT[name] ?? 1;
@@ -168,7 +186,7 @@ export function fitCentre(name: OrnamentLayerName, cx: number, cy: number, maxW:
 }
 
 /** Round motifs turn in place; other art would look wrong spinning. */
-const ROUND = new Set<OrnamentLayerName>(['medallion', 'mandala', 'rangoliBloom', 'kolam', 'arabesque', 'geometric', 'roseWindow']);
+const ROUND = new Set<OrnamentLayerName>(['medallion', 'mandala', 'rangoliBloom', 'kolam', 'arabesque', 'geometric', 'roseWindow', 'girih', 'phulkariBagh']);
 export const isRound = (a?: Art): a is Art => !!a && ROUND.has(a.name);
 /** The art when it is a round motif, else the fallback. */
 export const round = (a: Art | undefined, fallback: Art): Art => (isRound(a) ? a : fallback);

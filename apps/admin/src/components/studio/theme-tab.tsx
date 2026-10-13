@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FONT_FAMILIES, INTROS, ORNAMENTS, PATTERNS, type FontRef, type ThemeColors } from '@bulava/template-schema';
+import { FONT_FAMILIES, INTROS, ORNAMENTS, PATTERNS, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, type FontRef, type ThemeColors, type ThemeDress } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
 import { Card, CardTitle, Field, Input, Select } from '../ui';
 import { EditError, type EditorProps } from './common';
@@ -13,6 +13,16 @@ const DEVANAGARI_FALLBACKS = ['Noto Sans Devanagari', 'Noto Serif Devanagari', '
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 type FontSlot = 'heading' | 'body' | 'script';
+
+/** The suite's pieces a theme may swap (theme.dress, docs/templates.md#section-suites); unset is the suite's own. */
+const DRESS_PIECES = [
+  ['frame', SUITE_FRAMES],
+  ['edge', SUITE_EDGES],
+  ['seal', SUITE_SEALS],
+  ['skyline', SUITE_SKYLINES],
+  ['corner', SUITE_CORNERS],
+  ['divider', SUITE_DIVIDERS],
+] as const satisfies ReadonlyArray<readonly [keyof ThemeDress, readonly string[]]>;
 
 function fontRef(family: string, fallback: string | undefined): FontRef {
   const deva = DEVANAGARI_CAPABLE.has(family);
@@ -82,6 +92,33 @@ export function ThemeTab({ definition, edit }: EditorProps) {
                   </Select>
                 )}
               </Field>
+              <p className="text-xs text-stone-500 sm:col-span-2">{t('theme.dress.hint')}</p>
+              {DRESS_PIECES.map(([piece, options]) => (
+                <Field key={piece} label={t(`theme.dress.${piece}`)}>
+                  {(p) => (
+                    <Select
+                      {...p}
+                      value={theme.dress?.[piece] ?? ''}
+                      onChange={(e) =>
+                        run((d) => {
+                          const dress: Record<string, string> = { ...(d.theme.dress ?? {}) };
+                          if (e.target.value) dress[piece] = e.target.value;
+                          else delete dress[piece];
+                          if (Object.keys(dress).length) d.theme.dress = dress as ThemeDress;
+                          else delete d.theme.dress;
+                        })
+                      }
+                    >
+                      <option value="">{t('theme.dress.own')}</option>
+                      {options.map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+              ))}
               <Field label={t('theme.intro')}>
                 {(p) => (
                   <Select

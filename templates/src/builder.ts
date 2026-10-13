@@ -1,4 +1,4 @@
-import { fontPairing, type EffectName, type Fonts, type IntroName, type LookName, type ORNAMENTS, type PhotoSlot, type TemplateDefinitionInput, type ThemeColors, type Value } from '@bulava/template-schema';
+import { fontPairing, type EffectName, type Fonts, type IntroName, type LookName, type ORNAMENTS, type PhotoSlot, type TemplateDefinitionInput, type ThemeColors, type ThemeDress, type Value } from '@bulava/template-schema';
 
 /**
  * Helpers to author catalog templates compactly. Output is plain
@@ -6,7 +6,7 @@ import { fontPairing, type EffectName, type Fonts, type IntroName, type LookName
  * renderers interpret the stored JSON.
  */
 
-export type Tier = 'FREE' | 'STANDARD' | 'PREMIUM';
+export type Tier = 'FREE' | 'PREMIUM' | 'SIGNATURE';
 
 export interface CatalogMeta {
   key: string;
@@ -149,16 +149,20 @@ type HeroVariant =
   | 'backwaters'
   | 'sarovar'
   | 'vrindavan';
-type TimelineVariant = 'cards' | 'timeline' | 'tiles' | 'tickets' | 'diya';
+type TimelineVariant = 'cards' | 'timeline' | 'frames' | 'tiles' | 'tickets' | 'diya';
 
-/** Layout choices for the sections that have several. */
+/** Layout choices for the sections that have several (template-engine SECTION_VARIANTS). */
 interface Variants {
   hero: HeroVariant;
   timeline: TimelineVariant;
-  couple: 'default' | 'stacked' | 'arch' | 'flip' | 'profile';
-  gallery: 'default' | 'stack' | 'mosaic' | 'polaroid';
-  story: 'default' | 'curtain' | 'polaroid';
-  countdown: 'default' | 'flip';
+  couple: 'default' | 'stacked' | 'arch' | 'portraits' | 'duet' | 'monogram' | 'flip' | 'profile';
+  gallery: 'default' | 'frames' | 'stack' | 'mosaic' | 'polaroid';
+  story: 'default' | 'letter' | 'curtain' | 'polaroid';
+  countdown: 'default' | 'flip' | 'rings' | 'calendar';
+  venue: 'default' | 'illustrated' | 'postcard';
+  rsvp: 'default' | 'card';
+  footer: 'default' | 'seal' | 'skyline' | 'blessing';
+  family: 'default' | 'blessings';
 }
 
 export type Layout =
@@ -208,47 +212,47 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: heroProps(t('template.weddingOf'), invocation) },
       { id: 'countdown', section: 'countdown', variant: v.countdown },
       { id: 'couple', section: 'couple', variant: v.couple, props: { partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
-      { id: 'family', section: 'family', props: { text: b('custom.blessings') } },
+      { id: 'family', section: 'family', variant: v.family, props: { text: b('custom.blessings'), partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
       { id: 'story', section: 'story', variant: v.story, props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'gallery', section: 'gallery', variant: v.gallery },
       { id: 'stay', section: 'accommodation', props: { text: b('custom.accommodation') } },
       { id: 'travel', section: 'travel', props: { text: b('custom.travel') } },
       { id: 'updates', section: 'announcements' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
       { id: 'gifts', section: 'giftRegistry', props: { text: b('custom.gifts') } },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   'wedding-lite': {
     eyebrow: t('template.weddingOf'),
-    slots: ['tagline', 'blessings', 'hashtag', 'closing'],
+    slots: ['tagline', 'blessings', 'partnerOneParents', 'partnerTwoParents', 'hashtag', 'closing'],
     sections: (v, invocation): SectionSpec[] => [
       { id: 'hero', section: 'hero', variant: v.hero, props: heroProps(t('template.weddingOf'), invocation) },
-      { id: 'family', section: 'family', props: { text: b('custom.blessings') } },
+      { id: 'family', section: 'family', variant: v.family, props: { text: b('custom.blessings'), partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'updates', section: 'announcements' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   engagement: {
     eyebrow: t('template.engagementOf'),
-    slots: ['tagline', 'story', 'hashtag', 'closing'],
+    slots: ['tagline', 'story', 'partnerOneParents', 'partnerTwoParents', 'hashtag', 'closing'],
     sections: (v): SectionSpec[] => [
       { id: 'hero', section: 'hero', variant: v.hero, props: heroProps(t('template.engagementOf')) },
       { id: 'countdown', section: 'countdown', variant: v.countdown },
-      { id: 'couple', section: 'couple', variant: v.couple },
+      { id: 'couple', section: 'couple', variant: v.couple, props: { partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
       { id: 'story', section: 'story', variant: v.story, props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'gallery', section: 'gallery', variant: v.gallery },
-      { id: 'rsvp', section: 'rsvp' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   'pre-wedding': {
@@ -258,10 +262,10 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: { ...heroProps(t('template.celebrateWith')), date: b('function.startsAt', { format: 'dateTime' }) } },
       { id: 'about', section: 'story', props: { heading: b('function.name'), text: b('custom.about') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'venue', section: 'venue', variant: v.venue },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   'save-the-date': {
@@ -270,8 +274,8 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
     sections: (v): SectionSpec[] => [
       { id: 'hero', section: 'hero', variant: v.hero, props: { ...heroProps(t('template.saveTheDate')), subtitle: t('template.joinUs') } },
       { id: 'countdown', section: 'countdown', variant: v.countdown },
-      { id: 'rsvp', section: 'rsvp' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   birthday: {
@@ -282,11 +286,11 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'countdown', section: 'countdown', variant: v.countdown },
       { id: 'about', section: 'story', variant: v.story, props: { text: b('custom.about'), image: b('photo.story', { fallback: b('photos[1]') }) } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'gallery', section: 'gallery', variant: v.gallery },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   anniversary: {
@@ -296,10 +300,10 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: heroProps(t('template.celebrateWith')) },
       { id: 'story', section: 'story', variant: v.story, props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'gallery', section: 'gallery', variant: v.gallery },
-      { id: 'rsvp', section: 'rsvp' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   'family-ceremony': {
@@ -308,12 +312,12 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
     sections: (v, invocation): SectionSpec[] => [
       { id: 'hero', section: 'hero', variant: v.hero, props: heroProps(t('template.blessings'), invocation) },
       { id: 'about', section: 'story', props: { text: b('custom.about') } },
-      { id: 'family', section: 'family', props: { text: b('custom.blessings') } },
+      { id: 'family', section: 'family', variant: v.family, props: { text: b('custom.blessings') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'venue', section: 'venue', variant: v.venue },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { closing: b('custom.closing') } },
     ],
   },
   housewarming: {
@@ -323,10 +327,10 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: { ...heroProps(t('template.joinUs'), invocation), title: b('event.title') } },
       { id: 'about', section: 'story', props: { text: b('custom.about') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'travel', section: 'travel', props: { text: b('custom.travel') } },
-      { id: 'rsvp', section: 'rsvp' },
-      { id: 'footer', section: 'footer', props: { closing: b('custom.closing') } },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { closing: b('custom.closing') } },
     ],
   },
   religious: {
@@ -336,10 +340,10 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: { ...heroProps(t('template.blessings'), invocation), title: b('event.title') } },
       { id: 'about', section: 'story', props: { text: b('custom.about') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'updates', section: 'announcements' },
-      { id: 'rsvp', section: 'rsvp' },
-      { id: 'footer', section: 'footer', props: { closing: b('custom.closing') } },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { closing: b('custom.closing') } },
     ],
   },
   festival: {
@@ -350,10 +354,10 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'countdown', section: 'countdown', variant: v.countdown },
       { id: 'about', section: 'story', props: { text: b('custom.about') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'venue', section: 'venue', variant: v.venue },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   corporate: {
@@ -363,11 +367,11 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: { eyebrow: t('invitation.youAreInvited'), title: b('event.title'), subtitle: b('custom.tagline'), date: b('event.startDate', { format: 'dateTime' }), place: b('venue.city') } },
       { id: 'about', section: 'story', props: { heading: t('template.about.title'), text: b('custom.about') } },
       { id: 'agenda', section: 'eventTimeline', variant: v.timeline, props: { heading: t('template.agenda.title') } },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'travel', section: 'travel', props: { text: b('custom.travel') } },
       { id: 'updates', section: 'announcements' },
-      { id: 'rsvp', section: 'rsvp' },
-      { id: 'footer', section: 'footer', props: { closing: b('custom.closing') } },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { closing: b('custom.closing') } },
     ],
   },
   school: {
@@ -377,11 +381,11 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: { eyebrow: t('invitation.youAreInvited'), title: b('event.title'), subtitle: b('custom.tagline'), date: b('event.startDate', { format: 'date' }), place: b('venue.name') } },
       { id: 'about', section: 'story', props: { text: b('custom.about') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'gallery', section: 'gallery', variant: v.gallery },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { closing: b('custom.closing') } },
     ],
   },
   community: {
@@ -392,11 +396,11 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'countdown', section: 'countdown', variant: v.countdown },
       { id: 'about', section: 'story', props: { text: b('custom.about') } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'updates', section: 'announcements' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { closing: b('custom.closing') } },
     ],
   },
   /** The Signature collection: a full cinematic journey with a verse and the menu. */
@@ -408,19 +412,19 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'quote', section: 'quote', props: { text: b('custom.quote'), by: b('custom.quoteBy') } },
       { id: 'countdown', section: 'countdown', variant: v.countdown },
       { id: 'couple', section: 'couple', variant: v.couple, props: { partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
-      { id: 'family', section: 'family', props: { text: b('custom.blessings') } },
+      { id: 'family', section: 'family', variant: v.family, props: { text: b('custom.blessings'), partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
       { id: 'story', section: 'story', variant: v.story, props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
       { id: 'menu', section: 'menu', props: { text: b('custom.menu') } },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'gallery', section: 'gallery', variant: v.gallery },
       { id: 'stay', section: 'accommodation', props: { text: b('custom.accommodation') } },
       { id: 'travel', section: 'travel', props: { text: b('custom.travel') } },
       { id: 'updates', section: 'announcements' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
       { id: 'gifts', section: 'giftRegistry', props: { text: b('custom.gifts') } },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   /** Signature journey for birthdays, festivals, pujas and other celebrations. */
@@ -434,13 +438,13 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'about', section: 'story', variant: v.story, props: { text: b('custom.about'), image: b('photo.story', { fallback: b('photos[1]') }) } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
       { id: 'menu', section: 'menu', props: { text: b('custom.menu') } },
-      { id: 'venue', section: 'venue' },
+      { id: 'venue', section: 'venue', variant: v.venue },
       { id: 'gallery', section: 'gallery', variant: v.gallery },
       { id: 'travel', section: 'travel', props: { text: b('custom.travel') } },
       { id: 'updates', section: 'announcements' },
-      { id: 'rsvp', section: 'rsvp' },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
       { id: 'photos', section: 'photoShare' },
-      { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
     ],
   },
   retirement: {
@@ -450,9 +454,9 @@ const LAYOUTS: Record<Layout, { eyebrow: Value; slots: SlotKey[]; sections: (v: 
       { id: 'hero', section: 'hero', variant: v.hero, props: heroProps(t('template.celebrateWith')) },
       { id: 'story', section: 'story', variant: v.story, props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
       { id: 'schedule', section: 'eventTimeline', variant: v.timeline },
-      { id: 'venue', section: 'venue' },
-      { id: 'rsvp', section: 'rsvp' },
-      { id: 'footer', section: 'footer', props: { closing: b('custom.closing') } },
+      { id: 'venue', section: 'venue', variant: v.venue },
+      { id: 'rsvp', section: 'rsvp', variant: v.rsvp },
+      { id: 'footer', section: 'footer', variant: v.footer, props: { closing: b('custom.closing') } },
     ],
   },
 };
@@ -470,6 +474,13 @@ export interface WebsiteSpec extends Omit<CatalogMeta, 'sortOrder'> {
   gallery?: Variants['gallery'];
   story?: Variants['story'];
   countdown?: Variants['countdown'];
+  venue?: Variants['venue'];
+  rsvp?: Variants['rsvp'];
+  footer?: Variants['footer'];
+  /** The family section's layout (lite weddings name both families by default). */
+  family?: Variants['family'];
+  /** Pieces of the suite (the ornament's) swapped for others: theme.dress. */
+  dress?: ThemeDress;
   /** Design language for every section (default classic). */
   look?: LookName;
   /** Default ambient effect (customers can change it). */
@@ -492,7 +503,7 @@ function photoSlotsFor(layout: Layout, hero: HeroVariant): PhotoSlot[] {
   const slots: PhotoSlot[] = [];
   if (COVER_HEROES.has(hero)) slots.push('cover');
   // Only layouts with a couple section show partner photos.
-  const sections = LAYOUTS[layout].sections({ hero, timeline: 'cards', couple: 'default', gallery: 'default', story: 'default', countdown: 'default' });
+  const sections = LAYOUTS[layout].sections({ hero, timeline: 'cards', couple: 'default', gallery: 'default', story: 'default', countdown: 'default', venue: 'default', rsvp: 'default', footer: 'default', family: 'default' });
   if (sections.some((sec) => sec.section === 'couple')) slots.push('partnerOne', 'partnerTwo');
   if (sections.some((sec) => sec.section === 'story' && sec.props && 'image' in sec.props)) slots.push('story');
   slots.push('closing');
@@ -527,6 +538,7 @@ export function website(spec: WebsiteSpec, sortOrder: number): CatalogEntry {
         colors: spec.colors,
         radius: spec.radius ?? 18,
         ornament: spec.ornament,
+        ...(spec.dress ? { dress: spec.dress } : {}),
         pattern: spec.pattern,
         heroTone: spec.heroTone ?? 'light',
         look: spec.look ?? 'classic',
@@ -548,7 +560,18 @@ export function website(spec: WebsiteSpec, sortOrder: number): CatalogEntry {
           {
             id: 'home',
             sections: layout.sections(
-              { hero: spec.hero, timeline: spec.timeline, couple: spec.couple ?? 'default', gallery: spec.gallery ?? 'default', story: spec.story ?? 'default', countdown: spec.countdown ?? 'default' },
+              {
+                hero: spec.hero,
+                timeline: spec.timeline,
+                couple: spec.couple ?? 'default',
+                gallery: spec.gallery ?? 'default',
+                story: spec.story ?? 'default',
+                countdown: spec.countdown ?? 'default',
+                venue: spec.venue ?? 'default',
+                rsvp: spec.rsvp ?? 'default',
+                footer: spec.footer ?? 'default',
+                family: spec.family ?? (spec.layout === 'wedding-lite' ? 'blessings' : 'default'),
+              },
               spec.invocation,
             ) as never,
           },

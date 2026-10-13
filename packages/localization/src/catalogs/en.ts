@@ -239,9 +239,13 @@ const core = {
 
 // template sections
   'template.couple.title': 'The Couple',
+  // Above the parents' names under each partner (the first partner is the bride, the second the groom).
+  'template.couple.daughterOf': 'Daughter of',
+  'template.couple.sonOf': 'Son of',
   'template.about.title': 'About',
   'template.agenda.title': 'Agenda',
   'template.family.title': 'With the blessings of',
+  'template.family.of': '{name}’s family',
   'template.story.title': 'Our Story',
   'template.schedule.title': 'The Celebrations',
   'template.venue.title': 'The Venue',
@@ -291,6 +295,9 @@ const core = {
   'template.joinUs': 'Please join us',
   'template.celebrateWith': 'Come celebrate with us',
   'template.weddingOf': 'The wedding of',
+  'template.nikah': 'The Nikah of',
+  'template.anandKaraj': 'The Anand Karaj of',
+  'template.holyMatrimony': 'United in Holy Matrimony',
   'template.weds': 'weds',
   'template.film.families': 'Together with their families',
   'template.film.celebrations': 'The celebrations',
@@ -511,7 +518,7 @@ const core = {
   'error.MFA_ALREADY_ENABLED': 'Two-step sign-in is already on.',
   'error.MFA_NOT_ENABLED': 'Two-step sign-in is not on.',
   'error.REMINDER_INVALID': 'Choose a reminder time in the future.',
-  'error.DOMAIN_INVALID': 'That does not look like a domain you can use. Enter something like amanweddsriya.com or invite.yourname.in.',
+  'error.DOMAIN_INVALID': 'That does not look like a domain you can use. Enter something like kabirwedsananya.com or invite.yourname.in.',
   'error.DOMAIN_TAKEN': 'This domain is already connected to another event.',
   'error.DOMAIN_UNAVAILABLE': 'Custom domains are not available yet.',
   'error.SUPER_ADMIN_PROTECTED': 'The Super Admin cannot be changed or suspended.',

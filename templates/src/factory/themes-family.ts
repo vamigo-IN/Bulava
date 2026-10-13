@@ -19,6 +19,7 @@ export const FAMILY_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'celebration',
+    suite: 'marigold',
     effect: 'marigold',
     intro: 'petals',
     kit: {
@@ -38,7 +39,7 @@ export const FAMILY_THEMES: Theme[] = [
       card: 'garland',
     },
     layouts: [
-      L('couple', 'Bharai', undefined, 'STANDARD', true),
+      L('couple', 'Bharai', undefined, 'PREMIUM', true),
       L('home', 'Mangal'),
       L('split', 'Mamta'),
       L('arch', 'Phool'),
@@ -61,6 +62,7 @@ export const FAMILY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'clouds',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -101,6 +103,7 @@ export const FAMILY_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'celebration',
+    suite: 'stars',
     effect: 'fireflies',
     intro: 'celestial',
     kit: {
@@ -137,6 +140,7 @@ export const FAMILY_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'temple',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -172,6 +176,7 @@ export const FAMILY_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'heritage',
+    suite: 'rangoli',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -193,7 +198,7 @@ export const FAMILY_THEMES: Theme[] = [
       card: 'garland',
     },
     layouts: [
-      L('home', 'Sanskar', undefined, 'STANDARD', true),
+      L('home', 'Sanskar', undefined, 'PREMIUM', true),
       L('couple', 'Utsav'),
       L('arch', 'Aashish'),
       L('jharokha', 'Haveli', { dark: true, foil: true, pair: { name: 'elephant', tint: 'accent' } }),
@@ -216,6 +221,7 @@ export const FAMILY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'clouds',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -250,6 +256,7 @@ export const FAMILY_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'marigold',
     effect: 'marigold',
     kit: {
       dark: false,

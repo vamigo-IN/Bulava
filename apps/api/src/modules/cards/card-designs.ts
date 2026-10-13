@@ -55,8 +55,17 @@ export function cardOrderReference(): string {
 }
 
 /** The downloaded file's name: the template and the format, never anything about the customer. */
-export function cardFileName(templateKey: string, format: string, as: 'image' | 'pdf' = 'image'): string {
-  return `${templateKey}-${format}.${as === 'pdf' ? 'pdf' : 'jpg'}`;
+export function cardFileName(templateKey: string, format: string, as: 'png' | 'jpeg' | 'pdf' = 'jpeg'): string {
+  return `${templateKey}-${format}.${as === 'jpeg' ? 'jpg' : as}`;
+}
+
+/**
+ * Where a card's PNG is kept: beside its image (`cards/exports/<id>.png`),
+ * saved by the media worker with the JPEG and deleted with it (the worker's
+ * card-retention derives the same key).
+ */
+export function cardPngKey(imageKey: string): string {
+  return `${imageKey.replace(/\.[A-Za-z0-9]+$/, '')}.png`;
 }
 
 /**

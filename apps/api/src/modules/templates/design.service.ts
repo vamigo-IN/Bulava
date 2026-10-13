@@ -43,7 +43,14 @@ export class DesignService {
       this.renderContext.resolveTemplate(event.id, event.typeKey, 'DIGITAL_CARD'),
       this.entitlements.forEvent(event.id),
     ]);
-    const context = await this.renderContext.build({ event, functions: event.functions, customization: website?.customization, ...(await this.media.templatePhotos(event.id, website?.customization)) });
+    const context = await this.renderContext.build({
+      event,
+      functions: event.functions,
+      customization: website?.customization,
+      ...(await this.media.templatePhotos(event.id, website?.customization)),
+      // The parents' order follows the design's tradition (the website's, else the film's or the card's).
+      faith: (website ?? video ?? card)?.definition.theme.faith ?? null,
+    });
     return {
       selections: { WEBSITE: website, VIDEO: video, DIGITAL_CARD: card },
       context,

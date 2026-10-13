@@ -111,7 +111,7 @@ function film(source: CatalogEntry, sortOrder: number): CatalogEntry {
       category: source.meta.category,
       style: source.meta.style,
       // A film is at least a Standard design.
-      tier: source.meta.tier === 'FREE' ? 'STANDARD' : source.meta.tier,
+      tier: source.meta.tier === 'FREE' ? 'PREMIUM' : source.meta.tier,
       badge: 'NEW',
       featured: false,
       tags: [...new Set([...source.meta.tags, 'video', 'film', 'canvas'])],

@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react';
-import { Laurel, Lotus, PeacockFeather, StarField } from './ornaments-signature';
+import type { OrnamentNameValue } from '@bulava/template-schema';
+import { Laurel, Lotus, PeacockFeather, RoseWindow, StarField } from './ornaments-signature';
+import { BaghEmblem, CloudsEmblem, DecoEmblem, Glyph, JaaliEmblem, KasavuEmblem, MarigoldEmblem, RangoliEmblem, TempleEmblem, type GlyphName } from './ornaments-suite';
 
 /**
  * Hand-built decorative SVGs. They use currentColor so templates recolour them
@@ -138,7 +140,8 @@ export function TempleBorder({ className, style }: OrnamentProps) {
   );
 }
 
-export type OrnamentName = 'none' | 'mandala' | 'paisley' | 'floral' | 'geometric' | 'confetti' | 'lotus' | 'peacock' | 'stars' | 'laurel';
+/** A theme's ornament (the schema's ORNAMENTS): its motif, and its sections' suite (sections/suites.ts). */
+export type OrnamentName = OrnamentNameValue;
 
 /** Two crossed peacock feathers in a square box (usable as a background motif). */
 export function PeacockPair({ className, style }: OrnamentProps) {
@@ -178,36 +181,35 @@ export function Ornament({ name, className, style }: { name: OrnamentName } & Or
       return <StarField className={className} style={style} />;
     case 'laurel':
       return <Laurel className={className} style={style} />;
+    case 'temple':
+      return <TempleEmblem className={className} style={style} />;
+    case 'kasavu':
+      return <KasavuEmblem className={className} style={style} />;
+    case 'jaali':
+      return <JaaliEmblem className={className} style={style} />;
+    case 'marigold':
+      return <MarigoldEmblem className={className} style={style} />;
+    case 'bagh':
+      return <BaghEmblem className={className} style={style} />;
+    case 'rangoli':
+      return <RangoliEmblem className={className} style={style} />;
+    case 'deco':
+      return <DecoEmblem className={className} style={style} />;
+    case 'clouds':
+      return <CloudsEmblem className={className} style={style} />;
+    case 'chapel':
+      return <RoseWindow className={className} style={style} />;
     default:
       return null;
   }
 }
 
-/** Small centred divider between sections. */
+/** Small centred divider between sections: two rules with the ornament's glyph between them. */
 export function Divider({ ornament }: { ornament: OrnamentName }) {
   return (
     <div aria-hidden="true" className="flex items-center justify-center gap-3 py-2 text-[var(--t-secondary)]">
       <span className="h-px w-16 bg-current opacity-60" />
-      {ornament === 'confetti' || ornament === 'stars' ? (
-        <span className="text-lg tracking-[0.4em]">✦</span>
-      ) : ornament === 'lotus' ? (
-        <Lotus className="h-5 w-8" />
-      ) : ornament === 'laurel' ? (
-        <Laurel className="h-6 w-7" />
-      ) : ornament === 'peacock' ? (
-        <svg viewBox="0 0 24 24" className="size-5">
-          <ellipse cx="12" cy="12" rx="7" ry="10" fill="none" stroke="currentColor" />
-          <ellipse cx="12" cy="13" rx="3.5" ry="5" fill="currentColor" />
-        </svg>
-      ) : ornament === 'geometric' ? (
-        <svg viewBox="0 0 20 20" className="size-4">
-          <rect x="4" y="4" width="12" height="12" transform="rotate(45 10 10)" fill="none" stroke="currentColor" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" className="size-5">
-          <path d="M12 2 C14 8 16 10 22 12 C16 14 14 16 12 22 C10 16 8 14 2 12 C8 10 10 8 12 2Z" fill="currentColor" />
-        </svg>
-      )}
+      {ornament === 'lotus' ? <Lotus className="h-5 w-8" /> : ornament === 'laurel' ? <Laurel className="h-6 w-7" /> : <Glyph name={ornament as GlyphName} className="size-5" />}
       <span className="h-px w-16 bg-current opacity-60" />
     </div>
   );
@@ -254,6 +256,23 @@ export function patternStyle(pattern: string, color: string, strength?: number):
         .join('');
       return svg(64, 64, `%3Cg fill='${c}' fill-opacity='${o(0.3)}'%3E${bits}%3Ccircle cx='48' cy='20' r='2.2'/%3E%3Ccircle cx='30' cy='56' r='2'/%3E%3C/g%3E`);
     }
+    case 'bandhani': {
+      // Tie-dye knots: little diamonds of four dots, staggered.
+      const knot = (x: number, y: number) => [[x, y - 3], [x + 3, y], [x, y + 3], [x - 3, y]].map(([a, b]) => `%3Ccircle cx='${a}' cy='${b}' r='1.15'/%3E`).join('');
+      return svg(28, 28, `%3Cg fill='${c}' fill-opacity='${o(0.28)}'%3E${knot(7, 7)}${knot(21, 21)}%3C/g%3E`);
+    }
+    case 'stars': {
+      const star = (x: number, y: number, r: number) => `%3Cpath d='M${x} ${y - r} L${x + r * 0.25} ${y - r * 0.25} L${x + r} ${y} L${x + r * 0.25} ${y + r * 0.25} L${x} ${y + r} L${x - r * 0.25} ${y + r * 0.25} L${x - r} ${y} L${x - r * 0.25} ${y - r * 0.25}Z'/%3E`;
+      return svg(48, 48, `%3Cg fill='${c}' fill-opacity='${o(0.3)}'%3E${star(12, 14, 4)}${star(35, 35, 3)}%3Ccircle cx='37' cy='10' r='1'/%3E%3Ccircle cx='9' cy='38' r='0.9'/%3E%3C/g%3E`);
+    }
+    case 'paisley': {
+      const buta = (x: number, y: number, flip: boolean) => `%3Cpath transform='translate(${x} ${y})${flip ? ' scale(-1 1)' : ''}' d='M0 9 C-6 8 -7 1 -3 -3 C0 -6 5 -5 5 0 C5 4 1 4 0.5 2'/%3E`;
+      return svg(56, 56, `%3Cg fill='none' stroke='${c}' stroke-opacity='${o(0.22)}' stroke-width='1.1' stroke-linecap='round'%3E${buta(14, 15, false)}${buta(42, 43, true)}%3C/g%3E`);
+    }
+    case 'kolam':
+      return svg(32, 32, `%3Cg fill='none' stroke='${c}' stroke-opacity='${o(0.2)}'%3E%3Cpath d='M16 8.5 Q23.5 8.5 23.5 16 Q23.5 23.5 16 23.5 Q8.5 23.5 8.5 16 Q8.5 8.5 16 8.5Z'/%3E%3C/g%3E%3Cg fill='${c}' fill-opacity='${o(0.24)}'%3E%3Ccircle cx='16' cy='16' r='1.3'/%3E%3Ccircle cx='0' cy='0' r='1.3'/%3E%3Ccircle cx='32' cy='0' r='1.3'/%3E%3Ccircle cx='0' cy='32' r='1.3'/%3E%3Ccircle cx='32' cy='32' r='1.3'/%3E%3C/g%3E`);
+    case 'scales':
+      return svg(40, 40, `%3Cg fill='none' stroke='${c}' stroke-opacity='${o(0.16)}'%3E%3Cpath d='M0 20 A20 20 0 0 1 40 20 M8 20 A12 12 0 0 1 32 20 M-20 40 A20 20 0 0 1 20 40 M20 40 A20 20 0 0 1 60 40 M-12 40 A12 12 0 0 1 12 40 M28 40 A12 12 0 0 1 52 40'/%3E%3C/g%3E`);
     default:
       return {};
   }

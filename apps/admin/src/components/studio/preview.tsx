@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Monitor, Play, Smartphone } from 'lucide-react';
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TemplateRenderer } from '@bulava/template-engine';
-import { sampleRenderContext, SAMPLE_PRESETS, templateAssetIds, videoDurationSec, type TemplateDefinition } from '@bulava/template-schema';
+import { SAMPLE_PRESETS, templateAssetIds, templateSampleContext, videoDurationSec, type RenderContext, type TemplateDefinition } from '@bulava/template-schema';
 import { apiPost } from '@/lib/api';
 import { TemplateVideo, templateVideoMetadata, type TemplateVideoProps } from '@bulava/video-engine';
 import { t } from '@/lib/i18n';
@@ -53,8 +53,8 @@ export function StudioPreview({ definition, version }: { definition: TemplateDef
     staleTime: 30 * 60_000,
   });
   const context = useMemo(
-    () => ({ ...sampleRenderContext({ language: effectiveLanguage, longNames, noPhotos, typeKey: effectiveType }), ...(artworkUrls.data ? { assets: artworkUrls.data } : {}) }),
-    [effectiveLanguage, longNames, noPhotos, effectiveType, artworkUrls.data],
+    () => ({ ...templateSampleContext(definition, { language: effectiveLanguage, longNames, noPhotos, typeKey: effectiveType }), ...(artworkUrls.data ? { assets: artworkUrls.data } : {}) }),
+    [definition, effectiveLanguage, longNames, noPhotos, effectiveType, artworkUrls.data],
   );
   const isWebsite = definition.type === 'WEBSITE';
   const intro = definition.website?.intro ?? 'none';
@@ -123,7 +123,7 @@ export function StudioPreview({ definition, version }: { definition: TemplateDef
   );
 }
 
-function VideoPreview({ definition, context, language, watermark }: { definition: TemplateDefinition; context: ReturnType<typeof sampleRenderContext>; language: string; watermark: boolean }) {
+function VideoPreview({ definition, context, language, watermark }: { definition: TemplateDefinition; context: RenderContext; language: string; watermark: boolean }) {
   const props = useMemo<TemplateVideoProps>(() => ({ definition, context, customization: null, language, watermark, musicUrl: null }), [definition, context, language, watermark]);
   const meta = templateVideoMetadata(props);
   const portrait = meta.height >= meta.width;

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
-import type { Artwork, Fonts, LookName, RenderContext, SectionInstance, ThemeColors } from '@bulava/template-schema';
+import type { Artwork, Fonts, LookName, RenderContext, SectionInstance, ThemeColors, ThemeDress } from '@bulava/template-schema';
 import type { OrnamentName } from './ornaments';
 
 /** Interactive pieces the host app injects into template slots. */
@@ -31,7 +31,10 @@ export interface SectionProps {
   t: Translator;
   language: string;
   timeZone: string;
+  /** The theme's ornament: its motif, and the suite every section is dressed in (sections/suites.ts). */
   ornament: OrnamentName;
+  /** Pieces of the suite the theme swaps for others (theme.dress). */
+  dress?: ThemeDress;
   pattern: string;
   /** Effective theme colours (after customization), for pattern images. */
   colors: ThemeColors;

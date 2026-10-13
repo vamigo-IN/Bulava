@@ -28,7 +28,7 @@ export function occasionIcon(typeKey: string): LucideIcon {
   return ICONS[typeKey] ?? CalendarHeart;
 }
 
-/** "Engagement / Roka" -> "Engagement": the short form used in titles like "Riya & Aman's Engagement". */
+/** "Engagement / Roka" -> "Engagement": the short form used in titles like "Ananya & Kabir's Engagement". */
 export function occasionShortName(name: string): string {
   return name.split(/\s*[/(]/)[0]?.trim() || name;
 }

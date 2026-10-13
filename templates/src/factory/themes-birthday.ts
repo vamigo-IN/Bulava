@@ -18,6 +18,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'clouds',
     effect: 'confetti',
     intro: 'envelope',
     kit: {
@@ -59,6 +60,8 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'confetti',
+    dress: { frame: 'scallop', edge: 'scallop' },
     effect: 'confetti',
     kit: {
       dark: false,
@@ -91,6 +94,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'stars',
     effect: 'fireflies',
     intro: 'celestial',
     kit: {
@@ -125,6 +129,8 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'clouds',
+    dress: { frame: 'circle', seal: 'sticker', edge: 'bunting' },
     effect: 'confetti',
     intro: 'envelope',
     kit: {
@@ -166,6 +172,8 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'confetti',
+    dress: { frame: 'cloud', seal: 'moon', edge: 'scallop' },
     effect: 'confetti',
     kit: {
       dark: false,
@@ -199,6 +207,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'confetti',
     effect: 'confetti',
     kit: {
       dark: false,
@@ -239,6 +248,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'rangoli',
     effect: 'marigold',
     intro: 'petals',
     kit: {
@@ -257,7 +267,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
       motif: { name: 'flourish' },
       card: 'garland',
     },
-    layouts: [L('couple', 'Pari', undefined, 'STANDARD', true), L('split', 'Rangoli'), L('home', 'Utsav'), L('party', 'Masti'), L('arch', 'Rani'), L('photo', 'Muskaan')],
+    layouts: [L('couple', 'Pari', undefined, 'PREMIUM', true), L('split', 'Rangoli'), L('home', 'Utsav'), L('party', 'Masti'), L('arch', 'Rani'), L('photo', 'Muskaan')],
   },
   {
     key: 'raja',
@@ -273,6 +283,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'royal',
+    suite: 'mandala',
     effect: 'goldDust',
     intro: 'doors',
     kit: {
@@ -292,7 +303,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
       sky: { name: 'stars', tint: 'accent' },
       card: 'framed',
     },
-    layouts: [L('jharokha', 'Beta', undefined, 'PREMIUM', true), L('couple', 'Shahzada'), L('party', 'Darbar', { pair: { name: 'balloonBunch' } }), L('arch', 'Mahal'), L('photo', 'Shaan'), L('split', 'Sawari')],
+    layouts: [L('jharokha', 'Beta', undefined, 'SIGNATURE', true), L('couple', 'Shahzada'), L('party', 'Darbar', { pair: { name: 'balloonBunch' } }), L('arch', 'Mahal'), L('photo', 'Shaan'), L('split', 'Sawari')],
   },
   {
     key: 'nanha',
@@ -308,6 +319,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'marigold',
     effect: 'marigold',
     kit: {
       dark: false,
@@ -349,6 +361,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'modern',
+    suite: 'deco',
     effect: 'goldDust',
     intro: 'seal',
     kit: {
@@ -368,7 +381,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
       sky: { name: 'confetti', tint: 'secondary' },
       card: 'minimal',
     },
-    layouts: [L('minimal', 'Milestone', undefined, 'STANDARD', true), L('couple', 'Toast'), L('photo', 'Glam'), L('split', 'Fizz'), L('arch', 'Gold'), L('party', 'Bash')],
+    layouts: [L('minimal', 'Milestone', undefined, 'PREMIUM', true), L('couple', 'Toast'), L('photo', 'Glam'), L('split', 'Fizz'), L('arch', 'Gold'), L('party', 'Bash')],
   },
   {
     key: 'glow',
@@ -384,6 +397,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'modern',
     look: 'modern',
+    suite: 'geometric',
     effect: 'confetti',
     kit: {
       dark: true,
@@ -417,6 +431,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'garden',
+    suite: 'floral',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -450,6 +465,8 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'heritage',
+    suite: 'mandala',
+    dress: { edge: 'marigoldSwag', seal: 'marigoldWreath', frame: 'arch' },
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -470,7 +487,7 @@ export const BIRTHDAY_THEMES: Theme[] = [
       card: 'framed',
     },
     layouts: [
-      L('home', 'Mahotsav', undefined, 'STANDARD', true),
+      L('home', 'Mahotsav', undefined, 'PREMIUM', true),
       L('couple', 'Shashti', { hero: { name: 'coupleElder', tint: 'accent' } }),
       L('jharokha', 'Ashirwad'),
       L('arch', 'Deep'),
@@ -492,6 +509,8 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'stars',
+    dress: { frame: 'cloud', skyline: 'clouds' },
     effect: 'fireflies',
     intro: 'celestial',
     kit: {
@@ -531,6 +550,8 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'rangoli',
+    dress: { edge: 'bunting', frame: 'scallop', seal: 'sticker' },
     effect: 'confetti',
     kit: {
       dark: false,
@@ -570,6 +591,8 @@ export const BIRTHDAY_THEMES: Theme[] = [
     ],
     fonts: 'playful',
     look: 'celebration',
+    suite: 'confetti',
+    dress: { frame: 'rounded', seal: 'emblem', edge: 'fairyLights' },
     effect: 'confetti',
     kit: {
       dark: false,

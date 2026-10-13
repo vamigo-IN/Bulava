@@ -163,6 +163,7 @@ export class PublicEventsService {
         ...(await this.media.templatePhotos(event.id, template.customization)),
         // Music comes with the plan (on unless a plan says otherwise; ADR-062).
         music: show.music ? await this.renderContext.resolveMusic(template) : null,
+        faith: template.definition.theme.faith ?? null,
       }),
       watermark: show.watermark,
       /** The free plan's mark across the whole invitation: the site's address (ADR-067). */

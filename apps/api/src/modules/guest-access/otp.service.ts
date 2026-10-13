@@ -10,7 +10,7 @@ const OTP_TTL_MS = 10 * 60_000;
 const PASS_TTL_SECONDS = 30 * 86_400;
 const MAX_SENDS_PER_WINDOW = 3;
 
-/** Masks "+919876543210" -> "+91•••••3210", "riya@example.com" -> "r•••@example.com". */
+/** Masks "+919876543210" -> "+91•••••3210", "ananya@example.com" -> "a•••@example.com". */
 export function maskTarget(target: string): string {
   if (target.includes('@')) {
     const [user, domain] = target.split('@');

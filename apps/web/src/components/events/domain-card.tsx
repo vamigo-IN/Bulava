@@ -92,7 +92,7 @@ export function DomainCard({ eventId }: { eventId: string }) {
       {data.available && data.entitled && !d ? (
         <form onSubmit={connect} className="flex flex-wrap items-end gap-2">
           <Field label={t('domain.input')} hint={t('domain.inputHint')}>
-            {(p) => <Input {...p} required maxLength={253} placeholder="amanweddsriya.com" value={hostname} onChange={(e) => setHostname(e.target.value)} className="w-72 max-w-full" />}
+            {(p) => <Input {...p} required maxLength={253} placeholder="kabirwedsananya.com" value={hostname} onChange={(e) => setHostname(e.target.value)} className="w-72 max-w-full" />}
           </Field>
           <Button type="submit" disabled={busy}>
             {t('domain.connect')}

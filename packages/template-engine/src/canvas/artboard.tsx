@@ -440,6 +440,15 @@ const ORNAMENT_BOX: Partial<Record<string, readonly [number, number]>> = {
   archFrame: [300, 400],
   templeBorder: [400, 40],
   seaWaves: [400, 120],
+  temple: [200, 200],
+  kasavu: [200, 200],
+  jaali: [200, 200],
+  marigold: [200, 200],
+  bagh: [200, 200],
+  rangoli: [200, 200],
+  deco: [200, 200],
+  clouds: [200, 200],
+  chapel: [200, 200],
 };
 
 function ornamentShadow(kind: OrnamentLayer['shadow'], color: string, env: LayerEnv, w: number): string | undefined {

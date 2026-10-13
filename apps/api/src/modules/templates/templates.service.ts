@@ -14,7 +14,7 @@ export const TemplateListQuerySchema = z.object({
   type: z.enum(['WEBSITE', 'VIDEO', 'DIGITAL_CARD']).optional(),
   eventType: z.string().max(40).optional(),
   tag: z.string().max(40).optional(),
-  tier: z.enum(['FREE', 'STANDARD', 'PREMIUM']).optional(),
+  tier: z.enum(['FREE', 'PREMIUM', 'SIGNATURE']).optional(),
   featured: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   q: z.string().trim().max(80).optional(),
   /** Only these templates (comma-separated keys). */

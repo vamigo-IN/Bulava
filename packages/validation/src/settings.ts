@@ -307,11 +307,11 @@ export const CardsSettingsSchema = z.object({
    */
   planDownloads: z.preprocess(legacyPlanDownloads, z.boolean()).default(true),
   /**
-   * Anyone downloads a card with the watermark after a mobile number. Off (as
-   * plans are one-time, ADR-062): downloads come with a plan, with the plan's
-   * mark or without it, or with the card bought alone.
+   * Anyone downloads a card with the watermark (the site's address across the
+   * card and a band along its foot) after a mobile number, as a PNG or a JPEG.
+   * Off: downloads come with a plan, or with the card bought alone.
    */
-  freeDownloads: z.boolean().default(false),
+  freeDownloads: z.boolean().default(true),
 });
 
 /**

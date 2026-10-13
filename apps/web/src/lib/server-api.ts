@@ -63,7 +63,7 @@ export interface TemplateSummary {
   description: string | null;
   category: string;
   style: string | null;
-  tier: 'FREE' | 'STANDARD' | 'PREMIUM';
+  tier: 'FREE' | 'PREMIUM' | 'SIGNATURE';
   badge: 'NEW' | 'POPULAR' | 'BESTSELLER' | null;
   featured: boolean;
   tags: string[];
@@ -165,7 +165,7 @@ export function formatInr(minor: number): string {
 /** Price label for a template tier: the first plan whose designs include it (admin-managed plans). */
 export function tierPrice(tier: TemplateSummary['tier'], plans: Plan[]): string | null {
   if (tier === 'FREE') return null;
-  const rank = tier === 'PREMIUM' ? 2 : 1;
+  const rank = tier === 'SIGNATURE' ? 2 : 1;
   const plan = plans
     .filter((p) => p.priceMinor > 0 && (p.features.find((f) => f.featureKey === 'templates.maxTier')?.limit ?? 0) >= rank)
     .sort((a, b) => a.priceMinor - b.priceMinor)[0];

@@ -1,10 +1,10 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { StockSearch, type StockSource } from '@/components/editor/stock-search';
 import { fontStack } from '@bulava/template-engine';
 import type { MessageKey } from '@bulava/localization';
-import { EFFECTS, FONT_PAIRINGS, INTROS, type Customization, type EffectName, type IntroName, type PhotoSlot, type TemplateDefinition, type ThemeColors } from '@bulava/template-schema';
+import { EFFECTS, FONT_PAIRINGS, INTROS, samplePreset, type Customization, type EffectName, type IntroName, type PhotoSlot, type TemplateDefinition, type ThemeColors } from '@bulava/template-schema';
 import { MusicPicker } from '@/components/events/music-picker';
 import { Alert, Input, Textarea } from '@/components/ui/primitives';
 import { useT } from '@/lib/i18n';
@@ -30,7 +30,8 @@ export function StylePanel({ definition, custom, setCustom }: PanelProps) {
   const caps = definition.capabilities;
   const presets = caps.colorPresets;
   const base: ThemeColors = presets.find((p) => p.name === custom.colorPreset)?.colors ?? definition.theme.colors;
-  const sample = 'Riya & Aman';
+  // The font cards show the template's own sample names (of its tradition).
+  const sample = useMemo(() => samplePreset(definition.eventTypes[0] ?? 'WEDDING', [], { seed: definition.templateKey, faith: definition.theme.faith ?? null }).title, [definition]);
 
   return (
     <div className="space-y-8">

@@ -111,11 +111,12 @@ export function FlipCard({ front, back, label, className }: { front: ReactNode; 
   return (
     <div className={`[perspective:1200px] ${className ?? ''}`}>
       <div className="bulava-flip relative h-full w-full [transform-style:preserve-3d]" style={{ transform: flipped ? 'rotateY(180deg)' : undefined }}>
-        <div className="relative h-full w-full [backface-visibility:hidden]" inert={flipped}>
+        {/* The face turned away is also invisible (from half way through the turn), so nothing reads it through the face shown. */}
+        <div className="relative h-full w-full [backface-visibility:hidden]" inert={flipped} style={{ visibility: flipped ? 'hidden' : 'visible', transition: `visibility 0s linear ${flipped ? '0.35s' : '0s'}` }}>
           {turn}
           <div className="pointer-events-none relative z-10 h-full">{front}</div>
         </div>
-        <div className="absolute inset-0 h-full w-full [backface-visibility:hidden] [transform:rotateY(180deg)]" inert={!flipped}>
+        <div className="absolute inset-0 h-full w-full [backface-visibility:hidden] [transform:rotateY(180deg)]" inert={!flipped} style={{ visibility: flipped ? 'visible' : 'hidden', transition: `visibility 0s linear ${flipped ? '0s' : '0.35s'}` }}>
           {turn}
           <div className="pointer-events-none relative z-10 h-full [&_a]:pointer-events-auto">{back}</div>
         </div>

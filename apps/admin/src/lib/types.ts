@@ -67,7 +67,7 @@ export type QueueCounts = Record<string, Partial<Record<'waiting' | 'active' | '
 
 export type TemplateStatus = 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED';
 export type TemplateType = 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD' | 'EMAIL' | 'SOCIAL';
-export type TemplateTier = 'FREE' | 'STANDARD' | 'PREMIUM';
+export type TemplateTier = 'FREE' | 'PREMIUM' | 'SIGNATURE';
 
 export interface TemplateVersionSummary {
   id: string;

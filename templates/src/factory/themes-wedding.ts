@@ -18,6 +18,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'regal',
     look: 'royal',
+    suite: 'mandala',
     effect: 'goldDust',
     intro: 'doors',
     kit: {
@@ -40,7 +41,7 @@ export const WEDDING_THEMES: Theme[] = [
       card: 'framed',
     },
     layouts: [
-      L('jharokha', 'Jharokha', undefined, 'PREMIUM', true),
+      L('jharokha', 'Jharokha', undefined, 'SIGNATURE', true),
       L('couple', 'Milan'),
       L('mandap', 'Mandap'),
       L('portrait', 'Roop'),
@@ -66,6 +67,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'garden',
+    suite: 'peacock',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -84,7 +86,7 @@ export const WEDDING_THEMES: Theme[] = [
       card: 'framed',
     },
     layouts: [
-      L('arch', 'Pankh', { hero: undefined }, 'STANDARD', true),
+      L('arch', 'Pankh', { hero: undefined }, 'PREMIUM', true),
       L('couple', 'Bagh'),
       L('jharokha', 'Mahal', { pair: { name: 'royalPeacock', tint: 'accent' } }),
       L('floral', 'Kunj'),
@@ -109,6 +111,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'heritage',
+    suite: 'temple',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -127,7 +130,7 @@ export const WEDDING_THEMES: Theme[] = [
       card: 'banded',
     },
     layouts: [
-      L('temple', 'Deepa', undefined, 'PREMIUM', true),
+      L('temple', 'Deepa', undefined, 'SIGNATURE', true),
       L('couple', 'Kalyanam'),
       L('mandap', 'Gopuram', { hero: { name: 'coupleSouth', tint: 'accent' } }),
       L('arch', 'Kolam'),
@@ -151,6 +154,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'kasavu',
     effect: 'petals',
     intro: 'curtain',
     kit: {
@@ -169,7 +173,7 @@ export const WEDDING_THEMES: Theme[] = [
       card: 'minimal',
     },
     layouts: [
-      L('mandap', 'Kayal', undefined, 'PREMIUM', true),
+      L('mandap', 'Kayal', undefined, 'SIGNATURE', true),
       L('couple', 'Mangalyam'),
       L('arch', 'Vilakku'),
       L('home', 'Pookalam'),
@@ -193,6 +197,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'royal',
+    suite: 'jaali',
     effect: 'lanterns',
     intro: 'lanterns',
     kit: {
@@ -213,7 +218,7 @@ export const WEDDING_THEMES: Theme[] = [
       card: 'framed',
     },
     layouts: [
-      L('night', 'Raat', undefined, 'PREMIUM', true),
+      L('night', 'Raat', undefined, 'SIGNATURE', true),
       L('couple', 'Qubool'),
       L('arch', 'Mehrab'),
       L('mandap', 'Darwaza'),
@@ -238,6 +243,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'regal',
     look: 'royal',
+    suite: 'jaali',
+    dress: { edge: 'zariBand', corner: 'paisleyOrnate', seal: 'medallion' },
     effect: 'goldDust',
     intro: 'curtain',
     kit: {
@@ -273,6 +280,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'classic',
     look: 'garden',
+    suite: 'floral',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -289,7 +297,7 @@ export const WEDDING_THEMES: Theme[] = [
       card: 'garland',
     },
     layouts: [
-      L('floral', 'Garden', undefined, 'STANDARD', true),
+      L('floral', 'Garden', undefined, 'PREMIUM', true),
       L('couple', 'Vows'),
       L('arch', 'Chapel'),
       L('mandap', 'Arbour'),
@@ -313,6 +321,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'classic',
+    suite: 'chapel',
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -344,6 +353,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'bagh',
     effect: 'marigold',
     intro: 'petals',
     kit: {
@@ -363,7 +373,7 @@ export const WEDDING_THEMES: Theme[] = [
       card: 'garland',
     },
     layouts: [
-      L('couple', 'Karaj', undefined, 'STANDARD', true),
+      L('couple', 'Karaj', undefined, 'PREMIUM', true),
       L('split', 'Shagun'),
       L('mandap', 'Sarovar', { dark: true, foil: true }),
       L('arch', 'Darshan'),
@@ -388,6 +398,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'lotus',
     effect: 'petals',
     intro: 'curtain',
     kit: {
@@ -430,6 +441,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'royal',
+    suite: 'mandala',
+    dress: { frame: 'arch', edge: 'arches', seal: 'rangoliBloom', corner: 'paisleyOrnate' },
     effect: 'petals',
     intro: 'doors',
     kit: {
@@ -464,6 +477,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'regal',
     look: 'royal',
+    suite: 'mandala',
+    dress: { corner: 'peacockFeather', skyline: 'peacocks', seal: 'arabesque' },
     effect: 'goldDust',
     intro: 'doors',
     kit: {
@@ -500,6 +515,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'royal',
+    suite: 'peacock',
+    dress: { frame: 'circle', skyline: 'moonrise', seal: 'moon' },
     effect: 'fireflies',
     intro: 'celestial',
     kit: {
@@ -518,7 +535,7 @@ export const WEDDING_THEMES: Theme[] = [
       sky: { name: 'stars', tint: 'accent' },
       card: 'framed',
     },
-    layouts: [L('mandap', 'Vrindavan', undefined, 'PREMIUM', true), L('couple', 'Raas'), L('arch', 'Bansuri', { hero: undefined }), L('night', 'Sharad', { skyline: { name: 'diyaRow' } }), L('jharokha', 'Mahal'), L('minimal', 'Moti'), L('photo', 'Yamuna'), L('split', 'Leela')],
+    layouts: [L('mandap', 'Vrindavan', undefined, 'SIGNATURE', true), L('couple', 'Raas'), L('arch', 'Bansuri', { hero: undefined }), L('night', 'Sharad', { skyline: { name: 'diyaRow' } }), L('jharokha', 'Mahal'), L('minimal', 'Moti'), L('photo', 'Yamuna'), L('split', 'Leela')],
   },
   {
     key: 'kesariya',
@@ -534,6 +551,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'marigold',
     effect: 'marigold',
     intro: 'petals',
     kit: {
@@ -570,6 +588,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'peacock',
+    dress: { edge: 'zariBand', frame: 'niche', seal: 'kolam' },
     effect: 'petals',
     intro: 'doors',
     kit: {
@@ -604,6 +624,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'paisley',
     effect: 'confetti',
     intro: 'petals',
     kit: {
@@ -640,6 +661,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'heritage',
+    suite: 'lotus',
+    dress: { edge: 'zariBand', seal: 'mandala', frame: 'arch', skyline: 'diyaRow' },
     effect: 'goldDust',
     intro: 'gates',
     kit: {
@@ -676,6 +699,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'modern',
+    suite: 'stars',
     effect: 'goldDust',
     intro: 'celestial',
     kit: {
@@ -710,6 +734,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'regal',
     look: 'royal',
+    suite: 'mandala',
+    dress: { edge: 'none', seal: 'sunburst', frame: 'deco', corner: 'decoCorner' },
     effect: 'goldDust',
     intro: 'seal',
     kit: {
@@ -746,6 +772,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'garden',
+    suite: 'floral',
+    dress: { frame: 'arch', edge: 'none', seal: 'emblem' },
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -778,6 +806,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'romantic',
     look: 'garden',
+    suite: 'floral',
+    dress: { frame: 'scallop', seal: 'botanicalWreath', corner: 'none' },
     effect: 'petals',
     intro: 'envelope',
     kit: {
@@ -809,6 +839,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'rangoli',
+    dress: { edge: 'none', seal: 'emblem', skyline: 'diyaRow' },
     effect: 'petals',
     kit: {
       dark: false,
@@ -840,6 +872,8 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'garden',
+    suite: 'floral',
+    dress: { frame: 'cloud', seal: 'moon', edge: 'scallop', skyline: 'clouds' },
     effect: 'petals',
     intro: 'celestial',
     kit: {
@@ -873,6 +907,7 @@ export const WEDDING_THEMES: Theme[] = [
     ],
     fonts: 'classic',
     look: 'classic',
+    suite: 'laurel',
     effect: 'goldDust',
     intro: 'seal',
     kit: {

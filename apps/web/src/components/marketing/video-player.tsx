@@ -2,12 +2,12 @@
 
 import { Player } from '@remotion/player';
 import { useMemo } from 'react';
-import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
+import { templateSampleContext, type TemplateDefinition } from '@bulava/template-schema';
 import { TemplateVideo, templateVideoMetadata, type TemplateVideoProps } from '@bulava/video-engine';
 
 export function VideoPlayer({ definition, eventType, label }: { definition: TemplateDefinition; eventType: string; label: string }) {
   const props = useMemo<TemplateVideoProps>(
-    () => ({ definition, context: sampleRenderContext({ typeKey: eventType, noPhotos: false }), customization: null, language: 'en', watermark: false, musicUrl: null }),
+    () => ({ definition, context: templateSampleContext(definition, { typeKey: eventType, noPhotos: false }), customization: null, language: 'en', watermark: false, musicUrl: null }),
     [definition, eventType],
   );
   const meta = templateVideoMetadata(props);

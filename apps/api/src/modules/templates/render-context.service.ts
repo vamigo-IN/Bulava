@@ -3,6 +3,7 @@ import {
   buildRenderContext,
   validateTemplateDefinition,
   type Customization,
+  type Faith,
   type FunctionContext,
   type GalleryImage,
   type RenderContext,
@@ -23,7 +24,7 @@ export interface ResolvedTemplate {
   templateId: string;
   templateKey: string;
   templateVersionId: string;
-  tier: 'FREE' | 'STANDARD' | 'PREMIUM';
+  tier: 'FREE' | 'PREMIUM' | 'SIGNATURE';
   definition: TemplateDefinition;
   customization: Customization | null;
   isDefault: boolean;
@@ -98,6 +99,8 @@ export class RenderContextService {
     announcements?: Array<{ title: string; body: string; publishedAt: Date | null }>;
     language?: string;
     music?: RenderContext['music'];
+    /** The design's tradition (its theme's faith): the order of the parents' names. */
+    faith?: Faith | null;
   }): Promise<RenderContext> {
     // A function without a date is a placeholder (a suggested ceremony not set up yet): templates never show it.
     const visible = input.functions.filter((f) => f.status !== 'DRAFT' && f.startsAt !== null);
@@ -122,6 +125,7 @@ export class RenderContextService {
       custom: input.customization?.custom ?? {},
       announcements: input.announcements?.map((a) => ({ title: a.title, body: a.body, publishedAt: a.publishedAt?.toISOString() ?? null })),
       music: input.music ?? null,
+      faith: input.faith ?? null,
     });
     // Where each function's map points: the place Google knows, or the pin the host set (ADR-072).
     const spots = new Map<string, string>();

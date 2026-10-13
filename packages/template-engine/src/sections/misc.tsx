@@ -2,36 +2,111 @@ import type { ReactNode } from 'react';
 import { Diya, Toran } from '../art/motifs';
 import { CountdownClock } from '../countdown';
 import { PhotoStack } from '../interactive';
+import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
-import { cardClass, cx, SectionShell, shell } from './shared';
+import { EDGE_HEIGHT, Hangings, PhotoFrame, Seal, ShapedCard, Skyline, SuiteEdge, SWAG_EDGES, type Band, type Dress } from './dress';
+import { BAND_CLASS, BAND_FILL, cardClass, cx, dressFor, initials, SectionShell, shell } from './shared';
 
+/** The month around a date as weeks of days (null before the first), in the event's time zone. */
+function monthOf(iso: string, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(iso));
+  const get = (type: string) => Number(parts.find((x) => x.type === type)?.value ?? 1);
+  const [y, m, day] = [get('year'), get('month'), get('day')];
+  const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const cells: Array<number | null> = [...Array.from({ length: first }, () => null), ...Array.from({ length: days }, (_, i) => i + 1)];
+  while (cells.length % 7) cells.push(null);
+  return { y, m, day, cells };
+}
+
+/** Month and weekday names in the page's language (Latin digits, as the rest of the page). */
+function calendarNames(language: string, y: number, m: number) {
+  const locale = language === 'hi-Latn' ? 'en-IN' : `${language}-IN`;
+  const fmt = (opts: Intl.DateTimeFormatOptions, date: Date) => {
+    try {
+      return new Intl.DateTimeFormat(`${locale}-u-nu-latn`, { ...opts, timeZone: 'UTC' }).format(date);
+    } catch {
+      return new Intl.DateTimeFormat('en-IN', { ...opts, timeZone: 'UTC' }).format(date);
+    }
+  };
+  // 2023-01-01 was a Sunday: the week's names from it.
+  const weekdays = Array.from({ length: 7 }, (_, i) => fmt({ weekday: 'narrow' }, new Date(Date.UTC(2023, 0, 1 + i))));
+  return { month: fmt({ month: 'long', year: 'numeric' }, new Date(Date.UTC(y, m - 1, 15))), weekdays };
+}
+
+/** The day's month as a printed calendar on light paper, the day itself ringed and crowned with the suite's glyph. */
+function Calendar({ d, iso, language, timeZone }: { d: Dress; iso: string; language: string; timeZone: string }) {
+  const { y, m, day, cells } = monthOf(iso, timeZone);
+  const names = calendarNames(language, y, m);
+  return (
+    <div className="bulava-reply-card">
+      <ShapedCard d={{ ...d, band: 'plain' }} className="px-5 pt-10 pb-7 @min-[640px]:px-9" fill="var(--rc-bg)">
+        <p className="text-center text-2xl text-[var(--t-primary-ink)] [font-family:var(--t-heading)]">{names.month}</p>
+        <div className="mt-5 grid grid-cols-7 gap-y-1.5 text-center" role="presentation">
+          {names.weekdays.map((w, i) => (
+            <span key={`w${i}`} className="pb-2 text-[0.65rem] font-semibold tracking-[0.2em] uppercase text-[var(--t-muted-ink)]">
+              {w}
+            </span>
+          ))}
+          {cells.map((n, i) =>
+            n === day ? (
+              <span key={i} className="relative mx-auto flex size-10 items-center justify-center rounded-full bg-[var(--t-button)] text-base font-semibold text-[var(--t-on-button)] shadow-md">
+                <Glyph name={d.suite.glyph} className="absolute -top-2.5 left-1/2 size-4 -translate-x-1/2 text-[var(--t-orn)]" />
+                {n}
+              </span>
+            ) : (
+              <span key={i} className="flex h-10 items-center justify-center text-sm tabular-nums text-[var(--t-text)]">
+                {n ?? ''}
+              </span>
+            ),
+          )}
+        </div>
+      </ShapedCard>
+    </div>
+  );
+}
+
+/**
+ * countdown: a live timer to the first function. Variants: default (boxes), flip
+ * (flip-clock leaves), rings (each number in a double ring of the suite's colour),
+ * calendar (the month printed like a calendar page, the day ringed, the time left in a line).
+ */
 export function Countdown(p: SectionProps) {
   const target = p.ctx.function?.startsAt ?? p.ctx.event.startDate;
   if (!target) return null;
   if (p.mode === 'live' && new Date(target).getTime() < Date.now()) return null;
-  const flip = p.instance.variant === 'flip';
+  const variant = p.instance.variant;
+  const flip = variant === 'flip';
+  const titled = flip || variant === 'calendar';
+  const d = dressFor(p);
+  const labels = {
+    days: p.t('template.countdown.days'),
+    hours: p.t('template.countdown.hours'),
+    minutes: p.t('template.countdown.minutes'),
+    seconds: p.t('template.countdown.seconds'),
+  };
   return (
-    <SectionShell {...shell(p)} heading={flip ? (p.value('heading') ?? p.t('template.countdown.title')) : undefined} eyebrow={flip ? undefined : (p.value('eyebrow') ?? p.t('template.countdown.title'))}>
-      <div className="mx-auto max-w-md">
-        <CountdownClock
-          target={target}
-          static={p.mode === 'thumbnail'}
-          variant={flip ? 'flip' : 'boxes'}
-          labels={{
-            days: p.t('template.countdown.days'),
-            hours: p.t('template.countdown.hours'),
-            minutes: p.t('template.countdown.minutes'),
-            seconds: p.t('template.countdown.seconds'),
-          }}
-        />
-      </div>
+    <SectionShell {...shell(p)} dress={d} heading={titled ? (p.value('heading') ?? p.t('template.countdown.title')) : undefined} eyebrow={titled ? undefined : (p.value('eyebrow') ?? p.t('template.countdown.title'))}>
+      {variant === 'calendar' ? (
+        <div className="mx-auto max-w-sm">
+          <Calendar d={d} iso={target} language={p.language} timeZone={p.timeZone} />
+          <div className="mt-8">
+            <CountdownClock target={target} static={p.mode === 'thumbnail'} variant="inline" labels={labels} />
+          </div>
+        </div>
+      ) : (
+        <div className={cx('mx-auto', variant === 'rings' ? 'max-w-lg' : 'max-w-md')}>
+          <CountdownClock target={target} static={p.mode === 'thumbnail'} variant={flip ? 'flip' : variant === 'rings' ? 'rings' : 'boxes'} labels={labels} />
+        </div>
+      )}
     </SectionShell>
   );
 }
 
 /**
  * gallery: approved photos (else the customer's chosen photos), lazy-loaded; hidden when there are none.
- * Variants: masonry (default), stack (3D swipeable cards), mosaic (a pyramid wall), polaroid (scattered prints).
+ * Variants: masonry (default), stack (3D swipeable cards), mosaic (a pyramid wall), polaroid (scattered
+ * prints), frames (a wall of the suite's frames: arches, niches, ovals…).
  */
 export function Gallery(p: SectionProps) {
   const images = p.ctx.gallery.images.length ? p.ctx.gallery.images : p.ctx.photos;
@@ -52,14 +127,26 @@ export function Gallery(p: SectionProps) {
       </a>
     );
   const dims = (img: (typeof shown)[number]) => (img.width && img.height ? { width: img.width, height: img.height } : {});
+  const d = dressFor(p);
+  const common = { ...shell(p), dress: d, heading };
 
   if (p.instance.variant === 'stack' && p.mode !== 'thumbnail' && shown.length > 1) {
     return (
-      <SectionShell {...shell(p)} heading={heading}>
+      <SectionShell {...common}>
         <PhotoStack
           photos={shown.slice(0, 12).map((img, i) => ({ url: img.url, thumbUrl: img.thumbUrl, label: label(i) }))}
           labels={{ next: p.t('template.gallery.next'), previous: p.t('template.gallery.previous'), hint: p.t('template.gallery.swipe') }}
         />
+      </SectionShell>
+    );
+  }
+
+  if (p.instance.variant === 'frames') {
+    return (
+      <SectionShell {...common} wide>
+        <div className="grid grid-cols-2 gap-x-5 gap-y-8 @min-[640px]:grid-cols-3 @min-[640px]:gap-x-10">
+          {shown.slice(0, 6).map((img, i) => wrap(i, img, <PhotoFrame d={d} src={img.thumbUrl} alt="" />, cx('mx-auto w-full max-w-[220px]', i % 2 ? '@min-[640px]:mt-10' : '')))}
+        </div>
       </SectionShell>
     );
   }
@@ -73,7 +160,7 @@ export function Gallery(p: SectionProps) {
       at += size;
     }
     return (
-      <SectionShell {...shell(p)} heading={heading} wide>
+      <SectionShell {...common} wide>
         <div className="flex flex-col items-center gap-1.5 @min-[640px]:gap-2">
           {rows.map((row, r) => (
             <div key={r} className="flex w-full justify-center gap-1.5 @min-[640px]:gap-2">
@@ -95,7 +182,7 @@ export function Gallery(p: SectionProps) {
 
   if (p.instance.variant === 'polaroid') {
     return (
-      <SectionShell {...shell(p)} heading={heading} wide>
+      <SectionShell {...common} wide>
         <div className="grid grid-cols-2 gap-6 @min-[640px]:grid-cols-3 @min-[640px]:gap-10">
           {shown.slice(0, 9).map((img, i) =>
             wrap(
@@ -113,7 +200,7 @@ export function Gallery(p: SectionProps) {
   }
 
   return (
-    <SectionShell {...shell(p)} heading={heading}>
+    <SectionShell {...common}>
       <div className="columns-2 gap-3 @min-[640px]:columns-3 [&>*]:mb-3">
         {shown.map((img, i) =>
           wrap(i, img, <img src={img.thumbUrl} alt="" loading="lazy" decoding="async" className="w-full rounded-[calc(var(--t-radius)*0.75)] object-cover shadow-sm" {...dims(img)} />, 'break-inside-avoid'),
@@ -123,20 +210,52 @@ export function Gallery(p: SectionProps) {
   );
 }
 
-/** rsvp: the host app injects the actual form; previews show a placeholder. */
+/** The reply options a preview shows in place of the host's form. */
+function ReplyPlaceholder({ d, options }: { d: Dress; options: string[] }) {
+  return (
+    <ul className="mx-auto max-w-sm space-y-3">
+      {options.map((label) => (
+        <li key={label} className="flex min-h-12 items-center gap-3 rounded-full border border-[var(--t-line)] px-5 text-sm">
+          <Glyph name={d.suite.glyph} className="size-4 shrink-0 text-[var(--t-orn)]" />
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * rsvp: the host app injects the actual form; previews show a placeholder. The form
+ * always sits on a light reply card (its labels are drawn in dark ink), whatever band
+ * the section is on. Variants: default (the card), card (the reply card in the suite's
+ * frame, its seal pressed onto the top edge).
+ */
 export function Rsvp(p: SectionProps) {
   if (!p.slots.rsvp && p.mode === 'live') return null;
-  return (
-    <SectionShell {...shell(p)} heading={p.slots.rsvpHeading ?? p.value('heading') ?? p.t('rsvp.title')} tone="surface">
-      {p.slots.rsvp ?? (
-        <div className="mx-auto max-w-sm space-y-3">
-          {[p.t('rsvp.attending'), p.t('rsvp.maybe'), p.t('rsvp.declined')].map((label) => (
-            <div key={label} className={cx('px-4 py-3 text-sm', cardClass(p.look))}>
-              {label}
+  const d = dressFor(p, 'surface');
+  // The pieces on the reply card take the card's light paper.
+  const paper: Dress = { ...d, band: 'plain' };
+  const content = p.slots.rsvp ?? <ReplyPlaceholder d={paper} options={[p.t('rsvp.attending'), p.t('rsvp.maybe'), p.t('rsvp.declined')]} />;
+  const heading = p.slots.rsvpHeading ?? p.value('heading') ?? p.t('rsvp.title');
+  if (p.instance.variant === 'card') {
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={heading}>
+        <div className="bulava-reply-card relative mx-auto max-w-lg bg-transparent pt-8" style={{ backgroundColor: 'transparent' }}>
+          <div className="absolute top-0 left-1/2 z-10 w-16 -translate-x-1/2">
+            <div className="rounded-full bg-[var(--rc-bg)] p-1.5 shadow-md">
+              <Seal d={paper} quiet />
             </div>
-          ))}
+          </div>
+          <ShapedCard d={paper} className="px-5 pt-14 pb-8 @min-[640px]:px-10" fill="var(--rc-bg)">
+            {content}
+          </ShapedCard>
         </div>
-      )}
+      </SectionShell>
+    );
+  }
+  return (
+    <SectionShell {...shell(p)} dress={d} heading={heading}>
+      <div className={cx('bulava-reply-card mx-auto max-w-lg px-5 py-8 @min-[640px]:px-10', cardClass(p.look), 'bg-[var(--rc-bg)]')}>{content}</div>
     </SectionShell>
   );
 }
@@ -144,29 +263,83 @@ export function Rsvp(p: SectionProps) {
 export function PhotoShare(p: SectionProps) {
   if (!p.slots.photoShare) return null;
   return (
-    <SectionShell {...shell(p)} heading={p.value('heading') ?? p.t('template.photoShare.title')}>
+    <SectionShell {...shell(p)} dress={dressFor(p)} heading={p.value('heading') ?? p.t('template.photoShare.title')}>
       {p.slots.photoShare}
     </SectionShell>
   );
 }
 
-/** footer: the closing line (with the customer's closing photo when placed), guest pass and watermark. */
+/**
+ * footer: the closing line (with the customer's closing photo when placed), the hashtag,
+ * the guest's pass and the watermark, on the closing band. Variants: default, seal (a
+ * seal with the couple's initials, the suite's strands hanging either side), skyline
+ * (the suite's art along the foot: domes, lamps, diyas, peacocks, roses, balloons…),
+ * blessing (strands hanging either side, the closing line large between them, the names).
+ */
 export function Footer(p: SectionProps) {
   const hashtag = p.value('hashtag');
   const closing = p.value('closing') ?? p.t('template.footer.thanks');
   const photo = p.ctx.photoSlots?.closing?.url;
-  return (
-    <footer className="bulava-band-primary relative overflow-hidden px-6 pt-16 pb-14 text-center">
-      {p.look === 'heritage' ? <Toran className="pointer-events-none absolute inset-x-0 top-0 mx-auto w-full max-w-[760px]" swags={4} /> : null}
-      <div className={cx('relative mx-auto max-w-md', p.look === 'heritage' && 'pt-16')}>
-        {photo ? (
-          <div className="mx-auto mb-8 size-40 overflow-hidden rounded-full border-4 border-[var(--t-accent)] shadow-[0_0_40px_rgba(0,0,0,0.35)]">
-            <img src={photo} alt="" className="h-full w-full object-cover" loading="lazy" />
-          </div>
-        ) : null}
+  const variant = p.instance.variant;
+  const band: Band = p.heroTone === 'dark' && p.look !== 'noir' && p.look !== 'heritage' && p.look !== 'celebration' ? 'deep' : 'primary';
+  const dress = dressFor(p, 'plain', band);
+  const suited = dress.suite.name !== 'none';
+  const who = p.ctx.couple ? `${p.ctx.couple.partnerOne} & ${p.ctx.couple.partnerTwo}` : (p.ctx.honoree?.name ?? p.ctx.event.title);
+  const mono = initials(who);
+  const edgeName = suited ? dress.suite.edge : 'none';
+  const edge = edgeName !== 'none' && edgeName !== 'scallop';
+  const hang = suited && (variant === 'seal' || variant === 'blessing') && !!dress.suite.hang;
+  // Room at the top for what hangs there: a swag's depth, a strand's, or a strip's.
+  const top = hang ? 112 : edge ? (SWAG_EDGES.has(edgeName) ? EDGE_HEIGHT[edgeName] + 36 : EDGE_HEIGHT[edgeName] + 52) : 64;
+
+  const portrait = photo ? (
+    <div className="mx-auto mb-8 size-40 overflow-hidden rounded-full border-4 border-[var(--t-accent)] shadow-[0_0_40px_rgba(0,0,0,0.35)]">
+      <img src={photo} alt="" className="h-full w-full object-cover" loading="lazy" />
+    </div>
+  ) : null;
+
+  const seal = (size: string) => (
+    <Seal d={dress} className={cx('mx-auto', size)}>
+      <span className="text-4xl tracking-[0.1em] text-[var(--t-accent-ink)] [font-family:var(--t-heading)]">{mono}</span>
+    </Seal>
+  );
+
+  let middle: ReactNode;
+  if (variant === 'seal') {
+    middle = (
+      <>
+        {portrait ?? <div className="mb-8">{seal('w-36')}</div>}
         <p className="text-3xl [font-family:var(--t-script)] text-[var(--t-accent-ink)] @min-[640px]:text-4xl">{closing}</p>
+      </>
+    );
+  } else if (variant === 'blessing') {
+    middle = (
+      <>
+        {portrait}
+        <Glyph name={dress.suite.glyph} className="mx-auto mb-5 size-8 text-[var(--t-orn)]" />
+        <p className="text-4xl leading-snug [font-family:var(--t-script)] text-[var(--t-accent-ink)] @min-[640px]:text-5xl">{closing}</p>
+        <div className="mx-auto mt-6 h-px w-24 bg-[var(--t-orn)] opacity-60" aria-hidden="true" />
+        <p className="mt-6 text-2xl tracking-[0.06em] break-words [font-family:var(--t-heading)]">{who}</p>
+      </>
+    );
+  } else {
+    middle = (
+      <>
+        {portrait ?? (suited && variant !== 'skyline' ? <div className="mb-8">{seal('w-24')}</div> : null)}
+        <p className="text-3xl [font-family:var(--t-script)] text-[var(--t-accent-ink)] @min-[640px]:text-4xl">{closing}</p>
+      </>
+    );
+  }
+
+  return (
+    <footer className={cx('relative overflow-hidden px-6 pb-14 text-center', BAND_CLASS[band])} style={{ ['--t-band' as string]: BAND_FILL[band], paddingTop: suited ? top : undefined }}>
+      {!suited && p.look === 'heritage' ? <Toran className="pointer-events-none absolute inset-x-0 top-0 mx-auto w-full max-w-[760px]" swags={4} /> : null}
+      {edge ? <SuiteEdge d={dress} name={edgeName} /> : null}
+      {hang ? <Hangings d={dress} /> : null}
+      <div className={cx('relative mx-auto max-w-md', !suited && 'pt-16', !suited && p.look === 'heritage' && 'pt-28')}>
+        {middle}
         {hashtag ? <p className="mt-4 text-sm tracking-[0.25em] uppercase text-[var(--t-muted-ink)]">{hashtag}</p> : null}
-        {p.look === 'heritage' ? (
+        {!suited && p.look === 'heritage' ? (
           <div className="mt-8 flex justify-center gap-6" aria-hidden="true">
             {[0, 1, 2].map((i) => (
               <Diya key={i} className="w-12" />
@@ -174,6 +347,7 @@ export function Footer(p: SectionProps) {
           </div>
         ) : null}
       </div>
+      {variant === 'skyline' && suited ? <Skyline d={dress} className="relative mt-10 -mb-14" /> : null}
       {p.slots.guestInfo ? <div className="relative mx-auto mt-8 max-w-md text-left">{p.slots.guestInfo}</div> : null}
       {p.slots.checkIn ? <div className="relative mx-auto mt-8 max-w-xs">{p.slots.checkIn}</div> : null}
       {p.slots.watermark ? <p className="relative mt-8 text-xs text-[var(--t-muted-ink)]">{p.t('template.madeWith')}</p> : null}

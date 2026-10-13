@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TemplateRenderer, TemplateStyles } from '@bulava/template-engine';
-import { sampleRenderContext } from '@bulava/template-schema';
+import { templateSampleContext } from '@bulava/template-schema';
 import { FilmPosterView } from '@/components/marketing/live-template';
 import { isCanvasFilm } from '@/lib/films';
 import { hasPosterScene, PosterScene } from '@/components/marketing/template-card';
@@ -46,11 +46,11 @@ export default async function PreviewFramePage({ params, searchParams }: { param
   return (
     <div id="preview-frame" style={{ width: PREVIEW_VIEWPORT_WIDTH }}>
       {view === 'full' ? (
-        <TemplateRenderer definition={tpl.definition} context={sampleRenderContext({ typeKey, tags: tpl.tags })} mode="preview" language="en" />
+        <TemplateRenderer definition={tpl.definition} context={templateSampleContext(tpl.definition, { typeKey, tags: tpl.tags })} mode="preview" language="en" />
       ) : (
         <>
           <TemplateStyles />
-          <TemplateRenderer definition={tpl.definition} context={sampleRenderContext({ typeKey, noPhotos: true, tags: tpl.tags })} mode="thumbnail" maxSections={4} />
+          <TemplateRenderer definition={tpl.definition} context={templateSampleContext(tpl.definition, { typeKey, noPhotos: true, tags: tpl.tags })} mode="thumbnail" maxSections={4} />
         </>
       )}
     </div>

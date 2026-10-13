@@ -15,7 +15,7 @@ import {
   ICONS,
   ILLUSTRATIONS,
   ORNAMENT_LAYERS,
-  sampleRenderContext,
+  templateSampleContext,
   SAMPLE_PRESETS,
   SHAPES,
   templateAssetIds,
@@ -246,8 +246,8 @@ export function CanvasEditor({ definition, sectionId, edit, onClose, onSave, sav
   const assetIds = templateAssetIds(definition).sort();
   const assetUrls = useQuery({ queryKey: ['admin', 'asset-urls', assetIds], queryFn: () => apiPost<Record<string, string>>('/admin/assets/urls', { ids: assetIds }), enabled: assetIds.length > 0, staleTime: 30 * 60_000 });
   const ctx = useMemo(
-    () => ({ ...sampleRenderContext({ language: effectiveLanguage, longNames, noPhotos, typeKey: effectiveType }), ...(assetUrls.data ? { assets: assetUrls.data } : {}) }),
-    [effectiveLanguage, longNames, noPhotos, effectiveType, assetUrls.data],
+    () => ({ ...templateSampleContext(definition, { language: effectiveLanguage, longNames, noPhotos, typeKey: effectiveType }), ...(assetUrls.data ? { assets: assetUrls.data } : {}) }),
+    [definition, effectiveLanguage, longNames, noPhotos, effectiveType, assetUrls.data],
   );
   const colors = useMemo(() => effectiveColors(definition, null), [definition]);
   const fonts = useMemo(() => effectiveFonts(definition, null), [definition]);

@@ -95,7 +95,7 @@ export function planCompareRows(plans: PlanFeatures[], t: Translator): CompareRo
   ];
 }
 
-/** The design tier a plan unlocks (templates.maxTier): 0 free, 1 standard, 2 premium. */
+/** The design collections a plan unlocks (templates.maxTier): 0 Free, 1 Premium, 2 Signature. */
 export const planTier = (plan: PlanFeatures): number => plan.features.find((f) => f.featureKey === 'templates.maxTier')?.limit ?? 0;
 
 /** What an add-on adds, in words, from its rows (a limit adds to the plan's). */

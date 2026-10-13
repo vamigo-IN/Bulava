@@ -253,6 +253,20 @@ export const ILLUSTRATIONS = [
   'laalPaar',
   'marigoldWreath',
   'ghungroo',
+  // Faith emblems for the very top of an invitation (FAITH_EMBLEMS).
+  'ganesha',
+  'crescentStar',
+  'khanda',
+  'cross',
+  // Faith themes' art (illustrations-sacred.tsx): Islamic geometry, Sikh and church weddings.
+  'girih',
+  'jaaliArch',
+  'fanoos',
+  'goldenTemple',
+  'phulkariBagh',
+  'lancetWindow',
+  'lilies',
+  'weddingBells',
 ] as const;
 export type IllustrationName = (typeof ILLUSTRATIONS)[number];
 

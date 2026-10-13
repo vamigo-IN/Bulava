@@ -1,4 +1,5 @@
-import type { ArtboardInput, CanvasSectionInput, LayerInput } from '@bulava/template-schema';
+import { EMBLEM_SIZE, type ArtboardInput, type CanvasSectionInput, type IllustrationName, type LayerInput } from '@bulava/template-schema';
+import { emblemLayers } from '../faith';
 import { at, b, cardButtons, eyebrows, lit, orn, photo, scene, sec, shape, t, text, widget, type Frame } from '../canvas-kit';
 import {
   art,
@@ -42,6 +43,9 @@ const fade = (delaySec = 0) => ({ animation: { entrance: 'fade' as const, delayS
 const up = (delaySec = 0) => ({ animation: { entrance: 'fadeUp' as const, delaySec } });
 
 // ─────────────────────────── Shared pieces ───────────────────────────
+
+/** A centred names box, kept clear of strands hanging down the board's sides (marigolds, jasmine, lanterns). */
+const clearOfHangs = (kit: Kit, frame: Frame, inset = 28): Frame => (kit.hang ? at(frame.x + inset, frame.y, frame.w - inset * 2, frame.h) : frame);
 
 function names(kit: Kit, frame: Frame, size: number, align: 'left' | 'center' = 'center'): LayerInput {
   return text('names', NAMES, frame, nameStyle(kit, size, align), { animation: { entrance: 'fadeUp', delaySec: 0.3, ...(kit.foil ? { motion: 'shimmer' as const } : {}) } });
@@ -128,9 +132,14 @@ function hangs(kit: Kit, positions: Array<[number, number]>, boardTop = 30): Lay
   return positions.map(([x, len], i) => art(`hang-${i + 1}`, h, at(x - 12, boardTop, 24, len), { animation: { entrance: 'fadeDown', delaySec: sec(i * 0.06), motion: 'sway' } }));
 }
 
+/** Woven borders drawn to their layer's size (FRAME_SIZED strips) and their height on a phone board. */
+const BORDER_HEIGHT: Partial<Record<string, number>> = { phulkari: 50, zariBand: 50, laalPaar: 54 };
+
 function topBand(kit: Kit, width: number, height: number): LayerInput[] {
   const tp = kit.top;
   if (!tp) return [];
+  const strip = BORDER_HEIGHT[tp.name];
+  if (strip) return [art('top', tp, at(-14, 0, width + 28, width > 420 ? Math.round(strip * 1.4) : strip), { animation: { entrance: 'fadeDown' } })];
   const isBorder = tp.name === 'templeBorder';
   if (width <= 420) return [art('top', tp, at(-14, isBorder ? 0 : -10, width + 28, isBorder ? 34 : height), { animation: { entrance: 'fadeDown', motion: isBorder ? 'none' : 'sway' } })];
   const pieces = Math.ceil(width / 366);
@@ -140,6 +149,20 @@ function topBand(kit: Kit, width: number, height: number): LayerInput[] {
 function invocation(kit: Kit, frame: Frame, size = 14, align: 'left' | 'center' = 'center'): LayerInput[] {
   return kit.invocation ? [text('invocation', lit(kit.invocation), frame, { font: 'Tiro Devanagari Hindi', size, color: kit.dark ? 'accent' : 'primary', align }, fade(0.15))] : [];
 }
+
+/**
+ * The faith emblem at the very top (kit.emblem: Ganesha, the crescent and star,
+ * the Khanda or the cross), centred on cx, upright and still, in the kit's
+ * metal, at the board's one emblem size (EMBLEM_SIZE, the same on every
+ * composition). `seal` sets it on a disc of the stock ringed in the metal, for
+ * where it sits over a toran, a garland or bunting, so it reads clear of them.
+ */
+function emblem(kit: Kit, cx: number, top: number, desktop = false, seal = false): LayerInput[] {
+  return kit.emblem ? emblemLayers(kit.emblem.name as IllustrationName, { cx, top, seal }, { width: desktop ? DESKTOP.width : MOBILE.width, dark: kit.dark }) : [];
+}
+
+/** The emblem at the head of a left-aligned column of words starting at x (desktop boards). */
+const emblemLeft = (kit: Kit, x: number, top: number): LayerInput[] => (kit.emblem ? emblem(kit, x + Math.round((EMBLEM_SIZE.desktop * aspectOf(kit.emblem.name)) / 2), top, true) : []);
 
 const board = (kit: Kit, layers: Array<LayerInput | LayerInput[] | false | null | undefined>, desktop = false): ArtboardInput => ({
   ...(desktop ? DESKTOP : MOBILE),
@@ -209,7 +232,9 @@ function cardFor(kit: Kit, style: CardStyle, occ: Occasion): CanvasSectionInput 
         height: 630,
         ...base,
         layers: [
-          art('garland', kit.top ?? { name: 'floralGarland', tint: '#6b8f6e' }, at(-14, -10, 418, 116), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
+          kit.top && BORDER_HEIGHT[kit.top.name]
+            ? art('garland', kit.top, at(-14, 0, 418, BORDER_HEIGHT[kit.top.name]!), { animation: { entrance: 'fadeDown' } })
+            : art('garland', kit.top ?? { name: 'floralGarland', tint: '#6b8f6e' }, at(-14, -10, 418, 116), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
           art('crest', crestOf(kit, occ), fitCentre(crestOf(kit, occ).name, 195, 132, 70, 46), { animation: { entrance: 'zoomIn', delaySec: 0.1 } }),
           ...cardText(kit, 160),
           details(290, 'accent', 'accent'),
@@ -271,6 +296,16 @@ function cardFor(kit: Kit, style: CardStyle, occ: Occasion): CanvasSectionInput 
 
 // ─────────────────────────── Compositions ───────────────────────────
 
+/**
+ * The small piece under a photo arch: a lotus for Hindu designs and designs of no one faith; for
+ * another faith's design its own motif (bells, doves), or nothing where that is a plain flourish.
+ */
+function archBase(kit: Kit, frame: Frame, extra: Partial<Extract<LayerInput, { kind: 'ornament' }>> = {}): LayerInput | null {
+  if (!kit.emblem || kit.emblem.name === 'ganesha') return orn('arch-base', 'lotus', frame, { color: 'secondary', foil: true, ...extra });
+  if (kit.motif.name === 'flourish') return null;
+  return art('arch-base', kit.motif, fitCentre(kit.motif.name, frame.x + frame.w / 2, frame.y + frame.h / 2, frame.w, frame.h), extra);
+}
+
 /** Arch: the photo in a gilded arch, the names beneath, and the hero art rising from the bottom. */
 const arch: Composition = {
   key: 'arch',
@@ -280,9 +315,10 @@ const arch: Composition = {
       wash(kit, at(-60, 500, 510, 460)),
       kit.sky && kit.dark ? art('sky', kit.sky, at(0, 0, 390, 360), { opacity: 0.7, animation: { entrance: 'fade', motion: 'twinkle' } }) : null,
       corners(kit, kit.corner, 120),
+      emblem(kit, 195, 6),
       photoSlot(at(118, 78, 154, 216), 'arch'),
       orn('arch', 'archFrame', at(104, 62, 182, 248), { color: 'secondary', foil: true, animation: { entrance: 'zoomIn' } }),
-      orn('arch-base', 'lotus', at(155, 288, 80, 48), { color: 'secondary', foil: true, ...up(0.2) }),
+      archBase(kit, at(155, 288, 80, 48), up(0.2)),
       eyebrows('eyebrow', at(40, 344, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
       names(kit, at(16, 362, 358, 96), 54),
       art('motif', kit.motif, fitCentre(kit.motif.name, 195, 474, 170, 30), fade(0.4)),
@@ -301,7 +337,8 @@ const arch: Composition = {
         kit.corner ? art('corner-l', kit.corner, at(-36, -30, aspectOf(kit.corner.name) >= 1 ? 300 : 160, Math.round((aspectOf(kit.corner.name) >= 1 ? 300 : 160) / aspectOf(kit.corner.name)), -16)) : null,
         photoSlot(at(196, 196, 280, 400), 'arch', undefined, { border: 4 }),
         orn('arch', 'archFrame', at(174, 170, 324, 448), { color: 'secondary', foil: true, animation: { entrance: 'zoomIn' } }),
-        orn('arch-base', 'lotus', at(276, 592, 120, 72), { color: 'secondary', foil: true }),
+        archBase(kit, at(276, 592, 120, 72)),
+        emblem(kit, 800, 164, true),
         eyebrows('eyebrow', at(540, 250, 520, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
         names(kit, at(520, 280, 560, 200), 96),
         art('motif', kit.motif, fitCentre(kit.motif.name, 800, 514, 300, 56)),
@@ -330,6 +367,7 @@ const jharokha: Composition = {
       orn('frame', 'ornateFrame', at(14, 86, 362, 744), { color: 'secondary', foil: true, animation: { entrance: 'fade', durationSec: 1.2 } }),
       topBand(kit, 390, 112),
       kit.hang?.name === 'lantern' ? hangs(kit, [[44, 80], [346, 80]]) : null,
+      kit.top ? emblem(kit, 195, 12, false, true) : emblem(kit, 195, 26),
       invocation(kit, at(70, 100, 250, 22)),
       photoSlot(opening(95, 126, 200), 'arch'),
       orn('jharokha', 'jharokha', at(95, 126, 200, 293), { color: 'secondary', foil: true, shadow: 'soft', animation: { entrance: 'zoomIn' } }),
@@ -353,6 +391,7 @@ const jharokha: Composition = {
         orn('jharokha', 'jharokha', at(940, 130, 300, 440), { color: 'secondary', foil: true, shadow: 'soft', animation: { entrance: 'zoomIn' } }),
         art('pair-l', pair, fit(pair.name, 872, 638, 220, 190), { shadow: 'soft', animation: { entrance: 'slideRight', delaySec: 0.3 } }),
         art('pair-r', pair, fit(pair.name, 1308, 638, 220, 190), { flipX: true, shadow: 'soft', animation: { entrance: 'slideLeft', delaySec: 0.3 } }),
+        emblemLeft(kit, 150, 112),
         invocation(kit, at(150, 186, 560, 30), 20, 'left'),
         eyebrows('eyebrow', at(150, 250, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15, 'left')),
         names(kit, at(140, 280, 680, 220), 108, 'left'),
@@ -373,7 +412,8 @@ const couple: Composition = {
   build(kit, occ) {
     const hero = kit.hero ?? { name: 'coupleHindu' as const, tint: 'primary' as const };
     const hasTop = !!kit.top;
-    const y0 = hasTop ? (kit.invocation ? 124 : 112) : 84;
+    // Without a top band the emblem takes the top; an invocation then moves under it.
+    const y0 = hasTop ? (kit.invocation ? 124 : 112) : kit.emblem && kit.invocation ? 128 : 84;
     const mobile = board(kit, [
       wash(kit, at(-40, 300, 470, 470), 0.32),
       kit.sky ? art('sky', kit.sky, at(0, 0, 390, 420), { opacity: kit.dark ? 0.55 : 0.45, animation: { entrance: 'fade', motion: 'twinkle' } }) : null,
@@ -383,9 +423,10 @@ const couple: Composition = {
         [366, 230],
       ]),
       topBand(kit, 390, 112),
-      hasTop ? invocation(kit, at(70, 100, 250, 22)) : invocation(kit, at(70, 52, 250, 22)),
+      hasTop ? emblem(kit, 195, 12, false, true) : emblem(kit, 195, kit.invocation ? 28 : 20),
+      hasTop ? invocation(kit, at(70, 100, 250, 22)) : invocation(kit, at(70, kit.emblem ? 96 : 52, 250, 22)),
       eyebrows('eyebrow', at(40, y0, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
-      names(kit, at(16, y0 + 20, 358, 92), 52),
+      names(kit, clearOfHangs(kit, at(16, y0 + 20, 358, 92)), 52),
       art('motif', kit.motif, fitCentre(kit.motif.name, 195, y0 + 128, 170, 30), fade(0.4)),
       dateCity(kit, y0 + 150, 30, 330, 16),
       art('hero', hero, fit(hero.name, 195, 734, 320, 734 - (y0 + 206)), { shadow: 'soft', animation: { entrance: 'fadeUp', delaySec: 0.35, durationSec: 1.1 } }),
@@ -404,6 +445,7 @@ const couple: Composition = {
           [1336, 200],
           [1400, 300],
         ]),
+        emblem(kit, 480, 118, true),
         invocation(kit, at(180, 196, 600, 30), 20),
         eyebrows('eyebrow', at(180, 246, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
         names(kit, at(160, 276, 640, 200), 92),
@@ -436,6 +478,7 @@ const split: Composition = {
         [366, 230],
       ], 40),
       topBand(kit, 390, 112),
+      kit.top ? emblem(kit, 195, 12, false, true) : emblem(kit, 195, 28),
       // The hand may reach over the words; anything else stays right of them.
       art('hero', hero, hero.name === 'mehendiHand' ? fit(hero.name, 288, 528, 250, 348, 6) : fit(hero.name, 298, 532, 184, 330, 4), { flipX: hero.name === 'mehendiHand', shadow: 'soft', animation: { entrance: 'slideLeft', delaySec: 0.3, durationSec: 1.1 } }),
       eyebrows('eyebrow', at(36, 200, 200, 20), occ.eyebrows, { ...eyebrowStyle(kit, 11, 'left'), color: kit.dark ? 'accent' : 'accent', weight: 700 }),
@@ -476,6 +519,7 @@ const split: Composition = {
           : art('bottom', round(kit.centre, { name: 'rangoliBloom' }), at(-180, 660, 400, 400), { opacity: 0.95, animation: { motion: 'spin' } }),
         kit.corner ? art('corner', kit.corner, fit(kit.corner.name, 1260, 860, 150, 208, 16), { flipX: true }) : null,
         art('hero', hero, fit(hero.name, 1060, 720, 440, 600, 6), { flipX: hero.name === 'mehendiHand', shadow: 'soft', animation: { entrance: 'slideLeft', delaySec: 0.3, durationSec: 1.1 } }),
+        emblemLeft(kit, 250, 144),
         eyebrows('eyebrow', at(250, 230, 560, 26), occ.eyebrows, { ...eyebrowStyle(kit, 15, 'left'), weight: 700, color: 'accent' }),
         names(kit, at(240, 260, 600, 200), 92, 'left'),
         dateCity(kit, 476, 250, 560, 24, 'left'),
@@ -499,12 +543,13 @@ const night: Composition = {
     const mobile: ArtboardInput = {
       ...board(darkKit, [
         art('stars', kit.sky ?? { name: 'stars', tint: 'accent' }, at(0, 0, 390, 300), { opacity: 0.75, animation: { entrance: 'fade', motion: 'twinkle' } }),
-        orn('moon', 'crescent', at(296, 108, 58, 58), { color: 'accent', shadow: 'glow', ...fade(0.2) }),
+        kit.emblem?.name === 'crescentStar' ? null : orn('moon', 'crescent', at(296, 108, 58, 58), { color: 'accent', shadow: 'glow', ...fade(0.2) }),
         hangs(lanternKit, [
           [54, 112],
           [111, 78],
           [277, 78],
         ]),
+        emblem(darkKit, 195, 48),
         art('centre', round(kit.centre, { name: 'arabesque', tint: 'primary' }), at(70, 150, 250, 250), { shadow: 'glow', animation: { entrance: 'zoomIn', delaySec: 0.1, motion: 'spin' } }),
         photoSlot(at(144, 224, 102, 102), 'circle', undefined, { border: 3 }),
         eyebrows('eyebrow', at(40, 418, 310, 20), occ.eyebrows, eyebrowStyle(darkKit)),
@@ -521,7 +566,7 @@ const night: Composition = {
         darkKit,
         [
           art('stars', kit.sky ?? { name: 'stars', tint: 'accent' }, at(0, 0, 1440, 480), { opacity: 0.7, animation: { entrance: 'fade', motion: 'twinkle' } }),
-          orn('moon', 'crescent', at(1240, 110, 90, 90), { color: 'accent', shadow: 'glow' }),
+          kit.emblem?.name === 'crescentStar' ? null : orn('moon', 'crescent', at(1240, 110, 90, 90), { color: 'accent', shadow: 'glow' }),
           hangs(lanternKit, [
             [105, 150],
             [208, 100],
@@ -532,6 +577,7 @@ const night: Composition = {
           ]),
           art('centre', round(kit.centre, { name: 'arabesque', tint: 'primary' }), at(160, 170, 380, 380), { shadow: 'glow', animation: { entrance: 'zoomIn', motion: 'spin' } }),
           photoSlot(at(273, 283, 154, 154), 'circle', undefined, { border: 4 }),
+          emblem(darkKit, 960, 138, true),
           eyebrows('eyebrow', at(640, 230, 640, 26), occ.eyebrows, eyebrowStyle(darkKit, 15)),
           names(darkKit, at(620, 258, 680, 190), 100),
           art('motif', kit.motif, fitCentre(kit.motif.name, 960, 478, 300, 56)),
@@ -558,6 +604,7 @@ const floral: Composition = {
       shape('blush', 'ellipse', at(-60, 120, 510, 460), { fill: { type: 'gradient', gradient: { kind: 'radial', from: 'accent', to: kit.dark ? 'primary' : 'background' } }, opacity: kit.dark ? 0.25 : 0.45 }),
       art('blooms-top', blooms, fit(blooms.name, 110, 212, 272, 230), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
       art('blooms-bottom', blooms, fit(blooms.name, 300, 900, 250, 168), { flipX: true, flipY: true, animation: { entrance: 'fadeUp', delaySec: 0.2, motion: 'sway' } }),
+      emblem(kit, 195, 20, false, true),
       photoSlot(at(104, 150, 182, 228), 'ellipse', kit.hero, { border: 3 }),
       art('motif', motif, fitCentre(motif.name, 195, 430, 130, 70), { animation: { entrance: 'fadeUp', delaySec: 0.25, motion: 'float' } }),
       eyebrows('eyebrow', at(40, 478, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
@@ -572,6 +619,7 @@ const floral: Composition = {
         art('blooms-top', blooms, fit(blooms.name, 180, 330, 420, 354), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
         art('blooms-bottom', blooms, fit(blooms.name, 1270, 914, 420, 354), { flipX: true, flipY: true, animation: { entrance: 'fadeUp', delaySec: 0.2, motion: 'sway' } }),
         photoSlot(at(250, 170, 300, 380), 'ellipse', kit.hero, { border: 4 }),
+        emblem(kit, 960, 60, true),
         art('motif', motif, fitCentre(motif.name, 960, 210, 180, 120), { animation: { entrance: 'fadeUp', delaySec: 0.25, motion: 'float' } }),
         eyebrows('eyebrow', at(660, 290, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
         names(kit, at(640, 318, 640, 180), 96),
@@ -601,7 +649,13 @@ const temple: Composition = {
         orn('border-top', 'templeBorder', at(-4, 0, 398, 34), { color: 'secondary', foil: true }),
         art('jasmine-l', jasmine, at(24, 30, 28, 290), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
         art('jasmine-r', jasmine, at(338, 30, 28, 290), { animation: { entrance: 'fadeDown', delaySec: 0.1, motion: 'sway' } }),
-        orn('bells', 'templeBells', at(105, 22, 180, 180), { color: 'secondary', shadow: 'soft', animation: { entrance: 'fadeDown', motion: 'sway' } }),
+        kit.emblem
+          ? [
+              orn('bells-l', 'templeBells', at(60, 30, 104, 104), { color: 'secondary', shadow: 'soft', animation: { entrance: 'fadeDown', motion: 'sway' } }),
+              orn('bells-r', 'templeBells', at(226, 30, 104, 104), { color: 'secondary', shadow: 'soft', animation: { entrance: 'fadeDown', delaySec: 0.1, motion: 'sway' } }),
+              ...emblem(darkKit, 195, 58),
+            ]
+          : orn('bells', 'templeBells', at(105, 22, 180, 180), { color: 'secondary', shadow: 'soft', animation: { entrance: 'fadeDown', motion: 'sway' } }),
         eyebrows('eyebrow', at(40, 224, 310, 20), occ.eyebrows, eyebrowStyle(darkKit)),
         names({ ...darkKit, nameFont: 'heading', foil: true }, at(20, 246, 350, 124), 54),
         orn('lotus', 'lotus', at(150, 370, 90, 54), { color: 'secondary', foil: true, ...fade(0.4) }),
@@ -624,9 +678,11 @@ const temple: Composition = {
           ...[40, 150, 1262, 1372].map((x, i) => art(`jasmine-${i + 1}`, jasmine, at(x, 34, 30, i % 3 ? 220 : 320), { animation: { entrance: 'fadeDown', delaySec: sec(i * 0.08), motion: 'sway' } })),
           orn('bells-l', 'templeBells', at(220, 30, 200, 200), { color: 'secondary', shadow: 'soft', animation: { entrance: 'fadeDown', motion: 'sway' } }),
           orn('bells-r', 'templeBells', at(1020, 30, 200, 200), { color: 'secondary', shadow: 'soft', animation: { entrance: 'fadeDown', delaySec: 0.1, motion: 'sway' } }),
-          eyebrows('eyebrow', at(420, 112, 600, 24), occ.eyebrows, eyebrowStyle(darkKit, 14)),
-          names({ ...darkKit, nameFont: 'heading', foil: true }, at(320, 138, 800, 110), 92),
-          orn('lotus', 'lotus', at(660, 250, 120, 72), { color: 'secondary', foil: true }),
+          // With an emblem between the border and the words, the words step down a little.
+          emblem(darkKit, 720, 46, true),
+          eyebrows('eyebrow', at(420, kit.emblem ? 128 : 112, 600, 24), occ.eyebrows, eyebrowStyle(darkKit, 14)),
+          names({ ...darkKit, nameFont: 'heading', foil: true }, kit.emblem ? at(320, 152, 800, 104) : at(320, 138, 800, 110), 92),
+          orn('lotus', 'lotus', kit.emblem ? at(664, 258, 112, 66) : at(660, 250, 120, 72), { color: 'secondary', foil: true }),
           dateCity(darkKit, 326, 420, 600, 20),
           countdown(darkKit, at(520, 392, 400, 44), 24, 'inline'),
           scene('temple', kit.scene ?? 'gopuram', at(0, 452, 1440, 448), { animation: { entrance: 'fade', durationSec: 1.2 } }),
@@ -663,7 +719,8 @@ const portrait: Composition = {
       wash(kit, at(-60, 140, 510, 420), 0.28),
       topBand(kit, 390, 112),
       kit.corner && !kit.top ? corners(kit, kit.corner, 110) : null,
-      eyebrows('eyebrow', at(40, kit.top ? 106 : 70, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
+      kit.top ? emblem(kit, 195, 12, false, true) : emblem(kit, 195, 16),
+      eyebrows('eyebrow', at(40, kit.top ? 106 : kit.emblem ? 80 : 70, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
       pane('l', 36, 150, 146, 196),
       pane('r', 208, 150, 146, 196),
       text('name-1', partner(1), at(20, 356, 178, 56), nameStyleSmall(34), { overflow: 'shrink', ...up(0.3) }),
@@ -689,6 +746,7 @@ const portrait: Composition = {
         wash(kit, at(380, 60, 680, 680), 0.26),
         topBand(kit, 1440, 112),
         kit.corner ? art('corner', kit.corner, at(-36, 600, aspectOf(kit.corner.name) >= 1 ? 320 : 170, Math.round((aspectOf(kit.corner.name) >= 1 ? 320 : 170) / aspectOf(kit.corner.name)))) : null,
+        kit.top ? emblem(kit, 720, 16, true, true) : emblem(kit, 720, 52, true),
         eyebrows('eyebrow', at(420, 128, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
         pane('l', 470, 176, 220, 296, 1.4),
         pane('r', 750, 176, 220, 296, 1.4),
@@ -716,6 +774,7 @@ const party: Composition = {
       art('balloons-l', balloons, fit(balloons.name, 41, 276, 162, 210), { animation: { entrance: 'fadeUp', delaySec: 0.1, motion: 'float' } }),
       art('balloons-r', balloons, fit(balloons.name, 349, 256, 162, 210), { flipX: true, animation: { entrance: 'fadeUp', delaySec: 0.2, motion: 'float' } }),
       art('bunting', kit.top ?? { name: 'bunting' }, at(0, -4, 390, 96), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
+      emblem(kit, 195, 14, false, true),
       shape('photo-pop', 'ellipse', at(116, 120, 158, 158), { fill: { type: 'color', color: 'secondary' }, animation: { entrance: 'zoomIn' } }),
       { id: 'photo-empty', kind: 'icon', icon: 'sparkle', color: 'surface', frame: at(160, 164, 70, 70), opacity: 0.9 },
       photo('photo', 'photo.cover', at(116, 120, 158, 158), { mask: 'circle', border: { width: 6, color: 'surface' }, shadow: true, animation: { entrance: 'zoomIn', delaySec: 0.1 } }),
@@ -735,6 +794,7 @@ const party: Composition = {
         art('confetti', kit.sky ?? { name: 'confetti', tint: 'accent' }, at(640, 40, 800, 460), { opacity: 0.5 }),
         art('bunting-l', kit.top ?? { name: 'bunting' }, at(0, -6, 720, 140), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
         art('bunting-r', kit.top ?? { name: 'bunting' }, at(720, -6, 720, 140), { animation: { entrance: 'fadeDown', delaySec: 0.1, motion: 'sway' } }),
+        emblem(kit, 720, 18, true, true),
         art('balloons-l', balloons, fit(balloons.name, 90, 471, 240, 311), { animation: { entrance: 'fadeUp', motion: 'float' } }),
         art('balloons-r', balloons, fit(balloons.name, 1350, 451, 240, 311), { flipX: true, animation: { entrance: 'fadeUp', delaySec: 0.1, motion: 'float' } }),
         art('hero', hero, fit(hero.name, 1000, 690, 380, 470), { shadow: 'soft', animation: { entrance: 'zoomIn', delaySec: 0.3 } }),
@@ -767,7 +827,8 @@ const dream: Composition = {
     const mobile: ArtboardInput = {
       ...board(light, [
         art('stars', kit.sky ?? { name: 'stars' }, at(0, 0, 390, 420), { opacity: 0.85, animation: { entrance: 'fade', motion: 'twinkle' } }),
-        art('top', top, fitCentre(top.name, 195, 152, 278, 241), { animation: { entrance: 'fadeDown', motion: 'float' } }),
+        kit.emblem ? art('top', top, fitCentre(top.name, 195, 178, 250, 196), { animation: { entrance: 'fadeDown', motion: 'float' } }) : art('top', top, fitCentre(top.name, 195, 152, 278, 241), { animation: { entrance: 'fadeDown', motion: 'float' } }),
+        emblem(light, 195, 18),
         shape('photo-bg', 'ellipse', at(130, 286, 130, 130), { fill: { type: 'color', color: 'surface' } }),
         { id: 'photo-empty', kind: 'icon', icon: 'star', color: 'secondary', frame: at(165, 321, 60, 60) },
         photo('photo', 'photo.cover', at(130, 286, 130, 130), { mask: 'circle', border: { width: 5, color: 'surface' }, shadow: true, animation: { entrance: 'zoomIn', delaySec: 0.2 } }),
@@ -795,6 +856,7 @@ const dream: Composition = {
           shape('photo-bg', 'ellipse', at(1010, 520, 170, 170), { fill: { type: 'color', color: 'surface' } }),
           { id: 'photo-empty', kind: 'icon', icon: 'star', color: 'secondary', frame: at(1055, 565, 80, 80) },
           photo('photo', 'photo.cover', at(1010, 520, 170, 170), { mask: 'circle', border: { width: 6, color: 'surface' }, shadow: true }),
+          emblemLeft(light, 200, 182),
           eyebrows('eyebrow', at(200, 270, 560, 26), occ.eyebrows, { font: 'body', size: 15, weight: 600, color: 'muted', letterSpacing: 0.26, transform: 'upper', align: 'left' }),
           names(light, at(190, 298, 620, 170), 96, 'left'),
           text('tagline', TAGLINE, at(200, 472, 520, 56), { font: 'body', size: 18, color: 'muted', lineHeight: 1.4, align: 'left' }, { visibleWhen: { exists: 'custom.tagline' } }),
@@ -825,9 +887,10 @@ const home: Composition = {
         [368, 210],
       ], 40),
       art('top', kit.top ?? { name: 'toran' }, at(-14, -10, 418, 112), { animation: { entrance: 'fadeDown', motion: 'sway' } }),
+      emblem(kit, 195, 12, false, true),
       invocation(kit, at(60, 104, 270, 26), 17),
       eyebrows('eyebrow', at(40, 136, 310, 20), occ.eyebrows, { font: 'body', size: 11, weight: 700, color: 'accent', letterSpacing: 0.26, transform: 'upper' }),
-      names(kit, at(16, 156, 358, 96), 44),
+      names(kit, at(44, 156, 302, 96), 44),
       art('hero', hero, fit(hero.name, 195, 534, 280, 280), { shadow: 'soft', animation: { entrance: 'zoomIn', delaySec: 0.25 } }),
       art('diyas', diyas, fit('diyaRow', 195, 611, 300, 83), up(0.4)),
       dateCity(kit, 622, 30, 330, 17),
@@ -842,6 +905,7 @@ const home: Composition = {
         art('hero', hero, fit(hero.name, 1080, 650, 480, 480), { shadow: 'soft', animation: { entrance: 'zoomIn', delaySec: 0.2 } }),
         art('diyas', diyas, fit('diyaRow', 1080, 771, 440, 121), up(0.35)),
         art('rangoli', round(kit.corner, { name: 'rangoliBloom' }), at(-110, 600, 380, 380), { opacity: 0.95, animation: { motion: 'spin' } }),
+        emblemLeft(kit, 200, 124),
         invocation(kit, at(200, 200, 560, 34), 24, 'left'),
         eyebrows('eyebrow', at(200, 244, 560, 26), occ.eyebrows, { font: 'body', size: 15, weight: 700, color: 'accent', letterSpacing: 0.26, transform: 'upper', align: 'left' }),
         names(kit, at(190, 272, 620, 170), 84, 'left'),
@@ -864,10 +928,11 @@ const minimal: Composition = {
     const mobile = board(kit, [
       shape('rule-o', 'rect', at(16, 16, 358, 812), { fill: { type: 'none' }, stroke: { width: 1.2, color: 'secondary' } }),
       shape('rule-i', 'rect', at(24, 24, 342, 796), { fill: { type: 'none' }, stroke: { width: 0.6, color: 'secondary' } }),
-      art('crest', crest, fitCentre(crest.name, 195, 116, 90, 56), fade()),
+      kit.emblem ? emblem(kit, 195, 92) : art('crest', crest, fitCentre(crest.name, 195, 116, 90, 56), fade()),
       eyebrows('eyebrow', at(40, 186, 310, 20), occ.eyebrows, { ...eyebrowStyle(kit), letterSpacing: 0.4 }),
       names(kit, at(24, 214, 342, 200), 66),
-      shape('rule', 'line', at(160, 432, 70, 2), { fill: { type: 'color', color: 'secondary' }, stroke: { width: 1, color: 'secondary' } }),
+      // With the emblem at the top, the theme's crest becomes the divider under the names.
+      kit.emblem ? art('crest', crest, fitCentre(crest.name, 195, 433, 84, 30), fade(0.35)) : shape('rule', 'line', at(160, 432, 70, 2), { fill: { type: 'color', color: 'secondary' }, stroke: { width: 1, color: 'secondary' } }),
       dateCity(kit, 452, 30, 330, 15),
       countdown(kit, at(70, 520, 250, 34), 17, 'inline'),
       kit.hero ? art('hero', kit.hero, fit(kit.hero.name, 195, 800, 220, 230), up(0.4)) : art('foot', kit.corner ?? kit.motif, fitCentre((kit.corner ?? kit.motif).name, 195, 720, 160, 120), fade(0.4)),
@@ -877,10 +942,10 @@ const minimal: Composition = {
       [
         shape('rule-o', 'rect', at(28, 28, 1384, 844), { fill: { type: 'none' }, stroke: { width: 1.4, color: 'secondary' } }),
         shape('rule-i', 'rect', at(40, 40, 1360, 820), { fill: { type: 'none' }, stroke: { width: 0.7, color: 'secondary' } }),
-        art('crest', crest, fitCentre(crest.name, 720, 128, 120, 74)),
+        kit.emblem ? emblem(kit, 720, 96, true) : art('crest', crest, fitCentre(crest.name, 720, 128, 120, 74)),
         eyebrows('eyebrow', at(420, 200, 600, 26), occ.eyebrows, { ...eyebrowStyle(kit, 15), letterSpacing: 0.4 }),
         names(kit, at(260, 230, 920, 200), 110),
-        shape('rule', 'line', at(680, 452, 80, 2), { fill: { type: 'color', color: 'secondary' }, stroke: { width: 1, color: 'secondary' } }),
+        kit.emblem ? art('crest', crest, fitCentre(crest.name, 720, 453, 120, 40)) : shape('rule', 'line', at(680, 452, 80, 2), { fill: { type: 'color', color: 'secondary' }, stroke: { width: 1, color: 'secondary' } }),
         dateCity(kit, 476, 420, 600, 22),
         countdown(kit, at(520, 560, 400, 44), 24, 'inline'),
         kit.hero ? art('hero', kit.hero, fit(kit.hero.name, 720, 862, 260, 250)) : null,
@@ -901,7 +966,8 @@ const mandap: Composition = {
     const mobile = board(kit, [
       kit.sky ? art('sky', kit.sky, at(0, 0, 390, 320), { opacity: kit.dark ? 0.7 : 0.4, animation: { motion: 'twinkle' } }) : null,
       topBand(kit, 390, 112),
-      invocation(kit, at(70, kit.top ? 112 : 74, 250, 22)),
+      kit.top ? emblem(kit, 195, 12, false, true) : emblem(kit, 195, 18),
+      invocation(kit, at(70, kit.top ? 112 : kit.emblem ? 80 : 74, 250, 22)),
       eyebrows('eyebrow', at(40, 146, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
       names(kit, at(16, 166, 358, 92), 50),
       dateCity(kit, 262, 30, 330, 16),
@@ -918,6 +984,7 @@ const mandap: Composition = {
       [
         kit.sky ? art('sky', kit.sky, at(0, 0, 1440, 380), { opacity: kit.dark ? 0.6 : 0.4, animation: { motion: 'twinkle' } }) : null,
         topBand(kit, 1440, 112),
+        kit.top ? emblem(kit, 720, 16, true, true) : emblem(kit, 720, 36, true),
         invocation(kit, at(420, 112, 600, 30), 20),
         eyebrows('eyebrow', at(420, 150, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
         names(kit, at(320, 176, 800, 120), 84),
@@ -938,9 +1005,12 @@ const photoFirst: Composition = {
   build(kit, occ) {
     const hero = kit.hero ?? kit.pair;
     const panel = kit.dark ? 'primary' : 'surface';
+    // With an emblem, the photo starts lower and the emblem sits on the stock above it.
+    const photoTop = kit.emblem ? 82 : 20;
     const mobile = board(kit, [
-      photoSlot(at(20, 20, 350, 500), 'rounded', hero, { radius: 30, border: 0 }),
+      photoSlot(at(20, photoTop, 350, 520 - photoTop), 'rounded', hero, { radius: 30, border: 0 }),
       kit.corner ? corners(kit, kit.corner, 96, 470) : null,
+      emblem(kit, 195, 20),
       shape('panel-scallop', 'scallop', at(-10, 462, 410, 50), { fill: { type: 'color', color: panel } }),
       shape('panel', 'rect', at(0, 508, 390, 336), { fill: { type: 'color', color: panel } }),
       eyebrows('eyebrow', at(40, 520, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
@@ -954,6 +1024,7 @@ const photoFirst: Composition = {
       [
         photoSlot(at(60, 60, 640, 780), 'rounded', hero, { radius: 40, border: 0 }),
         kit.corner ? art('corner', kit.corner, at(1180, -40, aspectOf(kit.corner.name) >= 1 ? 300 : 170, Math.round((aspectOf(kit.corner.name) >= 1 ? 300 : 170) / aspectOf(kit.corner.name)), 16), { flipX: true }) : null,
+        emblem(kit, 1060, 150, true),
         eyebrows('eyebrow', at(760, 240, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
         names(kit, at(740, 270, 640, 200), 92),
         art('motif', kit.motif, fitCentre(kit.motif.name, 1060, 500, 300, 56)),
@@ -966,7 +1037,207 @@ const photoFirst: Composition = {
   },
 };
 
-export const COMPOSITIONS = { arch, jharokha, couple, split, night, floral, temple, portrait, party, dream, home, minimal, mandap, photo: photoFirst } satisfies Record<string, Composition>;
+// ─────────────────────────── Faith compositions ───────────────────────────
+
+/** Where a photo sits behind the jaali mehrab (JAALI_ARCH_OPENING in the engine), for a window w wide at (x, y). */
+const jaaliOpening = (x: number, y: number, w: number) => {
+  const h = (w * 440) / 300;
+  return at(Math.round(x + w * 0.24), Math.round(y + h * 0.16), Math.round(w * 0.52), Math.round(h * 0.7));
+};
+
+/** Where a photo sits behind the lancet window (LANCET_OPENING in the engine), for a window w wide at (x, y). */
+const lancetOpening = (x: number, y: number, w: number) => {
+  const h = (w * 440) / 260;
+  return at(Math.round(x + w * 0.2577), Math.round(y + h * 0.2955), Math.round(w * 0.4846), Math.round(h * 0.6136));
+};
+
+/** Hanging lamps (fanoos, lanterns) at their own proportions: [centre x, top, height]. */
+function lamps(lamp: Art, positions: Array<[number, number, number]>): LayerInput[] {
+  const a = aspectOf(lamp.name);
+  return positions.map(([cx, top, h], i) =>
+    art(`lamp-${i + 1}`, lamp, at(Math.round(cx - (h * a) / 2), top, Math.round(h * a), h), {
+      ...(lamp.name === 'fanoos' ? {} : { shadow: 'glow' as const }),
+      animation: { entrance: 'fadeDown', delaySec: sec(0.1 + i * 0.08), motion: 'sway' },
+    }),
+  );
+}
+
+/** Mehrab (nikah): the photo in a carved jaali window, fanoos glowing either side, the names beneath, domes at the foot. */
+const mehrab: Composition = {
+  key: 'mehrab',
+  build(kit, occ) {
+    const lamp = kit.pair ?? { name: 'fanoos' as const, tint: 'secondary' as const };
+    const skyline = kit.skyline ?? { name: 'domes' as const, foil: true };
+    const window: Art = { name: 'jaaliArch', tint: 'secondary', foil: true };
+    const mobile = board(kit, [
+      kit.sky && kit.dark ? art('sky', kit.sky, at(0, 0, 390, 320), { opacity: 0.6, animation: { entrance: 'fade', motion: 'twinkle' } }) : null,
+      wash(kit, at(-40, 60, 470, 420), 0.3),
+      lamps(lamp, [
+        [46, -6, 112],
+        [344, -6, 112],
+      ]),
+      emblem(kit, 195, 16),
+      photoSlot(jaaliOpening(87, 78, 216), 'arch', kit.hero),
+      art('window', window, at(87, 78, 216, 317), { shadow: 'soft', animation: { entrance: 'zoomIn' } }),
+      eyebrows('eyebrow', at(40, 412, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
+      names(kit, at(16, 432, 358, 92), 50),
+      art('motif', kit.motif, fitCentre(kit.motif.name, 195, 538, 170, 28), fade(0.4)),
+      dateCity(kit, 554, 30, 330, 16),
+      countdown(kit, at(70, 612, 250, 34), 17, 'inline'),
+      art('skyline', skyline, fit(skyline.name, 195, 862, 380, 186), up(0.3)),
+    ]);
+    const desktop = board(
+      kit,
+      [
+        kit.sky && kit.dark ? art('sky', kit.sky, at(0, 0, 680, 460), { opacity: 0.55, animation: { motion: 'twinkle' } }) : null,
+        wash(kit, at(120, 40, 640, 760), 0.3),
+        lamps(lamp, [
+          [160, -8, 150],
+          [680, -8, 150],
+        ]),
+        photoSlot(jaaliOpening(270, 80, 300), 'arch', kit.hero, { border: 0 }),
+        art('window', window, at(270, 80, 300, 440), { shadow: 'soft', animation: { entrance: 'zoomIn' } }),
+        art('skyline', skyline, fit(skyline.name, 420, 900, 520, 300), { opacity: 0.9, ...up(0.3) }),
+        emblem(kit, 1000, 112, true),
+        eyebrows('eyebrow', at(700, 200, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
+        names(kit, at(680, 230, 640, 190), 92),
+        art('motif', kit.motif, fitCentre(kit.motif.name, 1000, 444, 300, 56)),
+        dateCity(kit, 486, 700, 600, 24),
+        countdown(kit, at(790, 580, 420, 96), 28),
+      ],
+      true,
+    );
+    return { hero: { mobile, desktop }, card: cardFor(kit, kit.card, occ) };
+  },
+};
+
+/** Darbar (Anand Karaj): the Darbar Sahib golden on its sarovar across the foot, the names in foil above, a band along the top. */
+const darbar: Composition = {
+  key: 'darbar',
+  build(kit, occ) {
+    const temple: Art = { name: 'goldenTemple', tint: 'secondary', foil: true };
+    const glow = (frame: Frame) => shape('glow', 'ellipse', frame, { fill: { type: 'gradient', gradient: { kind: 'radial', from: 'accent', to: kit.dark ? 'primary' : 'background' } }, opacity: kit.dark ? 0.32 : 0.5 });
+    const mobile = board(kit, [
+      kit.sky ? art('sky', kit.sky, at(0, 372, 390, 200), { opacity: kit.dark ? 0.7 : 0.4, animation: { entrance: 'fade', motion: 'twinkle' } }) : null,
+      hangs(kit, [
+        [22, 230],
+        [368, 230],
+      ], 40),
+      topBand(kit, 390, 112),
+      kit.top ? emblem(kit, 195, 12, false, true) : emblem(kit, 195, 22),
+      eyebrows('eyebrow', at(40, 108, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
+      names(kit, clearOfHangs(kit, at(16, 128, 358, 104)), 52),
+      art('motif', kit.motif, fitCentre(kit.motif.name, 195, 248, 170, 28), fade(0.4)),
+      dateCity(kit, 266, 30, 330, 16),
+      countdown(kit, at(70, 326, 250, 34), 17, 'inline'),
+      glow(at(-40, 470, 470, 320)),
+      isRound(kit.centre)
+        ? [
+            art('centre-l', kit.centre, at(-70, 400, 170, 170), { opacity: kit.dark ? 0.5 : 0.4, animation: { motion: 'spin' } }),
+            art('centre-r', kit.centre, at(290, 400, 170, 170), { opacity: kit.dark ? 0.5 : 0.4, animation: { motion: 'spin' } }),
+          ]
+        : null,
+      art('temple', temple, fit('goldenTemple', 195, 852, 390, 320), { shadow: kit.dark ? 'glow' : 'soft', animation: { entrance: 'fadeUp', delaySec: 0.3, durationSec: 1.2 } }),
+    ]);
+    const desktop = board(
+      kit,
+      [
+        kit.sky ? [art('sky-l', kit.sky, at(0, 90, 340, 420), { opacity: kit.dark ? 0.6 : 0.35, animation: { motion: 'twinkle' } }), art('sky-r', kit.sky, at(1100, 90, 340, 420), { opacity: kit.dark ? 0.6 : 0.35, flipX: true, animation: { motion: 'twinkle' } })] : null,
+        hangs(kit, [
+          [40, 300],
+          [104, 200],
+          [1336, 200],
+          [1400, 300],
+        ], 50),
+        topBand(kit, 1440, 112),
+        kit.top ? emblem(kit, 720, 16, true, true) : emblem(kit, 720, 40, true),
+        eyebrows('eyebrow', at(420, 124, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
+        names(kit, at(320, 152, 800, 130), 88),
+        dateCity(kit, 290, 420, 600, 22),
+        countdown(kit, at(520, 352, 400, 44), 22, 'inline'),
+        glow(at(260, 440, 920, 560)),
+        isRound(kit.centre)
+          ? [
+              art('centre-l', kit.centre, at(70, 520, 320, 320), { opacity: kit.dark ? 0.45 : 0.35, animation: { motion: 'spin' } }),
+              art('centre-r', kit.centre, at(1050, 520, 320, 320), { opacity: kit.dark ? 0.45 : 0.35, animation: { motion: 'spin' } }),
+            ]
+          : null,
+        art('temple', temple, fit('goldenTemple', 720, 906, 640, 480), { shadow: kit.dark ? 'glow' : 'soft', animation: { entrance: 'fadeUp', delaySec: 0.3, durationSec: 1.2 } }),
+      ],
+      true,
+    );
+    return { hero: { mobile, desktop }, card: cardFor(kit, kit.card, occ) };
+  },
+};
+
+/** Lancet (church wedding): the photo in a stained-glass lancet window, lilies at its foot, the names beneath. */
+const lancet: Composition = {
+  key: 'lancet',
+  build(kit, occ) {
+    const window: Art = { name: 'lancetWindow', tint: 'secondary', foil: true };
+    const flowers = kit.corner ?? { name: 'lilies' as const, tint: 'accent' as const };
+    const mobile = board(kit, [
+      wash(kit, at(-40, 80, 470, 460), 0.35),
+      emblem(kit, 195, 14),
+      photoSlot(lancetOpening(85, 72, 220), 'arch', kit.hero),
+      art('window', window, at(85, 72, 220, 372), { shadow: 'soft', animation: { entrance: 'zoomIn' } }),
+      art('flowers-l', flowers, fit(flowers.name, 76, 470, 140, 170), { animation: { entrance: 'fadeUp', delaySec: 0.3, motion: 'sway' } }),
+      art('flowers-r', flowers, fit(flowers.name, 314, 470, 140, 170), { flipX: true, animation: { entrance: 'fadeUp', delaySec: 0.4, motion: 'sway' } }),
+      eyebrows('eyebrow', at(40, 484, 310, 20), occ.eyebrows, eyebrowStyle(kit)),
+      names(kit, at(16, 504, 358, 96), 50),
+      art('motif', kit.motif, fitCentre(kit.motif.name, 195, 616, 150, 34), fade(0.4)),
+      dateCity(kit, 640, 30, 330, 16),
+      countdown(kit, at(48, 706, 294, 62), 19),
+      kit.pair ? art('pair', kit.pair, fitCentre(kit.pair.name, 195, 806, 110, 58), { animation: { entrance: 'fadeUp', delaySec: 0.5, motion: 'float' } }) : null,
+    ]);
+    const desktop = board(
+      kit,
+      [
+        wash(kit, at(140, 40, 600, 800), 0.32),
+        photoSlot(lancetOpening(290, 66, 300), 'arch', kit.hero, { border: 0 }),
+        art('window', window, at(290, 66, 300, 508), { shadow: 'soft', animation: { entrance: 'zoomIn' } }),
+        art('flowers-l', flowers, fit(flowers.name, 270, 650, 190, 230), { animation: { entrance: 'fadeUp', delaySec: 0.3, motion: 'sway' } }),
+        art('flowers-r', flowers, fit(flowers.name, 610, 650, 190, 230), { flipX: true, animation: { entrance: 'fadeUp', delaySec: 0.4, motion: 'sway' } }),
+        emblem(kit, 1020, 112, true),
+        eyebrows('eyebrow', at(720, 200, 600, 26), occ.eyebrows, eyebrowStyle(kit, 15)),
+        names(kit, at(700, 230, 640, 190), 92),
+        art('motif', kit.motif, fitCentre(kit.motif.name, 1020, 448, 300, 60)),
+        dateCity(kit, 490, 720, 600, 24),
+        countdown(kit, at(810, 580, 420, 96), 28),
+        kit.pair ? art('pair', kit.pair, fitCentre(kit.pair.name, 1020, 764, 200, 110), { animation: { motion: 'float' } }) : null,
+      ],
+      true,
+    );
+    return { hero: { mobile, desktop }, card: cardFor(kit, kit.card, occ) };
+  },
+};
+
+const EMBLEM_IDS = new Set(['emblem-seal', 'emblem-ring', 'emblem']);
+
+/** A board with its emblem (and the emblem's seal) moved to the top of the stack. */
+function emblemLast(board: ArtboardInput): ArtboardInput {
+  const layers = board.layers ?? [];
+  const isEmblem = (l: LayerInput) => EMBLEM_IDS.has((l as { id: string }).id);
+  return layers.some(isEmblem) ? { ...board, layers: [...layers.filter((l) => !isEmblem(l)), ...layers.filter(isEmblem)] } : board;
+}
+
+/**
+ * The faith emblem is drawn last on every board: above all the art, and in
+ * the same place in the stack on the phone and desktop boards, so a card
+ * switching between them keeps its order (cards.ts withCardFormat).
+ */
+const emblemOnTop = (c: Composition): Composition => ({
+  ...c,
+  build(kit, occ) {
+    const built = c.build(kit, occ);
+    if (!kit.emblem) return built;
+    const { mobile, desktop } = built.hero;
+    return { ...built, hero: { ...built.hero, ...(mobile ? { mobile: emblemLast(mobile) } : {}), ...(desktop ? { desktop: emblemLast(desktop) } : {}) } };
+  },
+});
+
+const ALL = { arch, jharokha, couple, split, night, floral, temple, portrait, party, dream, home, minimal, mandap, photo: photoFirst, mehrab, darbar, lancet } satisfies Record<string, Composition>;
+export const COMPOSITIONS = Object.fromEntries(Object.entries(ALL).map(([k, c]) => [k, emblemOnTop(c)])) as typeof ALL;
 export type CompositionKey = keyof typeof COMPOSITIONS;
 
 /** One line about what each composition shows, for template descriptions. */
@@ -985,6 +1256,9 @@ export const COMPOSITION_BLURB: Record<CompositionKey, (k: Kit) => string> = {
   minimal: (k) => `a fine double rule, your names large in script and the date spaced out${k.hero ? `, ${describe(k.hero)} at the foot` : ''}`,
   mandap: (k) => `${describe(k.hero ?? { name: 'coupleHindu' })} standing before ${sceneWords[k.scene ?? 'mandap'] ?? 'an illustrated scene'}`,
   photo: (k) => `a large photo of you (${describe(k.hero ?? k.pair ?? { name: 'doves' })} until you add one) over a scalloped panel with the details`,
+  mehrab: (k) => `your photo in a carved jaali mehrab, ${describe(k.pair ?? { name: 'fanoos' })} glowing either side, ${describe(k.skyline ?? { name: 'domes' })} below`,
+  darbar: (k) => `the Darbar Sahib golden on its sarovar, your names in foil above${k.top ? `, ${describe(k.top)} along the top` : ''}`,
+  lancet: (k) => `your photo in a stained-glass church window, ${describe(k.corner ?? { name: 'lilies' })} at its foot, your names in script`,
 };
 
 const sceneWords: Partial<Record<string, string>> = {
@@ -1052,6 +1326,15 @@ const WORDS: Partial<Record<string, string>> = {
   rings: 'wedding rings',
   giftBox: 'presents',
   brideBust: 'the bride',
+  girih: 'a girih star rosette',
+  jaaliArch: 'a carved jaali mehrab',
+  fanoos: 'fanoos lanterns',
+  goldenTemple: 'the Darbar Sahib on its sarovar',
+  phulkariBagh: 'a phulkari medallion',
+  lancetWindow: 'a stained-glass window',
+  lilies: 'Madonna lilies',
+  weddingBells: 'wedding bells',
+  phulkari: 'a phulkari border',
 };
 
 export const describe = (a: Art) => WORDS[a.name] ?? a.name.replace(/([A-Z])/g, ' $1').toLowerCase();

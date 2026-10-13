@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Translator } from '@bulava/localization';
 import { CARD_TIME_ZONE, type Artboard, type CardDesign, type RenderContext, type Theme } from '@bulava/template-schema';
 import { themeStyle } from '../theme';
+import { WatermarkVeil } from '../veil';
 import { CanvasArtboard, type ArtboardMode } from './artboard';
 
 /** Cards style only their own layers: the theme's page-wide choices stay neutral. */
@@ -13,9 +14,10 @@ export function watermarkBandHeight(board: Pick<Artboard, 'width' | 'height'>): 
 }
 
 /**
- * The free card's mark: a band across the bottom with the site's name, part
- * of the card itself (the exported image is rendered with it), sized to the
- * card so it reads the same on every format.
+ * The free card's mark: the site's address tiled across the whole card
+ * (`WatermarkVeil`) and a band across the bottom with the site's name, both
+ * part of the card itself (the exported image is rendered with them), sized
+ * to the card so they read the same on every format.
  */
 function WatermarkBand({ board, text }: { board: Artboard; text: string }) {
   const u = (n: number) => `${((n / board.width) * 100).toFixed(4)}cqw`;
@@ -32,7 +34,8 @@ function WatermarkBand({ board, text }: { board: Artboard; text: string }) {
         right: 0,
         bottom: 0,
         height: u(band),
-        zIndex: 5,
+        // Above the tiled address, which stops at the band.
+        zIndex: 50,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -65,8 +68,10 @@ export interface CardViewProps {
   t: Translator;
   /** Static by default: no entrances or loops, long text still shrinks to fit. */
   mode?: ArtboardMode;
-  /** The free card's watermark text; absent for paid and plan downloads. */
+  /** The free card's watermark text (the band); absent for paid and plan downloads. */
   watermark?: string | null;
+  /** The address tiled across a free card; by default the band's text after its last "·" ("Made with Bulava · bulava.in"). */
+  veil?: string | null;
   omit?: ReadonlySet<string>;
   className?: string;
   style?: CSSProperties;
@@ -77,8 +82,9 @@ export interface CardViewProps {
  * watermark when it has one. The editor, the download preview and the export
  * renderer all draw cards with this, so what is downloaded is what was seen.
  */
-export function CardView({ design, board, ctx, t, mode = 'edit', watermark, omit, className, style }: CardViewProps) {
+export function CardView({ design, board, ctx, t, mode = 'edit', watermark, veil, omit, className, style }: CardViewProps) {
   const shown = board ?? design.board;
+  const address = watermark ? (veil ?? watermark.split('·').pop()?.trim() ?? watermark) : null;
   return (
     <div lang={design.language} className={['bulava-template', className].filter(Boolean).join(' ')} style={{ ...themeStyle({ ...CARD_THEME, colors: design.colors }, design.colors, design.fonts), width: '100%', backgroundColor: 'transparent', ...style }}>
       <CanvasArtboard
@@ -91,7 +97,14 @@ export function CardView({ design, board, ctx, t, mode = 'edit', watermark, omit
         timeZone={CARD_TIME_ZONE}
         mode={mode}
         omit={omit}
-        overlay={watermark ? <WatermarkBand board={shown} text={watermark} /> : undefined}
+        overlay={
+          watermark ? (
+            <>
+              <WatermarkVeil text={address ?? watermark} tile="38cqw" firm />
+              <WatermarkBand board={shown} text={watermark} />
+            </>
+          ) : undefined
+        }
       />
     </div>
   );

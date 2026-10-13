@@ -4,7 +4,7 @@ import { Play } from 'lucide-react';
 import { useMemo } from 'react';
 import { createTranslator } from '@bulava/localization';
 import { CanvasArtboard, fillStyle, TemplateRenderer, TemplateStyles, TemplateThumbnail, themeStyle } from '@bulava/template-engine';
-import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
+import { templateSampleContext, type TemplateDefinition } from '@bulava/template-schema';
 
 /*
  * Templates drawn live, for those without a pre-rendered preview image yet
@@ -15,7 +15,7 @@ import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-s
 
 /** The hero phone's invitation: the full preview, which HeroStage scrolls. */
 export function LiveScreen({ definition, eventType }: { definition: TemplateDefinition; eventType: string }) {
-  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType }), [eventType]);
+  const ctx = useMemo(() => templateSampleContext(definition, { typeKey: eventType }), [definition, eventType]);
   return <TemplateRenderer definition={definition} context={ctx} mode="preview" language="en" />;
 }
 
@@ -25,7 +25,7 @@ export function LiveScreen({ definition, eventType }: { definition: TemplateDefi
  * size is given.
  */
 export function FilmPosterView({ definition, eventType, tags, width, height, label }: { definition: TemplateDefinition; eventType: string; tags?: readonly string[]; width?: number; height?: number; label: string }) {
-  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, tags }), [eventType, tags]);
+  const ctx = useMemo(() => templateSampleContext(definition, { typeKey: eventType, tags }), [definition, eventType, tags]);
   const t = useMemo(() => createTranslator('en'), []);
   const board = definition.scenes?.find((s) => s.canvas)?.canvas?.board;
   // What films leave out: the website's buttons and live countdown.
@@ -62,7 +62,7 @@ export function LiveThumbnailView({
   height: number;
   sections: number;
 }) {
-  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, noPhotos: true, tags }), [eventType, tags]);
+  const ctx = useMemo(() => templateSampleContext(definition, { typeKey: eventType, noPhotos: true, tags }), [definition, eventType, tags]);
   return (
     <>
       <TemplateStyles />

@@ -1,4 +1,5 @@
 export * from './definition';
+export * from './faith';
 export * from './canvas';
 export * from './canvas-custom';
 export * from './film-custom';
@@ -8,7 +9,7 @@ export * from './bindings';
 export * from './validate';
 export * from './checks';
 export * from './sample-presets';
-export * from './sample-images';
+export * from './sample-photos';
 export * from './contrast';
 export * from './fonts';
 export * from './cards';

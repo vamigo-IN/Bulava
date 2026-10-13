@@ -19,6 +19,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'heritage',
+    suite: 'rangoli',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -40,7 +41,7 @@ export const HOME_THEMES: Theme[] = [
       card: 'garland',
     },
     layouts: [
-      L('home', 'Shanti', undefined, 'STANDARD', true),
+      L('home', 'Shanti', undefined, 'PREMIUM', true),
       L('home', 'Kalash', { hero: { name: 'kalash' } }),
       L('couple', 'Ghar'),
       L('arch', 'Dwar'),
@@ -64,6 +65,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'floral',
     effect: 'petals',
     kit: {
       dark: false,
@@ -95,6 +97,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'modern',
     look: 'modern',
+    suite: 'geometric',
     effect: 'confetti',
     kit: {
       dark: false,
@@ -127,6 +130,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'heritage',
+    suite: 'temple',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -149,7 +153,7 @@ export const HOME_THEMES: Theme[] = [
       card: 'framed',
     },
     layouts: [
-      L('home', 'Thali', undefined, 'STANDARD', true),
+      L('home', 'Thali', undefined, 'PREMIUM', true),
       L('temple', 'Ghanti', { pair: { name: 'bananaLeaf', tint: '#3d7f3e' } }),
       L('mandap', 'Mandir'),
       L('night', 'Sandhya', { hero: undefined }),
@@ -172,6 +176,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'lotus',
     effect: 'marigold',
     kit: {
       dark: false,
@@ -206,6 +211,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'kasavu',
     effect: 'marigold',
     intro: 'doors',
     kit: {
@@ -248,6 +254,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'grand',
     look: 'royal',
+    suite: 'rangoli',
     effect: 'lanterns',
     intro: 'lanterns',
     kit: {
@@ -267,7 +274,7 @@ export const HOME_THEMES: Theme[] = [
       sky: { name: 'stars', tint: 'accent' },
       card: 'framed',
     },
-    layouts: [L('night', 'Raat', { hero: undefined }, 'STANDARD', true), L('home', 'Deep'), L('arch', 'Rangoli'), L('photo', 'Milan'), L('minimal', 'Diya'), L('split', 'Phuljhadi')],
+    layouts: [L('night', 'Raat', { hero: undefined }, 'PREMIUM', true), L('home', 'Deep'), L('arch', 'Rangoli'), L('photo', 'Milan'), L('minimal', 'Diya'), L('split', 'Phuljhadi')],
   },
   {
     key: 'chand',
@@ -283,6 +290,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'elegant',
     look: 'royal',
+    suite: 'jaali',
     effect: 'lanterns',
     intro: 'lanterns',
     kit: {
@@ -303,7 +311,7 @@ export const HOME_THEMES: Theme[] = [
       sky: { name: 'stars', tint: 'accent' },
       card: 'framed',
     },
-    layouts: [L('night', 'Raat', { hero: undefined }, 'STANDARD', true), L('arch', 'Mubarak'), L('mandap', 'Mehrab'), L('photo', 'Daawat'), L('minimal', 'Noor')],
+    layouts: [L('night', 'Raat', { hero: undefined }, 'PREMIUM', true), L('arch', 'Mubarak'), L('mandap', 'Mehrab'), L('photo', 'Daawat'), L('minimal', 'Noor')],
   },
   {
     key: 'gulal',
@@ -319,6 +327,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'confetti',
     effect: 'confetti',
     intro: 'petals',
     kit: {
@@ -352,6 +361,8 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'classic',
     look: 'celebration',
+    suite: 'stars',
+    dress: { seal: 'roseWindow', frame: 'lancet' },
     effect: 'snow',
     intro: 'envelope',
     kit: {
@@ -386,6 +397,7 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'desi',
     look: 'celebration',
+    suite: 'paisley',
     effect: 'marigold',
     kit: {
       dark: false,
@@ -403,7 +415,7 @@ export const HOME_THEMES: Theme[] = [
       motif: { name: 'flourish' },
       card: 'garland',
     },
-    layouts: [L('split', 'Garba', undefined, 'STANDARD', true), L('home', 'Aarti', { hero: { name: 'kalash' } }), L('couple', 'Dandiya'), L('photo', 'Raas'), L('minimal', 'Shakti')],
+    layouts: [L('split', 'Garba', undefined, 'PREMIUM', true), L('home', 'Aarti', { hero: { name: 'kalash' } }), L('couple', 'Dandiya'), L('photo', 'Raas'), L('minimal', 'Shakti')],
   },
   {
     key: 'pongal',
@@ -419,6 +431,8 @@ export const HOME_THEMES: Theme[] = [
     ],
     fonts: 'heritage',
     look: 'heritage',
+    suite: 'kasavu',
+    dress: { seal: 'kolam', edge: 'templeBorder' },
     effect: 'marigold',
     kit: {
       dark: false,

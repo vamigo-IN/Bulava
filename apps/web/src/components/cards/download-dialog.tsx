@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, Crown, Download, FileText, LoaderCircle, Lock, Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Check, Crown, Download, LoaderCircle, Lock, Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { CardView } from '@bulava/template-engine';
@@ -13,6 +13,7 @@ import { cardApi, formatRupees, rememberOrder, startDownload, unlockHref, type C
 import { runCheckout } from '@/lib/checkout';
 import { cn } from '@/lib/utils';
 import type { CardEditorApi } from './editor-types';
+import { FileChoice } from './file-choice';
 import { OrderStatus } from './order-status';
 
 type Option = 'FREE' | 'PLAN';
@@ -35,8 +36,10 @@ const ACCENT = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-vis
  * whose plan includes watermark-free cards (ADR-071) sees how many are left and
  * downloads with one click, nothing to fill in; with none left, or none in the
  * plan, the price per card and the plan that unlocks more are offered. Every
- * card is saved as an image or a PDF. Closing the dialog never touches the
- * design; reopening it after paying goes straight to the bought card.
+ * card is saved as a PNG or a JPEG, and a watermark-free one also as a PDF
+ * (the free card's PDF button offers the watermark-free card). Closing the
+ * dialog never touches the design; reopening it after paying goes straight to
+ * the bought card.
  */
 export function DownloadDialog({
   editor,
@@ -79,8 +82,6 @@ export function DownloadDialog({
   const [problem, setProblem] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const price = formatRupees(config?.priceMinor ?? 5000);
-  // A plan download saves itself once, when its image is ready.
-  const autoSaved = useRef(false);
 
   useEffect(() => {
     void cardApi.event({ type: 'DOWNLOAD_MODAL_OPENED', templateKey: template.key, ...(sessionToken ? { session: sessionToken } : {}), meta: { format: design.format } });
@@ -167,22 +168,20 @@ export function DownloadDialog({
       }
     });
 
-  const saveFile = (card: CardExportView, as: CardFileType) => {
+  const saveFile = (card: CardExportView, as: CardFileType, option: Option, after?: CardAllowance) => {
     setSaving(as);
     return run(async () => {
       const token = await ensureSession();
-      const { url } = await cardApi.exportDownload(token, card.id, as);
-      startDownload(url);
+      try {
+        const { url } = await cardApi.exportDownload(token, card.id, as);
+        startDownload(url);
+      } catch (error) {
+        // A card made before PNGs were saved is being made again (no charge): wait for it, then choose again.
+        if (!(error instanceof ApiError && error.code === 'CARD_NOT_READY')) throw error;
+        setStep({ kind: 'making', option, exportId: card.id, allowance: after });
+      }
     }).finally(() => setSaving(null));
   };
-
-  // A plan download saves the image the moment it is ready (the customer asked for it with one click).
-  useEffect(() => {
-    if (step.kind !== 'ready' || step.option !== 'PLAN' || autoSaved.current) return;
-    autoSaved.current = true;
-    void saveFile(step.card, 'image');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
 
   const pay = (e: FormEvent) => {
     e.preventDefault();
@@ -455,7 +454,7 @@ export function DownloadDialog({
           <h2 id="download-title" className="font-display text-2xl text-ink sm:text-3xl">
             {t('cards.download.readyTitle')}
           </h2>
-          <p className="text-sm text-stone-600">{step.option === 'FREE' ? t('cards.download.readyFree') : t('cards.download.readyPlanSaved')}</p>
+          <p className="text-sm text-stone-600">{step.option === 'FREE' ? t('cards.download.readyFree') : t('cards.download.readyPlan')}</p>
           {preview(step.option === 'FREE', 'mx-auto w-40')}
           {step.option === 'PLAN' && step.allowance ? (
             <p className="flex items-center justify-center gap-1.5 text-sm text-stone-600">
@@ -463,15 +462,17 @@ export function DownloadDialog({
             </p>
           ) : null}
           {problem ? <Problem text={problem} /> : null}
-          <div className="grid gap-2 sm:grid-cols-[1.4fr_1fr]">
-            <button type="button" disabled={working} onClick={() => void saveFile(step.card, 'image')} className={cn('btn-3d min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60', ACCENT)}>
-              {saving === 'image' ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <Download aria-hidden className="size-5" />} {t('cards.download.save', { width: step.card.width, height: step.card.height })}
-            </button>
-            <button type="button" disabled={working} onClick={() => void saveFile(step.card, 'pdf')} className={cn('btn-3d btn-3d-light min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60', ACCENT)}>
-              {saving === 'pdf' ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <FileText aria-hidden className="size-5" />} {t('cards.download.savePdf')}
-            </button>
-          </div>
-          <p className="text-xs text-stone-500">{t('cards.download.fileHint')}</p>
+          <p className="text-sm font-semibold text-ink">{t('cards.file.choose')}</p>
+          <FileChoice
+            t={t}
+            saving={saving}
+            disabled={working}
+            pdfLocked={step.option === 'FREE'}
+            lockedLabel={t('cards.file.pdfWithCard', { price })}
+            onLocked={config?.paymentsReady ? choosePaid : undefined}
+            onSave={(as) => void saveFile(step.card, as, step.option, step.allowance)}
+          />
+          <p className="text-xs text-stone-500">{t('cards.file.hint', { width: step.card.width, height: step.card.height })}</p>
           {step.option === 'FREE' && planReady && allowance ? (
             // Cards left on the plan: the clean card costs nothing, so that is the offer (not the price per card).
             <div className="rounded-2xl bg-gradient-to-br from-gold-100/70 to-surface p-4 text-left shadow-clay-sm">

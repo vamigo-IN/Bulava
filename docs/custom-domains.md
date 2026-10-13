@@ -1,6 +1,6 @@
 # Custom domains
 
-A host on the Premium or Studio plan can serve one event from their own domain, for example `amanweddsriya.com`. The domain opens the event's page, and new guest links (invitations, photo-album QR codes) use it. The plan feature is `domain.custom`. Each event can have one domain, and each domain can serve only one event at a time.
+A host on the Premium or Studio plan can serve one event from their own domain, for example `kabirwedsananya.com`. The domain opens the event's page, and new guest links (invitations, photo-album QR codes) use it. The plan feature is `domain.custom`. Each event can have one domain, and each domain can serve only one event at a time.
 
 ## Availability
 
@@ -111,5 +111,5 @@ The API reads these for on-demand checks and the worker reads them for the perio
 
 - `apps/api/test/domains.e2e-spec.ts` replaces the DNS resolver and the certificate provider (`DNS_RESOLVER`, `HOSTNAME_PROVIDER`). It covers plan gating, hostname rules, the three checks, guest links and posting from the domain, squatting, takeover refusal, a lapsed domain changing hands, the worker's switch-off and removal.
 - `packages/domains` unit tests cover hostname normalisation and the Cloudflare client.
-- **In the browser**, map a test hostname to the dev server with Chrome's `--host-resolver-rules="MAP riya-aman.in [::1]"` and mark its row ACTIVE in the database.
+- **In the browser**, map a test hostname to the dev server with Chrome's `--host-resolver-rules="MAP ananya-kabir.in [::1]"` and mark its row ACTIVE in the database.
 - **Dev-only redirect quirk:** Next.js turns redirects whose origin equals its own (`http://localhost:3000`) into relative redirects. Redirects from a customer domain to the main site then loop in development. To test that path, build the web app with a distinct origin (for example `WEB_ORIGIN=http://bulava.local:3000` plus a host-resolver rule for `bulava.local`). Production is unaffected, because the main site and customer domains never share an origin.

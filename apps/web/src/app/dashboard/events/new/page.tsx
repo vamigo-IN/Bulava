@@ -22,7 +22,8 @@ import { Alert, Field, Input, Spinner } from '@/components/ui/primitives';
 
 const STEPS = ['create.step.occasion', 'create.step.details'] as const;
 type Names = { partnerOne: string; partnerTwo: string; name: string; partnerOneFather: string; partnerOneMother: string; partnerTwoFather: string; partnerTwoMother: string };
-const PARENTS = ['partnerOneFather', 'partnerOneMother', 'partnerTwoFather', 'partnerTwoMother'] as const;
+/** The mother first, as Hindu invitations name parents (the invitation orders them by the design's tradition, ADR-068). */
+const PARENTS = ['partnerOneMother', 'partnerOneFather', 'partnerTwoMother', 'partnerTwoFather'] as const;
 
 export default function NewEventPage() {
   return (

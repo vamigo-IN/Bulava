@@ -23,7 +23,7 @@ interface PublishedPreview {
 interface PreviewView {
   published?: undefined;
   event: { id: string; title: string; slug: string; typeKey: string; language: string; timezone: string; status: string; accessMode: string };
-  template: { key: string; name: string; tier: 'FREE' | 'STANDARD' | 'PREMIUM'; definition: TemplateDefinition; customization: Customization | null };
+  template: { key: string; name: string; tier: 'FREE' | 'PREMIUM' | 'SIGNATURE'; definition: TemplateDefinition; customization: Customization | null };
   context: RenderContext;
   watermark: boolean;
   /** The free plan's mark across the whole invitation (ADR-067), and the sections the plan or the host leave out. */

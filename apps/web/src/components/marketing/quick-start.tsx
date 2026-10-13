@@ -206,10 +206,10 @@ export function QuickStartModal({ template, open, onClose }: { template: Templat
             {schema === 'couple' ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label={t('quick.partnerOne')}>
-                  {(p) => <Input {...p} required autoComplete="off" value={details.partnerOne ?? ''} onChange={(e) => setDetails({ ...details, partnerOne: e.target.value })} placeholder="Riya" />}
+                  {(p) => <Input {...p} required autoComplete="off" value={details.partnerOne ?? ''} onChange={(e) => setDetails({ ...details, partnerOne: e.target.value })} placeholder="Ananya" />}
                 </Field>
                 <Field label={t('quick.partnerTwo')}>
-                  {(p) => <Input {...p} required autoComplete="off" value={details.partnerTwo ?? ''} onChange={(e) => setDetails({ ...details, partnerTwo: e.target.value })} placeholder="Aman" />}
+                  {(p) => <Input {...p} required autoComplete="off" value={details.partnerTwo ?? ''} onChange={(e) => setDetails({ ...details, partnerTwo: e.target.value })} placeholder="Kabir" />}
                 </Field>
               </div>
             ) : schema === 'honoree' ? (

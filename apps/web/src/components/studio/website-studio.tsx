@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { sampleRenderContext, type Customization, type TemplateDefinition } from '@bulava/template-schema';
+import { templateSampleContext, type Customization, type TemplateDefinition } from '@bulava/template-schema';
 import { CanvasDesigner } from '@/components/design/canvas-designer';
 import { readStudioDraft, writeStudioDraft } from '@/lib/design-drafts';
 import { I18nProvider, useT } from '@/lib/i18n';
@@ -35,7 +35,7 @@ function WebsiteStudioEditor({ template, eventType }: { template: StudioTemplate
   const router = useRouter();
   const [custom, setCustom] = useState<Customization>({});
   const [ready, setReady] = useState(false);
-  const context = useMemo(() => sampleRenderContext({ typeKey: eventType, language: 'en', tags: template.tags }), [eventType, template.tags]);
+  const context = useMemo(() => templateSampleContext(template.definition, { typeKey: eventType, language: 'en', tags: template.tags }), [eventType, template.definition, template.tags]);
 
   useEffect(() => {
     const draft = readStudioDraft('website', template.key);

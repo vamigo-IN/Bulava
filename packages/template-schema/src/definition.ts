@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, SCENE_NAMES, ValueSchema } from './base';
+import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, SCENE_NAMES, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, ValueSchema } from './base';
 import { ArtboardSchema, CanvasSectionSchema } from './canvas';
+import { FAITHS } from './faith';
 
-export { ConditionSchema, DARK_SCENE_NAMES, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, SCENE_NAMES, VALUE_FORMATS, ValueSchema, type SceneNameValue } from './base';
+export { ConditionSchema, DARK_SCENE_NAMES, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, SCENE_NAMES, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, VALUE_FORMATS, ValueSchema, type OrnamentNameValue, type SceneNameValue } from './base';
+export type { SuiteCorner, SuiteDivider, SuiteEdge, SuiteFrame, SuiteSeal, SuiteSkyline } from './base';
 export type { Condition, EffectName, FontFamily, Value } from './base';
 
 /**
@@ -51,11 +53,26 @@ export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch'] as const;
 export type IntroName = (typeof INTROS)[number];
 
+/** A suite's pieces a theme swaps (base.ts SUITE_*): no defaults, so an omitted piece stays the suite's own. */
+export const ThemeDressSchema = z
+  .object({
+    frame: z.enum(SUITE_FRAMES).optional(),
+    edge: z.enum(SUITE_EDGES).optional(),
+    seal: z.enum(SUITE_SEALS).optional(),
+    skyline: z.enum(SUITE_SKYLINES).optional(),
+    corner: z.enum(SUITE_CORNERS).optional(),
+    divider: z.enum(SUITE_DIVIDERS).optional(),
+  })
+  .strict();
+export type ThemeDress = z.infer<typeof ThemeDressSchema>;
+
 export const ThemeSchema = z.object({
   colors: ThemeColorsSchema,
   radius: z.number().int().min(0).max(48).default(16),
-  /** Decorative motif rendered by the engine (no external asset needed). */
+  /** Decorative motif rendered by the engine (no external asset needed), and the suite every section below the hero is dressed in. */
   ornament: z.enum(ORNAMENTS).default('none'),
+  /** Pieces of the suite swapped for others (docs/templates.md#section-suites); unset pieces are the suite's own. */
+  dress: ThemeDressSchema.optional(),
   /** Optional background pattern. */
   pattern: z.enum(PATTERNS).default('none'),
   /** dark = hero on the primary colour with gold/champagne type (luxury look). */
@@ -64,6 +81,14 @@ export const ThemeSchema = z.object({
   look: z.enum(LOOKS).default('classic'),
   /** Default ambient effect (customers may change it when animation is editable). */
   effect: z.enum(EFFECTS).default('none'),
+  /**
+   * The tradition the design belongs to, when it is clearly one family's (a
+   * nikah under a mihrab, an Anand Karaj, a church wedding, Hindu rituals):
+   * previews show names of that tradition and the hero wears its emblem
+   * (the hero's `emblem` prop, or an emblem layer on a canvas). Unset for designs
+   * that suit every family.
+   */
+  faith: z.enum(FAITHS).optional(),
 });
 export type Theme = z.infer<typeof ThemeSchema>;
 

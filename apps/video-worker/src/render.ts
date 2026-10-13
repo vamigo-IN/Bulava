@@ -149,6 +149,8 @@ export async function renderVideoJob(deps: RenderDeps, videoJobId: string, attem
       photoSlots,
       assets,
       custom: input.customization?.custom ?? {},
+      // The parents' names in the film's tradition's order (ADR-068).
+      faith: definition.theme.faith ?? null,
     });
 
     const inputProps: TemplateVideoProps = {

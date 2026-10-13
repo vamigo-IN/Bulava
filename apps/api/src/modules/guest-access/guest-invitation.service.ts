@@ -421,6 +421,7 @@ export class GuestInvitationService {
       photoSlots,
       language,
       music,
+      faith: template?.definition.theme.faith ?? null,
     });
     return {
       event: {

@@ -9,6 +9,8 @@ import { BabyCradle, BrideBust, GroomBust, KidBoy, KidGirl, MomToBe } from './il
 import { BotanicalWreath, DecoFrame, GoldVine, HairlineFrame, MandalaCrown, MandalaHalf, Sparkles } from './illustrations-heirloom';
 import { Champagne, Cupcake, Dhol, Dino, Doli, HaldiBowl, Rocket, Stork, TeddyBear, Unicorn } from './illustrations-props';
 import { Alpana, Ghungroo, Kuthuvilakku, LaalPaar, MarigoldSwag, MarigoldWreath, Mihrab, Phulkari, Prabhavali, ZariBand } from './illustrations-regional';
+import { CrescentStar, Cross, Ganesha, Khanda } from './illustrations-faith';
+import { Fanoos, GirihRosette, GoldenTemple, JaaliArch, LancetWindow, Lilies, PhulkariBagh, WeddingBells } from './illustrations-sacred';
 
 export type { IllustrationProps } from './kit';
 export { foilCss, metalStops } from './kit';
@@ -88,6 +90,18 @@ const COMPONENTS: Record<IllustrationName, (props: IllustrationProps) => ReactNo
   laalPaar: LaalPaar,
   marigoldWreath: MarigoldWreath,
   ghungroo: Ghungroo,
+  ganesha: Ganesha,
+  crescentStar: CrescentStar,
+  khanda: Khanda,
+  cross: Cross,
+  girih: GirihRosette,
+  jaaliArch: JaaliArch,
+  fanoos: Fanoos,
+  goldenTemple: GoldenTemple,
+  phulkariBagh: PhulkariBagh,
+  lancetWindow: LancetWindow,
+  lilies: Lilies,
+  weddingBells: WeddingBells,
 };
 
 /** Drawn to the layer's own size (frames, garlands, strings); the others keep their proportions inside it. */
@@ -164,7 +178,21 @@ export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
   laalPaar: 390 / 56,
   marigoldWreath: 1,
   ghungroo: 0.1,
+  ganesha: 200 / 212,
+  crescentStar: 1,
+  khanda: 200 / 216,
+  cross: 160 / 200,
+  girih: 1,
+  jaaliArch: 300 / 440,
+  fanoos: 120 / 260,
+  goldenTemple: 400 / 306,
+  phulkariBagh: 1,
+  lancetWindow: 260 / 440,
+  lilies: 240 / 300,
+  weddingBells: 220 / 190,
 };
+
+export { JAALI_ARCH_OPENING, LANCET_OPENING } from './illustrations-sacred';
 
 /** Where a photo sits behind a jharokha, as fractions of the jharokha's frame (an arch mask fits it). */
 export const JHAROKHA_OPENING = { x: 0.2067, y: 0.2545, w: 0.5867, h: 0.5 } as const;

@@ -65,9 +65,17 @@ export const SECTION_VARIANTS: Readonly<Record<string, readonly string[]>> = {
     'vrindavan',
     'artwork',
   ],
-  couple: ['default', 'stacked', 'arch', 'flip', 'profile'],
-  story: ['default', 'curtain', 'polaroid'],
-  eventTimeline: ['cards', 'timeline', 'tiles', 'tickets', 'diya'],
-  gallery: ['default', 'stack', 'mosaic', 'polaroid'],
-  countdown: ['default', 'flip'],
+  couple: ['default', 'stacked', 'portraits', 'duet', 'monogram', 'flip', 'profile'],
+  family: ['default', 'blessings'],
+  parents: ['default', 'blessings'],
+  story: ['default', 'letter', 'curtain', 'polaroid'],
+  eventTimeline: ['cards', 'timeline', 'frames', 'tiles', 'tickets', 'diya'],
+  gallery: ['default', 'frames', 'stack', 'mosaic', 'polaroid'],
+  countdown: ['default', 'flip', 'rings', 'calendar'],
+  venue: ['default', 'illustrated', 'postcard'],
+  rsvp: ['default', 'card'],
+  footer: ['default', 'seal', 'skyline', 'blessing'],
 };
+
+/** The section suites (sections/suites.ts): each ornament's own pieces, for the Studio and the docs. */
+export { SUITES, suiteOf, type Suite } from './sections/suites';

@@ -881,8 +881,8 @@ enum TemplateType {
 
 enum TemplateTier {
   FREE
-  STANDARD
   PREMIUM
+  SIGNATURE
 }
 
 enum TemplateStatus {
@@ -899,7 +899,7 @@ model Template {
   description      String?
   category         String
   style            String?
-  tier             TemplateTier   @default(STANDARD)
+  tier             TemplateTier   @default(PREMIUM)
   /**
    * Marketing badge: NEW, POPULAR, BESTSELLER.
    */
@@ -1887,7 +1887,7 @@ enum DomainStatus {
 model EventDomain {
   id                String       @id @default(uuid(7)) @db.Uuid
   eventId           String       @unique @db.Uuid
-  /// Lower-case, punycode, e.g. "amanweddsriya.com". Several events may claim a
+  /// Lower-case, punycode, e.g. "kabirwedsananya.com". Several events may claim a
   /// hostname; only one claim can be verified at a time (partial unique index).
   hostname          String
   status            DomainStatus @default(PENDING)

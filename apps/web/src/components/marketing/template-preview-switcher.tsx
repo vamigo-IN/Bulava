@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { IntroOverlay, TemplateRenderer, themeStyle } from '@bulava/template-engine';
 import { createTranslator, formatEventDateWithWeekday } from '@bulava/localization';
-import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
+import { templateSampleContext, type TemplateDefinition } from '@bulava/template-schema';
 import { cn } from '@/lib/utils';
 
 /** A segmented control: a pressed-in track with the chosen segment raised as a 3D button. */
@@ -29,7 +29,7 @@ export function TemplatePreviewSwitcher({
 }) {
   const [view, setView] = useState<'mobile' | 'desktop'>('mobile');
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
-  const ctx = sampleRenderContext({ typeKey: eventType, language, tags });
+  const ctx = templateSampleContext(definition, { typeKey: eventType, language, tags });
   const isWebsite = definition.type === 'WEBSITE';
   const intro = definition.website?.intro ?? 'none';
   const [opening, setOpening] = useState<number | null>(null);
@@ -110,7 +110,7 @@ function PreviewOpening({
   definition: TemplateDefinition;
   intro: Exclude<NonNullable<TemplateDefinition['website']>['intro'], 'none'>;
   language: string;
-  ctx: ReturnType<typeof sampleRenderContext>;
+  ctx: ReturnType<typeof templateSampleContext>;
   tr: ReturnType<typeof createTranslator>;
 }) {
   const names = ctx.couple ? `${ctx.couple.partnerOne} & ${ctx.couple.partnerTwo}` : (ctx.honoree?.name ?? ctx.event.title);

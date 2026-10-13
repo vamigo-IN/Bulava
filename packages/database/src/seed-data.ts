@@ -402,7 +402,7 @@ export async function seedTemplates(
       eventTypes: meta.eventTypes,
       languages: validated.definition.languages,
       outputs: [type],
-      isPremium: meta.tier === 'PREMIUM',
+      isPremium: meta.tier === 'SIGNATURE',
       tags: meta.tags,
     };
 

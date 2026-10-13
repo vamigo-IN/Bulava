@@ -90,7 +90,7 @@ const GENERATED: Record<CardExportKind, 'FREE_CARD_GENERATED' | 'PAID_CARD_GENER
  * Renders one card image: Chromium opens the web app's /cards/render page
  * (the same CardView the editor draws, with the watermark for free cards) at
  * the format's size and pixel ratio, waits for fonts and photos, and the
- * screenshot becomes a high-quality JPEG in private storage. A paid card's
+ * screenshot becomes a high-quality JPEG and a PNG in private storage. A paid card's
  * first email is queued as soon as its image exists.
  */
 export async function renderCard(deps: CardDeps, exportId: string): Promise<'READY' | 'SKIPPED'> {
@@ -125,11 +125,15 @@ export async function renderCard(deps: CardDeps, exportId: string): Promise<'REA
     await browser?.close().catch(() => undefined);
   }
 
-  const image = await sharp(Buffer.from(png))
-    .flatten({ background: '#ffffff' })
-    .jpeg({ quality: 92, mozjpeg: true, chromaSubsampling: '4:4:4' })
-    .toBuffer({ resolveWithObject: true });
+  const flat = sharp(Buffer.from(png)).flatten({ background: '#ffffff' });
+  const [image, lossless] = await Promise.all([
+    flat.clone().jpeg({ quality: 92, mozjpeg: true, chromaSubsampling: '4:4:4' }).toBuffer({ resolveWithObject: true }),
+    // The PNG download (docs/cards.md#files): the same pixels, without JPEG's loss.
+    flat.clone().png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer(),
+  ]);
   const key = StorageKeys.cardExport(card.id);
+  // The PNG first: an export is READY only once every file it offers exists.
+  await storage.put(StorageKeys.cardExportPng(card.id), lossless, 'image/png');
   await storage.put(key, image.data, 'image/jpeg');
   await prisma.cardExport.update({
     where: { id: card.id },

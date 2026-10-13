@@ -1,6 +1,6 @@
 /**
  * Hostname rules for customer domains. Accepts what people paste
- * ("https://AmanWeddsRiya.com/", "www.amanweddsriya.com") and returns the
+ * ("https://KabirWedsAnanya.com/", "www.kabirwedsananya.com") and returns the
  * canonical lower-case, punycode form, or a reason it cannot be used.
  */
 

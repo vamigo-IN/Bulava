@@ -68,14 +68,14 @@ The web app maps codes to translation keys `error.<CODE>`.
 ## Typical host flow
 
 ```http
-POST /api/v1/auth/email/start       {"email":"riya@example.com"}
+POST /api/v1/auth/email/start       {"email":"ananya@example.com"}
                                     → { method: "code", challengeToken, target, expiresAt, resendAfter }
                                       (or { method: "password" } for an account with a password)
 POST /api/v1/auth/email/verify      {"challengeToken":"…","code":"123456"}   (signs in, or for a new address
                                     → { signupRequired: true, signupToken, target })
-POST /api/v1/auth/email/signup      {"signupToken":"…","name":"Riya","acceptTerms":true,"password":"…optional…"}
-POST /api/v1/events                 {"typeKey":"WEDDING","title":"Aman & Riya Wedding","language":"hi",
-                                     "details":{"partnerOne":"Riya","partnerTwo":"Aman"},"applyDefaults":false}
+POST /api/v1/auth/email/signup      {"signupToken":"…","name":"Ananya","acceptTerms":true,"password":"…optional…"}
+POST /api/v1/events                 {"typeKey":"WEDDING","title":"Ananya & Kabir Wedding","language":"hi",
+                                     "details":{"partnerOne":"Ananya","partnerTwo":"Kabir"},"applyDefaults":false}
 POST /api/v1/events/:id/groups      {"name":"Friends"}
 POST /api/v1/events/:id/functions   {"name":"Sangeet","startsAt":"2026-12-14T19:00:00+05:30",
                                      "accessMode":"GROUP_RESTRICTED","audienceGroupIds":["<friends>"]}
@@ -91,7 +91,7 @@ Invitation responses include `url` (`${WEB_ORIGIN}/invite/<token>`). Creating an
 ## Quick start (preview before paying)
 
 ```http
-POST /api/v1/public/quick-start      {"templateKey":"rose-arch-card","details":{"partnerOne":"Riya","partnerTwo":"Aman"},
+POST /api/v1/public/quick-start      {"templateKey":"rose-arch-card","details":{"partnerOne":"Ananya","partnerTwo":"Kabir"},
                                       "date":"2026-12-14","phone":"98765 43210","acceptTerms":true,"whatsappUpdates":false}
 → 200 { user, event: { id, previewToken, previewUrl }, whatsappSent }   (sets the session cookies)
 → 200 { requiresOtp: true, target: "+91•••••3210" }                     (the number already has an account)
@@ -103,13 +103,13 @@ POST /api/v1/auth/phone/otp          {"phone":"98765 43210"}            → { se
 POST /api/v1/auth/phone/status       {"sendId":"…"}                     → { delivery: sending | sent | delivered | read | failed | unknown }
 POST /api/v1/auth/phone/verify       {"phone":"98765 43210","code":"123456"}  (a session, mfaRequired / restoreRequired,
                                                                           or { signupRequired, signupToken } for a new number)
-POST /api/v1/auth/phone/signup       {"signupToken":"…","name":"Riya","acceptTerms":true,"whatsappUpdates":false}
+POST /api/v1/auth/phone/signup       {"signupToken":"…","name":"Ananya","acceptTerms":true,"whatsappUpdates":false}
 POST /api/v1/users/me/phone/code     → { sent, target, sendId, resendAfter }   (signed in: confirm the account's number)
 POST /api/v1/users/me/phone/confirm  {"code":"123456"}
-POST /api/v1/auth/claim              {"email":"riya@example.com","password":"…optional…"}  (signed in; an account without an email)
+POST /api/v1/auth/claim              {"email":"ananya@example.com","password":"…optional…"}  (signed in; an account without an email)
                                      → { verificationRequired: true, challengeToken, … }
 POST /api/v1/auth/claim/verify       {"challengeToken":"…","code":"123456"}   (adds the confirmed email, and the password if given)
-PATCH /api/v1/users/me               {"name":"Riya","phone":"98765 43210","whatsappUpdates":true}
+PATCH /api/v1/users/me               {"name":"Ananya","phone":"98765 43210","whatsappUpdates":true}
 ```
 
 A draft may select any template (`PUT /events/:id/design/website`): the preview shows a watermark when the plan does not cover it. Publishing (`PATCH /events/:id {"status":"ACTIVE"}`) is where the plan is checked (`402 PLAN_UPGRADE_REQUIRED`) and where a provisional account is refused (`403 ACCOUNT_UNVERIFIED`), as are orders, sending invitations and adding team members. See [authentication.md](authentication.md#quick-start-whatsapp-codes-and-provisional-accounts).
@@ -151,7 +151,7 @@ The GET returns the event shell, the guest's name, and only the functions the gu
 
 ## Digital cards
 
-The public card editor's routes (no account; the card's token in `x-card-session`, an order's in `x-card-order`), the plan download (as many card designs as the plan includes, `cards.included`) and the console's routes are in [cards.md](cards.md#api). Every card download (`POST /public/cards/session/exports/:id/download`, `POST /public/cards/order/download`) takes `{ "as": "pdf" }` for a one-page PDF of the image instead of the image.
+The public card editor's routes (no account; the card's token in `x-card-session`, an order's in `x-card-order`), the plan download (as many card designs as the plan includes, `cards.included`) and the console's routes are in [cards.md](cards.md#api). Every card download (`POST /public/cards/session/exports/:id/download`, `POST /public/cards/order/download`) takes `{ "as": "png" | "jpeg" | "pdf" }` (a JPEG when nothing is asked); a PDF comes only with a watermark-free card (`CARD_PDF_LOCKED` for the free one).
 
 ## Added in this release
 

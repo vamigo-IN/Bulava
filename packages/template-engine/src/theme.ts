@@ -80,6 +80,11 @@ export function themeStyle(theme: Theme, colors: ThemeColors, fonts: Fonts): CSS
   const onBand = (c: string, band: string) => ensureContrast(c, [band, mix(band, '#ffffff', 0.1)], AA_TEXT);
   const bp = colors.primary;
   const ba = colors.accent;
+  // Dark stock (heroTone "dark"): sections alternate the primary band with a deeper shade of it.
+  const bd = deepOf(colors);
+  // A light reply card that keeps its own inks on any band (the RSVP form inside it is the host's).
+  const card = lightest([colors.background, colors.surface, colors.text]);
+  const onCard = (c: string) => ensureContrast(c, [card], AA_TEXT);
   return {
     ['--t-primary' as string]: colors.primary,
     ['--t-secondary' as string]: colors.secondary,
@@ -120,6 +125,24 @@ export function themeStyle(theme: Theme, colors: ThemeColors, fonts: Fonts): CSS
     ['--ba-accent-ink' as string]: onBand(colors.primary, ba),
     ['--ba-button' as string]: colors.primary,
     ['--ba-on-button' as string]: onFill(colors.primary, [colors.background, colors.text, colors.surface]),
+    // Deep band (dark stock).
+    ['--t-deep' as string]: bd,
+    ['--bd-text' as string]: onBand(contrastRatio(colors.text, bd) > contrastRatio(colors.background, bd) ? colors.text : colors.background, bd),
+    ['--bd-muted' as string]: onBand(mix(colors.background, bd, 0.25), bd),
+    ['--bd-accent-ink' as string]: onBand(colors.accent, bd),
+    ['--bd-button' as string]: colors.accent,
+    ['--bd-on-button' as string]: ensureContrast(bd, [colors.accent], AA_TEXT),
+    // Ornaments (borders, glyphs, line art) on the paper; bands swap in a colour that shows on them.
+    ['--t-orn' as string]: colors.secondary,
+    // The reply card.
+    ['--rc-bg' as string]: card,
+    ['--rc-text' as string]: onCard(contrastRatio(colors.text, card) >= contrastRatio(colors.background, card) ? colors.text : colors.background),
+    ['--rc-muted' as string]: onCard(colors.muted),
+    ['--rc-primary-ink' as string]: onCard(colors.primary),
+    ['--rc-secondary-ink' as string]: onCard(colors.secondary),
+    ['--rc-accent-ink' as string]: onCard(colors.accent),
+    ['--rc-button' as string]: colors.primary,
+    ['--rc-on-button' as string]: onFill(colors.primary, [colors.background, colors.text, colors.surface]),
     // Noir: gold buttons and glass cards (set here, because inline variables win over classes).
     ...(theme.look === 'noir'
       ? {
@@ -128,6 +151,7 @@ export function themeStyle(theme: Theme, colors: ThemeColors, fonts: Fonts): CSS
           ['--t-card' as string]: 'rgb(255 255 255 / 0.05)',
           ['--t-card-alt' as string]: 'rgb(255 255 255 / 0.08)',
           ['--t-line' as string]: `${colors.accent}4d`,
+          ['--t-orn' as string]: colors.accent,
         }
       : {}),
     ['--t-radius' as string]: `${theme.radius}px`,
@@ -138,6 +162,24 @@ export function themeStyle(theme: Theme, colors: ThemeColors, fonts: Fonts): CSS
     color: text,
     fontFamily: 'var(--t-body)',
   };
+}
+
+/** The deep band of a dark-stock design: the primary colour taken a third of the way to black. */
+export function deepOf(colors: ThemeColors): string {
+  return mix(colors.primary, '#000000', 0.34);
+}
+
+/** The lightest of some colours (relative luminance). */
+function lightest(list: string[]): string {
+  const lum = (hex: string) => {
+    const n = Number.parseInt(hex.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  return list.reduce((a, b) => (lum(b) > lum(a) ? b : a));
 }
 
 /** Relative luminance, used to pick readable text on coloured surfaces. */

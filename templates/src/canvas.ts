@@ -175,7 +175,7 @@ const SPECS: CanvasSpec[] = [
     description: 'A blush-and-gold invitation designed on the canvas: your photo in a gilded arch under a slow mandala, names in script, and a card for every function with the date, time and venue, directions and an add-to-calendar button.',
     category: 'Wedding',
     style: 'Canvas',
-    tier: 'STANDARD',
+    tier: 'PREMIUM',
     badge: 'NEW',
     featured: true,
     tags: ['canvas', 'hindu', 'floral', 'romantic', 'modern'],
@@ -188,15 +188,19 @@ const SPECS: CanvasSpec[] = [
     ],
     fonts: 'romantic',
     look: 'garden',
+    ornament: 'floral',
+    dress: { frame: 'arch' },
+    heroTone: 'light',
+    closing: { rsvp: 'default', footer: 'skyline' },
     effect: 'petals',
     slots: ['tagline', 'story', 'partnerOneParents', 'partnerTwoParents', 'hashtag', 'closing'],
     photoSlots: ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing'],
     hero: { mobile: roseHeroMobile, desktop: roseHeroDesktop },
     card: { mobile: roseCard, desktopMaxWidth: 520, repeatPerFunction: true },
     middle: [
-      { id: 'couple', section: 'couple', variant: 'arch', props: { partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
-      { id: 'story', section: 'story', variant: 'polaroid', props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
-      { id: 'gallery', section: 'gallery', variant: 'mosaic' },
+      { id: 'couple', section: 'couple', variant: 'portraits', props: { partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
+      { id: 'story', section: 'story', variant: 'letter', props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
+      { id: 'gallery', section: 'gallery', variant: 'polaroid' },
     ],
   },
   {
@@ -218,6 +222,10 @@ const SPECS: CanvasSpec[] = [
     ],
     fonts: 'modern',
     look: 'celebration',
+    ornament: 'confetti',
+    dress: { edge: 'none' },
+    heroTone: 'light',
+    closing: { rsvp: 'default', footer: 'seal' },
     effect: 'confetti',
     slots: ['tagline', 'about', 'hashtag', 'closing'],
     photoSlots: ['cover', 'story', 'closing'],
@@ -225,7 +233,7 @@ const SPECS: CanvasSpec[] = [
     card: { mobile: popCard, desktopMaxWidth: 520, repeatPerFunction: true },
     middle: [
       { id: 'about', section: 'story', variant: 'polaroid', props: { text: b('custom.about'), image: b('photo.story', { fallback: b('photos[1]') }) } },
-      { id: 'gallery', section: 'gallery', variant: 'polaroid' },
+      { id: 'gallery', section: 'gallery', variant: 'mosaic' },
     ],
   },
 ];
@@ -261,3 +269,9 @@ export function foldLookalikes(specs: CanvasSpec[], lookalikes: Readonly<Record<
 
 /** Sort after the standard website templates (index.ts passes the offset); the blank canvas comes last, so no other template moves. */
 export const canvasTemplates = (offset: number) => [...foldLookalikes([...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]), BLANK_SPEC].map((spec, i) => canvasWebsite(spec, offset + i));
+
+/**
+ * The canvas designs retired from the website catalog as lookalikes (lookalikes.ts). A film made
+ * from one (canvas-films.ts) is a product of its own and stays: films are built from these too.
+ */
+export const retiredCanvasDesigns = () => [...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS].filter((spec) => LOOKALIKES[spec.key]).map((spec) => canvasWebsite(spec, 0));

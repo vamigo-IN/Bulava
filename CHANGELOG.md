@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Designs for every faith, pages that match their design, and cards your way
+
+- **Every faith, at the very top.** Hindu designs open with Lord Ganesha, Muslim designs with the crescent and star, Sikh designs with the Khanda and Christian designs with the cross. New Muslim, Sikh and Christian wedding designs use each tradition's own words: The Nikah of, The Anand Karaj of, United in Holy Matrimony.
+- **The whole page matches the design.** Every section below the opening (the couple, the story, the countdown, the venue, the gallery, the RSVP and the closing) now carries the design's own art: torans, jaali arches, temple borders, phulkari, stained glass and more. Near-identical designs are gone, so every design in the gallery looks different.
+- **Your parents, in the right order.** The couple section shows each partner's parents ("Daughter of", "Son of"), the mother first on Hindu invitations.
+- **Real sample photos and names.** Previews show real photographs, and sample names that fit each design's tradition.
+- **Free, Premium and Signature.** Designs come in three collections: Free for everyone, Premium with any plan, and Signature from the Premium plan.
+- **Venues from Google Maps.** Start typing your venue and choose it: the address and the exact spot for guests' directions fill in. Can't find it? Drop a pin on Google Maps and paste the link.
+- **One function to start.** A new event starts with its main function; add the others whenever you like. Functions ask for a start time only.
+- **Cards your way.** Download any card free with the bulava.in watermark across it, or without it through your plan (5 cards with Standard, 10 with Premium, 20 with Ultimate) or for ₹50 a card. Save it as a PNG, a JPEG or, without the watermark, a print-ready PDF.
+- **Search the templates.** The templates page has a search, like the card gallery.
+- **Smoother on slow connections.** Sign-in and the dashboard no longer get stuck on a slow or dropped connection, and a template's page keeps "Use this template" in reach on phones.
+
 ### New plans at launch prices, a faster way to publish, and your parents on the invitation
 
 - **Four plans, at launch prices.** Starter ₹299 (usually ₹599), Standard ₹599 (usually ₹1,199), Premium ₹999 (usually ₹1,999) and Ultimate ₹1,999 (usually ₹3,999), each shown with the saving. Pay once; moving to a bigger plan costs only the difference.
@@ -27,7 +40,7 @@
 - **Add-ons, without a bigger plan.** Add the MP4 video (+₹300), remove the Bulava mark (+₹149), one more function or celebration (+₹199 each), 1,000 more guest photos (+₹149), done-for-you setup (+₹499) or same-day delivery (+₹199), on the new *Plan & add-ons* page or from an event's *Unlock more*.
 - **Unlock a bigger plan for the difference.** Moving from Starter to Premium costs ₹700, not ₹999. A plan you already have (or a smaller one) is never sold twice.
 - **Only the event's owner buys.** Co-hosts and the team see what the plan includes and that the owner can unlock more.
-- **Your own invitation link** with Premium and above, such as */e/aman-weds-riya*; links you shared before keep opening your invitation.
+- **Your own invitation link** with Premium and above, such as */e/kabir-weds-ananya*; links you shared before keep opening your invitation.
 - **Design anything, without an account.** The new *Design* page asks what you want to make (a website invitation, a video invitation or a digital card) and for which occasion, then shows the designs for it and a **blank canvas** with every tool. Edit and preview as much as you like; your design is kept in your browser, and goes onto your event when you sign in to publish.
 - **Free photos and illustrations in the editors.** Search Pexels and Pixabay from the Photos panel of the card, invitation and film editors; the image you pick is added as your own photo. (Our team switches this on under Integrations.)
 - **Your whole invitation on the canvas.** *Design it on the canvas* now shows every part of your invitation in order: redraw any of them on the canvas, hide one, or add your own section after it.

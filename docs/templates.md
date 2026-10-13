@@ -20,7 +20,7 @@ Template (catalog entry: name, category, style, tier, badge, tags, event types, 
 
 ## The catalog
 
-578 templates: 532 websites, 43 videos and 3 image cards, across every event type and the major traditions (Hindu, Sikh, Muslim, South Indian, Kerala, Christian, Bengali, Marathi, Gujarati, Punjabi, Rajasthani), in Free, Standard and Premium tiers. 460 of the websites come from the [template factory](#template-factory): 150 weddings, 111 for engagements, the other wedding functions and anniversaries, 91 birthdays and 108 for baby showers, naming ceremonies, mundans, housewarmings, pujas and festivals. The 479 canvas templates are 406 designs: some designs come in versions for several occasions ([Lookalikes](#lookalikes)).
+529 templates: 482 websites, 44 videos and 3 image cards, across every event type and the major traditions (Hindu, Sikh, Muslim, South Indian, Kerala, Christian, Bengali, Marathi, Gujarati, Punjabi, Rajasthani), in three collections: Free, Premium (with any paid plan) and Signature (from the Premium plan). 409 of the websites come from the [template factory](#template-factory): 132 weddings, 99 for engagements, the other wedding functions and anniversaries, 78 birthdays and 100 for baby showers, naming ceremonies, mundans, housewarmings, pujas and festivals. The 428 canvas websites are 389 designs: some designs come in versions for several occasions ([Lookalikes](#lookalikes)). Every website's sections below the hero are dressed in a [suite](#section-suites) that matches its hero.
 
 - **Flagship websites** open on an illustrated 3D scene: *Marigold Mahal* (toran), *Divine Gopuram* (temple at sunrise), *Rajwada Royale* (palace on the lake), *Noor-e-Nikah* (receding arches), *Anand Karaj* (golden sarovar), *Mangal Mandap*, *Midnight Gold* (noir medallion), *Blush & Bloom* (flower arch), *Shubho Bibaho* (lotus pond), *Kerala Kasavu* (backwaters) and *Bansuri* (moonlit Vrindavan).
 - **Illustrated films** are filmed inside the same scenes: *The Divine Flute*, *Temple Dawn*, *Royal Reveal*, *Noor Arches*, *Golden Sarovar*, *Marigold Mahal Film*, *Kasavu Backwaters*, *Blush & Bloom Film*, *Birthday Bash*, *Griha Pravesh Blessings* and *Lotus Blessings Film* each open in a different scene; the premium films (*Maharani Film*, *Ring Ceremony Film*, *Midnight Deco Film*, *Deepotsav Film*) cut between scenes in their own palettes, so no two films look alike.
@@ -28,7 +28,7 @@ Template (catalog entry: name, category, style, tier, badge, tags, event types, 
 - **The Signature collection** (tag `signature`) are "experience" websites with their own opening animation, the host's music, a verse, the menu, a countdown and RSVP.
 - **The card collection** (`templates/src/canvas-cards.ts`) are [canvas](#canvas-sections) invitations composed like printed cards, with full-colour illustrations, foil lettering and paper textures: *Shahi Gajraj* (a gilded jharokha guarded by elephants), *Mor Pankh* (a peacock garden), *Kovil Mani* (temple bells and a gopuram at dusk), *Noor Mahal* (lanterns and domes), *Eternal Bloom* (roses and doves), *Mehendi Rang* (a hand painted with henna), *Cake & Candles* (birthdays), *Twinkle Star* (baby showers and naming ceremonies) and *Shubh Griha* (housewarmings). Each has phone and desktop heroes, a card for every function and three colour presets.
 - **The stationery collection** (`templates/src/premium-cards.ts`, tag `stationery`) are canvas invitations composed like foil-stamped stationery, each in its own tradition's vocabulary: *Royal Maroon & Gold* (a mandala crown, gold vines, a double hairline frame and the couple's photo in a gilded frame), *Kalyana Zari* (a Kanjeevaram zari border and a flame-ringed prabhavali with brass kuthuvilakku lamps), *Phulkari* (Anand Karaj, phulkari borders and a silk-ringed diamond), *Mehrab* (a nikah under a Mughal mihrab), *Lal Paar* (a Bengali red border and an alpana), *Champagne Wreath* (an engagement in a gold olive wreath), *Genda Phool* (a haldi in marigold swags and a marigold wreath), *Sangeet Sandhya* (fairy lights, ghungroo strands and a gold dhol) and *Midnight Deco* (a reception in an art deco frame). Each has phone and desktop heroes and a card for every function; most carry an RSVP block (a pill over Accept and Decline) and a timeline of the first three functions (`functions[n].*` with short dates, each column hidden when that function is missing). The RSVP words are printed text under buttons of the panel's colour: on a website the buttons cover them and scroll to the RSVP form; a digital card drops the buttons and keeps the words.
-- **The illustrated collection** ([template factory](#template-factory)): 79 art-directed themes, each laid out in the compositions that suit it. *Rajwada*, *Mayur*, *Kanchi*, *Mehtab* and *Laavan* for weddings; *Heena* and *Dholki* for the mehendi and sangeet; *Unicorn*, *Dino*, *Galaxy*, *Gudiya* and *Raja* for children's birthdays; *Godh* and *Valaikappu* for baby showers; *Vastu* for griha pravesh; *Jyoti*, *Chand*, *Gulal* and *Noel* for festivals; and so on.
+- **The illustrated collection** ([template factory](#template-factory)): 85 art-directed themes, each laid out in the compositions that suit it. *Rajwada*, *Mayur*, *Kanchi*, *Mehtab* and *Laavan* for weddings; *Jaali* and *Firoza* for the nikah, *Amritsar* and *Kesri* for the Anand Karaj, *Covenant* and *Lilium* for church weddings ([Faith](#faith)); *Heena* and *Dholki* for the mehendi and sangeet; *Unicorn*, *Dino*, *Galaxy*, *Gudiya* and *Raja* for children's birthdays; *Godh* and *Valaikappu* for baby showers; *Vastu* for griha pravesh; *Jyoti*, *Chand*, *Gulal* and *Noel* for festivals; and so on.
 
 `pnpm db:seed` is the catalog's migration, and the deploy's `migrate` job runs it on every release (`seedTemplates`). It loads new templates; republishes catalog-owned templates whose definition changed (a version whose changelog is *Catalog seed* or *Catalog update*) as a new version; and updates a catalog-owned template's listing (tier, tags, order, featured…) in place when only that changed, unless staff edited the listing in the console (an audited `template.meta_updated`). Templates edited in Template Studio are left alone unless you run `pnpm --filter @bulava/database seed:templates`. Definitions are compared key-order-insensitively, so unchanged templates keep their version. `node dist/seed.js --templates-only --dry-run` lists what a release would change and writes nothing ([deployment.md](deployment.md#template-releases)).
 
@@ -43,9 +43,10 @@ Lookalike templates are removed, never hard-deleted: `Template.deletedAt` hides 
 
 ### Lookalikes
 
-A design is its illustrations and where they sit on the phone artboard, on light or dark stock: `designLook` (`@bulava/template-schema`) hashes exactly that, leaving out palettes, fonts and words, which customers change themselves. So:
+A design is its illustrations and where they sit on the phone artboard, on light or dark stock: `designLook` (`@bulava/template-schema`, `looks.ts`) hashes exactly that, leaving out palettes, fonts and words, which customers change themselves, and the scattered specks (stars, sparkles, confetti) that never make two designs different. `heroSimilarity` measures how alike two heroes look to a customer, 0 to 1, whatever their colours: the overlap of their art and where it sits (a sixth of the width, a tenth of the height), large art weighing more than small and the hero's subject most (any bride and groom in Indian dress are "a couple"; a church couple, a girl, a boy, a unicorn and a dinosaur are each their own), a little less when one is on dark stock and the other on light. So:
 
-- **One template per design and occasion.** Two templates of one occasion that share a look are the same design in two colourways; the catalog test fails on them. `templates/src/lookalikes.ts` lists the ones retired on 2026-10-09 (54, among them Rajwada Jharokha, a factory copy of Shahi Gajraj), each pointing at the template kept, which takes their colours as presets (`foldLookalikes`, at most 12), so no colourway is lost. The keys are in `RETIRED_TEMPLATE_KEYS`.
+- **One template per design and occasion.** Two templates of one occasion whose heroes are `HERO_LOOKALIKE` (0.70) or more alike are one design in two colourways, and the catalog test fails on them (as it does on an equal `designLook`). `templates/src/lookalikes.ts` lists the ones retired: 54 on 2026-10-09 (equal looks, among them Rajwada Jharokha, a factory copy of Shahi Gajraj) and 75 on 2026-10-13 (alike heroes: the same layout and art in another colourway or on the other stock, such as Kanchi and Kerala's couple, arch, home, split and photo layouts, the pastel dream skies of seven birthday themes, Heena and Mehfil). Each points at the template kept, which takes their colours as presets (`foldLookalikes`, at most 12), so no colourway is lost. The keys are in `RETIRED_TEMPLATE_KEYS`. The one kept was chosen in this order: a hand-made original, a design already kept for earlier lookalikes, a featured one, a theme's first layout; anything as alike as `HERO_LOOKALIKE` to one kept folded into it. A film made from a retired design stays: films are built from the retired designs too (`retiredCanvasDesigns`, `canvas.ts`).
+- **No two lower pages alike in one occasion.** Below the hero, the suite with its pieces, the look, the stock and every section's layout make a page's second half (see [Section suites](#section-suites)); the catalog test fails when two templates of one occasion share all of them, and when a website has no suite.
 - **One card per design in galleries.** A design may have versions for several occasions (a wedding design and its anniversary version, each with its own wording and names). The API lists each template's look (`preview.look`), and galleries show a look once (`onePerLook`, `apps/web/src/lib/template-looks.ts`): the version for the occasion chosen, else the first in the gallery's order. This applies to `/templates` (the occasion filter picks the version whose main event type it is), `/cards` (the occasion filter is the category), the home page's collection and the dashboard's design picker (always showing the design in use).
 
 ## TemplateDefinition (schemaVersion 1)
@@ -63,11 +64,13 @@ type TemplateDefinition = {
   theme: {
     colors: { primary; secondary; accent; background; surface; text; muted };  // hex
     radius: number;                 // 0–48 px
-    ornament: 'none' | 'mandala' | 'paisley' | 'floral' | 'geometric' | 'confetti' | 'lotus' | 'peacock' | 'stars' | 'laurel';
-    pattern: 'none' | 'dots' | 'jaali' | 'waves' | 'rangoli' | 'damask';
+    ornament: Ornament;             // the motif, and the suite every section below the hero is dressed in
+    dress?: { frame?; edge?; seal?; skyline?; corner?; divider? };  // suite pieces swapped (SUITE_* enums)
+    pattern: 'none' | 'dots' | 'jaali' | 'waves' | 'rangoli' | 'damask' | 'confetti' | 'bandhani' | 'stars' | 'paisley' | 'kolam' | 'scales';
     heroTone: 'light' | 'dark';     // dark = hero on the primary colour with gold type
     look: Look;                     // how every section is dressed (below)
     effect: Effect;                 // ambient particles over a live invitation
+    faith?: 'hindu' | 'muslim' | 'sikh' | 'christian';  // the tradition the design belongs to (Faith, below)
   };
   fonts: { heading: FontRef; body: FontRef; script?: FontRef };  // families from FONT_FAMILIES
   capabilities: {
@@ -86,6 +89,8 @@ type TemplateDefinition = {
 };
 
 type Look = 'classic' | 'heritage' | 'noir' | 'royal' | 'garden' | 'celebration' | 'modern';
+type Ornament = 'none' | 'mandala' | 'paisley' | 'floral' | 'geometric' | 'confetti' | 'lotus' | 'peacock' | 'stars' | 'laurel'
+              | 'temple' | 'kasavu' | 'jaali' | 'marigold' | 'bagh' | 'rangoli' | 'deco' | 'clouds' | 'chapel';
 type Effect = 'none' | 'petals' | 'marigold' | 'goldDust' | 'fireflies' | 'confetti' | 'lanterns' | 'snow';
 type PhotoSlot = 'cover' | 'partnerOne' | 'partnerTwo' | 'story' | 'closing';
 type Intro = 'none' | 'envelope' | 'curtain' | 'doors' | 'gates' | 'seal' | 'lanterns' | 'petals' | 'celestial' | 'scratch';
@@ -198,21 +203,61 @@ A layer that is not 3:2 still renders (stretched to the canvas); the Artwork tab
 |---|---|---|
 | `hero` | invocation, eyebrow, names, date, place, tagline, cover photo; greets the guest by name on personal invitations | `classic`, `arch`, `split`, `photo`, `minimal`, `festive`, `temple`, `monogram`, `cathedral`, `seaside`, `celestial`, `lantern`, `peacock`, the drawn scenes `gopuram`, `palace`, `toran`, `arches`, `lotus`, `mandap`, `noir`, `floral`, `balloons`, `backwaters`, `sarovar`, `vrindavan`, and `artwork` (painted) |
 | `quote` | a verse, shloka or line, set large | default |
-| `countdown` | live timer to the first function | `default`, `flip` (flip-clock digits) |
-| `couple` | partners with their photos | `default`, `stacked`, `arch`, `flip` (3D cards that turn over), `profile` |
-| `story` | text with a photo | `default`, `curtain` (tap to reveal), `polaroid` |
-| `parents`, `family` | text slots | default |
-| `eventTimeline` | only the functions this viewer may see, each with a motif picked from its name | `cards`, `timeline`, `tiles`, `tickets`, `diya` |
-| `menu` | "Course \| dishes" lines from a text slot | default |
-| `venue`, `map` | venue card with directions | default |
-| `gallery` | approved photos the viewer may see | `default`, `stack` (swipeable 3D stack), `mosaic`, `polaroid` |
-| `accommodation`, `travel`, `giftRegistry` | text slots | default |
+| `countdown` | live timer to the first function | `default`, `flip` (flip-clock digits), `rings` (each number in a double ring), `calendar` (the month printed like a calendar page, the day ringed) |
+| `couple` | partners with their photos and their parents ("Daughter of / Son of", [below](#the-parents)) | `default` (round portraits in the suite's seal), `stacked`, `portraits` (alias `arch`: tall frames in the suite's shape), `duet` (two round portraits overlapping, the families side by side), `monogram` (the names either side of a seal with their initials), `flip` (3D cards that turn over to the parents), `profile` (editorial rows) |
+| `story` | text with a photo | `default` (the photo in the suite's frame), `letter` (a letter on paper, the photo pinned above it), `curtain` (tap to reveal), `polaroid` |
+| `parents`, `family` | the blessings | `default` (the text), `blessings` (each family's parents under the couple's names, the suite's seal between, then the text) |
+| `eventTimeline` | only the functions this viewer may see, each with a motif picked from its name | `cards`, `timeline` (the suite's glyph on every node), `frames` (cards in the suite's shape), `tiles`, `tickets`, `diya` |
+| `menu` | "Course \| dishes" lines from a text slot, on a card in the suite's shape | default |
+| `venue`, `map` | venue card with directions | `default` (a card under the suite's seal), `illustrated` (the suite's foot art standing on the card), `postcard` (an address card with a stamp and a postmark) |
+| `gallery` | approved photos the viewer may see | `default`, `frames` (a wall of the suite's frames), `stack` (swipeable 3D stack), `mosaic`, `polaroid` |
+| `accommodation`, `travel`, `giftRegistry` | text slots, in a card under the suite's seal | default |
 | `announcements` | published updates for this viewer | default |
-| `rsvp` | the host app injects the RSVP form (or the public registration form) | default |
+| `rsvp` | the host app injects the RSVP form (or the public registration form) on a light reply card | `default`, `card` (the card in the suite's shape, its seal pressed onto the top edge) |
 | `photoShare` | QR photo rooms for this guest | default |
-| `footer` | closing line and photo, hashtag, check-in QR, watermark | default |
+| `footer` | closing line and photo, hashtag, check-in QR, watermark | `default`, `seal` (the couple's initials on the suite's seal, strands hanging either side), `skyline` (the suite's art along the foot), `blessing` (the closing line large, the names) |
 
 Sections with nothing to show (no photos, empty text) hide themselves, and live pages reveal sections as they scroll into view (disabled for reduced motion). Every 3D control has a keyboard path: flip cards have a turn button per face and the hidden face is `inert`.
+
+### Section suites
+
+The sections below a hero are dressed as one printed suite with it (`template-engine/src/sections/suites.ts`, `dress.tsx`). The theme's ornament names the **suite**, the art vocabulary of its hero: the glyph between rules under every heading and on timeline nodes, the corner pieces, the border along the top of a band, the round seal (monograms, the countdown, the RSVP card, the closing), the shape of photo frames and cards, the art at the foot of the page, the strands hanging in the closing band, the stars over a dark band and the paper's pattern. The look still sets the type and the rhythm of the bands, the palette the colours, and each section's variant its layout.
+
+| Suite | For | Its pieces |
+|---|---|---|
+| `mandala` | Rajasthani palaces | the foil flourish, filigree corners, a marigold toran, the medallion, jharokha windows, a pair of elephants, lanterns |
+| `peacock` | Mayur, Krishna | peacock feathers in the corners, the medallion, arches, a pair of royal peacocks |
+| `jaali` | Mughal, nikah | a row of cusped arches, filigree, the arabesque, mihrab frames, domes, lanterns |
+| `temple` | South Indian temples | the temple border, the kolam, prabhavali niches, brass kuthuvilakku lamps, jasmine |
+| `kasavu` | Kerala | the kasavu's gold zari border, the nilavilakku in a ring, arches, lamps, jasmine |
+| `lotus` | Bengali | the laal paar border, the alpana, round frames, lotuses |
+| `bagh` | Punjabi, Sikh | the phulkari border, the phulkari flower, arches |
+| `marigold` | haldi, genda phool | marigold swags, the marigold wreath, scalloped frames, a row of diyas, marigold strands |
+| `rangoli` | the threshold, Diwali | a mango-leaf toran, the rangoli, doorway arches, diyas |
+| `paisley` | bandhani, mehendi | bandhani dots, paisley corners, a line mandala, arches, a kalash either side |
+| `floral` | garden romance | rose corners, a rose garland, a botanical wreath, oval frames, roses |
+| `chapel` | church weddings | a row of lancet arches, a quatrefoil, the rose window, lancet frames, doves |
+| `laurel` | heirloom classic | laurel sprigs, double hairline frames, a crest |
+| `deco` | art deco nights | stepped rules, fans, stepped frames and corners, a sunburst |
+| `stars` | night skies | stars on the rules and over the bands, round frames, a moon seal, a crescent rising |
+| `geometric` | modern | a diamond on fine rules, rounded cards, a jaali star |
+| `confetti` | parties | bunting, confetti, ticket cards, a sticker seal, balloons and presents |
+| `clouds` | the nursery | a scalloped cloud edge, cloud frames, a moon seal, clouds |
+| `none` | templates before suites | the look's own rules and corners |
+
+**Restraint.** A suite takes one or two pieces of its hero's art, never all of them: a band takes a border or corners, never both; swags (a toran, a garland, bunting) hang over every third band and strips over every other one; stars cross every other dark band; a page shows the suite's frame at most twice. Every piece is drawn in code in the palette (foil where the suite is metal), and takes a colour that shows on its band: gold on paper, the light accent on a dark band, the primary on the accent band. Sections render on the server, so each computes its dress (`dressFor`: band, look, palette, suite) and passes it to the shell and every piece; there is no React context.
+
+**Swapping pieces.** `theme.dress` swaps single pieces for others, so two designs in one suite still differ: `frame` (jharokha, niche, mihrab, lancet, arch, oval, circle, scallop, ticket, deco, double, cloud, rounded), `edge`, `seal` (`emblem` sets the suite's own emblem in a double ring), `skyline`, `corner`, `divider` (the `SUITE_*` enums in `@bulava/template-schema`, which Template Studio offers; unset pieces stay the suite's own).
+
+**How a template picks its suite.**
+
+- **Factory themes** name it (`suite` in `themes-*.ts`, from the kit's art: a jharokha and elephants take `mandala`, a temple `temple`, Kerala `kasavu`, a nikah `jaali`, phulkari `bagh`, marigolds `marigold`, a church `chapel`…) and may swap pieces (`dress`); a theme that shares a suite with another of its occasion swaps a piece or two. Each **composition** lays the sections out its own way (`templates/src/factory/arrangements.ts`): a jharokha hero keeps its windows for the couple's portraits and closes on the suite's skyline, a night hero overlaps two round portraits and swipes through the photos, a photo hero turns its portraits over like prints, a minimal hero stays quiet (no border or corners). A theme that lays one composition out twice gives the second another arrangement. A layout may swap pieces too (`dress` on the layout).
+- **Hand-made websites** (`website.ts`, `signature.ts`) set `ornament`, `dress` and each section's variant in their specs; **canvas collections** (`canvas-cards.ts`, `premium-cards.ts`, `canvas.ts`) set `ornament`, `dress`, `heroTone` and `closing` (the RSVP's and the footer's variants) beside their sections.
+- **Dark stock.** A hero on dark stock (a dark kit, a night sky, a temple at dusk) sets `heroTone: 'dark'`, so the royal, classic, garden and modern looks carry the dark stock down the page (the primary band alternating with a deeper one) and function cards sit on the deep band on wide screens.
+
+#### The parents
+
+The couple's details carry each partner's father and mother ([ADR-068](decisions.md)); they fill `custom.partnerOneParents` and `custom.partnerTwoParents` as one line each, in the order the design's tradition writes them (the mother first for Hindu, Sikh and other designs, the father first for Muslim and Christian ones: `mothersFirst` in `context.ts`), unless the host wrote their own lines. Every couple section and the family section's `blessings` layout bind those slots, never the four names. Under each partner's name a small label (`template.couple.daughterOf` / `sonOf`: "Daughter of" / "Son of", सुपुत्री / सुपुत्र; the first partner is the bride, as the event form asks) sits over the parents' names on two lines, the second led by a script ampersand. The `duet` layout sets both families side by side under the names, the `blessings` layout under each family's name (`template.family.of`). An empty line shows nothing, label included. Names and verses use the heading face where it is a book face (italic only where it has a true italic, Cormorant Garamond) and the body face under a display heading such as Cinzel's capitals; Devanagari labels are set larger and unspaced (`labelClass`).
 
 ### Canvas sections
 
@@ -235,11 +280,11 @@ Colours are palette roles (`primary`, `accent`, `text`…) or fixed hex values; 
 
 Every layer also has a `blend` mode (normal, multiply, screen, overlay, soft light). Gradients are linear or radial, with an optional middle colour (`via`). An artboard can be printed on a `texture` (paper, linen, grain or a watercolour wash, at `textureStrength`), an SVG noise overlay that costs no image. The `shimmer` motion sweeps light across foil text and glints other layers; like every motion it stops for reduced motion.
 
-Rose Arch and Confetti Pop (`templates/src/canvas.ts`), the card collection (`templates/src/canvas-cards.ts`) and the [template factory](#template-factory)'s 513 invitations are built this way. Each has phone and desktop hero artboards and a per-function card. They use only drawn art and host photos, with a shape, icon or illustration behind every photo for invitations without one; designers add painted or photographic layers from the asset library. `templates/src/canvas-kit.ts` holds the shorthands they are written with (`at`, `text`, `orn`, `scene`, `photo`, `cardButtons`…) and `canvasWebsite`, which turns a design into the website: the hero, the function cards, standard sections, RSVP and footer.
+Rose Arch and Confetti Pop (`templates/src/canvas.ts`), the card collection (`templates/src/canvas-cards.ts`) and the [template factory](#template-factory)'s 409 invitations are built this way. Each has phone and desktop hero artboards and a per-function card. They use only drawn art and host photos, with a shape, icon or illustration behind every photo for invitations without one; designers add painted or photographic layers from the asset library. `templates/src/canvas-kit.ts` holds the shorthands they are written with (`at`, `text`, `orn`, `scene`, `photo`, `cardButtons`…) and `canvasWebsite`, which turns a design into the website: the hero, the function cards, standard sections, RSVP and footer.
 
 #### Illustrations
 
-`template-engine/src/art/illustrations-*.tsx` draws 69 full-colour illustrations in code (`ILLUSTRATIONS` in the schema):
+`template-engine/src/art/illustrations-*.tsx` draws 81 full-colour illustrations in code (`ILLUSTRATIONS` in the schema):
 
 - **Royal and floral**: a caparisoned elephant, a royal peacock with a tiered train, a jharokha (`JHAROKHA_OPENING` says where a photo sits behind it), rose clusters, floral garlands and doves.
 - **Ornament**: an ornate frame, filigree corners, a flourish, a medallion, a paisley, an arabesque and domes.
@@ -248,6 +293,7 @@ Rose Arch and Confetti Pop (`templates/src/canvas.ts`), the card collection (`te
 - **People** (`illustrations-people.tsx`, `illustrations-family.tsx`): eight couples (a Hindu bride in lehenga and her groom in safa, after the varmala, Sikh, nikah, South Indian, Christian, Bengali in topor and mukut, and a couple who have shared a lifetime), the bride and the groom as portrait busts, a girl and a boy in party hats, a baby in a cradle and a mother-to-be in a silk saree. The tint is the outfit.
 - **Props** (`illustrations-props.tsx`): a stork with a bundle, a teddy bear, a unicorn, a little dinosaur, a rocket, a cupcake, a bridal doli, a dhol, an urli of haldi and a champagne toast.
 - **Stationery** (`illustrations-heirloom.tsx`): gold line art for foil-stamped cards: a mandala crown with a lotus-bud pendant and its half for the foot, a double hairline frame and an art deco frame (both drawn to the whole card, so every card format keeps its margins), a floral gold vine for the sides, scattered sparkles and a botanical wreath tied with a ribbon.
+- **Faith** (`illustrations-faith.tsx`, `illustrations-sacred.tsx`): the four emblems ([Faith](#faith): Lord Ganesha, the crescent and star, the Khanda, the cross with olive branches), drawn as foil stamps in one metal; and each tradition's wedding art: a girih rosette (an eight-fold Islamic star), a jaali mehrab window in marble and gold (its opening takes a photo, `JAALI_ARCH_OPENING`), a fanoos lantern, the Darbar Sahib on its sarovar, a phulkari bagh medallion, a stained-glass lancet window (its opening takes a photo, `LANCET_OPENING`), Madonna lilies and wedding bells.
 - **Regional** (`illustrations-regional.tsx`): one tradition each: a South Indian prabhavali (its opening takes a photo, like the jharokha), a brass kuthuvilakku, a Kanjeevaram zari border, a Mughal mihrab, a phulkari border, a Bengali alpana and lal paar border, marigold swags, a marigold wreath and a strand of ghungroo. Borders, frames, vines and swags are drawn to the layer's size (`FRAME_SIZED`); the editors' add menus put frames around the whole board, borders across the top and strands down a side.
 
 The layer's colour is the illustration's main colour (the elephant, the train, the leaves, the henna) and the palette colours the rest, so a colour preset restyles the art like the text. Real flowers and flames keep their own colours (`NATURE` in `art/kit.tsx`). Garlands, strings and frames are drawn to the layer's size (`FRAME_SIZED`); the others keep their proportions (`ILLUSTRATION_ASPECT`, which also sizes new layers in the editor).
@@ -271,20 +317,21 @@ Most of the catalog is made by `templates/src/factory/`, the way a design studio
 | File | What it holds |
 |---|---|
 | `kit.ts` | A **kit**, the theme's art direction: dark or light stock, paper texture, foil, the name font, and which illustration sits where (`hero`, a flanking `pair`, a `top` band, mirrored `corner`s, a turning round `centre` motif, `hang`ing strings or lanterns, a `scene`, a `skyline`, the `motif` under the names, `float` art over a dream sky, a `crest`). Also the **occasions** (wedding, engagement, haldi, mehendi, sangeet, reception, anniversary, birthday, baby shower, naming, housewarming, puja, festival): category, event types, eyebrow lines, sections and a default crest. |
-| `compositions.ts` | 14 **compositions** (arch, jharokha, couple, split, night, floral, temple, portrait, party, dream, home, minimal, mandap, photo), each a phone and a desktop artboard plus a function card (framed, banded, garland, header, sky or minimal). Zones are fixed (art along the top, words in the middle, art along the bottom), so any kit fits without overlaps; a piece a kit leaves out is left out. |
+| `compositions.ts` | 17 **compositions** (arch, jharokha, couple, split, night, floral, temple, portrait, party, dream, home, minimal, mandap, photo, and the faith compositions mehrab, darbar and lancet), each a phone and a desktop artboard plus a function card (framed, banded, garland, header, sky or minimal). Zones are fixed (art along the top, words in the middle, art along the bottom), so any kit fits without overlaps; a piece a kit leaves out is left out. |
 | `theme.ts` | A **theme**: a name word, a palette and presets, fonts, look, effect, opening, the kit, and its layouts. Each layout becomes one template named "<theme word> <layout word>", keyed `<slug>-invite`, with its tier from the composition unless the layout sets one. |
 | `themes-*.ts` | The themes, by occasion. `collection.ts` gathers them and orders the templates so a gallery shows one design from every theme before the second of any. |
 
 Rules the compositions keep, so a new theme only chooses art:
 
-- Only round motifs turn (`isRound`: medallion, mandala, rangoli, kolam, arabesque, geometric, rose window); other art floats or sways.
+- Only round motifs turn (`isRound`: medallion, mandala, rangoli, kolam, arabesque, geometric, rose window, girih, phulkari bagh); other art floats or sways.
+- A faith theme's kit carries its emblem (`kit.emblem`, set in `collection.ts`), which every composition places at the very top ([Faith](#faith)); names keep clear of strands hanging down the sides, and the piece under a photo arch is a lotus only for Hindu designs and designs of no one faith.
 - A photo frame shows its art (or the couple's monogram, `{{couple.partnerOne|initial}} & …`) until the host adds a photo, so no frame is ever empty.
 - The crest never repeats the art at the foot, and rings appear only for couples.
 - Party themes (bunting or presents) end the split layout in balloons and presents, garden themes in roses, the rest in a turning rangoli.
 - Occasions whose title is the event's own (housewarming, puja, festival) set it smaller, on two lines.
 - A theme may reorder its occasion's event types (`eventTypes`); the first decides the sample content of its previews (a mundan theme shows a mundan). Festival themes are tagged (`eid`, `holi`, `christmas`, `navratri`, `pongal`) so previews use that festival's sample title (`SAMPLE_VARIANTS`).
 
-To add a theme: write it in the occasion's `themes-*.ts` (a unique word, a palette with light accents for dark stock, a kit, and layouts with distinct words), run the catalog tests (unique names and themes, no two layouts of a theme with the same composition and art, no two templates of an occasion with one look, the test matrix), seed, and generate its previews. A theme that would repeat another theme's design in new colours belongs in that theme's presets instead. Children's themes use the *Playful* font pairing (Baloo 2 and Pacifico).
+To add a theme: write it in the occasion's `themes-*.ts` (a unique word, a palette with light accents for dark stock, a kit, its `suite` and any `dress`, and layouts with distinct words), run the catalog tests (unique names and themes, no two layouts of a theme with the same composition and art, no two heroes of an occasion `HERO_LOOKALIKE` or more alike, no two lower pages alike, the test matrix), seed, and generate its previews. A new composition gets an arrangement in `arrangements.ts`. A theme that would repeat another theme's design in new colours belongs in that theme's presets instead. Children's themes use the *Playful* font pairing (Baloo 2 and Pacifico).
 
 ### Importing card JSON
 
@@ -335,6 +382,43 @@ To check a film or card change, render stills with sample data (one frame per sc
 pnpm --filter @bulava/template-catalog build
 node infrastructure/scripts/film-stills.mjs --out ./film-stills bansuri-video royal-card   # omit keys for all
 ```
+
+## Faith
+
+A design that clearly belongs to one tradition carries it in `theme.faith` (`hindu`, `muslim`, `sikh` or `christian`: `FAITHS` in `@bulava/template-schema`); designs that suit every family have none.
+
+**How a template gets its faith.** `withFaith` (`templates/src/faith.ts`) decides it for the whole catalog, so no theme sets it by hand: the one faith its tags name, else the tradition its rites name (`nikah`, `walima`, `eid`: Muslim; `anand-karaj`, `gurpurab`: Sikh; `church`, `christmas`, `vow-renewal`: Christian; `griha-pravesh`, `namkaran`, `puja` and the other rites: Hindu), else Hindu for a wedding design of a Hindu regional tradition (South Indian, Kerala, Bengali, Marathi, Gujarati, Rajasthani…). A design tagged for two faiths (a mehendi for Hindu and Muslim brides) has none. A faith template then carries its faith as a tag (the galleries' tradition filter), `theme.faith`, and its tradition's wording: "The wedding of" becomes *The Nikah of*, *The Anand Karaj of* or *United in Holy Matrimony* (`template.nikah`, `template.anandKaraj`, `template.holyMatrimony`, in English and Hindi).
+
+### The emblem
+
+Faith templates of the occasions in `EMBLEM_CATEGORIES` (weddings and their functions, pujas and other religious events, thread ceremonies, mundans, naming ceremonies, baby showers and housewarmings; birthdays, anniversaries and festivals have their own art) wear their faith's emblem at the very top of the opening (`FAITH_EMBLEMS`): Lord Ganesha for Hindu families, the crescent and star for Muslim families, the Khanda for Sikh families and the cross with olive branches for Christian families, each drawn as a foil stamp in the design's metal (`art/illustrations-faith.tsx`). The rules, checked for every faith template by `templates/src/faith.test.ts`:
+
+- At the very top, above every word, upright, whole and still: never rotated, flipped, cropped or moving, never behind or touching text, never at the foot.
+- One size on every design: `EMBLEM_SIZE`, 48 design units on a phone board and 64 on a desktop board.
+- Drawn over the art (the last layers of the board), standing on a seal (a disc of the stock ringed in the metal) where it sits over a toran, a garland, a border or busy art.
+
+Where it comes from:
+
+- **Drawn heroes**: the hero's `emblem` prop (`HeroEmblem` in `sections/hero.tsx`), stamped in the hero's gold, bronze or silver (`emblemMetal`; never in a palette's leaf green).
+- **Factory templates**: the kit's `emblem`, which every composition places; the minimal layout moves its crest under the names to make room.
+- **Hand-made canvas openings**: `EMBLEM_SLOTS` in `templates/src/faith.ts`: the emblem's place, a seal, and the layers that make room (moved, dropped or replaced: on Kovil Mani one set of temple bells becomes two with Ganesha between them; on Noor Mahal the crescent and star takes the moon's place in the sky).
+- **Cards**: made from the openings (`cardFromTemplate`), so every card format carries the emblem.
+
+### Faith themes
+
+`templates/src/factory/themes-faith.ts` holds wedding themes made for one faith, each in its tradition's own vocabulary and suite: *Jaali* (an emerald nikah under a carved marble jaali, fanoos and a girih star) and *Firoza* (turquoise tile-work on ivory) in the `jaali` suite; *Amritsar* (royal blue, the Darbar Sahib shining on its sarovar) and *Kesri* (saffron and royal blue, phulkari and marigolds) in the `bagh` suite; *Covenant* (a stained-glass lancet, Madonna lilies and bells) in the `chapel` suite and *Lilium* (lilies on sage and blush watercolour) in the `floral` suite. They use three compositions made for them: `mehrab` (the photo in the jaali window, fanoos either side, domes at the foot), `darbar` (the Darbar Sahib across the foot, the names in foil above) and `lancet` (the photo in a stained-glass window, lilies at its foot). Muslim, Sikh and Christian families each have at least six wedding designs, every one its own look (the faith test checks it).
+
+### Sample people
+
+Every preview, editor and test builds its sample with `templateSampleContext(definition, …)`: a family of the template's tradition, chosen by its key, so each template always shows the same names and a gallery shows many (`sample-presets.ts`): the couple or the person celebrated, the parents in their tradition's order (the mother first for Hindu and Sikh families, the father first for Muslim and Christian ones: `mothersFirst`), the grandparents' blessings in the tradition's honorifics, the tradition's wedding functions (Haldi, Sangeet, Wedding, Reception; Mehndi, Nikah, Walima; Mehndi, Anand Karaj, Reception; Mehendi, Holy Matrimony, Reception), its verse and its wedding menu. A design that suits every family shows a family of one tradition, chosen by its key; Hindu regional designs show names of their region. No sample name is fixed in code.
+
+### Sample photos
+
+Previews show real photographs, never drawn placeholders or data URIs (they would ride in every bundle): `sample-photos.ts` lists them, and `samplePhotoSet(typeKey, tradition, tags)` picks a template's cover, the couple's two portraits, its story, its closing photo and a gallery of four by occasion and tradition: a couple in their tradition's wedding clothes, the bride and the groom, the wedding's moments and places (a mandap, the mosque beside the Taj Mahal, the Darbar Sahib, a church nave) for weddings; a baby, a cake, a mother-to-be or a puja's lamps for other occasions. The files are WebP (at most 1200 px on the long side, metadata removed) in `apps/web/public/samples` and the same in `apps/admin/public/samples` for Template Studio, served from `/samples/` (`SAMPLE_PHOTO_BASE`); a renderer without them passes an origin (`photoBase`: `film-stills.mjs` serves the folder while it renders).
+
+Every photo is CC0 or public domain and is credited in `samples/CREDITS.md` (file, what it shows, author, source page, licence). To add or replace one: only photos whose licence allows use in Bulava without payment (CC0, public domain, or the Pexels, Unsplash or Pixabay licences through their APIs), never a web image search, no recognisable public figures, nothing undignified; re-encode it the same way, keep the file name (or update `SAMPLE_PHOTOS` with its size) and its line in both `CREDITS.md`. The Muslim and Sikh couples are shown by their hands and wedding clothes until licensed nikah and Anand Karaj couple photographs replace `muslim-couple`, `muslim-bride`, `muslim-groom`, `sikh-couple`, `sikh-bride` and `sikh-groom`.
+
+The editors' empty photo spots keep their camera placeholder: a sample photo there would read as the host's own and then vanish from the preview and the download.
 
 ## Bindings
 

@@ -21,12 +21,14 @@ export function CanvasSection(p: SectionProps) {
     : [p.ctx];
   const rsvpTargetId = p.rsvpSectionId;
   const backdrop = fillBackdrop(canvas.mobile.background, p.colors);
+  // Below a hero on dark stock the page is dark (sections/shared.tsx bandFor): cards set in it sit on its deep band.
+  const darkPage = p.heroTone === 'dark' && p.index > 0;
   const fallbackStyle: CSSProperties = canvas.desktop
     ? {}
     : {
         ['--cv-max' as string]: `${canvas.desktopMaxWidth}px`,
         // The centred artboard sits on its own colours, darkened a little so it reads as a card.
-        ...fillStyle(canvas.mobile.background.type === 'image' ? { type: 'color', color: backdrop?.[0] ?? p.colors.background } : canvas.mobile.background, p.colors, p.ctx),
+        ...(darkPage ? { background: 'var(--t-deep)' } : fillStyle(canvas.mobile.background.type === 'image' ? { type: 'color', color: backdrop?.[0] ?? p.colors.background } : canvas.mobile.background, p.colors, p.ctx)),
       };
   const fonts = p.fonts;
   const drawSection = p.drawSection ? (id: string) => p.drawSection!(id, p.index) : undefined;

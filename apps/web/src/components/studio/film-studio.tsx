@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { sampleRenderContext, type Customization } from '@bulava/template-schema';
+import { templateSampleContext, type Customization } from '@bulava/template-schema';
 import { FilmDesigner } from '@/components/design/film-designer';
 import { readStudioDraft, writeStudioDraft } from '@/lib/design-drafts';
 import { I18nProvider, useT } from '@/lib/i18n';
@@ -30,7 +30,7 @@ function FilmStudioEditor({ template, eventType }: { template: StudioTemplate; e
   const router = useRouter();
   const [custom, setCustom] = useState<Customization>({});
   const [ready, setReady] = useState(false);
-  const context = useMemo(() => sampleRenderContext({ typeKey: eventType, language: 'en', tags: template.tags }), [eventType, template.tags]);
+  const context = useMemo(() => templateSampleContext(template.definition, { typeKey: eventType, language: 'en', tags: template.tags }), [eventType, template.definition, template.tags]);
 
   useEffect(() => {
     const draft = readStudioDraft('video', template.key);

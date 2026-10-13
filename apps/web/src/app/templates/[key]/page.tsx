@@ -49,7 +49,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
    * before any sign-up); films open on the canvas before any sign-up (ADR-063); other designs
    * start a new event. Signed-in hosts go straight to a new event with the design.
    */
-  const useTemplate = (className: string) =>
+  const templateCta = (className: string) =>
     tpl.definition!.type === 'WEBSITE' ? (
       <UseTemplateButton template={{ key: tpl.key, name: tpl.name, eventTypes: tpl.eventTypes }} className={className}>
         {t('template.use')}
@@ -117,7 +117,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
                     <p className="font-display text-4xl">{price ?? t('template.free')}</p>
                     {price ? <p className="text-sm text-stone-500">{t('template.included', { plan: t(`filter.tier.${tpl.tier}`) })}</p> : null}
                   </div>
-                  {useTemplate('btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base')}
+                  {templateCta('btn-3d group/cta mt-6 min-h-14 w-full rounded-2xl text-base')}
                   {tpl.definition.type === 'WEBSITE' ? (
                     <>
                       <Link href={`/templates/${tpl.key}/demo`} className="btn-3d btn-3d-light mt-3 min-h-12 w-full rounded-2xl text-brand-700">
@@ -189,7 +189,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
             <p className="truncate text-xs font-medium text-stone-500">{tpl.name}</p>
             <p className="font-display text-xl leading-tight text-ink">{price ?? t('template.free')}</p>
           </div>
-          {useTemplate('btn-3d group/cta min-h-12 shrink-0 rounded-2xl px-5 text-sm')}
+          {templateCta('btn-3d group/cta min-h-12 shrink-0 rounded-2xl px-5 text-sm')}
         </StickyCta>
       </main>
       <SiteFooter />

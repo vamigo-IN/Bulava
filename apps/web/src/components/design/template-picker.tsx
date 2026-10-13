@@ -11,8 +11,8 @@ import { cardPreview } from '@/lib/template-previews';
 import type { TemplateSummaryLite } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-export const TIER_RANK = { FREE: 0, STANDARD: 1, PREMIUM: 2 } as const;
-const TIERS = ['ALL', 'FREE', 'STANDARD', 'PREMIUM'] as const;
+export const TIER_RANK = { FREE: 0, PREMIUM: 1, SIGNATURE: 2 } as const;
+const TIERS = ['ALL', 'FREE', 'PREMIUM', 'SIGNATURE'] as const;
 type TierFilter = (typeof TIERS)[number];
 
 /** Wide screens show a live preview beside the grid; narrower ones choose with a single tap. */
@@ -251,7 +251,7 @@ function TierTag({ tier }: { tier: TemplateSummaryLite['tier'] }) {
     <span
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
-        tier === 'FREE' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : tier === 'PREMIUM' ? 'bg-brand-50 text-brand-700 ring-brand-200' : 'bg-amber-50 text-amber-900 ring-amber-200',
+        tier === 'FREE' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : tier === 'SIGNATURE' ? 'bg-brand-50 text-brand-700 ring-brand-200' : 'bg-amber-50 text-amber-900 ring-amber-200',
       )}
     >
       {t(`filter.tier.${tier}`)}

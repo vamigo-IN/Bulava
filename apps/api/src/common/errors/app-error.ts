@@ -109,6 +109,8 @@ export const ErrorCode = {
   CARD_NOT_READY: HttpStatus.CONFLICT,
   /** A watermark-free download without paying needs a plan that covers it. */
   CARD_PLAN_REQUIRED: HttpStatus.FORBIDDEN,
+  /** A PDF comes with a watermark-free card (a plan's or one bought), never with the free card. */
+  CARD_PDF_LOCKED: HttpStatus.FORBIDDEN,
   /** Stock image search is switched off, its library did not answer, or it is busy (ADR-064). */
   STOCK_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   /** Venue search is switched off, Google did not answer, or the day's Places budget is spent (ADR-072). */

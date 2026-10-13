@@ -321,8 +321,8 @@ export class CardOrdersService implements OnModuleInit {
     };
   }
 
-  /** The bought card's image, or its PDF. */
-  async download(orderToken: string, as: CardFileType = 'image') {
+  /** The bought card as a PNG, a JPEG or a PDF. */
+  async download(orderToken: string, as: CardFileType = 'jpeg') {
     const order = await this.byToken(orderToken);
     if (order.status !== 'PAID') throw new AppError('CARD_NOT_READY', order.status === 'REFUNDED' ? 'This order was refunded.' : 'This card is not paid for yet.');
     const card = await this.latestCard(order.id);

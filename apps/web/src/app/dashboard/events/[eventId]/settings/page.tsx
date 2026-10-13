@@ -207,7 +207,8 @@ function GeneralCard({ event, run }: { event: EventSummary; run: Run }) {
   );
 }
 
-const PARENTS = ['partnerOneFather', 'partnerOneMother', 'partnerTwoFather', 'partnerTwoMother'] as const;
+/** The mother first, as Hindu invitations name parents (the invitation orders them by the design's tradition, ADR-068). */
+const PARENTS = ['partnerOneMother', 'partnerOneFather', 'partnerTwoMother', 'partnerTwoFather'] as const;
 
 /** The names the invitation shows (ADR-068): the couple and their parents, or the person celebrated; fixed here at any time. */
 function NamesCard({ event, run }: { event: EventSummary; run: Run }) {

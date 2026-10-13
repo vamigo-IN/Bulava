@@ -10,6 +10,11 @@ export function cardPdfKey(imageKey: string): string {
   return `${imageKey.replace(/\.[A-Za-z0-9]+$/, '')}.pdf`;
 }
 
+/** A card's PNG, saved beside its image by the media worker (the API's cardPngKey): deleted with it. */
+export function cardPngKey(imageKey: string): string {
+  return `${imageKey.replace(/\.[A-Za-z0-9]+$/, '')}.png`;
+}
+
 /** The order page of a paid card (the token after #, so it is never sent to a server or logged). */
 export function cardOrderUrl(webOrigin: string, orderId: string, tokenKey: string): string {
   return `${webOrigin.replace(/\/$/, '')}/cards/order#${cardOrderToken(orderId, tokenKey)}`;
@@ -85,8 +90,11 @@ export async function cardRetention(deps: Pick<WorkerDeps, 'prisma' | 'log'> & {
   for (const image of images) {
     try {
       await remove(image.storageKey);
-      // Its PDF, if one was made (deleting a file that is not there is not an error).
-      if (image.storageKey) await remove(cardPdfKey(image.storageKey));
+      // Its PNG and PDF, if they were made (deleting a file that is not there is not an error).
+      if (image.storageKey) {
+        await remove(cardPngKey(image.storageKey));
+        await remove(cardPdfKey(image.storageKey));
+      }
       await prisma.cardExport.update({ where: { id: image.id }, data: { status: 'EXPIRED', storageKey: null } });
     } catch (err) {
       log.warn({ err, exportId: image.id }, 'Could not delete an expired card image; trying again tomorrow');

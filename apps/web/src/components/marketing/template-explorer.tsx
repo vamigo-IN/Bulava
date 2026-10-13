@@ -6,7 +6,7 @@ import { TrackedLink } from './tracked-link';
 
 export interface ExplorerItem {
   key: string;
-  tier: 'FREE' | 'STANDARD' | 'PREMIUM';
+  tier: 'FREE' | 'PREMIUM' | 'SIGNATURE';
   tags: string[];
   eventTypes: string[];
   outputs: string[];

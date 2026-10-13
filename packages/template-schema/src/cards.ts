@@ -3,7 +3,7 @@ import { createTranslator, formatEventTime, utcToZonedWallTime, zonedWallTimeToU
 import type { Value } from './base';
 import { resolveBinding, resolveValue } from './bindings';
 import { ArtboardSchema, type Artboard, type ArtboardInput, type CanvasSection, type Frame, type Layer, type LayerInput, type WidgetLayer } from './canvas';
-import { sampleRenderContext, type GalleryImage, type RenderContext } from './context';
+import { templateSampleContext, type GalleryImage, type RenderContext } from './context';
 import { FontsSchema, ThemeColorsSchema, type PhotoSlot, type TemplateDefinition } from './definition';
 
 /**
@@ -425,7 +425,8 @@ export function cardFromTemplate(definition: TemplateDefinition, options: CardFr
   const eventType = options.eventType ?? definition.eventTypes[0] ?? 'WEDDING';
   const languages = definition.languages.filter((l): l is (typeof CARD_LANGUAGES)[number] => (CARD_LANGUAGES as readonly string[]).includes(l));
   const language = languages.find((l) => l === options.language) ?? languages[0] ?? 'en';
-  const sample = sampleRenderContext({ typeKey: eventType, language, tags: options.tags, noPhotos: true });
+  // The card starts with the template's own sample people: names of its tradition, chosen by its key.
+  const sample = templateSampleContext(definition, { typeKey: eventType, language, tags: options.tags, noPhotos: true });
   const opts = { t: createTranslator(language), language, timeZone: CARD_TIME_ZONE };
 
   const layers: LayerInput[] = [];

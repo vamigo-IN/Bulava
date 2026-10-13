@@ -138,7 +138,7 @@ function ListingForm({ template, eventTypes, onEventTypes }: { template: AdminTe
           <Field label={t('details.tier')}>
             {(p) => (
               <Select {...p} value={form.tier} onChange={(e) => set('tier', e.target.value as typeof form.tier)}>
-                {(['FREE', 'STANDARD', 'PREMIUM'] as const).map((v) => (
+                {(['FREE', 'PREMIUM', 'SIGNATURE'] as const).map((v) => (
                   <option key={v} value={v}>
                     {t(`tier.${v}`)}
                   </option>

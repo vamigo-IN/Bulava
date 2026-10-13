@@ -124,6 +124,7 @@ function pageOf({ definition: template, context, customization, language: langua
     language,
     timeZone,
     ornament,
+    ...(definition.theme.dress ? { dress: definition.theme.dress } : {}),
     pattern: definition.theme.pattern,
     colors,
     heroTone: definition.theme.heroTone ?? 'light',

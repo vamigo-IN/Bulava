@@ -70,8 +70,10 @@ export const StorageKeys = {
   cardUploadOriginal: (sessionId: string, uploadId: string, ext: string) => `cards/uploads/${safe(sessionId)}/${safe(uploadId)}-original.${safe(ext)}`,
   /** The photo as the card shows it: re-encoded without metadata, at most 2400 px. */
   cardUpload: (sessionId: string, uploadId: string) => `cards/uploads/${safe(sessionId)}/${safe(uploadId)}.webp`,
-  /** A rendered digital card. */
+  /** A rendered digital card (the JPEG); its PNG and PDF sit beside it with their own extensions. */
   cardExport: (exportId: string) => `cards/exports/${safe(exportId)}.jpg`,
+  /** The same card as a lossless PNG, saved by the media worker with the JPEG. */
+  cardExportPng: (exportId: string) => `cards/exports/${safe(exportId)}.png`,
 };
 
 export const ALLOWED_UPLOAD_TYPES: Record<string, { ext: string; kind: 'image' | 'video' | 'audio' | 'font' | 'svg'; maxBytes: number }> = {

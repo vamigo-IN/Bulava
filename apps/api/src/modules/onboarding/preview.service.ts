@@ -66,6 +66,7 @@ export class PreviewService {
         announcements,
         ...(await this.media.templatePhotos(event.id, template.customization)),
         music: show.music ? await this.renderContext.resolveMusic(template) : null,
+        faith: template.definition.theme.faith ?? null,
       }),
       // Previews always carry the mark; paying removes it from the published invitation.
       watermark: true,

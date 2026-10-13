@@ -43,7 +43,7 @@ export const UpdateTemplateMetaSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   category: z.string().trim().min(1).max(60).optional(),
   style: z.string().trim().max(40).nullable().optional(),
-  tier: z.enum(['FREE', 'STANDARD', 'PREMIUM']).optional(),
+  tier: z.enum(['FREE', 'PREMIUM', 'SIGNATURE']).optional(),
   badge: z.enum(['NEW', 'POPULAR', 'BESTSELLER']).nullable().optional(),
   featured: z.boolean().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
@@ -390,7 +390,7 @@ export class AdminTemplatesService {
   async updateMeta(adminId: string, id: string, input: UpdateTemplateMetaInput, meta: RequestMeta) {
     const updated = await this.prisma.template.update({
       where: { id },
-      data: { ...input, ...(input.tier ? { isPremium: input.tier === 'PREMIUM' } : {}) },
+      data: { ...input, ...(input.tier ? { isPremium: input.tier === 'SIGNATURE' } : {}) },
     });
     await this.audit.record({ actorType: 'USER', actorId: adminId, action: 'template.meta_updated', targetType: 'Template', targetId: id, metadata: input as Prisma.InputJsonValue, meta });
     await this.catalog.invalidate();

@@ -8,7 +8,7 @@ import { QueueService } from '../../infrastructure/queue/queue.service';
 import { STORAGE } from '../../infrastructure/storage/storage.module';
 import { AppError } from '../../common/errors/app-error';
 import type { AuthUser } from '../../common/request-context';
-import { CARD_EXPORT_DAYS, cardFileName, cardPdfKey } from './card-designs';
+import { CARD_EXPORT_DAYS, cardFileName, cardPdfKey, cardPngKey } from './card-designs';
 import { jpegPdf } from './card-pdf';
 import { CardsService, LIVE_EXPORT, type CardAllowance } from './cards.service';
 
@@ -19,7 +19,8 @@ const DAY = 86_400_000;
  * after a mobile number, and watermark-free ones through the customer's plan,
  * as many designs as it includes. Each is rendered once per design; asking
  * again (a double click, a refresh, a retry) returns the same image. Paid
- * cards are in CardOrdersService. Every image is also a one-page PDF.
+ * cards are in CardOrdersService. Every card saves as a PNG or a JPEG, and a
+ * watermark-free one also as a one-page PDF (docs/cards.md#files).
  */
 @Injectable()
 export class CardDownloadsService {
@@ -146,8 +147,8 @@ export class CardDownloadsService {
     return this.view(card);
   }
 
-  /** A signed link that downloads the image or its PDF. The first download of each image counts as the completed download. */
-  async download(token: string, exportId: string, as: CardFileType = 'image') {
+  /** A signed link that downloads the card as a PNG, a JPEG or (watermark-free) a PDF. The first download of each card counts as the completed download. */
+  async download(token: string, exportId: string, as: CardFileType = 'jpeg') {
     const session = await this.cards.session(token);
     const card = await this.prisma.cardExport.findFirst({ where: { id: exportId, sessionId: session.id, kind: { in: ['FREE', 'PLAN'] } } });
     if (!card) throw AppError.notFound('Card image');
@@ -155,9 +156,13 @@ export class CardDownloadsService {
   }
 
   /** Shared with paid orders: the link, the download counted, and the completed step recorded once (whichever file it is). */
-  async signedDownload(card: CardExport, refs: { sessionId?: string | null; leadId?: string | null; orderId?: string | null; userId?: string | null; templateKey: string }, as: CardFileType = 'image') {
+  async signedDownload(card: CardExport, refs: { sessionId?: string | null; leadId?: string | null; orderId?: string | null; userId?: string | null; templateKey: string }, as: CardFileType = 'jpeg') {
     if (card.status !== 'READY' || !card.storageKey) throw new AppError('CARD_NOT_READY', 'Your card is not ready yet.');
-    const key = as === 'pdf' ? await this.pdf(card.storageKey) : card.storageKey;
+    // A PDF comes with a watermark-free card (through a plan, or bought on its own), never with the free one.
+    if (as === 'pdf' && card.kind === 'FREE') {
+      throw new AppError('CARD_PDF_LOCKED', 'A PDF comes with a watermark-free card: through a plan that includes cards, or bought on its own.');
+    }
+    const key = as === 'pdf' ? await this.pdf(card.storageKey) : as === 'png' ? await this.png(card, card.storageKey) : card.storageKey;
     const fileName = cardFileName(card.templateKey, card.format, as);
     const url = await this.storage.presignDownload(key, { expiresInSeconds: 600, downloadName: fileName });
     const now = new Date();
@@ -168,6 +173,19 @@ export class CardDownloadsService {
       await this.cards.event(type, { ...refs, meta: { format: card.format, file: as } });
     }
     return { url, fileName };
+  }
+
+  /**
+   * The card's PNG, saved by the media worker beside its JPEG. A card made
+   * before PNGs were saved is made again (the same design, so the same card,
+   * at no charge) and the customer is asked to wait a moment.
+   */
+  private async png(card: CardExport, imageKey: string): Promise<string> {
+    const key = cardPngKey(imageKey);
+    if (await this.storage.head(key)) return key;
+    await this.prisma.cardExport.update({ where: { id: card.id }, data: { status: 'QUEUED' } });
+    await this.queue(card.id);
+    throw new AppError('CARD_NOT_READY', 'Your card is being made as a PNG. Please wait a moment and try again.', { exportId: card.id });
   }
 
   /**

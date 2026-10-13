@@ -1,6 +1,6 @@
 # Digital cards
 
-Anyone can turn a template into a personalised invitation card at `/cards`, without an account, and download it: with a small watermark across the bottom (for a mobile number, when the console offers it, or with any plan), or without it for a configurable price per card (₹50 at least). A plan may include a number of watermark-free cards (`cards.included`, [ADR-071](#plan-holders)): signed-in customers download that many card designs without paying or filling anything in. Every card is saved as an image or as a PDF. Website and video invitations are untouched: cards are a separate flow over the same templates.
+Anyone can turn a template into a personalised invitation card at `/cards`, without an account, and download it: free with the watermark (the site's address across the card and a band along its foot, for a mobile number; the console can switch this off), or without it for a configurable price per card (₹50 at least). A plan may include a number of watermark-free cards (`cards.included`, [ADR-071](#plan-holders)): signed-in customers download that many card designs without paying or filling anything in. Every card is saved as a PNG or a JPEG, and a watermark-free one also as a PDF. Website and video invitations are untouched: cards are a separate flow over the same templates.
 
 ```text
 /cards (gallery) → /cards/editor/:key → Download
@@ -62,11 +62,11 @@ The design is kept in `localStorage` (`bulava.card.<templateKey>`) on every chan
 
 | | Free | Watermark-free | Plan |
 |---|---|---|---|
-| For | anyone while the console offers it (`cards.freeDownloads`), else holders of any paid plan | anyone | signed in, with cards left on their plan |
+| For | anyone (`cards.freeDownloads`, on by default), else holders of any paid plan | anyone | signed in, with cards left on their plan |
 | Asks for | WhatsApp/mobile number | number, full name, email, the ticked Terms and Refund Policy | nothing |
 | Optional | offers on WhatsApp (unticked) | offers on WhatsApp (unticked) | |
-| Image | with the watermark band | without | without |
-| File | image or PDF | image or PDF | image or PDF |
+| Image | with the watermark (the address across it, the band along its foot) | without | without |
+| File | PNG or JPEG | PNG, JPEG or PDF | PNG, JPEG or PDF |
 | Delivery | download | download + email with the image attached | download |
 | Kept | 7 days | a year after payment | 30 days |
 
@@ -74,11 +74,11 @@ Numbers are validated and stored as E.164 with the calling code and national num
 
 Each download is one **export** (`CardExport`) per design and kind: asking again (a second click, a refresh, a retry) returns the same image (`card_exports_live_per_design`). The image is made by the media worker (see [Export renderer](#export-renderer)); the browser polls `GET /public/cards/session/exports/:id` and then asks for a signed link (`POST …/download`, ten minutes, `Content-Disposition: attachment`). The first download of an image is what counts as a completed download.
 
-The watermark is part of the image: one band across the bottom (about a tenth of the shorter side) with the site's name and address from the settings (`Made with Bulava · bulava.in`), drawn by `CardView` into the free export only. It is the only mark on a card: templates carry no brand layers (a design with one would be a catalog bug), and the editor's preview, the download dialog's previews and the export all draw the same band. The paid and plan exports are the same render without it.
+The watermark is part of the image, drawn by `CardView` into the free export only: the site's address (`bulava.in`, the band's text after its last "·") tiled across the whole card (`WatermarkVeil`, the free website's mark, a little firmer, with tiles sized to the card: `38cqw`), and one band across the bottom (about a tenth of the shorter side, above the tiles) with the site's name and address from the settings (`Made with Bulava · bulava.in`). It is the only mark on a card: templates carry no brand layers (a design with one would be a catalog bug), and the editor's preview, the download dialog's previews and the export all draw the same marks. The paid and plan exports are the same render without them.
 
 ### Files
 
-Each download is saved as the image (a JPEG, as rendered) or as a PDF (`POST …/download { "as": "pdf" }`; the image when nothing is asked): one page at the card's size, the image at 300 dpi, so a Portrait 5 × 7 card prints at exactly 5 × 7 inches (the phone card is 3.9 × 8.44 in, the square 3.6 in). The PDF is the image itself, put in a PDF without decoding or re-encoding it (`card-pdf.ts`, no library), so it is exactly what was seen, the watermark band included on a free card. The API makes it from the image the first time it is asked for, keeps it in private storage beside the image (`cards/exports/<id>.pdf`) and hands out a signed link like the image's; the worker deletes it with the image. A PDF download is a download like any other: it counts, and the first of either completes the download.
+The dialog asks how to save the card once it is ready: a **PNG** (the best quality), a **JPEG** (smaller, for WhatsApp) or a **PDF** (for printing): `POST …/download { "as": "png" | "jpeg" | "pdf" }` (a JPEG when nothing is asked; `image`, from older clients, is the JPEG). All three are the same render. The media worker saves the JPEG and the PNG together (`cards/exports/<id>.jpg` and `.png`); a card made before PNGs were saved is made again when its PNG is asked for (the same design, at no charge: the answer is `CARD_NOT_READY` and the dialog waits for it). The PDF is one page at the card's size, the image at 300 dpi, so a Portrait 5 × 7 card prints at exactly 5 × 7 inches (the phone card is 3.9 × 8.44 in, the square 3.6 in). It is the JPEG itself, put in a PDF without decoding or re-encoding it (`card-pdf.ts`, no library), so it is exactly what was seen. The API makes it from the image the first time it is asked for, keeps it in private storage beside the image (`cards/exports/<id>.pdf`) and hands out a signed link like the image's; the worker deletes the PNG and the PDF with the image. **A PDF comes with a watermark-free card only** (a plan's or one bought): the free card's PDF is refused (`CARD_PDF_LOCKED`), and the dialog's PDF button on a free card offers the watermark-free card for its price instead. Every file is a download like any other: it counts, and the first of any completes the download.
 
 ## Paid cards
 
@@ -111,7 +111,7 @@ A plan includes a number of watermark-free cards: the plan feature `cards.includ
 
 `GET /public/cards/config` gives a signed-in customer the allowance (`account.cards`: `{ included, used, left, planName }`, null without one) and everyone the plan that unlocks (more) watermark-free cards (`unlock`: the cheapest public one-time plan with more cards than they have, `{ key, name, cards, priceMinor, fullPriceMinor }`, a plan holder's price being the difference from their plan, as the checkout charges it). `GET /public/cards/session`, signed in, says whether this design was had through the plan before (`planCounted`).
 
-The dialog then shows, above the other ways to download, *Included in your Standard plan: 3 of 5 watermark-free cards left on your Standard plan* with one button and no form; the image is saved as soon as it is ready, and the ready step offers the image again or the PDF, with the cards left. A design had before says so (downloading it again takes nothing more). With none left it says how many were used; without a plan that includes cards it offers the price per card and the plan to unlock (a card in the dialog for someone without a plan, a line under the options otherwise), in the checkout's words: *unlock*, a one-time payment, GST included, and only the difference for a plan holder. Unlocking goes to `/dashboard/checkout?plan=<key>` (through `/login?next=` for a visitor). If a plan download fails (the last card went meanwhile, the plan ended) the dialog returns to the choices with the numbers as they are now.
+The dialog then shows, above the other ways to download, *Included in your Standard plan: 3 of 5 watermark-free cards left on your Standard plan* with one button and no form; once the card is ready it asks how to save it (PNG, JPEG or PDF), with the cards left. A design had before says so (downloading it again takes nothing more). With none left it says how many were used; without a plan that includes cards it offers the price per card and the plan to unlock (a card in the dialog for someone without a plan, a line under the options otherwise), in the checkout's words: *unlock*, a one-time payment, GST included, and only the difference for a plan holder. Unlocking goes to `/dashboard/checkout?plan=<key>` (through `/login?next=` for a visitor). If a plan download fails (the last card went meanwhile, the plan ended) the dialog returns to the choices with the numbers as they are now.
 
 ## Tracking
 
@@ -132,7 +132,7 @@ The console's numbers come from these facts: cards made (customised sessions), f
 
 ## Export renderer
 
-The media worker renders each export (`card-render` queue, one at a time by default: `CARD_RENDER_CONCURRENCY`): Chromium (`puppeteer-core`; Alpine's `chromium` in the media worker image, `CHROMIUM_PATH` to override) opens `WEB_INTERNAL_URL/cards/render/<token>` at the format's design size and pixel ratio, with reduced motion. The page fetches `GET /public/cards/render/<token>` (the design, signed photo links, the watermark or none) and draws `CardView` exactly as the editor does; it marks itself ready once fonts are in, text has been fitted with them and every image has loaded. The screenshot becomes a JPEG (quality 92, 4:4:4) in private storage (`cards/exports/<id>.jpg`); its PDF is made from it when first asked for ([Files](#files)).
+The media worker renders each export (`card-render` queue, one at a time by default: `CARD_RENDER_CONCURRENCY`): Chromium (`puppeteer-core`; Alpine's `chromium` in the media worker image, `CHROMIUM_PATH` to override) opens `WEB_INTERNAL_URL/cards/render/<token>` at the format's design size and pixel ratio, with reduced motion. The page fetches `GET /public/cards/render/<token>` (the design, signed photo links, the watermark or none) and draws `CardView` exactly as the editor does; it marks itself ready once fonts are in, text has been fitted with them and every image has loaded. The screenshot becomes a JPEG (quality 92, 4:4:4) and a PNG in private storage (`cards/exports/<id>.jpg`, `.png`; the PNG is saved first, so a READY export has both); its PDF is made from the JPEG when first asked for ([Files](#files)).
 
 The render token is `<exportId>.<expiry>.<HMAC>`, valid for ten minutes, minted by the worker. Nginx refuses `/cards/render/` and `/api/v1/public/cards/render/` from outside; the worker reaches the web app inside the Docker network, and the API redacts the token from its logs. A failed render is retried twice; after the last attempt the export is FAILED, and the editor or the order page makes a new one.
 
@@ -148,7 +148,7 @@ The worker's daily `card-retention` task (batches, logged):
 
 | What | When |
 |---|---|
-| Free images | deleted 7 days after they are made, with their PDF (the export row stays, `EXPIRED`) |
+| Free images | deleted 7 days after they are made, with their PNG (the export row stays, `EXPIRED`) |
 | Plan images | 30 days (a design downloaded stays counted against the plan) |
 | Paid images | a year after payment (the order stays) |
 | Photos never uploaded, or rejected | after a day |
@@ -167,12 +167,12 @@ Public (`@Public()`; the card's token in `x-card-session`, an order's in `x-card
 | `POST /public/cards/events` | browser-only funnel steps |
 | `POST /public/cards/sessions` · `GET /public/cards/session` · `PUT /public/cards/session/design` | save, reopen (signed in: `planCounted`), autosave |
 | `POST /public/cards/session/uploads` · `…/uploads/:id/complete` · `GET …/uploads/:id` | photos |
-| `POST /public/cards/session/free-download` · `GET …/exports/:id` · `POST …/exports/:id/download` `{ as?: image or pdf }` | the free card (the same links serve a plan card) |
+| `POST /public/cards/session/free-download` · `GET …/exports/:id` · `POST …/exports/:id/download` `{ as?: png, jpeg or pdf }` | the free card (the same links serve a plan card; no PDF of a free card) |
 | `POST /public/cards/session/orders` | the paid card's order and checkout |
-| `GET /public/cards/order` · `POST /public/cards/order/{checkout,verify,events,download,email,regenerate}` (`download`: `{ as?: image or pdf }`) | the order page |
+| `GET /public/cards/order` · `POST /public/cards/order/{checkout,verify,events,download,email,regenerate}` (`download`: `{ as?: png, jpeg or pdf }`) | the order page |
 | `POST /public/cards/recover` | links to bought cards, by email |
 | `GET /public/cards/render/:token` | the export renderer only |
 
 Signed in: `POST /cards/session/plan-download` (the export, and the `allowance` after it). Console: `GET /admin/cards/{stats,leads,leads.csv,leads/:id,orders,orders/:id}`, `POST /admin/cards/leads/:id/withdraw-offers`, `POST /admin/cards/orders/:id/{resend-email,regenerate,refund}`.
 
-Errors: `CARDS_UNAVAILABLE` (switched off), `CARD_SESSION_EXPIRED` (cleaned up: the editor starts the server copy again from the device copy), `CARD_NOT_READY`, `CARD_PLAN_REQUIRED` (a download the plan does not include: no free downloads without a plan, or no watermark-free cards left, `details: { included, used }`), plus `CUSTOMIZATION_INVALID`, `UPLOAD_REJECTED`, `PAYMENTS_UNAVAILABLE`, `PAYMENT_VERIFICATION_FAILED` and `ORDER_NOT_PAYABLE`.
+Errors: `CARDS_UNAVAILABLE` (switched off), `CARD_SESSION_EXPIRED` (cleaned up: the editor starts the server copy again from the device copy), `CARD_NOT_READY` (also while an older card is made again as a PNG), `CARD_PDF_LOCKED` (a PDF of the free card), `CARD_PLAN_REQUIRED` (a download the plan does not include: no free downloads without a plan, or no watermark-free cards left, `details: { included, used }`), plus `CUSTOMIZATION_INVALID`, `UPLOAD_REJECTED`, `PAYMENTS_UNAVAILABLE`, `PAYMENT_VERIFICATION_FAILED` and `ORDER_NOT_PAYABLE`.

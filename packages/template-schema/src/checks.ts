@@ -1,7 +1,7 @@
 import { createTranslator } from '@bulava/localization';
 import { resolveValue } from './bindings';
 import { layerBackdrop, solidColorOf, type Artboard } from './canvas';
-import { sampleRenderContext } from './context';
+import { templateSampleContext } from './context';
 import { AA_TEXT, contrastRatio } from './contrast';
 import type { TemplateDefinition, Value } from './definition';
 import { videoDurationSec } from './validate';
@@ -46,7 +46,7 @@ const OPTIONAL_PROP = /^(tagline|image|invocation|subtitle|place|hashtag|closing
 /** Resolve every prop/element across the test matrix. Pure; used by Template Studio before publishing. */
 export function runTemplateChecks(definition: TemplateDefinition): TemplateCheckResult[] {
   return templateCheckCases(definition).map((c) => {
-    const ctx = sampleRenderContext({ language: c.language, longNames: c.longNames, noPhotos: c.noPhotos, typeKey: c.typeKey });
+    const ctx = templateSampleContext(definition, { language: c.language, longNames: c.longNames, noPhotos: c.noPhotos, typeKey: c.typeKey });
     const opts = { t: createTranslator(c.language), language: c.language, timeZone: ctx.event.timezone };
     const empty: string[] = [];
     const long: string[] = [];

@@ -50,8 +50,12 @@ function FlipDigit({ value }: { value: string }) {
   );
 }
 
-/** Live countdown. Renders a stable placeholder on the server to avoid hydration mismatch. */
-export function CountdownClock({ target, labels, static: isStatic, variant = 'boxes' }: { target: string; labels: Labels; static?: boolean; variant?: 'boxes' | 'flip' }) {
+/**
+ * Live countdown. Renders a stable placeholder on the server to avoid hydration mismatch.
+ * Variants: boxes, flip (flip-clock leaves), rings (each number in a double ring), inline
+ * (one line: "42 days · 8 hours · 30 minutes").
+ */
+export function CountdownClock({ target, labels, static: isStatic, variant = 'boxes' }: { target: string; labels: Labels; static?: boolean; variant?: 'boxes' | 'flip' | 'rings' | 'inline' }) {
   const t = new Date(target).getTime();
   // Static (thumbnail) mode shows fixed illustrative numbers so server and client render identically.
   const [now, setNow] = useState<ReturnType<typeof remaining> | null>(isStatic ? { days: 42, hours: 8, minutes: 30, seconds: 15, done: false } : null);
@@ -88,6 +92,36 @@ export function CountdownClock({ target, labels, static: isStatic, variant = 'bo
           );
         })}
       </div>
+    );
+  }
+
+  if (variant === 'rings') {
+    return (
+      <div className="grid grid-cols-4 gap-3 @min-[640px]:gap-6" role="timer" aria-live="off" data-live="">
+        {cells.map(([key, n]) => (
+          <div key={key} className="text-center">
+            <div className="relative mx-auto flex aspect-square w-full max-w-24 items-center justify-center rounded-full border-2 border-[var(--t-orn,var(--t-secondary))]">
+              <span className="absolute inset-1.5 rounded-full border border-[var(--t-orn,var(--t-secondary))] opacity-50" aria-hidden="true" />
+              <span className="text-3xl tabular-nums [font-family:var(--t-heading)] text-[var(--t-primary-ink)] @min-[640px]:text-4xl">{n === null ? '–' : String(n).padStart(2, '0')}</span>
+            </div>
+            <div className="mt-2 text-[0.65rem] tracking-[0.2em] uppercase text-[var(--t-muted-ink)]">{labels[key]}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (variant === 'inline') {
+    return (
+      <p className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1 text-center" role="timer" aria-live="off" data-live="">
+        {cells.map(([key, n], i) => (
+          <span key={key} className="inline-flex items-baseline gap-1.5">
+            {i ? <span aria-hidden="true" className="mr-2 text-[var(--t-orn,var(--t-secondary))]">·</span> : null}
+            <span className="text-3xl tabular-nums [font-family:var(--t-heading)] text-[var(--t-primary-ink)]">{n === null ? '–' : String(n).padStart(2, '0')}</span>
+            <span className="text-[0.7rem] tracking-[0.2em] uppercase text-[var(--t-muted-ink)]">{labels[key]}</span>
+          </span>
+        ))}
+      </p>
     );
   }
 

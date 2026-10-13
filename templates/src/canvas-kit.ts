@@ -1,4 +1,4 @@
-import type { ArtboardInput, CanvasSectionInput, EffectName, IntroName, LayerInput, LookName, OrnamentLayerName, PhotoSlot, Value } from '@bulava/template-schema';
+import type { ArtboardInput, CanvasSectionInput, EffectName, IntroName, LayerInput, LookName, OrnamentLayerName, OrnamentNameValue, PhotoSlot, ThemeDress, Value } from '@bulava/template-schema';
 import { fontsFor, palette, SLOTS, type CatalogEntry, type CatalogMeta, type FontPreset, type SlotKey } from './builder';
 
 /**
@@ -36,6 +36,17 @@ export interface CanvasSpec extends Omit<CatalogMeta, 'sortOrder'> {
   card: CanvasSectionInput;
   /** Standard sections after the canvas ones (before rsvp and footer). */
   middle: Array<{ id: string; section: string; variant?: string; props?: Record<string, Value> }>;
+  /**
+   * The suite the standard sections are dressed in (theme.ornament, docs/templates.md#section-suites):
+   * the one that matches the hero's art. Without one they wear the look's plain dress.
+   */
+  ornament?: OrnamentNameValue;
+  /** Pieces of the suite swapped for others (theme.dress). */
+  dress?: ThemeDress;
+  /** The hero sits on dark stock: the sections below follow it onto dark bands. */
+  heroTone?: 'light' | 'dark';
+  /** The RSVP's and the footer's layouts (their variants). */
+  closing?: { rsvp?: string; footer?: string };
 }
 
 /** Shorthand for a layer frame. */
@@ -100,7 +111,7 @@ export function canvasWebsite(spec: CanvasSpec, sortOrder: number): CatalogEntry
       description: spec.description,
       eventTypes: spec.eventTypes,
       languages: ['en', 'hi', 'hi-Latn'],
-      theme: { colors: spec.colors, radius: 20, ornament: 'none', pattern: 'none', heroTone: 'light', look: spec.look, effect: spec.effect },
+      theme: { colors: spec.colors, radius: 20, ornament: spec.ornament ?? 'none', ...(spec.dress && Object.keys(spec.dress).length ? { dress: spec.dress } : {}), pattern: 'none', heroTone: spec.heroTone ?? 'light', look: spec.look, effect: spec.effect },
       fonts: fontsFor(spec.fonts),
       capabilities: {
         editable: { colors: true, fonts: true, music: false, background: false, layout: true, photos: true, text: true, animation: true },
@@ -119,8 +130,8 @@ export function canvasWebsite(spec: CanvasSpec, sortOrder: number): CatalogEntry
               ...(spec.extra ?? []).map((e) => ({ id: e.id, section: 'canvas', canvas: e.canvas })),
               { id: 'functions', section: 'canvas', canvas: spec.card },
               ...spec.middle,
-              { id: 'rsvp', section: 'rsvp' },
-              { id: 'footer', section: 'footer', props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
+              { id: 'rsvp', section: 'rsvp', ...(spec.closing?.rsvp ? { variant: spec.closing.rsvp } : {}) },
+              { id: 'footer', section: 'footer', ...(spec.closing?.footer ? { variant: spec.closing.footer } : {}), props: { hashtag: b('custom.hashtag'), closing: b('custom.closing') } },
             ] as never,
           },
         ],

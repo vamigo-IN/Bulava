@@ -62,8 +62,11 @@ export interface CardConfig {
   } | null;
 }
 
-/** How a card is saved: the image, or the same card as a one-page PDF. */
-export type CardFileType = 'image' | 'pdf';
+/** How a card is saved: a PNG, a JPEG, or (watermark-free cards) a one-page PDF at the card's print size. */
+export type CardFileType = 'png' | 'jpeg' | 'pdf';
+
+/** The choices, in the order the dialogs show them. */
+export const CARD_FILE_TYPES: readonly CardFileType[] = ['png', 'jpeg', 'pdf'];
 
 export interface CardUpload {
   id: string;
@@ -156,7 +159,7 @@ export const cardApi = {
   freeDownload: (token: string, body: { phone: string; marketingConsent: boolean }) => api<CardExportView>('/public/cards/session/free-download', { method: 'POST', body, headers: withSession(token) }),
   planDownload: (token: string) => api<CardExportView & { allowance: CardAllowance }>('/cards/session/plan-download', { method: 'POST', body: {}, headers: withSession(token) }),
   exportStatus: (token: string, id: string) => api<CardExportView>(`/public/cards/session/exports/${id}`, { headers: withSession(token) }),
-  exportDownload: (token: string, id: string, as: CardFileType = 'image') =>
+  exportDownload: (token: string, id: string, as: CardFileType = 'jpeg') =>
     api<{ url: string; fileName: string }>(`/public/cards/session/exports/${id}/download`, { method: 'POST', body: { as }, headers: withSession(token) }),
   createOrder: (token: string, body: { phone: string; name: string; email: string; acceptTerms: boolean; marketingConsent: boolean }) =>
     api<CardCheckout>('/public/cards/session/orders', { method: 'POST', body, headers: withSession(token) }),
@@ -166,7 +169,7 @@ export const cardApi = {
     api<{ status: 'PAID' }>('/public/cards/order/verify', { method: 'POST', body, headers: withOrder(orderToken) }),
   orderEvent: (orderToken: string, body: { type: 'PAYMENT_FAILED' | 'PAYMENT_CANCELLED'; reason?: string }) =>
     api<{ ok: true }>('/public/cards/order/events', { method: 'POST', body, headers: withOrder(orderToken) }).catch(() => undefined),
-  orderDownload: (orderToken: string, as: CardFileType = 'image') => api<{ url: string; fileName: string }>('/public/cards/order/download', { method: 'POST', body: { as }, headers: withOrder(orderToken) }),
+  orderDownload: (orderToken: string, as: CardFileType = 'jpeg') => api<{ url: string; fileName: string }>('/public/cards/order/download', { method: 'POST', body: { as }, headers: withOrder(orderToken) }),
   orderEmail: (orderToken: string) => api<{ emailStatus: 'QUEUED' }>('/public/cards/order/email', { method: 'POST', body: {}, headers: withOrder(orderToken) }),
   orderRegenerate: (orderToken: string) => api<{ status: string }>('/public/cards/order/regenerate', { method: 'POST', body: {}, headers: withOrder(orderToken) }),
   recover: (body: { email: string; phone: string }) => api<{ ok: true }>('/public/cards/recover', { method: 'POST', body }),

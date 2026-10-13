@@ -1,9 +1,37 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { EMBLEM_NAMES, type IllustrationName, type ThemeColors } from '@bulava/template-schema';
 import { ArchFrame, Confetti, FloralCorner, Mandala, Ornament, patternStyle, TempleBorder } from '../ornaments';
 import { CrestFrame, Crescent, GothicArch, Lantern, Laurel, PeacockFeather, RoseWindow, SeaWaves, StarField } from '../ornaments-signature';
+import { ILLUSTRATION_ASPECT, Illustration } from '../art/illustrations';
+import { emblemMetal } from '../art/illustrations-faith';
 import { artworkArt, DARK_SCENES, SceneHero, sceneArt, type SceneName } from '../art/scenes';
 import type { SectionProps } from '../types';
 import { cx, initials, Names } from './shared';
+
+/**
+ * A faith emblem crowning the hero (the `emblem` prop: ganesha, crescentStar,
+ * khanda or cross; docs/templates.md#faith): centred above everything else,
+ * stamped in the hero's metal (emblemMetal: its gold, bronze or silver), the
+ * same size in every variant, never behind the words.
+ */
+function HeroEmblem({ name, colors, dark, shadow, className }: { name: IllustrationName; colors: ThemeColors; dark?: boolean; shadow?: boolean; className?: string }) {
+  const aspect = Math.round(ILLUSTRATION_ASPECT[name] * 1000) / 1000;
+  return (
+    <div
+      data-emblem={name}
+      aria-hidden="true"
+      className={cx('pointer-events-none shrink-0 [--emblem:3.5rem] @min-[640px]:[--emblem:4rem]', className)}
+      style={{ height: 'var(--emblem)', width: `calc(var(--emblem) * ${aspect})`, filter: shadow ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' : undefined }}
+    >
+      <Illustration name={name} color={emblemMetal(colors, !!dark)} colors={colors} foil w={64 * aspect} h={64} style={{ display: 'block', width: '100%', height: '100%' }} />
+    </div>
+  );
+}
+
+/** The hero's emblem prop, when it names a faith emblem. */
+function emblemOf(value: string | undefined): IllustrationName | undefined {
+  return value && EMBLEM_NAMES.has(value) ? (value as IllustrationName) : undefined;
+}
 
 /** Name styling per scene: grand capitals for heritage scenes, italic serif for noir, script elsewhere. */
 const SCENE_TYPE: Partial<Record<string, 'script' | 'caps' | 'italic'>> = {
@@ -50,6 +78,10 @@ export function Hero(p: SectionProps) {
   // Personal invitations greet the guest by name (never in catalogue thumbnails).
   const greeting = p.ctx.guest && p.mode !== 'thumbnail' ? p.t('invitation.dear', { guestName: p.ctx.guest.name }) : undefined;
   const common = { title, greeting, invocation: v('invocation'), eyebrow: v('eyebrow'), subtitle: v('subtitle'), date: v('date'), place: v('place'), tagline: v('tagline'), dark };
+  // The faith emblem crowns the hero: at the top of the words, or above the variant's own crown piece.
+  const emblemName = emblemOf(v('emblem'));
+  const emblem = (onDark: boolean | undefined, className?: string, shadow?: boolean): ReactNode =>
+    emblemName ? <HeroEmblem name={emblemName} colors={p.colors} dark={onDark} shadow={shadow} className={className} /> : null;
   const pattern = patternStyle(p.pattern, dark ? p.colors.accent : p.colors.secondary);
   const surface: CSSProperties = dark ? { ...pattern, backgroundColor: p.colors.primary, color: 'var(--t-on-primary)' } : pattern;
   const ornamentColor = dark ? 'text-[var(--t-accent)]' : 'text-[var(--t-secondary)]';
@@ -60,7 +92,7 @@ export function Hero(p: SectionProps) {
     const art = sceneArt(p.instance.variant as SceneName, p.colors, { monogram: initials(title), photo: image });
     return (
       <SceneHero art={art} colors={p.colors} thumbnail={p.mode === 'thumbnail'}>
-        <HeroText {...common} dark={DARK_SCENES.has(p.instance.variant)} names={scene} />
+        <HeroText {...common} dark={DARK_SCENES.has(p.instance.variant)} names={scene} emblem={emblem(DARK_SCENES.has(p.instance.variant))} />
       </SceneHero>
     );
   }
@@ -72,7 +104,7 @@ export function Hero(p: SectionProps) {
     const style = v('nameStyle');
     return (
       <SceneHero art={art} colors={p.colors} thumbnail={p.mode === 'thumbnail'}>
-        <HeroText {...common} dark={artwork.dark} names={style === 'caps' || style === 'italic' ? style : 'script'} />
+        <HeroText {...common} dark={artwork.dark} names={style === 'caps' || style === 'italic' ? style : 'script'} emblem={emblem(artwork.dark, undefined, true)} />
       </SceneHero>
     );
   }
@@ -85,7 +117,7 @@ export function Hero(p: SectionProps) {
           <div className="relative mx-auto w-full max-w-sm">
             <ArchFrame className={cx('absolute inset-0 h-full w-full', ornamentColor)} />
             <div className="relative flex min-h-[460px] flex-col items-center justify-center px-10 pt-20 pb-10">
-              <HeroText {...common} />
+              <HeroText {...common} emblem={emblem(dark)} />
             </div>
           </div>
         </header>
@@ -93,6 +125,7 @@ export function Hero(p: SectionProps) {
     case 'split':
       return (
         <header className="relative overflow-hidden px-6 py-12" style={surface}>
+          {emblem(dark, 'mx-auto mb-8')}
           <div className="mx-auto grid max-w-4xl items-center gap-10 @min-[640px]:grid-cols-2">
             <div className="mx-auto w-64 overflow-hidden rounded-t-full border-4 border-[var(--t-secondary)] bg-[var(--t-surface)] shadow-xl @min-[640px]:w-full">
               {image ? (
@@ -116,6 +149,12 @@ export function Hero(p: SectionProps) {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,var(--t-secondary),var(--t-primary))]" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10" />
+          {emblemName ? (
+            <>
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/45 to-transparent" aria-hidden="true" />
+              <div className="absolute inset-x-0 top-0 flex justify-center pt-6">{emblem(true, undefined, true)}</div>
+            </>
+          ) : null}
           <div className="relative w-full px-6 pb-16">
             <HeroText {...common} inverse />
           </div>
@@ -125,6 +164,7 @@ export function Hero(p: SectionProps) {
       return (
         <header className="px-6 pt-16 pb-12" style={dark ? surface : undefined}>
           <div className={cx('mx-auto max-w-3xl border-y py-12', dark ? 'border-[var(--t-accent)]/40' : 'border-[var(--t-secondary)]/40')}>
+            {emblem(dark, 'mb-6')}
             {common.eyebrow ? <p className={cx('text-xs font-semibold tracking-[0.35em] uppercase', dark ? 'text-[var(--t-accent-on-primary)]' : 'text-[var(--t-secondary-ink)]')}>{common.eyebrow}</p> : null}
             <h1 className="mt-4 text-5xl leading-[1.05] tracking-tight [font-family:var(--t-heading)] @min-[640px]:text-7xl">{title}</h1>
             {common.subtitle ? <p className={cx('mt-5 max-w-xl text-lg', dark ? 'opacity-80' : 'text-[var(--t-muted-ink)]')}>{common.subtitle}</p> : null}
@@ -141,6 +181,7 @@ export function Hero(p: SectionProps) {
           <Confetti className="pointer-events-none absolute top-2 left-1/2 w-[520px] -translate-x-1/2" />
           <Confetti className="pointer-events-none absolute bottom-0 left-1/2 w-[520px] -translate-x-1/2 rotate-180" />
           <div className="relative mx-auto max-w-lg">
+            {emblem(dark, 'mx-auto mb-5')}
             <div
               className={cx(
                 'mx-auto mb-6 flex size-28 items-center justify-center rounded-full text-4xl shadow-lg ring-8 [font-family:var(--t-script)]',
@@ -158,7 +199,7 @@ export function Hero(p: SectionProps) {
         <header className="relative overflow-hidden px-6 pt-6 pb-14 text-center" style={dark ? { ...patternStyle('dots', p.colors.accent), backgroundColor: p.colors.primary, color: p.colors.background } : patternStyle('dots', p.colors.secondary)}>
           <TempleBorder className={cx('mx-auto h-8 w-full max-w-md', ornamentColor)} />
           <div className="mx-auto max-w-md py-10">
-            <HeroText {...common} />
+            <HeroText {...common} emblem={emblem(dark)} />
           </div>
           <TempleBorder className={cx('mx-auto h-8 w-full max-w-md rotate-180', ornamentColor)} />
         </header>
@@ -167,6 +208,7 @@ export function Hero(p: SectionProps) {
       const mono = initials(title);
       return (
         <header className="relative overflow-hidden px-6 pt-14 pb-16 text-center" style={surface}>
+          {emblem(dark, 'mx-auto mb-6')}
           <div className="relative mx-auto w-56">
             <Laurel className={cx('absolute -inset-x-10 top-10 w-[calc(100%+5rem)]', ornamentColor, 'opacity-80')} />
             <CrestFrame className={cx('relative w-full', ornamentColor)} />
@@ -191,6 +233,7 @@ export function Hero(p: SectionProps) {
           <div className="relative mx-auto w-full max-w-sm">
             <GothicArch className={cx('absolute inset-0 h-full w-full', ornamentColor)} />
             <div className="relative flex min-h-[500px] flex-col items-center px-10 pt-10 pb-10">
+              {emblem(dark, 'mb-4')}
               <RoseWindow className={cx('mb-6 w-28', ornamentColor, 'bulava-spin-slow')} />
               <HeroText {...common} />
             </div>
@@ -205,7 +248,7 @@ export function Hero(p: SectionProps) {
         >
           <div className="pointer-events-none absolute top-[22%] left-1/2 size-48 -translate-x-1/2 rounded-full opacity-60 blur-[1px]" style={{ background: `radial-gradient(circle, ${p.colors.accent}, transparent 70%)` }} />
           <div className="relative mx-auto max-w-lg">
-            <HeroText {...common} />
+            <HeroText {...common} emblem={emblem(dark)} />
           </div>
           <SeaWaves className="bulava-drift pointer-events-none absolute inset-x-0 bottom-0 h-36 w-[120%]" />
         </header>
@@ -223,7 +266,7 @@ export function Hero(p: SectionProps) {
           />
           <Crescent className="pointer-events-none absolute top-10 right-10 w-16 text-[var(--t-accent)] opacity-90" />
           <div className="relative mx-auto max-w-lg">
-            <HeroText {...common} dark />
+            <HeroText {...common} dark emblem={emblem(true)} />
           </div>
         </header>
       );
@@ -239,7 +282,7 @@ export function Hero(p: SectionProps) {
             ))}
           </div>
           <div className="relative mx-auto mt-6 max-w-lg">
-            <HeroText {...common} dark />
+            <HeroText {...common} dark emblem={emblem(true)} />
           </div>
         </header>
       );
@@ -253,7 +296,7 @@ export function Hero(p: SectionProps) {
             style={{ animationDelay: '1.2s' }}
           />
           <div className="relative mx-auto max-w-lg pt-28">
-            <HeroText {...common} />
+            <HeroText {...common} emblem={emblem(dark)} />
           </div>
         </header>
       );
@@ -272,7 +315,7 @@ export function Hero(p: SectionProps) {
             />
           )}
           <div className="relative mx-auto max-w-lg">
-            <HeroText {...common} />
+            <HeroText {...common} emblem={emblem(dark)} />
           </div>
         </header>
       );
@@ -293,6 +336,7 @@ function HeroText({
   align = 'center',
   names: namesStyle = 'script',
   portrait,
+  emblem,
 }: {
   title: string;
   greeting?: string;
@@ -309,6 +353,8 @@ function HeroText({
   names?: 'script' | 'caps' | 'italic';
   /** Cover photo shown as a portrait above the names (scenes). */
   portrait?: string;
+  /** The faith emblem, above everything (HeroEmblem). */
+  emblem?: ReactNode;
 }) {
   const onColor = inverse || dark;
   // Text on a dark hero sits on the primary colour; on a light hero, on the page background.
@@ -316,6 +362,7 @@ function HeroText({
   const names = inverse ? 'text-white' : dark ? 'text-[var(--t-accent-on-primary)]' : 'text-[var(--t-primary-ink)]';
   return (
     <div className={cx('flex flex-col', align === 'left' ? 'items-center @min-[640px]:items-start' : 'items-center', dark && !inverse && 'text-[var(--t-on-primary)]')}>
+      {emblem ? <div className="mb-4">{emblem}</div> : null}
       {portrait ? (
         <div className="mb-5 size-24 overflow-hidden rounded-full border-[3px] border-[var(--t-accent)] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] @min-[640px]:size-28">
           <img src={portrait} alt="" className="h-full w-full object-cover" loading="eager" />

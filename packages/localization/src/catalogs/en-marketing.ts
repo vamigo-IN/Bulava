@@ -109,8 +109,8 @@ export const enMarketing = {
   'home.grid.empty': 'No templates match these filters yet.',
   'filter.all': 'All',
   'filter.tier.FREE': 'Free',
-  'filter.tier.STANDARD': 'Standard',
   'filter.tier.PREMIUM': 'Premium',
+  'filter.tier.SIGNATURE': 'Signature',
   'filter.type.WEBSITE': 'Invitation websites',
   'filter.type.VIDEO': 'Video invites',
   'filter.type.DIGITAL_CARD': 'Image cards',
@@ -210,7 +210,7 @@ export const enMarketing = {
 
   'home.pricing.eyebrow': 'Pricing',
   'home.pricing.title': 'Simple. No surprises.',
-  'home.pricing.subtitle': 'Design and preview free. Pay once when you are ready to share: no subscriptions, ever. Prices include GST.',
+  'home.pricing.subtitle': 'Design, preview and publish free with the Bulava mark. Pay once to remove it and add replies, photos and more: no subscriptions, ever. Prices include GST.',
   'home.pricing.oneTime': 'pay once',
   'home.pricing.yearly': 'per year',
   'home.pricing.free': 'Free forever',
@@ -321,7 +321,7 @@ export const enMarketing = {
   'home.faq.6.a': 'Design and preview free. Plans and add-ons are one-time payments through Razorpay (UPI, cards, net banking), and nothing renews. Unlock a bigger plan whenever you like and pay only the difference. Planners managing many events can write to us for a pack.',
 
   'home.final.title': 'Ready to send an invitation your guests will remember?',
-  'home.final.subtitle': 'Design and preview for free, without an account. Pay once when you are ready to share.',
+  'home.final.subtitle': 'Design and preview for free, without an account, and publish free with the Bulava mark. Pay once when you want more.',
 
   'footer.templates': 'Templates',
   'footer.product': 'Product',
@@ -349,6 +349,9 @@ export const enMarketing = {
   'like.limited': 'Someone on this network liked this design today. Sign in to like it too.',
   'templates.showMore': 'Show more templates ({count} more)',
   'templates.detail.back': 'All templates',
+  'templates.search': 'Search templates',
+  'templates.searchPlaceholder': 'Search: royal, floral, nikah, haldi, birthday…',
+  'templates.searchButton': 'Search',
   'templates.detail.demo': 'Open the live demo',
   'templates.detail.designFree': 'Or design it yourself first, no sign-up needed',
   // A template page's share image (link previews on WhatsApp, Instagram, Facebook, X).
@@ -404,7 +407,7 @@ export const enMarketing = {
   'templates.detail.desktop': 'Desktop',
 
   'pricing.title': 'One-time payment. No subscriptions, ever.',
-  'pricing.subtitle': 'Design and preview free as much as you like. Choose a plan when you are ready to share, and pay once for your celebration.',
+  'pricing.subtitle': 'Design and preview free as much as you like, and publish free with the Bulava mark. Pay once for a plan when you want it clean, with replies, photos and more.',
 
   // Design v2: cursor label, hero status chips, section captions
   'cursor.view': 'View',
@@ -437,7 +440,7 @@ export const enMarketing = {
   // The design page and its editors (ADR-063): for everyone, signed in or not.
   'studio.eyebrow': 'Design it yourself',
   'studio.title': 'Design your invitation',
-  'studio.subtitle': 'Try any design for free. Change the words, colours, layout and art on the canvas, and preview it the way your guests will see it. You only need a plan to publish or download.',
+  'studio.subtitle': 'Try any design for free. Change the words, colours, layout and art on the canvas, and preview it the way your guests will see it. Publish a free design for free with the Bulava mark; a plan takes it off and adds more.',
   'studio.step.make': 'What would you like to make?',
   'studio.step.occasion': 'What’s the occasion?',
   'studio.step.design': 'Start from a design or a blank canvas',

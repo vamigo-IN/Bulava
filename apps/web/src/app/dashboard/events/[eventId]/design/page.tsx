@@ -150,7 +150,7 @@ function DesignEditor() {
               <p className="text-[11px] font-semibold tracking-[0.18em] text-gold-700 uppercase">{starter && !dirty ? t('design.starter') : t('design.yours')}</p>
               <h2 className="mt-1 truncate font-display text-3xl leading-tight">{name}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {selected ? <Badge tone={selected.tier === 'FREE' ? 'success' : selected.tier === 'PREMIUM' ? 'brand' : 'warning'}>{t(`filter.tier.${selected.tier}`)}</Badge> : null}
+                {selected ? <Badge tone={selected.tier === 'FREE' ? 'success' : selected.tier === 'SIGNATURE' ? 'brand' : 'warning'}>{t(`filter.tier.${selected.tier}`)}</Badge> : null}
                 {dirty ? <Badge tone="warning">{t('design.unsaved')}</Badge> : !starter ? <Badge tone="success">{t('design.savedBadge')}</Badge> : null}
               </div>
             </div>

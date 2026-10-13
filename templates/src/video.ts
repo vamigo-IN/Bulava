@@ -495,7 +495,7 @@ function video(spec: VideoSpec, sortOrder: number): CatalogEntry {
 const SPECS: VideoSpec[] = [
   // ───────────── Illustrated films ─────────────
   {
-    key: 'bansuri-video', name: 'The Divine Flute', category: 'Wedding', style: 'Divine', tier: 'PREMIUM', badge: 'NEW', featured: true,
+    key: 'bansuri-video', name: 'The Divine Flute', category: 'Wedding', style: 'Divine', tier: 'SIGNATURE', badge: 'NEW', featured: true,
     description: 'A heritage film set in moonlit Vrindavan: the kadamba tree, the Yamuna, a golden flute and peacock plumes. Fireflies rise as your names appear in gold, then each function and a blessing to close.',
     tags: ['signature', 'hindu', 'krishna', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'film', ornament: 'peacock', fonts: 'regal', invocation: INVOCATION.krishna, eyebrow: t('template.weddingOf'),
     colors: palette('#0b3d5c', '#1f8a70', '#e9c46a', '#f5fbf8', '#e6f2ee', '#10262f', '#557079'),
@@ -510,7 +510,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'kanjeevaram-video', name: 'Temple Dawn', category: 'Wedding', style: 'Temple', tier: 'PREMIUM', badge: 'NEW', featured: true,
+    key: 'kanjeevaram-video', name: 'Temple Dawn', category: 'Wedding', style: 'Temple', tier: 'SIGNATURE', badge: 'NEW', featured: true,
     description: 'Sunrise over a South Indian temple: the camera glides through carved pillars to the gopuram as bells and marigolds frame your names. Each function follows under the mandap.',
     tags: ['south-indian', 'tamil', 'telugu', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'film', ornament: 'mandala', fonts: 'grand', invocation: INVOCATION.tamil, eyebrow: t('template.weddingOf'),
     colors: palette('#8a0f1f', '#b8862c', '#f0c75e', '#fdf6e7', '#fbecd0', '#2d1a0f', '#7d6248'),
@@ -524,7 +524,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'royal-reveal-video', name: 'Royal Reveal', category: 'Wedding', style: 'Royal', tier: 'PREMIUM', badge: 'BESTSELLER', featured: true,
+    key: 'royal-reveal-video', name: 'Royal Reveal', category: 'Wedding', style: 'Royal', tier: 'SIGNATURE', badge: 'BESTSELLER', featured: true,
     description: 'A Rajasthani palace on the lake at night: sky lanterns drift up as the camera glides over the water, your names shine in gold, and each function unfolds beneath marigold torans.',
     tags: ['hindu', 'royal', 'rajasthani', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'film', ornament: 'mandala', fonts: 'royal', invocation: INVOCATION.hindu, eyebrow: t('template.weddingOf'),
     colors: palette('#5a0f1f', '#b8892b', '#f1d9a0', '#fbf6ec', '#fffdf8', '#2b1b17', '#7a6558'),
@@ -538,7 +538,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'nikah-noor-video', name: 'Noor Arches', category: 'Wedding', style: 'Royal', tier: 'PREMIUM', badge: 'NEW',
+    key: 'nikah-noor-video', name: 'Noor Arches', category: 'Wedding', style: 'Royal', tier: 'SIGNATURE', badge: 'NEW',
     description: 'Emerald arches receding into golden light: the camera walks through the jharokhas with Bismillah, your names in gold, and every function to follow.',
     tags: ['muslim', 'nikah', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'film', ornament: 'geometric', fonts: 'regal', invocation: INVOCATION.muslim, eyebrow: t('template.weddingOf'),
     colors: palette('#064e3b', '#c9a227', '#f3e3a3', '#f8f5ec', '#fffdf5', '#10231c', '#5b6f65'),
@@ -552,7 +552,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'anand-karaj-video', name: 'Golden Sarovar', category: 'Wedding', style: 'Traditional', tier: 'PREMIUM',
+    key: 'anand-karaj-video', name: 'Golden Sarovar', category: 'Wedding', style: 'Traditional', tier: 'SIGNATURE',
     description: 'Golden domes mirrored in still water under a starry sky, opening with Ik Onkar: a serene film for Anand Karaj.',
     tags: ['sikh', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'film', ornament: 'geometric', fonts: 'grand', invocation: INVOCATION.sikh, eyebrow: t('template.weddingOf'),
     colors: palette('#1e3a8a', '#e07b00', '#fbbf24', '#fffaf2', '#fff3de', '#172033', '#5b6478'),
@@ -562,7 +562,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'marigold-mahal-film', name: 'Marigold Mahal Film', category: 'Wedding', style: 'Heritage', tier: 'PREMIUM', badge: 'NEW', featured: true,
+    key: 'marigold-mahal-film', name: 'Marigold Mahal Film', category: 'Wedding', style: 'Heritage', tier: 'SIGNATURE', badge: 'NEW', featured: true,
     description: 'Marigold torans, a turning rangoli and a row of diyas in crimson and saffron: a joyful heritage film that matches the Marigold Mahal website.',
     tags: ['hindu', 'heritage', 'north-indian', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'film', ornament: 'mandala', fonts: 'desi', invocation: INVOCATION.hindu, eyebrow: t('template.weddingOf'),
     colors: palette('#a3123a', '#e8891d', '#f6c343', '#fff8ec', '#fdf0d8', '#3b1410', '#7c4a3c'),
@@ -577,7 +577,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'kerala-kasavu-film', name: 'Kasavu Backwaters', category: 'Wedding', style: 'Minimal', tier: 'STANDARD', badge: 'NEW',
+    key: 'kerala-kasavu-film', name: 'Kasavu Backwaters', category: 'Wedding', style: 'Minimal', tier: 'PREMIUM', badge: 'NEW',
     description: 'Coconut palms, a houseboat at sunset and a kasavu-gold border: a calm film for Kerala weddings.',
     tags: ['south-indian', 'kerala', 'malayali', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'film', ornament: 'lotus', fonts: 'elegant', eyebrow: t('template.weddingOf'),
     colors: palette('#6b5a1e', '#2f6b3f', '#e9c46a', '#fbf9f2', '#f3efe0', '#2a2618', '#7a7258'),
@@ -587,7 +587,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'blush-and-bloom-film', name: 'Blush & Bloom Film', category: 'Wedding', style: 'Floral', tier: 'STANDARD', badge: 'NEW',
+    key: 'blush-and-bloom-film', name: 'Blush & Bloom Film', category: 'Wedding', style: 'Floral', tier: 'PREMIUM', badge: 'NEW',
     description: 'Layered rose arches and drifting petals in blush and sage: a romantic film for weddings, engagements and receptions.',
     tags: ['floral', 'pastel', 'video', 'illustrated'], eventTypes: ['WEDDING', 'ENGAGEMENT'], recipe: 'film', ornament: 'floral', fonts: 'romantic', eyebrow: t('template.weddingOf'),
     colors: palette('#9d4d5e', '#8fa98a', '#f4c2c2', '#fdf8f7', '#fbeeee', '#3a2328', '#86666c'),
@@ -601,7 +601,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'birthday-bash-video', name: 'Birthday Bash', category: 'Birthday', style: 'Party', tier: 'STANDARD',
+    key: 'birthday-bash-video', name: 'Birthday Bash', category: 'Birthday', style: 'Party', tier: 'PREMIUM',
     description: 'Balloons float up, confetti falls and the name lands in big bright type: a fun video invite for birthday parties.',
     tags: ['birthday', 'party', 'video', 'illustrated'], eventTypes: ['BIRTHDAY'], recipe: 'film', ornament: 'confetti', fonts: 'modern', eyebrow: t('template.birthdayOf'),
     colors: palette('#db2777', '#2563eb', '#fde047', '#fff7fb', '#ffffff', '#1f1330', '#6b5a80'),
@@ -621,7 +621,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'lotus-blessings-video', name: 'Lotus Blessings Film', category: 'Puja & Ceremonies', style: 'Serene', tier: 'STANDARD',
+    key: 'lotus-blessings-video', name: 'Lotus Blessings Film', category: 'Puja & Ceremonies', style: 'Serene', tier: 'PREMIUM',
     description: 'A lotus pond with floating diyas at dawn: a calm film for pujas, griha pravesh and naming ceremonies.',
     tags: ['signature', 'puja', 'video', 'illustrated'], eventTypes: ['RELIGIOUS', 'HOUSEWARMING', 'NAMING_CEREMONY', 'THREAD_CEREMONY'], recipe: 'film', ornament: 'lotus', fonts: 'heritage', invocation: INVOCATION.om, eyebrow: t('template.blessings'),
     colors: palette('#9a3412', '#d97706', '#fcd9a8', '#fffaf3', '#ffffff', '#2f1a0d', '#86684f'),
@@ -632,7 +632,7 @@ const SPECS: VideoSpec[] = [
   },
   // ───────────── Premium films ─────────────
   {
-    key: 'maharani-film', name: 'Maharani Film', category: 'Wedding', style: 'Royal', tier: 'PREMIUM', badge: 'NEW', featured: true,
+    key: 'maharani-film', name: 'Maharani Film', category: 'Wedding', style: 'Royal', tier: 'SIGNATURE', badge: 'NEW', featured: true,
     description: 'A royal wedding film in maroon and gold: your monogram glows in a gold medallion, the camera moves into a mandap lit by the sacred fire as your names shine, your photo appears in the medallion, each function unfolds under glowing arches and the fire closes the film.',
     tags: ['hindu', 'royal', 'north-indian', 'cinematic', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'premium', ornament: 'mandala', fonts: 'royal', invocation: INVOCATION.hindu, eyebrow: t('template.weddingOf'),
     colors: palette('#5a0f28', '#c9a24a', '#f2dca6', '#fbf5ec', '#fffdf8', '#2a0712', '#7a5a52'),
@@ -648,7 +648,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'ring-ceremony-film', name: 'Ring Ceremony Film', category: 'Engagement', style: 'Romantic', tier: 'STANDARD', badge: 'NEW', featured: true,
+    key: 'ring-ceremony-film', name: 'Ring Ceremony Film', category: 'Engagement', style: 'Romantic', tier: 'PREMIUM', badge: 'NEW', featured: true,
     description: 'A rose-gold film for an engagement: dawn over a lotus pond, your names in flowing script under glowing arches, your photo in a gold ring, every function on a glass card and a blessing to close.',
     tags: ['engagement', 'ring-ceremony', 'romantic', 'cinematic', 'video', 'illustrated'], eventTypes: ['ENGAGEMENT', 'WEDDING'], recipe: 'premium', ornament: 'laurel', fonts: 'romantic', eyebrow: t('template.engagementOf'),
     colors: palette('#5b2a4a', '#c99a6a', '#f3d6c8', '#fbf3f1', '#fffaf8', '#2e1424', '#7f6474'),
@@ -663,7 +663,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'midnight-deco-film', name: 'Midnight Deco Film', category: 'Reception', style: 'Glamour', tier: 'PREMIUM', badge: 'NEW', featured: true,
+    key: 'midnight-deco-film', name: 'Midnight Deco Film', category: 'Reception', style: 'Glamour', tier: 'SIGNATURE', badge: 'NEW', featured: true,
     description: 'A black-tie reception film in midnight and gold: the lake palace by night with sky lanterns rising, your monogram in a gold medallion as your names land in tall gold capitals, your photo in a gold arch and every function under the palace lights.',
     tags: ['reception', 'sangeet', 'art-deco', 'night', 'cinematic', 'video', 'illustrated'], eventTypes: ['WEDDING'], recipe: 'premium', ornament: 'geometric', fonts: 'editorial', eyebrow: t('template.reception'),
     colors: palette('#0e1a2b', '#d4b26a', '#ecdcb0', '#f6f4ef', '#ffffff', '#05090f', '#5b6474'),
@@ -678,7 +678,7 @@ const SPECS: VideoSpec[] = [
     },
   },
   {
-    key: 'deepotsav-film', name: 'Deepotsav Film', category: 'Festival', style: 'Festive', tier: 'STANDARD', badge: 'NEW',
+    key: 'deepotsav-film', name: 'Deepotsav Film', category: 'Festival', style: 'Festive', tier: 'PREMIUM', badge: 'NEW',
     description: 'A Diwali film in indigo and saffron gold: a marigold toran over a rangoli of diyas, sky lanterns rising over the palace as your evening is announced, the programme on glass cards under glowing arches, and a warm wish to close.',
     tags: ['festival', 'diwali', 'cinematic', 'video', 'illustrated'], eventTypes: ['FESTIVAL', 'COMMUNITY'], recipe: 'premium', ornament: 'mandala', fonts: 'grand', invocation: '॥ शुभ दीपावली ॥', eyebrow: t('template.celebrateWith'),
     colors: palette('#1f1b4d', '#f2a93b', '#ffd27a', '#fbf7ef', '#fffdf8', '#0d0b24', '#6b6780'),
@@ -694,50 +694,50 @@ const SPECS: VideoSpec[] = [
   },
   // ───────────── Ornament films ─────────────
   {
-    key: 'lantern-night-video', name: 'Lantern Night Film', category: 'Wedding', style: 'Royal', tier: 'PREMIUM', badge: 'NEW',
+    key: 'lantern-night-video', name: 'Lantern Night Film', category: 'Wedding', style: 'Royal', tier: 'SIGNATURE', badge: 'NEW',
     description: 'A starlit 9:16 film in indigo and saffron gold with sky lanterns rising: your names, every function and a glowing close, set to your music.',
     tags: ['signature', 'hindu', 'video'], eventTypes: ['WEDDING'], recipe: 'royal', ornament: 'stars', fonts: 'royal', invocation: INVOCATION.hindu, eyebrow: t('template.weddingOf'), particles: 'lanterns',
     colors: palette('#1b1f4b', '#e0a030', '#f7d58b', '#fbf7ef', '#fffdf8', '#1d1a2e', '#6b6780'),
   },
   {
-    key: 'celestial-vows-video', name: 'Celestial Vows Film', category: 'Wedding', style: 'Celestial', tier: 'PREMIUM',
+    key: 'celestial-vows-video', name: 'Celestial Vows Film', category: 'Wedding', style: 'Celestial', tier: 'SIGNATURE',
     description: 'Stars and moonlight in a modern motion invite for evening weddings, sangeet and cocktails.',
     tags: ['signature', 'night', 'video'], eventTypes: ['WEDDING', 'ENGAGEMENT'], recipe: 'modern', ornament: 'stars', fonts: 'royal', eyebrow: t('template.weddingOf'), particles: 'goldDust',
     colors: palette('#141a3a', '#9aa6d6', '#e8e3c8', '#f5f6fb', '#ffffff', '#141a30', '#5d6480'),
   },
   {
-    key: 'cathedral-grace-video', name: 'Cathedral Grace Film', category: 'Wedding', style: 'Heritage', tier: 'PREMIUM',
+    key: 'cathedral-grace-video', name: 'Cathedral Grace Film', category: 'Wedding', style: 'Heritage', tier: 'SIGNATURE',
     description: 'Laurel, navy and antique gold with a verse to open and petals falling: a graceful video invitation for church weddings.',
     tags: ['signature', 'christian', 'video'], eventTypes: ['WEDDING'], recipe: 'royal', ornament: 'laurel', fonts: 'editorial', invocation: INVOCATION.christian, eyebrow: t('template.weddingOf'), particles: 'petals',
     colors: palette('#1f2a44', '#b8955a', '#e7d3a8', '#f8f6f1', '#ffffff', '#1a2030', '#606879'),
   },
   {
-    key: 'save-the-date-video', name: 'Save the Date Film', category: 'Save the Date', style: 'Modern', tier: 'STANDARD', badge: 'POPULAR',
+    key: 'save-the-date-video', name: 'Save the Date Film', category: 'Save the Date', style: 'Modern', tier: 'PREMIUM', badge: 'POPULAR',
     description: 'Your favourite photo with a slow zoom, falling petals, your names and date. The perfect first announcement.',
     tags: ['save-the-date', 'photo', 'video'], eventTypes: ['WEDDING', 'ENGAGEMENT'], recipe: 'photo', ornament: 'floral', fonts: 'classic', eyebrow: t('template.saveTheDate'), particles: 'petals',
     colors: palette('#3a2328', '#b76e79', '#f3d1d6', '#fdf8f8', '#ffffff', '#3a2328', '#86666c'),
   },
   {
-    key: 'festive-greetings-video', name: 'Festive Greetings', category: 'Festival', style: 'Festive', tier: 'STANDARD',
+    key: 'festive-greetings-video', name: 'Festive Greetings', category: 'Festival', style: 'Festive', tier: 'PREMIUM',
     description: 'Purple and gold sparkle with rising lanterns for Diwali, Eid and festival gatherings.',
     tags: ['festival', 'diwali', 'video'], eventTypes: ['FESTIVAL', 'COMMUNITY'], recipe: 'festive', ornament: 'mandala', fonts: 'royal', eyebrow: t('template.celebrateWith'), particles: 'lanterns',
     colors: palette('#3b0764', '#f59e0b', '#fde68a', '#fbf7ff', '#ffffff', '#1e0833', '#6b5a80'),
   },
   {
-    key: 'corporate-invite-video', name: 'Keynote', category: 'Corporate', style: 'Modern', tier: 'STANDARD',
+    key: 'corporate-invite-video', name: 'Keynote', category: 'Corporate', style: 'Modern', tier: 'PREMIUM',
     description: 'A clean motion invite for launches, conferences and company celebrations.',
     tags: ['corporate', 'video'], eventTypes: ['CORPORATE'], recipe: 'modern', ornament: 'geometric', fonts: 'modern', eyebrow: t('invitation.youAreInvited'),
     colors: palette('#1e3a8a', '#0ea5e9', '#bae6fd', '#f8fafc', '#ffffff', '#0f172a', '#64748b'),
   },
   // ───────────── Image cards ─────────────
   {
-    key: 'royal-card', name: 'Royal Card', category: 'Wedding', style: 'Royal', tier: 'STANDARD', card: true, backdrop: 'palace',
+    key: 'royal-card', name: 'Royal Card', category: 'Wedding', style: 'Royal', tier: 'PREMIUM', card: true, backdrop: 'palace',
     description: 'A 4:5 illustrated card of your invitation, a palace on the lake at night, for WhatsApp, Instagram and printing.',
     tags: ['hindu', 'card', 'illustrated'], eventTypes: ['WEDDING', 'ENGAGEMENT'], recipe: 'royal', ornament: 'mandala', fonts: 'royal', invocation: INVOCATION.hindu, eyebrow: t('template.weddingOf'),
     colors: palette('#5a0f1f', '#b8892b', '#f1d9a0', '#fbf6ec', '#fffdf8', '#2b1b17', '#7a6558'),
   },
   {
-    key: 'temple-card', name: 'Temple Card', category: 'Wedding', style: 'Temple', tier: 'STANDARD', card: true, backdrop: 'gopuram', badge: 'NEW',
+    key: 'temple-card', name: 'Temple Card', category: 'Wedding', style: 'Temple', tier: 'PREMIUM', card: true, backdrop: 'gopuram', badge: 'NEW',
     description: 'A 4:5 illustrated card with a temple gopuram at sunrise, for South Indian weddings.',
     tags: ['south-indian', 'card', 'illustrated'], eventTypes: ['WEDDING', 'ENGAGEMENT'], recipe: 'royal', ornament: 'mandala', fonts: 'grand', invocation: INVOCATION.tamil, eyebrow: t('template.weddingOf'),
     colors: palette('#8a0f1f', '#b8862c', '#f0c75e', '#fdf6e7', '#fbecd0', '#2d1a0f', '#7d6248'),

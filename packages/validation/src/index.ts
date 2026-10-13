@@ -857,7 +857,7 @@ export const FEATURE_KEYS = {
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
 
 /** Template tiers as numbers for templates.maxTier comparisons. */
-export const TEMPLATE_TIER_RANK = { FREE: 0, STANDARD: 1, PREMIUM: 2 } as const;
+export const TEMPLATE_TIER_RANK = { FREE: 0, PREMIUM: 1, SIGNATURE: 2 } as const;
 
 /** The most of one stackable add-on in one purchase (ADR-062). */
 export const ADDON_MAX_QUANTITY = 20;
@@ -1262,14 +1262,19 @@ export const CardOrderSchema = z.object({
 });
 export type CardOrderInput = z.infer<typeof CardOrderSchema>;
 
-/** How a card is saved: the image (JPEG, as rendered) or a one-page PDF of it at the card's size. */
-export const CARD_FILE_TYPES = ['image', 'pdf'] as const;
+/**
+ * How a card is saved (docs/cards.md#files): a PNG (lossless), a JPEG (small,
+ * for WhatsApp) or a one-page PDF at the card's print size. All three are the
+ * same rendered card. A PDF comes with a watermark-free card (a plan's or one
+ * bought), never with the free card.
+ */
+export const CARD_FILE_TYPES = ['png', 'jpeg', 'pdf'] as const;
 export type CardFileType = (typeof CARD_FILE_TYPES)[number];
 
-/** A signed link to a card's file (free, plan or paid): the image unless the PDF is asked for (no body: the image). */
+/** A signed link to a card's file (free, plan or paid): a JPEG unless another type is asked for. `image` (older clients) is the JPEG. */
 export const CardDownloadSchema = z
   .object({
-    as: z.enum(CARD_FILE_TYPES).default('image'),
+    as: z.preprocess((v) => (v === 'image' ? 'jpeg' : v), z.enum(CARD_FILE_TYPES)).default('jpeg'),
   })
   .prefault({});
 export type CardDownloadInput = z.infer<typeof CardDownloadSchema>;

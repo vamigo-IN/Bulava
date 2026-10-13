@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { TemplateRenderer } from '@bulava/template-engine';
-import { sampleRenderContext, type TemplateDefinition } from '@bulava/template-schema';
+import { templateSampleContext, type TemplateDefinition } from '@bulava/template-schema';
 import { UseTemplateButton } from '@/components/marketing/quick-start';
 import { createTranslator } from '@bulava/localization';
 
@@ -27,7 +27,7 @@ export function TemplateDemo({
   tags?: string[];
 }) {
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
-  const ctx = useMemo(() => sampleRenderContext({ typeKey: eventType, language, tags }), [eventType, language, tags]);
+  const ctx = useMemo(() => templateSampleContext(definition, { typeKey: eventType, language, tags }), [definition, eventType, language, tags]);
   return (
     <div className="pb-28" style={{ background: definition.theme.colors.background }}>
       <TemplateRenderer key={language} definition={definition} context={ctx} mode="live" language={language} introKey={`demo-${templateKey}`} />

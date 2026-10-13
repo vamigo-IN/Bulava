@@ -62,7 +62,7 @@ export interface EventSummary {
   /** readyFunctions: functions with a date, time and venue. */
   counts: { functions: number; readyFunctions: number; guests: number };
   /** The website design the host chose; null while the event type's default stands in. */
-  design: { templateKey: string; templateName: string; tier: 'FREE' | 'STANDARD' | 'PREMIUM' } | null;
+  design: { templateKey: string; templateName: string; tier: 'FREE' | 'PREMIUM' | 'SIGNATURE' } | null;
   /** The host's shareable, watermarked preview link: /preview/<token>. */
   previewToken: string;
   /** "quick_start" when it began on the template page. */
@@ -272,7 +272,7 @@ export interface ResolvedTemplate {
   templateId: string;
   templateKey: string;
   templateVersionId: string;
-  tier: 'FREE' | 'STANDARD' | 'PREMIUM';
+  tier: 'FREE' | 'PREMIUM' | 'SIGNATURE';
   definition: import('@bulava/template-schema').TemplateDefinition;
   customization: import('@bulava/template-schema').Customization | null;
   isDefault: boolean;
@@ -381,7 +381,7 @@ export interface TemplateSummaryLite {
   name: string;
   description: string | null;
   category: string;
-  tier: 'FREE' | 'STANDARD' | 'PREMIUM';
+  tier: 'FREE' | 'PREMIUM' | 'SIGNATURE';
   badge: string | null;
   tags: string[];
   eventTypes: string[];
