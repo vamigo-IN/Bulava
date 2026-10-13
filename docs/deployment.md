@@ -170,7 +170,7 @@ New and changed catalog templates reach the server with the release, through the
 docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate node dist/seed.js --templates-only --dry-run
 ```
 
-It prints one line per template (`create`, `update`, `sync`, `retire`) and a total, and writes nothing. A release that changes the database cannot be compared before its migrations run, so its dry run says so and skips the preview (`previewTemplates`); the migrate job then prints what it synced, which `deploy-server.sh` shows at the end. To apply just the catalog without a full release: the same command without `--dry-run`. If the database was restored from a backup older than the catalog, `up -d` (or that command) brings the templates back.
+It prints one line per template (`create`, `update`, `sync`, `retire`) and a total, and writes nothing. The dry run runs this release's code against the database before its migrations do, so it first lists the migrations the database lacks (`pendingMigrations`, against `_prisma_migrations`). With some pending it still previews when it can, and when the old database cannot be read yet (a missing table or column, an enum value the release renamed, such as the template tiers of ADR-067) it names those migrations and skips the preview instead of failing (`previewTemplates`); the migrate job then prints what it synced, which `deploy-server.sh` shows at the end. With none pending, any error stops the deploy. To apply just the catalog without a full release: the same command without `--dry-run`. If the database was restored from a backup older than the catalog, `up -d` (or that command) brings the templates back.
 
 ## Rollback
 

@@ -459,17 +459,20 @@ export async function seedTemplates(
 
 /**
  * The deploy's preview of the catalog migration: `seedTemplates` as a dry run, before the release
- * migrates. A release that changes the database cannot read the old tables yet, so there is nothing
- * to compare: null instead of an error (the migrate job then reports what it syncs).
+ * migrates. A release that changes the database may not be able to read it yet (a table or column it
+ * lacks, an enum value it renamed), so there is nothing to compare: null instead of an error, and the
+ * migrate job then reports what it syncs. `migrationsPending` (from `pendingMigrations`) says the
+ * release has migrations still to run: then any query the database refuses means just that.
  */
 export async function previewTemplates(
   prisma: PrismaClient,
-  options: { updateChanged?: boolean; catalog?: CatalogEntry[]; retiredKeys?: readonly string[] } = {},
+  options: { updateChanged?: boolean; catalog?: CatalogEntry[]; retiredKeys?: readonly string[]; migrationsPending?: boolean } = {},
 ): Promise<TemplateSeedResult | null> {
+  const { migrationsPending = false, ...seedOptions } = options;
   try {
-    return await seedTemplates(prisma, { ...options, dryRun: true });
+    return await seedTemplates(prisma, { ...seedOptions, dryRun: true });
   } catch (error) {
-    if (schemaBehind(error)) return null;
+    if (schemaBehind(error) || (migrationsPending && queryRefused(error))) return null;
     throw error;
   }
 }
@@ -478,4 +481,15 @@ export async function previewTemplates(
 export function schemaBehind(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   return code === 'P2021' || code === 'P2022';
+}
+
+/**
+ * A query the database answered with data this release's client cannot read or a refusal (Prisma's
+ * P2xxx errors, and unknown request errors such as "Value 'STANDARD' not found in enum"), as opposed
+ * to an unreachable database (P1xxx) or a bug in the seed.
+ */
+function queryRefused(error: unknown): boolean {
+  const { name, code } = (error ?? {}) as { name?: unknown; code?: unknown };
+  if (name === 'PrismaClientUnknownRequestError') return true;
+  return name === 'PrismaClientKnownRequestError' && typeof code === 'string' && code.startsWith('P2');
 }

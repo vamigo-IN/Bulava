@@ -1,5 +1,7 @@
+import path from 'node:path';
 import { seedPlatformAdmin } from './admin-seed';
 import { createPrismaClient } from './client';
+import { pendingMigrations } from './migrations';
 import { seedOriginalMusic } from './music-seed';
 import { previewTemplates, seedReferenceData, seedTemplates } from './seed-data';
 import { seedSitePages } from './site-pages';
@@ -13,9 +15,10 @@ import { seedSitePages } from './site-pages';
  *
  * --templates-only runs just the template catalog's migration (seedTemplates);
  * --dry-run (templates only) lists what it would create, update, sync or retire
- * and writes nothing; against a database that still lacks this release's
- * migrations it says so and exits cleanly. The deploy's migrate job runs the
- * full seed.
+ * and writes nothing. The deploy runs it before migrating: when this release has
+ * migrations the database lacks and the old database cannot be read with this
+ * release's code (a renamed enum value, a missing column), it names them and
+ * exits cleanly. The deploy's migrate job runs the full seed.
  *
  * Admin variables: ADMIN_EMAIL, ADMIN_PASSWORD, optional ADMIN_NAME, and
  * ADMIN_RESET_PASSWORD=true to overwrite an existing admin's password.
@@ -26,19 +29,25 @@ import { seedSitePages } from './site-pages';
  */
 const flag = (name: string) => process.argv.includes(name);
 
+/** The release's migrations, shipped beside dist/ (the migrate image runs `prisma migrate deploy` from them). */
+const MIGRATIONS_DIR = path.join(__dirname, '..', 'prisma', 'migrations');
+
 async function main(): Promise<void> {
   const prisma = createPrismaClient();
   try {
     const dryRun = flag('--dry-run');
     if (flag('--templates-only') || dryRun) {
       const options = { updateChanged: flag('--update-templates') };
-      const result = dryRun ? await previewTemplates(prisma, options) : await seedTemplates(prisma, options);
+      const pending = dryRun ? await pendingMigrations(prisma, MIGRATIONS_DIR) : [];
+      const result = dryRun ? await previewTemplates(prisma, { ...options, migrationsPending: pending.length > 0 }) : await seedTemplates(prisma, options);
       if (!result) {
-        console.log('Dry run skipped: this release changes the database, so the catalog is compared after its migrations (the migrate job prints what it synced).');
+        const migrations = pending.length ? ` (${pending.join(', ')})` : '';
+        console.log(`Dry run skipped: this release changes the database${migrations}, so the catalog is compared after its migrations (the migrate job prints what it synced).`);
         return;
       }
       for (const c of result.changes) console.log(`  ${c.change.padEnd(6)} ${c.key}`);
-      console.log(`${dryRun ? 'Dry run (nothing written). Would change' : 'Templates'}: ${templateSummary(result)}.`);
+      const before = pending.length ? `, read before ${pending.length === 1 ? 'its migration' : `its ${pending.length} migrations`}` : '';
+      console.log(`${dryRun ? `Dry run (nothing written${before}). Would change` : 'Templates'}: ${templateSummary(result)}.`);
       return;
     }
     await seedReferenceData(prisma);

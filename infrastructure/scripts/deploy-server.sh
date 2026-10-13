@@ -25,8 +25,11 @@ compose() { docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"; }
 [ -f "$ENV_FILE" ] || die "missing $ENV_FILE (run this from the repository root, e.g. /opt/bulava)"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || die "the checkout has local changes; commit or discard them first (git status)"
 
-# The release now running, whose images stay for a rollback.
-previous="$(git rev-parse --verify --quiet HEAD || true)"
+# The release now running, whose images stay for a rollback: the tag of the API's running image
+# (a run that stopped half-way has already checked out the new commit), else the checkout's commit.
+running="$(docker inspect -f '{{.Config.Image}}' "$(compose ps -q api 2>/dev/null)" 2>/dev/null || true)"
+previous="${running##*:}"
+[[ "$previous" =~ ^([0-9a-f]{40}|v[0-9][0-9A-Za-z.+-]*)$ ]] || previous="$(git rev-parse --verify --quiet HEAD || true)"
 
 log "Fetching $target"
 git fetch --quiet --tags origin
