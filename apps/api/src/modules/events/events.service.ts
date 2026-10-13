@@ -3,9 +3,11 @@ import { randomBytes } from 'node:crypto';
 import { hashPassword, isLinkMode, permissionsForEventRole, type EventPermission, type EventRole } from '@bulava/auth';
 import { isSupportedLanguage, zonedWallTimeToUtcIso } from '@bulava/localization';
 import {
+  mainDefaultFunction,
   slugify,
   validateEventDetails,
   type CreateEventInput,
+  type DefaultFunction,
   type UpdateEventInput,
 } from '@bulava/validation';
 import type { EventStatus, Prisma } from '@bulava/database';
@@ -100,17 +102,15 @@ function designOf(event: EventWithPolicy): EventDto['design'] {
   return template ? { templateKey: template.key, templateName: template.name, tier: template.tier } : null;
 }
 
-interface DefaultItem {
-  name: string;
-  slug: string;
-}
+/** An event type's suggested group or function (`main` marks the function a new event starts with). */
+type DefaultItem = DefaultFunction;
 
 function asDefaultItems(value: Prisma.JsonValue): DefaultItem[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((v) => {
     if (typeof v !== 'object' || v === null || Array.isArray(v)) return [];
-    const { name, slug } = v as Record<string, unknown>;
-    return typeof name === 'string' && typeof slug === 'string' ? [{ name, slug }] : [];
+    const { name, slug, main } = v as Record<string, unknown>;
+    return typeof name === 'string' && typeof slug === 'string' ? [{ name, slug, ...(main === true ? { main: true } : {}) }] : [];
   });
 }
 
@@ -223,10 +223,13 @@ export class EventsService {
       });
 
       if (input.applyDefaults) {
-        // The host may keep only some of the suggestions (no Mehendi, say); unknown slugs are ignored.
-        // They are placeholders until they have a date: the plan counts only those guests see (ADR-062).
+        // One function to start with, the occasion's main one (the wedding itself, not the Haldi before it),
+        // unless the host chose which suggestions to keep; unknown slugs are ignored (ADR-072). Hosts add
+        // the others on the Functions page. They are placeholders until they have a date (ADR-062).
+        const suggested = asDefaultItems(type.defaultFunctions);
         const chosen = input.functionSlugs ? new Set(input.functionSlugs) : null;
-        const defaults = asDefaultItems(type.defaultFunctions).filter((f) => !chosen || chosen.has(f.slug));
+        const main = mainDefaultFunction(type, suggested);
+        const defaults = chosen ? suggested.filter((f) => chosen.has(f.slug)) : main ? [main] : [];
         await tx.eventFunction.createMany({
           data: defaults.map((f, index) => ({
             eventId: created.id,
@@ -266,9 +269,9 @@ export class EventsService {
 
   /**
    * A day chosen before the functions have their own dates (event creation, the
-   * quick start): it goes on the main function, the one named after the event
-   * type or else the first, at 10 am in the event's time zone. Without
-   * functions it becomes the event's start date.
+   * quick start): it goes on the main function (`mainDefaultFunction`: the one
+   * named after the occasion, or else the first), at 10 am in the event's time
+   * zone. Without functions it becomes the event's start date.
    */
   async setMainDate(eventId: string, type: { key: string; name: string }, date: string, timezone: string): Promise<void> {
     const startsAt = new Date(zonedWallTimeToUtcIso(`${date}T10:00`, timezone));
@@ -277,7 +280,7 @@ export class EventsService {
       await this.prisma.event.update({ where: { id: eventId }, data: { startDate: startsAt, endDate: startsAt } });
       return;
     }
-    const main = functions.find((f) => f.slug === type.key.toLowerCase() || f.name.toLowerCase() === type.name.toLowerCase()) ?? functions[0]!;
+    const main = mainDefaultFunction(type, functions) ?? functions[0]!;
     await this.prisma.$transaction(async (tx) => {
       await tx.eventFunction.update({ where: { id: main.id }, data: { startsAt } });
       const agg = await tx.eventFunction.aggregate({ where: { eventId, deletedAt: null, status: { not: 'CANCELLED' } }, _min: { startsAt: true }, _max: { endsAt: true, startsAt: true } });

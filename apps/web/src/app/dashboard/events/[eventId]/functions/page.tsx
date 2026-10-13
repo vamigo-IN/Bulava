@@ -1,13 +1,21 @@
 'use client';
 
+import { ExternalLink, MapPin, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { formatEventDateWithWeekday, formatEventTime } from '@bulava/localization';
 import { apiDelete, apiPatch, apiPost } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { useEvent, useFunctions, useGroups, useInvalidateEvent } from '@/lib/queries';
+import type { Venue } from '@/lib/types';
 import { Alert, Badge, Button, Card, EmptyState, Spinner } from '@/components/ui/primitives';
 import { FunctionForm, type FunctionPayload } from '@/components/events/function-form';
+
+/** "Bhawani Singh Rd, Rambagh · Jaipur, Rajasthan 302005": what guests read under the venue's name. */
+function venueLine(venue: Venue): string {
+  const place = [venue.city, [venue.state, venue.postalCode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  return [venue.address, place].filter(Boolean).join(' · ');
+}
 
 export default function FunctionsPage() {
   const t = useT();
@@ -52,6 +60,7 @@ export default function FunctionsPage() {
               <Card>
                 {editing === fn.id ? (
                   <FunctionForm
+                    eventId={eventId}
                     initial={fn}
                     groups={groups.data ?? []}
                     timeZone={timeZone}
@@ -77,7 +86,26 @@ export default function FunctionsPage() {
                           {formatEventTime(fn.startsAt, { language: 'en', timeZone })}
                         </p>
                       ) : null}
-                      {fn.venue ? <p className="text-sm text-stone-600">{fn.venue.name}</p> : null}
+                      {fn.venue ? (
+                        <div className="mt-1 flex min-w-0 items-start gap-1.5 text-sm text-stone-600">
+                          <MapPin aria-hidden className="mt-0.5 size-3.5 shrink-0 text-gold-600" />
+                          <p className="min-w-0">
+                            <span className="font-medium text-stone-700">{fn.venue.name}</span>
+                            {venueLine(fn.venue) ? <span className="block text-xs text-stone-500">{venueLine(fn.venue)}</span> : null}
+                            {fn.venue.mapUrl ? (
+                              <a
+                                href={fn.venue.mapUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700"
+                              >
+                                {t('function.viewMap')}
+                                <ExternalLink aria-hidden className="size-3" />
+                              </a>
+                            ) : null}
+                          </p>
+                        </div>
+                      ) : null}
                       <p className="mt-2 text-xs text-stone-500">
                         {t('function.field.audienceGroups')}:{' '}
                         {fn.audienceGroupIds.length
@@ -106,6 +134,7 @@ export default function FunctionsPage() {
       {editing === 'new' ? (
         <Card>
           <FunctionForm
+            eventId={eventId}
             groups={groups.data ?? []}
             timeZone={timeZone}
             submitting={busy}
@@ -113,6 +142,15 @@ export default function FunctionsPage() {
             onCancel={() => setEditing(null)}
           />
         </Card>
+      ) : functions.data?.length ? (
+        // One function to start with (ADR-072): the rest are added here, each with its own day and place.
+        <div className="flex flex-col items-start gap-3 rounded-3xl border border-dashed border-gold-300 bg-white/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <p className="max-w-xl text-sm leading-relaxed text-stone-600">{t('function.addMoreHint')}</p>
+          <Button className="shrink-0" onClick={() => setEditing('new')}>
+            <Plus aria-hidden className="size-4" />
+            {t('function.addMore')}
+          </Button>
+        </div>
       ) : (
         <Button onClick={() => setEditing('new')}>{t('function.add')}</Button>
       )}

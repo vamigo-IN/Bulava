@@ -87,19 +87,33 @@ export interface ShareLinkInfo {
   eventStatus: EventSummary['status'];
 }
 
+/** A function's venue: the name the host typed, the address, the spot on the map and guests' directions link. */
+export interface Venue {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string;
+  latitude: number | null;
+  longitude: number | null;
+  mapUrl: string | null;
+}
+
+/** A function has a start only (ADR-072): the API still returns an older function's end, which the dashboard never shows. */
 export interface EventFunction {
   id: string;
   name: string;
   slug: string;
   description: string | null;
   startsAt: string | null;
-  endsAt: string | null;
   status: 'DRAFT' | 'SCHEDULED' | 'POSTPONED' | 'CANCELLED' | 'COMPLETED';
   visibility: 'LISTED' | 'UNLISTED';
   sortOrder: number;
   accessMode: AccessMode | 'INHERIT';
   effectiveAccessMode: AccessMode;
-  venue: { id: string; name: string; address: string | null; city: string | null; mapUrl: string | null } | null;
+  venue: Venue | null;
   audienceGroupIds: string[];
 }
 

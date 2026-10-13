@@ -23,7 +23,7 @@ export const RunCheckSchema = z.object({ to: z.string().trim().max(200).optional
 const TIMEOUT = 10_000;
 
 /** External APIs; tests and staging can point them elsewhere. */
-function apiBase(name: 'RAZORPAY_API_BASE' | 'CLOUDFLARE_API_BASE' | 'WHATSAPP_API_BASE' | 'GETGABS_API_BASE' | 'PEXELS_API_BASE' | 'PIXABAY_API_BASE', fallback: string): string {
+function apiBase(name: 'RAZORPAY_API_BASE' | 'CLOUDFLARE_API_BASE' | 'WHATSAPP_API_BASE' | 'GETGABS_API_BASE' | 'PEXELS_API_BASE' | 'PIXABAY_API_BASE' | 'GOOGLE_PLACES_API_BASE', fallback: string): string {
   return (process.env[name] || fallback).replace(/\/$/, '');
 }
 
@@ -431,18 +431,67 @@ export class SettingsChecksService {
     steps.push({ label: 'Authorized redirect URI', ok: null, detail: `${redirect} must be listed on the client; Google checks it when someone signs in.` });
   }
 
+  /** Maps: the public embed key (testable only in a browser), and the server's Places key with a real venue search (ADR-072). */
   private async maps(steps: SettingCheckStep[]) {
     const s = await this.store.get('maps');
-    steps.push({ label: 'Maps switched on', ok: s.value.enabled ? true : null, detail: s.value.enabled ? undefined : 'Off: invitations show a directions link only.' });
+    steps.push({
+      label: 'Maps switched on',
+      ok: s.value.enabled ? true : null,
+      detail: s.value.enabled ? undefined : 'Off: invitations show a directions link only, and hosts type venue addresses themselves.',
+    });
     if (!s.value.embedKey) {
-      steps.push({ label: 'Maps Embed API key', ok: false, detail: 'Create a browser key in Google Cloud with the Maps Embed API enabled, restricted to your site’s domains.' });
+      // Needed for what is switched on: maps on invitations. Venue search works without it.
+      steps.push({
+        label: 'Maps Embed API key',
+        ok: s.value.enabled && s.value.showOnInvitations ? false : null,
+        detail: 'Create a browser key in Google Cloud with the Maps Embed API enabled, restricted to your site’s domains. Without it, invitations and the venue field show no map.',
+      });
+    } else {
+      steps.push({
+        label: 'Maps Embed API key',
+        ok: null,
+        detail: 'Google checks a restricted key against the page showing the map, so it can only be tested in a browser: the preview below uses it.',
+      });
+    }
+    await this.placesCheck(steps, s);
+  }
+
+  private async placesCheck(steps: SettingCheckStep[], s: ResolvedSetting<'maps'>) {
+    const key = s.secrets.placesApiKey;
+    if (!s.value.venueSearch) {
+      steps.push({ label: 'Venue search', ok: null, detail: 'Off: hosts type venue addresses themselves and can still set the spot from a Google Maps link.' });
       return;
     }
+    if (!key) {
+      steps.push({
+        label: 'Places API key',
+        ok: null,
+        detail: 'Not set: hosts type venue addresses themselves. For venue search, create a key with the Places API (New) enabled, restricted to that API and not to websites (the server calls Google).',
+      });
+      return;
+    }
+    const res = await requestJson(`${apiBase('GOOGLE_PLACES_API_BASE', 'https://places.googleapis.com')}/v1/places:autocomplete`, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': key, 'x-goog-fieldmask': 'suggestions.placePrediction.text.text' },
+      body: { input: 'Rambagh Palace Jaipur', languageCode: 'en', regionCode: 'in' },
+    }).catch((error: unknown) => ({ status: 0, body: { message: describe(error) } as Record<string, unknown> }));
+    const suggestions = Array.isArray(res.body.suggestions) ? (res.body.suggestions as Array<{ placePrediction?: { text?: { text?: unknown } } }>) : [];
+    const first = suggestions.find((x) => typeof x.placePrediction?.text?.text === 'string')?.placePrediction?.text?.text as string | undefined;
+    steps.push(
+      res.status === 200
+        ? { label: 'Google accepted the Places key and answered a venue search', ok: true, detail: first ? `First suggestion: ${first.slice(0, 120)}` : undefined }
+        : {
+            label: 'Google accepted the Places key',
+            ok: false,
+            detail: `${errorText(res.body) ?? (res.status ? `Google answered ${res.status}.` : 'No answer.')} Check that the Places API (New) is enabled for the key's project, with billing, and that the key is not restricted to websites.`,
+          },
+    );
     steps.push({
-      label: 'Maps Embed API key',
+      label: 'Daily limit',
       ok: null,
-      detail: 'Google checks a restricted key against the page showing the map, so it can only be tested in a browser: the preview below uses it.',
+      detail: `At most ${s.value.placesDailyLimit} Places calls a day (searches and chosen places); after that, venue search rests until midnight UTC and hosts type the address.`,
     });
+    if (!s.value.enabled) steps.push({ label: 'Venue search', ok: null, detail: 'Maps is switched off, so hosts do not see venue search yet.' });
   }
 
   /** Stock images (ADR-064): each library's key, with a real search. */

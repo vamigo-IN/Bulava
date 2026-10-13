@@ -96,8 +96,12 @@ export class EventToolsService {
       }
       if (input.functions) {
         for (const f of source.functions) {
-          const venue = f.venue
-            ? await tx.venue.create({ data: { eventId: event.id, name: f.venue.name, address: f.venue.address, city: f.venue.city, mapUrl: f.venue.mapUrl, country: f.venue.country } })
+          // The whole venue: its address, the spot on the map and the guests' directions link.
+          const v = f.venue;
+          const venue = v
+            ? await tx.venue.create({
+                data: { eventId: event.id, name: v.name, address: v.address, city: v.city, state: v.state, postalCode: v.postalCode, country: v.country, latitude: v.latitude, longitude: v.longitude, mapUrl: v.mapUrl, notes: v.notes },
+              })
             : null;
           const fpolicy = f.accessPolicy ? await tx.accessPolicy.create({ data: { mode: f.accessPolicy.mode } }) : null;
           await tx.eventFunction.create({

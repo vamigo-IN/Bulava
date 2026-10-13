@@ -280,7 +280,7 @@ export const CreateEventSchema = z.object({
   details: z.record(z.string(), z.unknown()).default({}),
   /** Create the event type's suggested functions and groups. */
   applyDefaults: z.boolean().default(true),
-  /** Which suggested functions to create (their slugs); all of them when omitted. */
+  /** Which suggested functions to create (their slugs); only the type's main one when omitted (ADR-072). */
   functionSlugs: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
   /** The main function's day, at 10 am in the event's time zone; each function's own date comes later. */
   date: dateOnly.optional(),
@@ -384,12 +384,134 @@ export type UpdateEventInput = z.infer<typeof UpdateEventSchema>;
 
 // ───────────────────────────── Functions ─────────────────────────────
 
-export const VenueInputSchema = z.object({
-  name: trimmed(160),
-  address: optionalText(500),
-  city: optionalText(120),
-  mapUrl: z.union([z.literal(''), z.url().max(1000)]).transform((v) => (v === '' ? undefined : v)).optional(),
+const latitude = z.number().min(-90).max(90);
+const longitude = z.number().min(-180).max(180);
+
+/**
+ * A function's venue. Its name is typed; the rest usually comes from the venue
+ * search (Google Places) or a Google Maps link the host pasted (ADR-072): the
+ * address without the city and state, the location, and `mapUrl`, the link
+ * guests open for directions. On an update the venue is replaced as a whole.
+ */
+export const VenueInputSchema = z
+  .object({
+    name: trimmed(160),
+    address: optionalText(500),
+    city: optionalText(120),
+    state: optionalText(120),
+    postalCode: optionalText(20),
+    /** ISO 3166 country code; India when left out. */
+    country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, 'A two-letter country code').optional(),
+    latitude: latitude.nullable().optional(),
+    longitude: longitude.nullable().optional(),
+    /** Guests' directions: a web address (http or https), normally a Google Maps link. */
+    mapUrl: z
+      .union([z.literal(''), z.null(), z.url({ protocol: /^https?$/ }).max(1000)])
+      .transform((v) => (v ? v : undefined))
+      .optional(),
+  })
+  .refine((v) => (v.latitude === null || v.latitude === undefined) === (v.longitude === null || v.longitude === undefined), {
+    message: 'Give both the latitude and the longitude',
+    path: ['latitude'],
+  });
+export type VenueInput = z.infer<typeof VenueInputSchema>;
+
+// ───────────────────────────── Venue search (Google Places, ADR-072) ─────────────────────────────
+
+/** Google's session token for an autocomplete session: URL-safe, at most 36 characters (a UUID fits). */
+export const PlaceSessionTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{8,36}$/, 'Not a session token');
+
+/** GET /events/:eventId/places/autocomplete: what the host has typed (a venue's name or its address). */
+export const PlaceAutocompleteSchema = z.object({
+  q: z.string().trim().min(2).max(120),
+  sessionToken: PlaceSessionTokenSchema.optional(),
 });
+export type PlaceAutocompleteInput = z.infer<typeof PlaceAutocompleteSchema>;
+
+/** GET /events/:eventId/places/:placeId: the session the chosen suggestion came from. */
+export const PlaceDetailsQuerySchema = z.object({ sessionToken: PlaceSessionTokenSchema.optional() });
+export type PlaceDetailsQuery = z.infer<typeof PlaceDetailsQuerySchema>;
+
+/** A Google place ID, as autocomplete returns it. */
+export const PlaceIdSchema = z.string().regex(/^[A-Za-z0-9_-]{10,512}$/, 'Not a place ID');
+
+/** POST /events/:eventId/places/link: what the host pasted from Google Maps (a share link, or the text around one). */
+export const MapLinkSchema = z.object({ url: z.string().trim().min(8).max(2000) });
+export type MapLinkInput = z.infer<typeof MapLinkSchema>;
+
+/** One suggestion while typing: the place's name and the rest of its address. */
+export interface PlaceSuggestion {
+  placeId: string;
+  name: string;
+  description: string;
+}
+
+/** A venue's address and location from Google: what choosing a suggestion fills in. */
+export interface PlaceLocation {
+  placeId: string | null;
+  /** The street part: the city, state, PIN code and country have their own fields. */
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  /** The link guests open for directions. */
+  mapUrl: string;
+}
+
+/** The Google Maps link of a place: its pin, and the place itself when its ID is known (Maps URLs, `query_place_id`). */
+export function googleMapsPlaceUrl(lat: number, lng: number, placeId?: string | null): string {
+  const params = new URLSearchParams({ api: '1', query: `${lat},${lng}` });
+  if (placeId) params.set('query_place_id', placeId);
+  return `https://www.google.com/maps/search/?${params.toString()}`;
+}
+
+/** The place ID a link from googleMapsPlaceUrl carries, if any. */
+export function placeIdFromMapUrl(mapUrl: string | null | undefined): string | null {
+  if (!mapUrl) return null;
+  try {
+    const url = new URL(mapUrl);
+    if (url.hostname !== 'www.google.com' || !url.pathname.startsWith('/maps/')) return null;
+    const id = url.searchParams.get('query_place_id');
+    return id && PlaceIdSchema.safeParse(id).success ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+// ───────────────────────────── Suggested functions ─────────────────────────────
+
+/** An event type's suggested function (event_types.defaultFunctions); `main` marks the one a new event starts with. */
+export interface DefaultFunction {
+  name: string;
+  slug: string;
+  main?: boolean;
+}
+
+/** Words that name a kind of gathering rather than the occasion. */
+const GENERIC_WORDS = new Set(['ceremony', 'function', 'event', 'events', 'party', 'celebration', 'main', 'session', 'puja', 'day', 'and', 'the', 'of']);
+
+/**
+ * The main one of an event type's suggested functions: a new event gets only
+ * this one (ADR-072). The one the type marks `main`; else the one named after
+ * the occasion (the wedding itself for WEDDING, not the Haldi listed first;
+ * Godh Bharai for "Baby Shower / Godh Bharai"); else the one sharing a word
+ * with it (Birthday Party for Birthday); else the first.
+ */
+export function mainDefaultFunction<T extends DefaultFunction>(type: { key: string; name: string }, defaults: readonly T[]): T | undefined {
+  if (defaults.length <= 1) return defaults[0];
+  const marked = defaults.find((f) => f.main === true);
+  if (marked) return marked;
+  // The occasion's names: its key and each part of its name ("Engagement / Roka", "Festival Party (Diwali, …)").
+  const names = new Set([slugify(type.key), ...type.name.split(/[/(),]/).map((part) => slugify(part))].filter(Boolean));
+  const own = (f: T) => [slugify(f.slug), slugify(f.name)];
+  const exact = defaults.find((f) => own(f).some((s) => names.has(s)));
+  if (exact) return exact;
+  const words = new Set([...names].flatMap((n) => n.split('-')).filter((w) => w.length > 2 && !GENERIC_WORDS.has(w)));
+  return defaults.find((f) => own(f).some((s) => s.split('-').some((w) => words.has(w)))) ?? defaults[0];
+}
 
 const FunctionBaseSchema = z.object({
   name: trimmed(120),

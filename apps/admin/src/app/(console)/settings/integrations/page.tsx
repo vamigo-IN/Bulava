@@ -374,6 +374,7 @@ function GoogleForm({ view, redirectUri }: { view: SettingGroupView; redirectUri
   );
 }
 
+/** Google Maps: the public embed key (maps on invitations and in the venue field) and the server's Places key (venue search, ADR-072). */
 function MapsForm({ view }: { view: SettingGroupView }) {
   const editor = useGroupEditor<Maps>('maps', view);
   const { draft, set } = editor;
@@ -385,7 +386,7 @@ function MapsForm({ view }: { view: SettingGroupView }) {
       description={t('int.maps.hint')}
       view={view}
       editor={editor}
-      status={status(saved.enabled, Boolean(saved.embedKey))}
+      status={status(saved.enabled, Boolean(saved.embedKey || (saved.venueSearch && view.secrets.placesApiKey?.set)))}
       savedMessage={t('settings.savedIntegration')}
       after={
         <>
@@ -424,6 +425,25 @@ function MapsForm({ view }: { view: SettingGroupView }) {
         onChange={(v) => set('embedKey', v)}
       />
       <Checkbox label={t('int.maps.showOnInvitations')} checked={draft.showOnInvitations} onChange={(e) => set('showOnInvitations', e.target.checked)} />
+      <div className="space-y-4 border-t border-stone-200 pt-4">
+        <div>
+          <h3 className="text-sm font-semibold text-stone-900">{t('int.maps.venueSearch')}</h3>
+          <p className="mt-1 max-w-2xl text-sm text-stone-500">{t('int.maps.venueSearchHint')}</p>
+        </div>
+        <Checkbox label={t('int.maps.venueSearchOn')} checked={draft.venueSearch} onChange={(e) => set('venueSearch', e.target.checked)} />
+        <GroupSecret editor={editor} view={view} name="placesApiKey" label={t('int.maps.placesKey')} hint={t('int.maps.placesKeyHint')} />
+        <TextField
+          label={t('int.maps.dailyLimit')}
+          hint={t('int.maps.dailyLimitHint')}
+          type="number"
+          min={100}
+          max={1_000_000}
+          className="[&_input]:max-w-48"
+          value={draft.placesDailyLimit}
+          // An emptied field stays empty while typing; the server refuses it if saved that way.
+          onChange={(v) => set('placesDailyLimit', (v === '' ? '' : Number(v)) as Maps['placesDailyLimit'])}
+        />
+      </div>
     </SettingsCard>
   );
 }

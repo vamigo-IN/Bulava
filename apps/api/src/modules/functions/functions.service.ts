@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { slugify, type CreateFunctionInput, type UpdateFunctionInput } from '@bulava/validation';
+import { slugify, type CreateFunctionInput, type UpdateFunctionInput, type VenueInput } from '@bulava/validation';
 import type { Prisma } from '@bulava/database';
 import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
@@ -18,12 +18,27 @@ const functionInclude = {
 
 type FunctionRow = Prisma.EventFunctionGetPayload<{ include: typeof functionInclude }>;
 
+export interface VenueDto {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string;
+  latitude: number | null;
+  longitude: number | null;
+  /** The link guests open for directions. */
+  mapUrl: string | null;
+}
+
 export interface FunctionDto {
   id: string;
   name: string;
   slug: string;
   description: string | null;
   startsAt: Date | null;
+  /** Kept for older clients: a function has a start only (ADR-072), and the dashboard never sets an end. */
   endsAt: Date | null;
   status: string;
   visibility: string;
@@ -31,8 +46,41 @@ export interface FunctionDto {
   /** The function's own mode, or INHERIT. */
   accessMode: string;
   effectiveAccessMode: string;
-  venue: { id: string; name: string; address: string | null; city: string | null; mapUrl: string | null } | null;
+  venue: VenueDto | null;
   audienceGroupIds: string[];
+}
+
+function toVenueDto(venue: NonNullable<FunctionRow['venue']>): VenueDto {
+  return {
+    id: venue.id,
+    name: venue.name,
+    address: venue.address,
+    city: venue.city,
+    state: venue.state,
+    postalCode: venue.postalCode,
+    country: venue.country,
+    latitude: venue.latitude === null ? null : Number(venue.latitude),
+    longitude: venue.longitude === null ? null : Number(venue.longitude),
+    mapUrl: venue.mapUrl,
+  };
+}
+
+/**
+ * The venue row for what the host sent: the whole venue (a field left out is
+ * cleared), as the venue field always sends it.
+ */
+function venueData(input: VenueInput) {
+  return {
+    name: input.name,
+    address: input.address ?? null,
+    city: input.city ?? null,
+    state: input.state ?? null,
+    postalCode: input.postalCode ?? null,
+    country: input.country ?? 'IN',
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
+    mapUrl: input.mapUrl ?? null,
+  } satisfies Prisma.VenueUncheckedUpdateInput;
 }
 
 function toDto(fn: FunctionRow): FunctionDto {
@@ -48,9 +96,7 @@ function toDto(fn: FunctionRow): FunctionDto {
     sortOrder: fn.sortOrder,
     accessMode: fn.accessPolicy?.mode ?? 'INHERIT',
     effectiveAccessMode: fn.accessPolicy?.mode ?? fn.event.accessPolicy.mode,
-    venue: fn.venue
-      ? { id: fn.venue.id, name: fn.venue.name, address: fn.venue.address, city: fn.venue.city, mapUrl: fn.venue.mapUrl }
-      : null,
+    venue: fn.venue ? toVenueDto(fn.venue) : null,
     audienceGroupIds: fn.audienceGroups.map((g) => g.groupId),
   };
 }
@@ -83,9 +129,7 @@ export class FunctionsService {
       const slug = await this.uniqueSlug(tx, access.eventId, input.slug ?? slugify(input.name));
       const sortOrder =
         input.sortOrder ?? (await tx.eventFunction.count({ where: { eventId: access.eventId, deletedAt: null } }));
-      const venue = input.venue
-        ? await tx.venue.create({ data: { eventId: access.eventId, ...input.venue } })
-        : null;
+      const venue = input.venue ? await tx.venue.create({ data: { eventId: access.eventId, ...venueData(input.venue) } }) : null;
       const policy =
         input.accessMode !== 'INHERIT' ? await tx.accessPolicy.create({ data: { mode: input.accessMode } }) : null;
 
@@ -154,7 +198,10 @@ export class FunctionsService {
     if (input.audienceGroupIds) await this.assertGroupsInEvent(access.eventId, input.audienceGroupIds);
 
     const startsAt = input.startsAt === undefined ? existing.startsAt : input.startsAt ? new Date(input.startsAt) : null;
-    const endsAt = input.endsAt === undefined ? existing.endsAt : input.endsAt ? new Date(input.endsAt) : null;
+    // A function has a start only (ADR-072): a start sent without an end drops the old end, which
+    // belonged to the old start (the dashboard never shows or sends one). Older clients may still send both.
+    const endsAt = input.endsAt !== undefined ? (input.endsAt ? new Date(input.endsAt) : null) : input.startsAt !== undefined ? null : existing.endsAt;
+    const endsAtChange = input.endsAt !== undefined || input.startsAt !== undefined ? endsAt : undefined;
     // A placeholder given a date becomes a function guests see.
     if (startsAt && !existing.startsAt) await this.assertRoomForDated(access.eventId);
     if (startsAt && endsAt && endsAt <= startsAt) {
@@ -166,15 +213,15 @@ export class FunctionsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const accessChanges: Record<string, unknown> = {};
 
-      // Venue
+      // Venue: replaced as a whole (the venue field sends all of it), or removed with null.
       let venueId: string | null | undefined;
       if (input.venue === null) {
         venueId = null;
       } else if (input.venue) {
         if (existing.venueId) {
-          await tx.venue.update({ where: { id: existing.venueId }, data: input.venue });
+          await tx.venue.update({ where: { id: existing.venueId }, data: venueData(input.venue) });
         } else {
-          venueId = (await tx.venue.create({ data: { eventId: access.eventId, ...input.venue } })).id;
+          venueId = (await tx.venue.create({ data: { eventId: access.eventId, ...venueData(input.venue) } })).id;
         }
       }
 
@@ -213,7 +260,7 @@ export class FunctionsService {
           slug,
           description: input.description,
           startsAt: input.startsAt === undefined ? undefined : startsAt,
-          endsAt: input.endsAt === undefined ? undefined : endsAt,
+          endsAt: endsAtChange,
           visibility: input.visibility,
           status: input.status,
           sortOrder: input.sortOrder,
@@ -322,16 +369,20 @@ export class FunctionsService {
     }
   }
 
-  /** Keep Event.startDate/endDate in sync with its functions. */
+  /**
+   * Keep Event.startDate/endDate in sync with its functions: the first start,
+   * and the last start or (older functions) end, whichever is later.
+   */
   private async refreshEventDates(tx: Tx, eventId: string): Promise<void> {
     const agg = await tx.eventFunction.aggregate({
       where: { eventId, deletedAt: null, status: { not: 'CANCELLED' } },
       _min: { startsAt: true },
       _max: { endsAt: true, startsAt: true },
     });
+    const ends = [agg._max.endsAt, agg._max.startsAt].filter((d): d is Date => d !== null);
     await tx.event.update({
       where: { id: eventId },
-      data: { startDate: agg._min.startsAt, endDate: agg._max.endsAt ?? agg._max.startsAt },
+      data: { startDate: agg._min.startsAt, endDate: ends.length ? new Date(Math.max(...ends.map((d) => d.getTime()))) : null },
     });
   }
 }

@@ -257,12 +257,28 @@ export function googleReady(value: z.infer<typeof GoogleSettingsSchema>, secrets
   return Boolean(value.enabled && value.clientId && secrets.clientSecret);
 }
 
+/** The most calls to the Places API a day the Super Admin may allow (searches, venue details, place links). */
+export const PLACES_DAILY_LIMIT_MAX = 1_000_000;
+
 export const MapsSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   /** A browser key for the Maps Embed API, restricted to the site's domains in Google Cloud. Public by design. */
   embedKey: opt(z.string().trim().regex(/^AIza[0-9A-Za-z_-]{35}$/, 'A Google API key starts with AIza')),
   showOnInvitations: z.boolean().default(true),
+  /**
+   * Venue search in the dashboard (ADR-072): as hosts type a venue, the API asks
+   * the Places API (New) with the server key (`placesApiKey`, a secret of this
+   * group, never sent to browsers) and fills the address and the location.
+   */
+  venueSearch: z.boolean().default(true),
+  /** At most this many Places API calls a day across the site, so a busy day or misuse never runs up the bill. */
+  placesDailyLimit: z.coerce.number().int().min(100).max(PLACES_DAILY_LIMIT_MAX).default(2000),
 });
+
+/** Whether hosts can search venues: Maps switched on, venue search on and the server's Places key set. */
+export function placesReady(value: z.infer<typeof MapsSettingsSchema>, secrets: Partial<Record<(typeof SETTING_SECRETS)['maps'][number], unknown>>): boolean {
+  return Boolean(value.enabled && value.venueSearch && secrets.placesApiKey);
+}
 
 export const DomainSettingsSchema = z.object({
   mode: z.enum(['off', 'cloudflare', 'manual']).default('off'),
@@ -346,7 +362,8 @@ export const SETTING_SECRETS = {
   // GetGabs: the API key, and the token in its webhook URL. Meta: the system-user token, the app secret and the webhook verify token.
   whatsapp: ['apiKey', 'webhookToken', 'accessToken', 'appSecret', 'webhookVerifyToken'],
   google: ['clientSecret'],
-  maps: [],
+  // The server's key for the Places API (New): venue search. The embed key is public and stays a value.
+  maps: ['placesApiKey'],
   domains: ['cloudflareApiToken'],
   cards: [],
   likes: [],

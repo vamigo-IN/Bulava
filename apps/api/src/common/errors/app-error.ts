@@ -111,6 +111,12 @@ export const ErrorCode = {
   CARD_PLAN_REQUIRED: HttpStatus.FORBIDDEN,
   /** Stock image search is switched off, its library did not answer, or it is busy (ADR-064). */
   STOCK_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  /** Venue search is switched off, Google did not answer, or the day's Places budget is spent (ADR-072). */
+  PLACES_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  /** A pasted location link that is not a Google Maps link, or leads somewhere else. */
+  MAP_LINK_INVALID: HttpStatus.BAD_REQUEST,
+  /** A Google Maps link without a spot in it (a dropped pin's share link has one). */
+  MAP_LINK_UNREADABLE: HttpStatus.BAD_REQUEST,
   SERVICE_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   INTERNAL_ERROR: HttpStatus.INTERNAL_SERVER_ERROR,
 } as const;

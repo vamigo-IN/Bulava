@@ -10,6 +10,7 @@ import {
 } from '@bulava/template-schema';
 import type { Prisma, TemplateType } from '@bulava/database';
 import { SettingsStore } from '@bulava/settings';
+import { placeIdFromMapUrl } from '@bulava/validation';
 import type { ObjectStorage } from '@bulava/storage';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { STORAGE } from '../../infrastructure/storage/storage.module';
@@ -26,6 +27,13 @@ export interface ResolvedTemplate {
   definition: TemplateDefinition;
   customization: Customization | null;
   isDefault: boolean;
+}
+
+/** What a venue's map shows: the Google place it was chosen as, else its pin, else nothing (its name is searched). */
+function mapQuery(venue: { latitude: Prisma.Decimal | null; longitude: Prisma.Decimal | null; mapUrl: string | null }): string | null {
+  const placeId = placeIdFromMapUrl(venue.mapUrl);
+  if (placeId) return `place_id:${placeId}`;
+  return venue.latitude !== null && venue.longitude !== null ? `${Number(venue.latitude)},${Number(venue.longitude)}` : null;
 }
 
 const FALLBACK_TEMPLATE_KEY = 'classic-ivory';
@@ -115,28 +123,37 @@ export class RenderContextService {
       announcements: input.announcements?.map((a) => ({ title: a.title, body: a.body, publishedAt: a.publishedAt?.toISOString() ?? null })),
       music: input.music ?? null,
     });
-    return this.withMaps(context);
+    // Where each function's map points: the place Google knows, or the pin the host set (ADR-072).
+    const spots = new Map<string, string>();
+    for (const f of visible) {
+      const spot = f.venue ? mapQuery(f.venue) : null;
+      if (spot) spots.set(f.id, spot);
+    }
+    return this.withMaps(context, spots);
   }
 
   /**
    * Google Maps embeds for venues, when the Super Admin has enabled them. The key
    * is a browser key restricted to Bulava's domains in Google Cloud, so it is
    * public by design; the map frame gets only the site's origin as referrer.
+   * A venue with a spot (chosen from the venue search, or a pin) shows that
+   * spot, so the map and the directions agree; others are found by their name.
    */
-  private async withMaps(context: RenderContext): Promise<RenderContext> {
+  private async withMaps(context: RenderContext, spots: ReadonlyMap<string, string>): Promise<RenderContext> {
     const maps = await this.settings.get('maps');
     const key = maps.value.enabled && maps.value.showOnInvitations ? maps.value.embedKey : undefined;
     if (!key) return context;
-    const embed = <T extends { name: string; address: string | null; city: string | null } | null | undefined>(venue: T): T => {
+    const embed = <T extends { name: string; address: string | null; city: string | null } | null | undefined>(venue: T, functionId: string | undefined): T => {
       if (!venue) return venue;
-      const place = [venue.name, venue.address, venue.city].filter(Boolean).join(', ');
+      const place = (functionId ? spots.get(functionId) : undefined) ?? [venue.name, venue.address, venue.city].filter(Boolean).join(', ');
       return { ...venue, embedUrl: `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(key)}&q=${encodeURIComponent(place)}` };
     };
     return {
       ...context,
-      venue: embed(context.venue),
-      function: context.function ? { ...context.function, venue: embed(context.function.venue) } : context.function,
-      functions: context.functions.map((f) => ({ ...f, venue: embed(f.venue) })),
+      // The event's venue is its first function's (buildRenderContext).
+      venue: embed(context.venue, context.functions[0]?.id),
+      function: context.function ? { ...context.function, venue: embed(context.function.venue, context.function.id) } : context.function,
+      functions: context.functions.map((f) => ({ ...f, venue: embed(f.venue, f.id) })),
     };
   }
 

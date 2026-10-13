@@ -37,6 +37,8 @@ import { ShareLinkController } from './modules/events/share-link.controller';
 import { ShareLinkService } from './modules/events/share-link.service';
 import { FunctionsController } from './modules/functions/functions.controller';
 import { FunctionsService } from './modules/functions/functions.service';
+import { PlacesController } from './modules/places/places.controller';
+import { PlacesService } from './modules/places/places.service';
 import { GroupsController } from './modules/groups/groups.controller';
 import { GroupsService } from './modules/groups/groups.service';
 import { GuestsController } from './modules/guests/guests.controller';
@@ -198,6 +200,7 @@ const bootConfig = loadConfig();
     EventsController,
     ShareLinkController,
     FunctionsController,
+    PlacesController,
     GroupsController,
     GuestsController,
     InvitationsController,
@@ -277,6 +280,7 @@ const bootConfig = loadConfig();
     EventsService,
     ShareLinkService,
     FunctionsService,
+    PlacesService,
     GroupsService,
     GuestsService,
     InvitationTokenService,
