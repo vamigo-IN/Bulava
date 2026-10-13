@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { cardOrderToken, generateSecureToken, hashToken, verifyCardRenderToken } from '@bulava/auth';
-import type { CardSession, Prisma } from '@bulava/database';
+import { featureLimit, loadEventFeatures, loadUserFeatures, type CardSession, type Prisma } from '@bulava/database';
 import { ObjectStorage, StorageKeys } from '@bulava/storage';
 import { CARD_FORMATS, CardDesignSchema, cardPixelSize, templateAssetIds, type CardDesign, type TemplateDefinition } from '@bulava/template-schema';
 import { FEATURE_KEYS, type CardDesignBody, type CardEventInput, type CardEventType, type CardUploadInput } from '@bulava/validation';
@@ -24,6 +24,28 @@ export interface CardEventRefs {
   templateKey?: string | null;
   meta?: Record<string, string | number | boolean | null>;
 }
+
+/**
+ * Watermark-free cards a customer's plan includes (ADR-071): the most any plan
+ * in force for them allows, how many designs they have downloaded through a
+ * plan, and what is left.
+ */
+export interface CardAllowance {
+  /** 0: none (each card is bought on its own); null: unlimited. */
+  included: number | null;
+  /** Card designs downloaded (or being made) through a plan, each counted once. */
+  used: number;
+  /** null: unlimited. */
+  left: number | null;
+  /** The plan they come with, by its name; null when given another way (the team's grant). */
+  planName: string | null;
+}
+
+/** Exports that exist or are on their way (a failed or expired one does not hold its design). */
+export const LIVE_EXPORT = ['QUEUED', 'RENDERING', 'READY'] as const;
+
+/** a is more than b (null: unlimited). */
+const moreCards = (a: number | null, b: number | null) => (a === null ? b !== null : b !== null && a > b);
 
 /** Photos a card may hold (replaced ones included): enough for any design, not a free photo host. */
 const MAX_UPLOADS_PER_CARD = 40;
@@ -72,8 +94,9 @@ export class CardsService {
 
   /**
    * What the editor needs before the download dialog: the price, whether
-   * payments work, the watermark, and for a signed-in customer whether their
-   * plan covers a watermark-free card (then nothing is asked of them).
+   * payments work, the watermark, the plan that unlocks (more) watermark-free
+   * cards, and for a signed-in customer how many their plan includes and has
+   * left (then nothing is asked of them).
    */
   async publicConfig(user: AuthUser | null) {
     const options = await this.options();
@@ -83,6 +106,7 @@ export class CardsService {
       user ? this.account(user, options.planDownloads) : Promise.resolve(null),
       this.prisma.pricingPlan.findFirst({ where: { active: true, kind: 'PLAN', visibility: 'PUBLIC', priceMinor: { gt: 0 } }, orderBy: { priceMinor: 'asc' }, select: { priceMinor: true } }),
     ]);
+    const unlock = options.planDownloads ? await this.unlockOffer(account?.cards?.included ?? 0, user?.id ?? null) : null;
     return {
       enabled: options.enabled,
       priceMinor: options.priceMinor,
@@ -91,21 +115,64 @@ export class CardsService {
       /** The watermarked card for a mobile number, for anyone (else for plan holders only). */
       freeDownloads: options.freeDownloads,
       planFromMinor: cheapest?.priceMinor ?? null,
+      /** Plans include watermark-free cards (`cards.included`); off: every watermark-free card is bought on its own. */
+      planCards: options.planDownloads,
+      /** The plan that unlocks (more) watermark-free cards, at what it costs this visitor. */
+      unlock,
       watermark,
       formats: Object.fromEntries(Object.entries(CARD_FORMATS).map(([key, f]) => [key, { width: f.width, height: f.height, pixels: cardPixelSize(key as keyof typeof CARD_FORMATS) }])),
       account,
     };
   }
 
-  private async account(user: AuthUser, mode: 'any' | 'subscription' | 'off') {
-    const [profile, coverage, paidPlan] = await Promise.all([
+  private async account(user: AuthUser, planCards: boolean) {
+    const [profile, allowance, paidPlan] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: user.id }, select: { name: true, email: true, phone: true, phoneVerifiedAt: true } }),
-      this.planCoverage(user.id, mode),
+      planCards ? this.allowance(user.id) : Promise.resolve(null),
       this.hasPaidPlan(user.id),
     ]);
     if (!profile) return null;
-    // Prefill only what the account has confirmed.
-    return { name: profile.name, email: profile.email, phone: profile.phoneVerifiedAt ? profile.phone : null, planDownload: coverage.eligible, planName: coverage.planName, paidPlan };
+    const cards = allowance && allowance.included !== 0 ? allowance : null;
+    return {
+      // Prefill only what the account has confirmed.
+      name: profile.name,
+      email: profile.email,
+      phone: profile.phoneVerifiedAt ? profile.phone : null,
+      paidPlan,
+      /** Watermark-free cards with their plan (null: none). */
+      cards,
+      /** A watermark-free card can be downloaded through the plan now. */
+      planDownload: Boolean(cards && (cards.left === null || cards.left > 0)),
+      planName: cards?.planName ?? null,
+    };
+  }
+
+  /**
+   * The cheapest plan on sale that includes more watermark-free cards than the
+   * customer has (any, for a visitor or a plan without them), at what it costs
+   * them: a plan holder pays the difference from their account's plan (ADR-062).
+   * Plans and their `cards.included` are rows, so the offer follows the console.
+   */
+  private async unlockOffer(included: number | null, userId: string | null) {
+    if (included === null) return null;
+    const plan = await this.prisma.pricingPlan.findFirst({
+      where: {
+        active: true,
+        kind: 'PLAN',
+        visibility: 'PUBLIC',
+        interval: 'ONE_TIME',
+        priceMinor: { gt: 0 },
+        features: { some: { featureKey: FEATURE_KEYS.CARDS_INCLUDED, enabled: true, OR: [{ limit: null }, { limit: { gt: included } }] } },
+      },
+      orderBy: { priceMinor: 'asc' },
+      select: { key: true, name: true, priceMinor: true, features: { where: { featureKey: FEATURE_KEYS.CARDS_INCLUDED }, select: { limit: true } } },
+    });
+    if (!plan) return null;
+    const owned = userId ? (await this.payments.accountPlans(userId)).filter((p) => p.interval === 'ONE_TIME').map((p) => p.priceMinor) : [];
+    const credit = Math.max(0, ...owned);
+    // A plan the account already has, or a bigger one by price, is not sold again (PLAN_ALREADY_ACTIVE).
+    if (plan.priceMinor <= credit) return null;
+    return { key: plan.key, name: plan.name, cards: plan.features[0]?.limit ?? null, priceMinor: plan.priceMinor - credit, fullPriceMinor: plan.priceMinor };
   }
 
   /** Whether the customer has a paid plan in force (any: one with the watermark still downloads cards with it). */
@@ -119,31 +186,65 @@ export class CardsService {
   }
 
   /**
-   * Whether a customer's plan covers watermark-free cards: a plan in force
-   * that removes the watermark (branding.watermark off). `subscription` counts
-   * account-wide (yearly) plans only; `any` also an event's plan while the
-   * event exists; `off` none.
+   * Watermark-free cards with a customer's plan (ADR-071): the most that any
+   * plan in force for them includes (`cards.included`: their account's plan,
+   * or one bought or given for an event of theirs, ADR-066, with add-ons), the
+   * designs they have downloaded through a plan, and what is left.
    */
-  async planCoverage(userId: string, mode: 'any' | 'subscription' | 'off'): Promise<{ eligible: boolean; planName: string | null }> {
-    if (mode === 'off') return { eligible: false, planName: null };
-    const now = new Date();
-    const grants = await this.prisma.entitlement.findMany({
-      where: {
-        userId,
-        featureKey: FEATURE_KEYS.WATERMARK,
-        enabled: false,
-        validFrom: { lte: now },
-        OR: [{ validUntil: null }, { validUntil: { gt: now } }],
-        ...(mode === 'subscription' ? { eventId: null } : {}),
-      },
-      select: { eventId: true, sourceType: true, sourceId: true },
+  async allowance(userId: string, tx?: Tx): Promise<CardAllowance> {
+    const [plan, counted] = await Promise.all([this.includedCards(userId), this.countedDesigns(userId, tx)]);
+    const used = counted.size;
+    return { included: plan.included, used, left: plan.included === null ? null : Math.max(0, plan.included - used), planName: plan.planName };
+  }
+
+  /**
+   * The designs a customer has had through a plan, each once: downloaded at
+   * least once, or being made now (so two tabs cannot both take the last card).
+   * Downloading one again, or making it again after it expired, is free.
+   */
+  async countedDesigns(userId: string, tx?: Tx): Promise<Set<string>> {
+    const rows = await (tx ?? this.prisma).cardExport.findMany({
+      where: { userId, kind: 'PLAN', OR: [{ firstDownloadedAt: { not: null } }, { status: { in: [...LIVE_EXPORT] } }] },
+      select: { designHash: true },
+      distinct: ['designHash'],
     });
-    const eventIds = grants.flatMap((g) => (g.eventId ? [g.eventId] : []));
-    const liveEvents = eventIds.length ? new Set((await this.prisma.event.findMany({ where: { id: { in: eventIds }, deletedAt: null }, select: { id: true } })).map((e) => e.id)) : new Set<string>();
-    const grant = grants.find((g) => !g.eventId) ?? grants.find((g) => g.eventId && liveEvents.has(g.eventId));
-    if (!grant) return { eligible: false, planName: null };
-    const order = grant.sourceType === 'ORDER' && grant.sourceId ? await this.prisma.order.findUnique({ where: { id: grant.sourceId }, select: { plan: { select: { name: true } } } }) : null;
-    return { eligible: true, planName: order?.plan.name ?? null };
+    return new Set(rows.map((r) => r.designHash));
+  }
+
+  /**
+   * The biggest `cards.included` among the plans in force for a customer, read
+   * as every feature is (the Free plan's baseline, grants, add-ons on top), and
+   * the name of the plan it comes with.
+   */
+  private async includedCards(userId: string): Promise<{ included: number | null; planName: string | null }> {
+    const now = new Date();
+    const inForce = { validFrom: { lte: now }, OR: [{ validUntil: null }, { validUntil: { gt: now } }] };
+    const key = FEATURE_KEYS.CARDS_INCLUDED;
+    let best: { included: number | null; eventId: string | null } = { included: featureLimit(await loadUserFeatures(this.prisma, userId, now), key), eventId: null };
+    // A plan bought or given for one of their events alone can be bigger than the account's.
+    const events = await this.prisma.event.findMany({ where: { ownerId: userId, deletedAt: null }, select: { id: true } });
+    if (events.length && best.included !== null) {
+      const own = await this.prisma.entitlement.findMany({ where: { ...inForce, featureKey: key, eventId: { in: events.map((e) => e.id) } }, select: { eventId: true }, distinct: ['eventId'] });
+      for (const { eventId } of own) {
+        const features = eventId ? await loadEventFeatures(this.prisma, eventId, now) : null;
+        const included = features ? featureLimit(features, key) : 0;
+        if (moreCards(included, best.included)) best = { included, eventId };
+      }
+    }
+    if (best.included === 0) return { included: 0, planName: null };
+    // Named after the plan bringing the most cards (an add-on adds to it; the team's grants have no plan name).
+    const grants = await this.prisma.entitlement.findMany({
+      where: { AND: [inForce, { featureKey: key, sourceType: 'ORDER', enabled: true }, { OR: [{ userId, eventId: null }, ...(best.eventId ? [{ eventId: best.eventId }] : [])] }] },
+      select: { limit: true, sourceId: true },
+    });
+    const top = grants.reduce<(typeof grants)[number] | null>((a, g) => (!a || moreCards(g.limit, a.limit) ? g : a), null);
+    const order = top?.sourceId ? await this.prisma.order.findUnique({ where: { id: top.sourceId }, select: { plan: { select: { name: true } } } }) : null;
+    return { included: best.included, planName: order?.plan.name ?? null };
+  }
+
+  /** Serialises a customer's plan downloads until the transaction ends, so the last card is taken once. */
+  async lockAllowance(tx: Tx, userId: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`card-allowance:${userId}`}::text, 0))`;
   }
 
   // ─────────────────────────── Templates ───────────────────────────
@@ -206,12 +307,22 @@ export class CardsService {
     return { token, ...this.sessionView(session) };
   }
 
-  /** A saved card: its design, photos and orders (a refreshed editor picks up where it was). */
-  async openSession(token: string) {
+  /**
+   * A saved card: its design, photos and orders (a refreshed editor picks up
+   * where it was), and for a signed-in customer whether this design was had
+   * through their plan before (then downloading it again takes nothing more).
+   */
+  async openSession(token: string, user: AuthUser | null = null) {
     const session = await this.session(token);
-    const [uploads, orders] = await Promise.all([
+    const [uploads, orders, counted] = await Promise.all([
       this.prisma.cardUpload.findMany({ where: { sessionId: session.id, status: { not: 'REJECTED' } }, orderBy: { createdAt: 'asc' } }),
       this.prisma.cardOrder.findMany({ where: { sessionId: session.id, status: { in: ['PENDING', 'PAID'] } }, orderBy: { createdAt: 'desc' }, take: 20 }),
+      user
+        ? this.prisma.cardExport.findFirst({
+            where: { userId: user.id, kind: 'PLAN', designHash: session.designHash, OR: [{ firstDownloadedAt: { not: null } }, { status: { in: [...LIVE_EXPORT] } }] },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
     ]);
     await this.prisma.cardSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
     return {
@@ -225,6 +336,7 @@ export class CardsService {
         orderToken: cardOrderToken(o.id, this.config.TOKEN_ENCRYPTION_KEY),
         paidAt: o.paidAt,
       })),
+      planCounted: Boolean(counted),
     };
   }
 

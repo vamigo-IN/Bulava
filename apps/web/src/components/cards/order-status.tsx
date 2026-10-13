@@ -1,10 +1,10 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeCheck, Check, CircleAlert, Copy, Download, LoaderCircle, Mail, RefreshCw } from 'lucide-react';
+import { BadgeCheck, Check, CircleAlert, Copy, Download, FileText, LoaderCircle, Mail, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { errorMessage, useOptionalT } from '@/lib/i18n';
-import { cardApi, formatRupees, startDownload, type CardOrderView } from '@/lib/cards';
+import { cardApi, formatRupees, startDownload, type CardFileType, type CardOrderView } from '@/lib/cards';
 import { runCheckout } from '@/lib/checkout';
 import { cn } from '@/lib/utils';
 
@@ -45,9 +45,9 @@ export function OrderStatus({ orderToken, siteName, compact }: { orderToken: str
     }
   };
 
-  const download = () =>
-    act('download', async () => {
-      const { url } = await cardApi.orderDownload(orderToken);
+  const download = (as: CardFileType) =>
+    act(as === 'pdf' ? 'pdf' : 'download', async () => {
+      const { url } = await cardApi.orderDownload(orderToken, as);
       startDownload(url);
     });
 
@@ -131,10 +131,16 @@ export function OrderStatus({ orderToken, siteName, compact }: { orderToken: str
       {making ? <div className="skeleton mx-auto aspect-[9/16] max-w-[12rem] rounded-2xl" aria-hidden /> : null}
 
       {ready ? (
-        <button type="button" disabled={working !== null} onClick={download} className="btn-3d min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60">
-          {working === 'download' ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <Download aria-hidden className="size-5" />}
-          {t('cards.order.download')}
-        </button>
+        <div className="space-y-2">
+          <button type="button" disabled={working !== null} onClick={() => void download('image')} className="btn-3d min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60">
+            {working === 'download' ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <Download aria-hidden className="size-5" />}
+            {t('cards.order.download')}
+          </button>
+          <button type="button" disabled={working !== null} onClick={() => void download('pdf')} className="btn-3d btn-3d-light min-h-12 w-full justify-center gap-2 rounded-2xl text-sm disabled:opacity-60">
+            {working === 'pdf' ? <LoaderCircle aria-hidden className="size-4 animate-spin" /> : <FileText aria-hidden className="size-4" />}
+            {t('cards.order.downloadPdf')}
+          </button>
+        </div>
       ) : null}
       {failed ? (
         <button type="button" disabled={working !== null} onClick={() => act('regenerate', () => cardApi.orderRegenerate(orderToken))} className="btn-3d min-h-12 w-full justify-center gap-2 rounded-2xl disabled:opacity-60">

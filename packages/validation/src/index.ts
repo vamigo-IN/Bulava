@@ -832,6 +832,12 @@ export const FEATURE_KEYS = {
   VIDEO_RENDERS_MAX: 'video.renders.max',
   VIDEO_HD: 'video.hd',
   WATERMARK: 'branding.watermark',
+  /**
+   * Digital cards the account downloads without the watermark and without
+   * paying per card: distinct designs, counted once each (ADR-071). 0: none
+   * (the card is bought on its own); null: unlimited.
+   */
+  CARDS_INCLUDED: 'cards.included',
   PLANNER: 'planner.workspace',
   CUSTOM_DOMAIN: 'domain.custom',
   /** WhatsApp Business messages per event (invitations and reminders sent from the platform's number). */
@@ -1255,6 +1261,18 @@ export const CardOrderSchema = z.object({
   marketingConsent: z.boolean().default(false),
 });
 export type CardOrderInput = z.infer<typeof CardOrderSchema>;
+
+/** How a card is saved: the image (JPEG, as rendered) or a one-page PDF of it at the card's size. */
+export const CARD_FILE_TYPES = ['image', 'pdf'] as const;
+export type CardFileType = (typeof CARD_FILE_TYPES)[number];
+
+/** A signed link to a card's file (free, plan or paid): the image unless the PDF is asked for (no body: the image). */
+export const CardDownloadSchema = z
+  .object({
+    as: z.enum(CARD_FILE_TYPES).default('image'),
+  })
+  .prefault({});
+export type CardDownloadInput = z.infer<typeof CardDownloadSchema>;
 
 /** How a checkout ended without a payment, as the browser saw it. */
 export const CardCheckoutEventSchema = z.object({

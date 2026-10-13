@@ -3,7 +3,7 @@ import { cardOrderToken, generateSecureToken, hashToken } from '@bulava/auth';
 import { Prisma, type CardOrder } from '@bulava/database';
 import { ObjectStorage } from '@bulava/storage';
 import { cardPixelSize, type CardFormat } from '@bulava/template-schema';
-import type { CardCheckoutEventInput, CardOrderInput, CardRecoverInput, VerifyPaymentInput } from '@bulava/validation';
+import type { CardCheckoutEventInput, CardFileType, CardOrderInput, CardRecoverInput, VerifyPaymentInput } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { QueueService } from '../../infrastructure/queue/queue.service';
@@ -321,12 +321,13 @@ export class CardOrdersService implements OnModuleInit {
     };
   }
 
-  async download(orderToken: string) {
+  /** The bought card's image, or its PDF. */
+  async download(orderToken: string, as: CardFileType = 'image') {
     const order = await this.byToken(orderToken);
     if (order.status !== 'PAID') throw new AppError('CARD_NOT_READY', order.status === 'REFUNDED' ? 'This order was refunded.' : 'This card is not paid for yet.');
     const card = await this.latestCard(order.id);
     if (!card) throw new AppError('CARD_NOT_READY', 'Your card is not ready yet.');
-    return this.downloads.signedDownload(card, this.refs(order));
+    return this.downloads.signedDownload(card, this.refs(order), as);
   }
 
   /** "Email it to me again": queued for the worker, a few times an hour at most. */

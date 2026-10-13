@@ -2,23 +2,24 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma, type CardExport, type CardSession } from '@bulava/database';
 import { ObjectStorage } from '@bulava/storage';
 import { cardPixelSize, type CardFormat } from '@bulava/template-schema';
-import type { CardFreeDownloadInput } from '@bulava/validation';
+import type { CardFileType, CardFreeDownloadInput } from '@bulava/validation';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { QueueService } from '../../infrastructure/queue/queue.service';
 import { STORAGE } from '../../infrastructure/storage/storage.module';
 import { AppError } from '../../common/errors/app-error';
 import type { AuthUser } from '../../common/request-context';
-import { CARD_EXPORT_DAYS, cardFileName } from './card-designs';
-import { CardsService } from './cards.service';
+import { CARD_EXPORT_DAYS, cardFileName, cardPdfKey } from './card-designs';
+import { jpegPdf } from './card-pdf';
+import { CardsService, LIVE_EXPORT, type CardAllowance } from './cards.service';
 
-const LIVE = ['QUEUED', 'RENDERING', 'READY'] as const;
 const DAY = 86_400_000;
 
 /**
  * Downloads of a card (docs/cards.md#downloads): free ones with the watermark
- * after a mobile number, and watermark-free ones for customers whose plan
- * covers them. Each is rendered once per design; asking again (a double click,
- * a refresh, a retry) returns the same image. Paid cards are in CardOrdersService.
+ * after a mobile number, and watermark-free ones through the customer's plan,
+ * as many designs as it includes. Each is rendered once per design; asking
+ * again (a double click, a refresh, a retry) returns the same image. Paid
+ * cards are in CardOrdersService. Every image is also a one-page PDF.
  */
 @Injectable()
 export class CardDownloadsService {
@@ -50,39 +51,59 @@ export class CardDownloadsService {
       await this.cards.event('FREE_DOWNLOAD_REQUESTED', { ...refs, meta: { format: session.format } }, tx);
       return contact;
     });
-    return this.view(await this.exportFor(session, 'FREE', { leadId: lead.id }));
+    return this.view(await this.freeExport(session, lead.id));
   }
 
-  /** A watermark-free card for a signed-in customer whose plan covers it: nothing is asked of them. */
+  /**
+   * A watermark-free card through the customer's plan (ADR-071): nothing is
+   * asked of them, and each design counts once against the cards the plan
+   * includes. Asking again, or downloading the design again later, takes
+   * nothing more. The count is taken under a lock per account, so two tabs
+   * cannot both have the last card.
+   */
   async plan(token: string, user: AuthUser) {
     const options = await this.cards.requireEnabled();
+    if (!options.planDownloads) throw new AppError('CARD_PLAN_REQUIRED', 'Watermark-free cards are bought one by one at the moment.', { included: 0 });
     const session = await this.cards.session(token);
-    const coverage = await this.cards.planCoverage(user.id, options.planDownloads);
-    if (!coverage.eligible) throw new AppError('CARD_PLAN_REQUIRED', 'Your plan does not include watermark-free cards.');
+    const allowance = await this.cards.allowance(user.id);
+    if (allowance.included === 0) throw new AppError('CARD_PLAN_REQUIRED', 'Your plan does not include watermark-free cards. Buy this card on its own, or unlock a plan that includes them.', { included: 0 });
+    let result: { card: CardExport; created: boolean; used: number };
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        await this.cards.lockAllowance(tx, user.id);
+        const counted = await this.cards.countedDesigns(user.id, tx);
+        // This design's clean image is already made or on its way: the same one, nothing more counted.
+        const live = await tx.cardExport.findFirst({ where: { sessionId: session.id, kind: 'PLAN', designHash: session.designHash, status: { in: [...LIVE_EXPORT] } } });
+        if (live) return { card: live, created: false, used: counted.size };
+        const again = counted.has(session.designHash);
+        if (!again && allowance.included !== null && counted.size >= allowance.included) {
+          throw new AppError('CARD_PLAN_REQUIRED', `The ${allowance.included} watermark-free cards with your plan are used. Buy this card on its own, or unlock a bigger plan.`, { included: allowance.included, used: counted.size });
+        }
+        const card = await tx.cardExport.create({ data: this.exportData(session, 'PLAN', { userId: user.id }) });
+        return { card, created: true, used: counted.size + (again ? 0 : 1) };
+      });
+    } catch (error) {
+      // Two clicks at once from two accounts on one card (card_exports_live_per_design): the other request made it.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const other = await this.prisma.cardExport.findFirst({ where: { sessionId: session.id, kind: 'PLAN', designHash: session.designHash, status: { in: [...LIVE_EXPORT] } } });
+        if (other) return { ...this.view(other), allowance };
+      }
+      throw error;
+    }
     if (!session.userId) await this.prisma.cardSession.update({ where: { id: session.id }, data: { userId: user.id } });
     await this.cards.event('PLAN_DOWNLOAD_REQUESTED', { sessionId: session.id, userId: user.id, templateKey: session.templateKey, meta: { format: session.format } });
-    return this.view(await this.exportFor(session, 'PLAN', { userId: user.id }));
+    if (result.created) await this.queue(result.card.id);
+    const after: CardAllowance = { ...allowance, used: result.used, left: allowance.included === null ? null : Math.max(0, allowance.included - result.used) };
+    return { ...this.view(result.card), allowance: after };
   }
 
-  /** The image of the card's current design (one per kind), or a new one queued for rendering. */
-  private async exportFor(session: CardSession, kind: 'FREE' | 'PLAN', refs: { leadId?: string; userId?: string }): Promise<CardExport> {
-    const where = { sessionId: session.id, kind, designHash: session.designHash, status: { in: [...LIVE] } };
+  /** The watermarked image of the card's current design, or a new one queued for rendering. */
+  private async freeExport(session: CardSession, leadId: string): Promise<CardExport> {
+    const where = { sessionId: session.id, kind: 'FREE' as const, designHash: session.designHash, status: { in: [...LIVE_EXPORT] } };
     const live = await this.prisma.cardExport.findFirst({ where });
     if (live) return live;
     try {
-      const created = await this.prisma.cardExport.create({
-        data: {
-          kind,
-          sessionId: session.id,
-          leadId: refs.leadId ?? null,
-          userId: refs.userId ?? null,
-          templateKey: session.templateKey,
-          format: session.format,
-          design: session.design as Prisma.InputJsonValue,
-          designHash: session.designHash,
-          expiresAt: new Date(Date.now() + CARD_EXPORT_DAYS[kind] * DAY),
-        },
-      });
+      const created = await this.prisma.cardExport.create({ data: this.exportData(session, 'FREE', { leadId }) });
       await this.queue(created.id);
       return created;
     } catch (error) {
@@ -93,6 +114,20 @@ export class CardDownloadsService {
       }
       throw error;
     }
+  }
+
+  private exportData(session: CardSession, kind: 'FREE' | 'PLAN', refs: { leadId?: string; userId?: string }): Prisma.CardExportUncheckedCreateInput {
+    return {
+      kind,
+      sessionId: session.id,
+      leadId: refs.leadId ?? null,
+      userId: refs.userId ?? null,
+      templateKey: session.templateKey,
+      format: session.format,
+      design: session.design as Prisma.InputJsonValue,
+      designHash: session.designHash,
+      expiresAt: new Date(Date.now() + CARD_EXPORT_DAYS[kind] * DAY),
+    };
   }
 
   async queue(exportId: string): Promise<void> {
@@ -111,27 +146,40 @@ export class CardDownloadsService {
     return this.view(card);
   }
 
-  /** A signed link that downloads the image. The first download of each image counts as the completed download. */
-  async download(token: string, exportId: string) {
+  /** A signed link that downloads the image or its PDF. The first download of each image counts as the completed download. */
+  async download(token: string, exportId: string, as: CardFileType = 'image') {
     const session = await this.cards.session(token);
     const card = await this.prisma.cardExport.findFirst({ where: { id: exportId, sessionId: session.id, kind: { in: ['FREE', 'PLAN'] } } });
     if (!card) throw AppError.notFound('Card image');
-    return this.signedDownload(card, { sessionId: session.id, leadId: card.leadId, userId: card.userId, templateKey: session.templateKey });
+    return this.signedDownload(card, { sessionId: session.id, leadId: card.leadId, userId: card.userId, templateKey: session.templateKey }, as);
   }
 
-  /** Shared with paid orders: the link, the download counted, and the completed step recorded once. */
-  async signedDownload(card: CardExport, refs: { sessionId?: string | null; leadId?: string | null; orderId?: string | null; userId?: string | null; templateKey: string }) {
+  /** Shared with paid orders: the link, the download counted, and the completed step recorded once (whichever file it is). */
+  async signedDownload(card: CardExport, refs: { sessionId?: string | null; leadId?: string | null; orderId?: string | null; userId?: string | null; templateKey: string }, as: CardFileType = 'image') {
     if (card.status !== 'READY' || !card.storageKey) throw new AppError('CARD_NOT_READY', 'Your card is not ready yet.');
-    const fileName = cardFileName(card.templateKey, card.format);
-    const url = await this.storage.presignDownload(card.storageKey, { expiresInSeconds: 600, downloadName: fileName });
+    const key = as === 'pdf' ? await this.pdf(card.storageKey) : card.storageKey;
+    const fileName = cardFileName(card.templateKey, card.format, as);
+    const url = await this.storage.presignDownload(key, { expiresInSeconds: 600, downloadName: fileName });
     const now = new Date();
     const first = !card.firstDownloadedAt;
     await this.prisma.cardExport.update({ where: { id: card.id }, data: { downloads: { increment: 1 }, lastDownloadedAt: now, ...(first ? { firstDownloadedAt: now } : {}) } });
     if (first) {
       const type = card.kind === 'FREE' ? 'FREE_DOWNLOAD_COMPLETED' : card.kind === 'PLAN' ? 'PLAN_DOWNLOAD_COMPLETED' : 'PAID_DOWNLOAD_COMPLETED';
-      await this.cards.event(type, { ...refs, meta: { format: card.format } });
+      await this.cards.event(type, { ...refs, meta: { format: card.format, file: as } });
     }
     return { url, fileName };
+  }
+
+  /**
+   * The card's PDF: its image on one page at the card's print size, made the
+   * first time it is asked for and kept beside the image in private storage
+   * (the worker deletes both when the image expires).
+   */
+  private async pdf(imageKey: string): Promise<string> {
+    const key = cardPdfKey(imageKey);
+    if (await this.storage.head(key)) return key;
+    await this.storage.put(key, jpegPdf(await this.storage.getBuffer(imageKey)), 'application/pdf');
+    return key;
   }
 
   view(card: CardExport) {

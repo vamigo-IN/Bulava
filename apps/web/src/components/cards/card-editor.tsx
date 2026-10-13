@@ -177,6 +177,8 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'local' | 'error'>(start.token ? 'saved' : 'idle');
   const [savedHash, setSavedHash] = useState<string | null>(null);
   const [orders, setOrders] = useState<CardSessionOrder[]>([]);
+  /** Signed in: the saved design was had through their plan before (downloading it again takes nothing more). */
+  const [planCounted, setPlanCounted] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const lastSynced = useRef<string | null>(null);
   const pending = useRef<Promise<string | null> | null>(null);
@@ -512,11 +514,13 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
   const openDownload = async () => {
     setOpening(true);
     setSelectedId(null);
+    setPlanCounted(false);
     try {
       const saved = await ensureSession();
       const session = await cardApi.openSession(saved);
       setOrders(session.orders);
       setSavedHash(session.designHash);
+      setPlanCounted(Boolean(session.planCounted));
     } catch {
       // Offline or the save failed: the dialog explains when something is asked of it.
     } finally {
@@ -770,7 +774,7 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
       ) : null}
 
       {downloadOpen ? (
-        <DownloadDialog editor={editor} ensureSession={ensureSession} sessionToken={token} paidOrder={paidOrder} siteName={siteName} onClose={() => setDownloadOpen(false)} />
+        <DownloadDialog editor={editor} ensureSession={ensureSession} sessionToken={token} paidOrder={paidOrder} planCounted={planCounted} siteName={siteName} onClose={() => setDownloadOpen(false)} />
       ) : null}
     </div>
   );

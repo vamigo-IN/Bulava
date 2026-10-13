@@ -5,6 +5,7 @@ import type { Response } from 'express';
 import {
   CardCheckoutEventSchema,
   CardDesignBodySchema,
+  CardDownloadSchema,
   CardEventSchema,
   CardFreeDownloadSchema,
   CardLeadsQuerySchema,
@@ -20,6 +21,7 @@ import {
   z,
   type CardCheckoutEventInput,
   type CardDesignBody,
+  type CardDownloadInput,
   type CardEventInput,
   type CardFreeDownloadInput,
   type CardOrderInput,
@@ -93,10 +95,11 @@ export class PublicCardsController {
     return this.cards.createSession(body, user);
   }
 
+  /** A saved card (and, signed in, whether its design was had through the plan before). */
   @Get('session')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  openSession(@Headers(CARD_SESSION_HEADER) token: string | undefined) {
-    return this.cards.openSession(sessionToken(token));
+  openSession(@Headers(CARD_SESSION_HEADER) token: string | undefined, @OptionalUser() user: AuthUser | null) {
+    return this.cards.openSession(sessionToken(token), user);
   }
 
   /** Autosave. */
@@ -160,12 +163,13 @@ export class PublicCardsController {
     return this.downloads.status(sessionToken(token), exportId);
   }
 
-  /** A signed link to the image; the first download of each image is the completed download. */
+  /** A signed link to the image or its PDF (`as`); the first download of each image is the completed download. */
   @Post('session/exports/:exportId/download')
   @HttpCode(200)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  download(@Headers(CARD_SESSION_HEADER) token: string | undefined, @Param('exportId', ParseIdPipe) exportId: string) {
-    return this.downloads.download(sessionToken(token), exportId);
+  @ApiZodBody(CardDownloadSchema)
+  download(@Headers(CARD_SESSION_HEADER) token: string | undefined, @Param('exportId', ParseIdPipe) exportId: string, @ZodBody(CardDownloadSchema) body: CardDownloadInput) {
+    return this.downloads.download(sessionToken(token), exportId, body.as);
   }
 
   /** The watermark-free card: a pending order for this exact design, then Razorpay Checkout. */
@@ -208,11 +212,13 @@ export class PublicCardsController {
     return this.orders.checkoutEvent(orderToken(token), body);
   }
 
+  /** The paid card's image or its PDF (`as`). */
   @Post('order/download')
   @HttpCode(200)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  orderDownload(@Headers(CARD_ORDER_HEADER) token: string | undefined) {
-    return this.orders.download(orderToken(token));
+  @ApiZodBody(CardDownloadSchema)
+  orderDownload(@Headers(CARD_ORDER_HEADER) token: string | undefined, @ZodBody(CardDownloadSchema) body: CardDownloadInput) {
+    return this.orders.download(orderToken(token), body.as);
   }
 
   @Post('order/email')
@@ -247,7 +253,7 @@ export class PublicCardsController {
   }
 }
 
-/** A watermark-free card for a signed-in customer whose plan covers it. */
+/** A watermark-free card through a signed-in customer's plan (as many designs as it includes, ADR-071). */
 @ApiTags('cards')
 @Controller('cards')
 export class CardsController {

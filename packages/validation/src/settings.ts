@@ -292,15 +292,20 @@ export const DomainSettingsSchema = z.object({
 /** The smallest price of a watermark-free card: ₹50, in paise. */
 export const CARD_MIN_PRICE_MINOR = 5000;
 
-/** Who downloads cards without the watermark at no charge: holders of any paid plan in force, of a yearly plan, or nobody. */
-export const CARD_PLAN_DOWNLOADS = ['any', 'subscription', 'off'] as const;
+/** Settings saved before ADR-071 chose which plans counted ('any', 'subscription') or none ('off'). */
+const legacyPlanDownloads = (value: unknown) => (value === 'off' ? false : value === 'any' || value === 'subscription' ? true : value);
 
 export const CardsSettingsSchema = z.object({
   /** The public card gallery and editor (/cards). */
   enabled: z.boolean().default(true),
   /** The watermark-free download of one card, in paise (₹50 at least). */
   priceMinor: z.coerce.number().int().min(CARD_MIN_PRICE_MINOR, 'At least ₹50 (5000 paise)').max(1_000_000).default(CARD_MIN_PRICE_MINOR),
-  planDownloads: z.enum(CARD_PLAN_DOWNLOADS).default('any'),
+  /**
+   * Plans include watermark-free cards: a signed-in customer downloads as many
+   * as the plan in force allows (`cards.included`, ADR-071) without paying per
+   * card. Off: everyone buys watermark-free cards one by one.
+   */
+  planDownloads: z.preprocess(legacyPlanDownloads, z.boolean()).default(true),
   /**
    * Anyone downloads a card with the watermark after a mobile number. Off (as
    * plans are one-time, ADR-062): downloads come with a plan, with the plan's

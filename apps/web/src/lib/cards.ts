@@ -13,6 +13,27 @@ import { stockQuery, type StockKind, type StockPage } from './stock';
 export const CARD_SESSION_HEADER = 'x-card-session';
 export const CARD_ORDER_HEADER = 'x-card-order';
 
+/** Watermark-free cards with the customer's plan (ADR-071). */
+export interface CardAllowance {
+  /** null: unlimited. */
+  included: number | null;
+  /** Card designs downloaded through a plan, each counted once. */
+  used: number;
+  /** null: unlimited. */
+  left: number | null;
+  planName: string | null;
+}
+
+/** The plan that unlocks (more) watermark-free cards, at what it costs this visitor (a plan holder pays the difference). */
+export interface CardUnlock {
+  key: string;
+  name: string;
+  /** Cards it includes; null: unlimited. */
+  cards: number | null;
+  priceMinor: number;
+  fullPriceMinor: number;
+}
+
 export interface CardConfig {
   enabled: boolean;
   priceMinor: number;
@@ -22,12 +43,27 @@ export interface CardConfig {
   freeDownloads: boolean;
   /** The plans page's first price, for "from …". */
   planFromMinor: number | null;
+  /** Plans include watermark-free cards (the console's switch). */
+  planCards: boolean;
+  unlock: CardUnlock | null;
   /** The free card's watermark, exactly as the export draws it. */
   watermark: string;
   formats: Record<CardFormat, { width: number; height: number; pixels: { width: number; height: number } }>;
-  /** Signed in: prefill, and whether their plan covers watermark-free cards. */
-  account: { name: string; email: string | null; phone: string | null; planDownload: boolean; planName: string | null; paidPlan: boolean } | null;
+  /** Signed in: prefill, and the watermark-free cards their plan includes. */
+  account: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    /** Any paid plan in force (the watermarked download comes with it). */
+    paidPlan: boolean;
+    cards: CardAllowance | null;
+    planDownload: boolean;
+    planName: string | null;
+  } | null;
 }
+
+/** How a card is saved: the image, or the same card as a one-page PDF. */
+export type CardFileType = 'image' | 'pdf';
 
 export interface CardUpload {
   id: string;
@@ -54,6 +90,8 @@ export interface OpenedSession {
   design: unknown;
   uploads: CardUpload[];
   orders: CardSessionOrder[];
+  /** Signed in: this design was had through their plan before (downloading it again takes nothing more). */
+  planCounted: boolean;
 }
 
 export interface CardExportView {
@@ -116,9 +154,10 @@ export const cardApi = {
   stockSearch: (token: string, q: string, kind: StockKind, page: number) => api<StockPage>(`/public/cards/session/stock?${stockQuery(q, kind, page)}`, { headers: withSession(token) }),
   stockImport: (token: string, id: string) => api<CardUpload>('/public/cards/session/stock', { method: 'POST', body: { id }, headers: withSession(token) }),
   freeDownload: (token: string, body: { phone: string; marketingConsent: boolean }) => api<CardExportView>('/public/cards/session/free-download', { method: 'POST', body, headers: withSession(token) }),
-  planDownload: (token: string) => api<CardExportView>('/cards/session/plan-download', { method: 'POST', body: {}, headers: withSession(token) }),
+  planDownload: (token: string) => api<CardExportView & { allowance: CardAllowance }>('/cards/session/plan-download', { method: 'POST', body: {}, headers: withSession(token) }),
   exportStatus: (token: string, id: string) => api<CardExportView>(`/public/cards/session/exports/${id}`, { headers: withSession(token) }),
-  exportDownload: (token: string, id: string) => api<{ url: string; fileName: string }>(`/public/cards/session/exports/${id}/download`, { method: 'POST', body: {}, headers: withSession(token) }),
+  exportDownload: (token: string, id: string, as: CardFileType = 'image') =>
+    api<{ url: string; fileName: string }>(`/public/cards/session/exports/${id}/download`, { method: 'POST', body: { as }, headers: withSession(token) }),
   createOrder: (token: string, body: { phone: string; name: string; email: string; acceptTerms: boolean; marketingConsent: boolean }) =>
     api<CardCheckout>('/public/cards/session/orders', { method: 'POST', body, headers: withSession(token) }),
   order: (orderToken: string) => api<CardOrderView>('/public/cards/order', { headers: withOrder(orderToken) }),
@@ -127,7 +166,7 @@ export const cardApi = {
     api<{ status: 'PAID' }>('/public/cards/order/verify', { method: 'POST', body, headers: withOrder(orderToken) }),
   orderEvent: (orderToken: string, body: { type: 'PAYMENT_FAILED' | 'PAYMENT_CANCELLED'; reason?: string }) =>
     api<{ ok: true }>('/public/cards/order/events', { method: 'POST', body, headers: withOrder(orderToken) }).catch(() => undefined),
-  orderDownload: (orderToken: string) => api<{ url: string; fileName: string }>('/public/cards/order/download', { method: 'POST', body: {}, headers: withOrder(orderToken) }),
+  orderDownload: (orderToken: string, as: CardFileType = 'image') => api<{ url: string; fileName: string }>('/public/cards/order/download', { method: 'POST', body: { as }, headers: withOrder(orderToken) }),
   orderEmail: (orderToken: string) => api<{ emailStatus: 'QUEUED' }>('/public/cards/order/email', { method: 'POST', body: {}, headers: withOrder(orderToken) }),
   orderRegenerate: (orderToken: string) => api<{ status: string }>('/public/cards/order/regenerate', { method: 'POST', body: {}, headers: withOrder(orderToken) }),
   recover: (body: { email: string; phone: string }) => api<{ ok: true }>('/public/cards/recover', { method: 'POST', body }),
@@ -182,6 +221,12 @@ export function forgetStoredCard(templateKey: string): void {
 }
 
 export { rememberOrder, storedOrders, type StoredOrder } from './card-store';
+
+/** Where a plan is unlocked: its checkout, through signing in for a visitor (the checkout names one-time payment and GST). */
+export function unlockHref(planKey: string, signedIn: boolean): string {
+  const checkout = `/dashboard/checkout?plan=${encodeURIComponent(planKey)}`;
+  return signedIn ? checkout : `/login?next=${encodeURIComponent(checkout)}`;
+}
 
 /** ₹50, ₹1,250.50 */
 export function formatRupees(minor: number): string {

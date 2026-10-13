@@ -534,7 +534,7 @@ export interface EventTypeOption {
 
 export interface CardStats {
   days: number;
-  settings: { enabled: boolean; priceMinor: number; planDownloads: 'any' | 'subscription' | 'off' };
+  settings: { enabled: boolean; priceMinor: number; planDownloads: boolean };
   funnel: { templatesSelected: number; editorsOpened: number; cardsCreated: number; downloadDialogs: number; freeDownloads: number; paymentsStarted: number; purchases: number };
   totals: { newLeads: number; totalLeads: number; consentedLeads: number; freeImages: number; planDownloads: number; revenueMinor: number; pendingOrders: number };
   conversion: { createdToFree: number; createdToPaid: number; freeToPaid: number; checkoutToPaid: number };

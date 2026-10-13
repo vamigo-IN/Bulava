@@ -114,13 +114,10 @@ function tier(o: {
     { featureKey: F.MUSIC, enabled: o.music },
     { featureKey: F.CUSTOM_LINK, enabled: o.premium },
     { featureKey: F.GALLERY, enabled: true },
-    { featureKey: CARDS_INCLUDED, enabled: o.cards > 0, limit: o.cards },
+    { featureKey: F.CARDS_INCLUDED, enabled: o.cards > 0, limit: o.cards },
     ...(o.prioritySupport ? [{ featureKey: F.PRIORITY_SUPPORT, enabled: true }] : []),
   ];
 }
-
-/** Watermark-free digital cards a plan includes (docs/cards.md). */
-const CARDS_INCLUDED = 'cards.included';
 
 /**
  * Initial plans and add-ons: Free and four one-time paid plans, each for one
@@ -151,7 +148,7 @@ const PLANS: PlanSeed[] = [
       { featureKey: F.MUSIC, enabled: false },
       { featureKey: F.CUSTOM_LINK, enabled: false },
       { featureKey: F.GALLERY, enabled: false },
-      { featureKey: CARDS_INCLUDED, enabled: false, limit: 0 },
+      { featureKey: F.CARDS_INCLUDED, enabled: false, limit: 0 },
     ],
   },
   {

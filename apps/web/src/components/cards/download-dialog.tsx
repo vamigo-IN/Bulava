@@ -1,28 +1,30 @@
 'use client';
 
-import { ArrowLeft, Check, Crown, Download, LoaderCircle, Lock, Mail, ShieldCheck, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Check, Crown, Download, FileText, LoaderCircle, Lock, Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { CardView } from '@bulava/template-engine';
 import { splitPhoneNumber } from '@bulava/validation';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { ApiError } from '@/lib/api';
 import { errorMessage } from '@/lib/i18n';
-import { cardApi, formatRupees, rememberOrder, startDownload, type CardExportView, type CardSessionOrder } from '@/lib/cards';
+import { cardApi, formatRupees, rememberOrder, startDownload, unlockHref, type CardAllowance, type CardExportView, type CardFileType, type CardSessionOrder, type CardUnlock } from '@/lib/cards';
 import { runCheckout } from '@/lib/checkout';
 import { cn } from '@/lib/utils';
 import type { CardEditorApi } from './editor-types';
 import { OrderStatus } from './order-status';
 
+type Option = 'FREE' | 'PLAN';
+
 type Step =
-  /** A plan holder's download, started as the dialog opens: nothing to choose or fill in. */
-  | { kind: 'starting' }
   | { kind: 'choose' }
   | { kind: 'free' }
   | { kind: 'paid'; notice?: string }
-  | { kind: 'making'; option: 'FREE' | 'PLAN'; exportId: string }
-  | { kind: 'ready'; option: 'FREE' | 'PLAN'; card: CardExportView }
+  | { kind: 'making'; option: Option; exportId: string; allowance?: CardAllowance }
+  | { kind: 'ready'; option: Option; card: CardExportView; allowance?: CardAllowance }
   | { kind: 'order'; orderToken: string }
-  | { kind: 'failed'; option: 'FREE' | 'PLAN'; message: string };
+  | { kind: 'failed'; option: Option; message: string };
 
 const ACCENT = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600';
 
@@ -30,8 +32,10 @@ const ACCENT = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-vis
  * Downloading a card (docs/cards.md#downloads): the free card with the
  * watermark for a mobile number, or the watermark-free card for the price
  * (number, name, email, the ticked Terms, then Razorpay). A signed-in customer
- * whose plan covers watermark-free cards gets no choice and no form: the clean
- * card is made and saved as the dialog opens. Closing it never touches the
+ * whose plan includes watermark-free cards (ADR-071) sees how many are left and
+ * downloads with one click, nothing to fill in; with none left, or none in the
+ * plan, the price per card and the plan that unlocks more are offered. Every
+ * card is saved as an image or a PDF. Closing the dialog never touches the
  * design; reopening it after paying goes straight to the bought card.
  */
 export function DownloadDialog({
@@ -39,6 +43,7 @@ export function DownloadDialog({
   ensureSession,
   sessionToken,
   paidOrder,
+  planCounted,
   siteName,
   onClose,
 }: {
@@ -48,14 +53,21 @@ export function DownloadDialog({
   sessionToken: string | null;
   /** A paid order for exactly this design, if one exists: no second purchase. */
   paidOrder: CardSessionOrder | null;
+  /** This design was had through the customer's plan before: downloading it again takes nothing more. */
+  planCounted: boolean;
   siteName: string;
   onClose: () => void;
 }) {
   const { design, t, config, template } = editor;
-  const plan = config?.account?.planDownload ? config.account : null;
+  const queries = useQueryClient();
+  const allowance = config?.account?.cards ?? null;
+  // The plan still has a card for this one (or had it already, or has no limit).
+  const planReady = Boolean(allowance && (allowance.left === null || allowance.left > 0 || planCounted));
   // The watermarked card: for anyone while free downloads are on, else with any paid plan (ADR-062).
   const freeOffered = Boolean(config?.freeDownloads || config?.account?.paidPlan);
-  const [step, setStep] = useState<Step>(plan ? { kind: 'starting' } : paidOrder ? { kind: 'order', orderToken: paidOrder.orderToken } : { kind: 'choose' });
+  const unlock = config?.unlock ?? null;
+  const signedIn = Boolean(config?.account);
+  const [step, setStep] = useState<Step>(paidOrder ? { kind: 'order', orderToken: paidOrder.orderToken } : { kind: 'choose' });
   const [phone, setPhone] = useState(config?.account?.phone ?? '');
   const [offers, setOffers] = useState(false);
   const [name, setName] = useState(config?.account?.name ?? '');
@@ -63,6 +75,7 @@ export function DownloadDialog({
   const [terms, setTerms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [working, setWorking] = useState(false);
+  const [saving, setSaving] = useState<CardFileType | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const price = formatRupees(config?.priceMinor ?? 5000);
@@ -93,7 +106,7 @@ export function DownloadDialog({
         try {
           const token = await ensureSession();
           const card = await cardApi.exportStatus(token, step.exportId);
-          if (card.status === 'READY') return setStep({ kind: 'ready', option: step.option, card });
+          if (card.status === 'READY') return setStep({ kind: 'ready', option: step.option, card, allowance: step.allowance });
           if (card.status === 'FAILED' || card.status === 'EXPIRED') return setStep({ kind: 'failed', option: step.option, message: t('cards.download.failed') });
         } catch (error) {
           if (Date.now() - started > 120_000) return setStep({ kind: 'failed', option: step.option, message: errorMessage(t, error) });
@@ -141,30 +154,33 @@ export function DownloadDialog({
   const planDownload = () =>
     run(async () => {
       const token = await ensureSession();
-      const card = await cardApi.planDownload(token);
-      setStep(card.status === 'READY' ? { kind: 'ready', option: 'PLAN', card } : { kind: 'making', option: 'PLAN', exportId: card.id });
+      try {
+        const { allowance: after, ...card } = await cardApi.planDownload(token);
+        setStep(card.status === 'READY' ? { kind: 'ready', option: 'PLAN', card, allowance: after } : { kind: 'making', option: 'PLAN', exportId: card.id, allowance: after });
+      } catch (error) {
+        // The last card went meanwhile (another tab), or the plan ended: the other ways, with the numbers as they are now.
+        if (!(error instanceof ApiError && error.code === 'CARD_PLAN_REQUIRED')) throw error;
+        setStep({ kind: 'choose' });
+        setProblem(t('cards.download.allowanceGone'));
+      } finally {
+        void queries.invalidateQueries({ queryKey: ['card-config'] });
+      }
     });
 
-  const saveFile = (card: CardExportView) =>
-    run(async () => {
+  const saveFile = (card: CardExportView, as: CardFileType) => {
+    setSaving(as);
+    return run(async () => {
       const token = await ensureSession();
-      const { url } = await cardApi.exportDownload(token, card.id);
+      const { url } = await cardApi.exportDownload(token, card.id, as);
       startDownload(url);
-    });
+    }).finally(() => setSaving(null));
+  };
 
-  // Plan holders: make the clean card as soon as the dialog opens (once; "Try again" asks again)…
-  const planStarted = useRef(false);
-  useEffect(() => {
-    if (step.kind !== 'starting' || planStarted.current) return;
-    planStarted.current = true;
-    void planDownload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.kind]);
-  // …and save it the moment it is ready.
+  // A plan download saves the image the moment it is ready (the customer asked for it with one click).
   useEffect(() => {
     if (step.kind !== 'ready' || step.option !== 'PLAN' || autoSaved.current) return;
     autoSaved.current = true;
-    void saveFile(step.card);
+    void saveFile(step.card, 'image');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
@@ -205,6 +221,7 @@ export function DownloadDialog({
   const choosePaid = () => {
     void cardApi.event({ type: 'PAID_OPTION_SELECTED', templateKey: template.key, ...(sessionToken ? { session: sessionToken } : {}) });
     setErrors({});
+    setProblem(null);
     setStep({ kind: 'paid' });
   };
 
@@ -214,34 +231,16 @@ export function DownloadDialog({
     </div>
   );
 
+  /** "3 of 5 watermark-free cards left on your Standard plan." */
+  const allowanceText = (a: CardAllowance) =>
+    a.left === null || a.included === null
+      ? t('cards.download.allowanceUnlimited')
+      : a.planName
+        ? t('cards.download.allowance', { left: a.left, included: a.included, plan: a.planName })
+        : t('cards.download.allowanceUnnamed', { left: a.left, included: a.included });
+
   let body: ReactNode;
   switch (step.kind) {
-    case 'starting':
-      body = problem ? (
-        <div className="space-y-4 py-4 text-center">
-          <h2 id="download-title" className="font-display text-2xl text-ink">
-            {t('cards.download.failedTitle')}
-          </h2>
-          <p className="text-sm text-stone-600">{problem}</p>
-          <button type="button" disabled={working} onClick={() => void planDownload()} className={cn('btn-3d min-h-12 w-full justify-center rounded-xl', ACCENT)}>
-            {t('cards.download.tryAgain')}
-          </button>
-          <button type="button" onClick={() => setStep({ kind: 'choose' })} className="text-sm font-semibold text-brand-700 hover:underline">
-            {t('cards.download.otherWays')}
-          </button>
-        </div>
-      ) : (
-        <div role="status" className="space-y-4 py-6 text-center">
-          <LoaderCircle aria-hidden className="mx-auto size-10 animate-spin text-brand-700" />
-          <h2 id="download-title" className="font-display text-2xl text-ink">
-            {t('cards.download.making')}
-          </h2>
-          <p className="flex items-center justify-center gap-1.5 text-sm text-stone-600">
-            <Crown aria-hidden className="size-4 text-brand-700" /> {plan?.planName ? t('cards.download.planNamed', { plan: plan.planName }) : t('cards.download.plan')}
-          </p>
-        </div>
-      );
-      break;
     case 'choose':
       body = (
         <div className="space-y-5">
@@ -251,19 +250,33 @@ export function DownloadDialog({
             </h2>
             <p className="mt-2 text-sm text-stone-600">{t('cards.download.subtitle')}</p>
           </header>
-          {plan ? (
+          {problem ? <Problem text={problem} /> : null}
+          {planReady && allowance ? (
             <div className="rounded-3xl bg-gradient-to-br from-gold-100 to-surface p-4 shadow-clay ring-1 ring-gold-300/60">
               <p className="flex items-center gap-2 text-sm font-semibold text-brand-800">
-                <Crown aria-hidden className="size-4" /> {plan.planName ? t('cards.download.planNamed', { plan: plan.planName }) : t('cards.download.plan')}
+                <Crown aria-hidden className="size-4" /> {allowance.planName ? t('cards.download.planNamed', { plan: allowance.planName }) : t('cards.download.plan')}
+              </p>
+              <p className="mt-1 text-sm text-stone-700">
+                {planCounted
+                  ? t('cards.download.allowanceAgain')
+                  : allowance.left === null || allowance.included === null
+                    ? t('cards.download.allowanceUnlimited')
+                    : t('cards.download.allowanceLeft', { left: allowance.left, included: allowance.included })}
               </p>
               <p className="mt-1 text-sm text-stone-700">{t('cards.download.planBody')}</p>
+              {allowance.included !== null && !planCounted ? <p className="mt-1 text-xs text-stone-500">{t('cards.download.allowanceNote')}</p> : null}
               <button type="button" disabled={working} onClick={() => void planDownload()} className={cn('btn-3d mt-3 min-h-12 w-full justify-center gap-2 rounded-xl text-base disabled:opacity-60', ACCENT)}>
                 {working ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <Download aria-hidden className="size-5" />} {t('cards.download.planButton')}
               </button>
             </div>
+          ) : allowance && allowance.included !== null ? (
+            <p className="flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+              <Crown aria-hidden className="mt-0.5 size-4 shrink-0" />
+              {usedText(t, allowance.included, allowance.planName)}
+            </p>
           ) : null}
           {/* Phones: one small preview above the two choices, so both fit on the screen. */}
-          <div className="sm:hidden">{preview(true, 'mx-auto w-24')}</div>
+          <div className="sm:hidden">{preview(freeOffered, 'mx-auto w-24')}</div>
           <div className="grid gap-4 sm:grid-cols-2">
             {freeOffered ? (
               <OptionCard
@@ -277,13 +290,26 @@ export function DownloadDialog({
                   </button>
                 }
               />
+            ) : unlock ? (
+              // No plan yet: the plan that includes watermark-free cards, this one among them.
+              <OptionCard
+                title={t('cards.download.unlockTitle', { plan: unlock.name })}
+                price={t('cards.download.unlockPrice', { price: formatRupees(unlock.priceMinor) })}
+                points={[unlockCards(t, unlock), t('cards.download.unlockPoint2'), t('cards.download.gst')]}
+                preview={preview(false, 'mx-auto hidden w-28 sm:block')}
+                action={
+                  <Link href={unlockHref(unlock.key, signedIn)} className={cn('btn-3d btn-3d-light min-h-12 w-full justify-center rounded-xl text-sm', ACCENT)}>
+                    {t('cards.download.unlockButton', { plan: unlock.name })}
+                  </Link>
+                }
+              />
             ) : (
-              // Downloads come with a plan: the invitation, the card as a PDF and more, paid once.
+              // Plans include no watermark-free cards at the moment: a plan downloads the card with its mark.
               <OptionCard
                 title={t('cards.download.withPlanTitle')}
                 price={t('cards.download.withPlanPrice', { price: formatRupees(config?.planFromMinor ?? 0) })}
                 points={[t('cards.download.withPlanPoint1'), t('cards.download.withPlanPoint2'), t('cards.download.withPlanPoint3')]}
-                preview={preview(false, 'mx-auto hidden w-28 sm:block')}
+                preview={preview(true, 'mx-auto hidden w-28 sm:block')}
                 action={
                   <Link href="/pricing" className={cn('btn-3d btn-3d-light min-h-12 w-full justify-center rounded-xl text-sm', ACCENT)}>
                     {t('cards.download.withPlanButton')}
@@ -304,6 +330,8 @@ export function DownloadDialog({
               }
             />
           </div>
+          {/* With the free card on offer (or a plan without cards left), the plan that includes (more) of them. */}
+          {unlock && freeOffered && !planReady ? <UnlockLine unlock={unlock} signedIn={signedIn} t={t} /> : null}
         </div>
       );
       break;
@@ -410,6 +438,11 @@ export function DownloadDialog({
             {t('cards.download.making')}
           </h2>
           <p className="text-sm text-stone-600">{t('cards.download.makingBody')}</p>
+          {step.option === 'PLAN' && step.allowance ? (
+            <p className="flex items-center justify-center gap-1.5 text-sm text-stone-600">
+              <Crown aria-hidden className="size-4 shrink-0 text-brand-700" /> {allowanceText(step.allowance)}
+            </p>
+          ) : null}
         </div>
       );
       break;
@@ -424,11 +457,31 @@ export function DownloadDialog({
           </h2>
           <p className="text-sm text-stone-600">{step.option === 'FREE' ? t('cards.download.readyFree') : t('cards.download.readyPlanSaved')}</p>
           {preview(step.option === 'FREE', 'mx-auto w-40')}
+          {step.option === 'PLAN' && step.allowance ? (
+            <p className="flex items-center justify-center gap-1.5 text-sm text-stone-600">
+              <Crown aria-hidden className="size-4 shrink-0 text-brand-700" /> {allowanceText(step.allowance)}
+            </p>
+          ) : null}
           {problem ? <Problem text={problem} /> : null}
-          <button type="button" disabled={working} onClick={() => void saveFile(step.card)} className={cn('btn-3d min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60', ACCENT)}>
-            {working ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <Download aria-hidden className="size-5" />} {t('cards.download.save', { width: step.card.width, height: step.card.height })}
-          </button>
-          {step.option === 'FREE' && config?.paymentsReady ? (
+          <div className="grid gap-2 sm:grid-cols-[1.4fr_1fr]">
+            <button type="button" disabled={working} onClick={() => void saveFile(step.card, 'image')} className={cn('btn-3d min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60', ACCENT)}>
+              {saving === 'image' ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <Download aria-hidden className="size-5" />} {t('cards.download.save', { width: step.card.width, height: step.card.height })}
+            </button>
+            <button type="button" disabled={working} onClick={() => void saveFile(step.card, 'pdf')} className={cn('btn-3d btn-3d-light min-h-13 w-full justify-center gap-2 rounded-2xl text-base disabled:opacity-60', ACCENT)}>
+              {saving === 'pdf' ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : <FileText aria-hidden className="size-5" />} {t('cards.download.savePdf')}
+            </button>
+          </div>
+          <p className="text-xs text-stone-500">{t('cards.download.fileHint')}</p>
+          {step.option === 'FREE' && planReady && allowance ? (
+            // Cards left on the plan: the clean card costs nothing, so that is the offer (not the price per card).
+            <div className="rounded-2xl bg-gradient-to-br from-gold-100/70 to-surface p-4 text-left shadow-clay-sm">
+              <p className="text-sm font-semibold text-ink">{t('cards.download.upgradeTitle')}</p>
+              <p className="mt-1 text-sm text-stone-600">{t('cards.download.planInstead')}</p>
+              <button type="button" disabled={working} onClick={() => void planDownload()} className={cn('btn-3d mt-3 min-h-11 gap-2 rounded-xl px-4 text-sm disabled:opacity-60', ACCENT)}>
+                <Crown aria-hidden className="size-4" /> {t('cards.download.planButton')}
+              </button>
+            </div>
+          ) : step.option === 'FREE' && config?.paymentsReady ? (
             <div className="rounded-2xl bg-gradient-to-br from-gold-100/70 to-surface p-4 text-left shadow-clay-sm">
               <p className="text-sm font-semibold text-ink">{t('cards.download.upgradeTitle')}</p>
               <p className="mt-1 text-sm text-stone-600">{t('cards.download.upgradeBody', { price })}</p>
@@ -450,8 +503,12 @@ export function DownloadDialog({
             {t('cards.download.failedTitle')}
           </h2>
           <p className="text-sm text-stone-600">{step.message}</p>
+          {problem ? <Problem text={problem} /> : null}
           <button type="button" disabled={working} onClick={() => (step.option === 'PLAN' ? void planDownload() : freeDownload())} className={cn('btn-3d min-h-12 w-full justify-center rounded-xl', ACCENT)}>
             {t('cards.download.tryAgain')}
+          </button>
+          <button type="button" onClick={() => setStep({ kind: 'choose' })} className="text-sm font-semibold text-brand-700 hover:underline">
+            {t('cards.download.otherWays')}
           </button>
         </div>
       );
@@ -486,6 +543,37 @@ export function DownloadDialog({
         </button>
         {body}
       </div>
+    </div>
+  );
+}
+
+/** "You have used the 5 watermark-free cards on your Standard plan." */
+function usedText(t: CardEditorApi['t'], included: number, plan: string | null): string {
+  if (included === 1) return plan ? t('cards.download.allowanceUsedOne', { plan }) : t('cards.download.allowanceUsedOneUnnamed');
+  return plan ? t('cards.download.allowanceUsed', { included, plan }) : t('cards.download.allowanceUsedUnnamed', { included });
+}
+
+/** "5 watermark-free cards, this one included." */
+function unlockCards(t: CardEditorApi['t'], unlock: CardUnlock): string {
+  if (unlock.cards === null) return t('cards.download.unlockCards.unlimited');
+  return unlock.cards === 1 ? t('cards.download.unlockCards.one') : t('cards.download.unlockCards.many', { count: unlock.cards });
+}
+
+/** The plan that includes (more) watermark-free cards: what it costs (the difference, for a plan holder), one-time with GST. */
+function UnlockLine({ unlock, signedIn, t }: { unlock: CardUnlock; signedIn: boolean; t: CardEditorApi['t'] }) {
+  const params = { plan: unlock.name, price: formatRupees(unlock.priceMinor), count: unlock.cards ?? 0 };
+  const line =
+    unlock.cards === null ? t('cards.download.unlockLine.unlimited', params) : unlock.cards === 1 ? t('cards.download.unlockLine.one', params) : t('cards.download.unlockLine.many', params);
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl bg-surface p-4 text-sm text-stone-700 shadow-clay-sm sm:flex-row sm:items-center">
+      <Sparkles aria-hidden className="hidden size-5 shrink-0 text-brand-700 sm:block" />
+      <p className="flex-1">
+        {line}
+        {unlock.priceMinor !== unlock.fullPriceMinor ? ` ${t('cards.download.unlockDifference')}` : ''}
+      </p>
+      <Link href={unlockHref(unlock.key, signedIn)} className={cn('btn-3d btn-3d-light min-h-11 shrink-0 justify-center rounded-xl px-4 text-sm', ACCENT)}>
+        {t('cards.download.unlockButton', { plan: unlock.name })}
+      </Link>
     </div>
   );
 }

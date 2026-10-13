@@ -55,8 +55,17 @@ export function cardOrderReference(): string {
 }
 
 /** The downloaded file's name: the template and the format, never anything about the customer. */
-export function cardFileName(templateKey: string, format: string): string {
-  return `${templateKey}-${format}.jpg`;
+export function cardFileName(templateKey: string, format: string, as: 'image' | 'pdf' = 'image'): string {
+  return `${templateKey}-${format}.${as === 'pdf' ? 'pdf' : 'jpg'}`;
+}
+
+/**
+ * Where a card's PDF is kept: beside its image (`cards/exports/<id>.pdf`), made
+ * the first time it is asked for and deleted with the image (the worker's
+ * card-retention derives the same key).
+ */
+export function cardPdfKey(imageKey: string): string {
+  return `${imageKey.replace(/\.[A-Za-z0-9]+$/, '')}.pdf`;
 }
 
 /** Retention of exported images (docs/cards.md#retention). */

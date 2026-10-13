@@ -151,7 +151,7 @@ The GET returns the event shell, the guest's name, and only the functions the gu
 
 ## Digital cards
 
-The public card editor's routes (no account; the card's token in `x-card-session`, an order's in `x-card-order`), the plan download and the console's routes are in [cards.md](cards.md#api).
+The public card editor's routes (no account; the card's token in `x-card-session`, an order's in `x-card-order`), the plan download (as many card designs as the plan includes, `cards.included`) and the console's routes are in [cards.md](cards.md#api). Every card download (`POST /public/cards/session/exports/:id/download`, `POST /public/cards/order/download`) takes `{ "as": "pdf" }` for a one-page PDF of the image instead of the image.
 
 ## Added in this release
 

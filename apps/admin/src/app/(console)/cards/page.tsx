@@ -260,15 +260,10 @@ function CardsSettingsForm({ view }: { view: SettingGroupView }) {
       <Field label={t('cards.settings.price')} hint={t('cards.settings.priceHint')} className="max-w-xs">
         {(p) => <Input {...p} type="number" min={50} max={10000} step={1} value={Math.round(draft.priceMinor / 100)} onChange={(e) => set('priceMinor', Math.round(Number(e.target.value || 0) * 100))} />}
       </Field>
-      <Field label={t('cards.settings.planDownloads')} hint={t('cards.settings.planDownloadsHint')} className="max-w-md">
-        {(p) => (
-          <Select {...p} value={draft.planDownloads} onChange={(e) => set('planDownloads', e.target.value as CardsSettingsValue['planDownloads'])}>
-            <option value="any">{t('cards.settings.plan.any')}</option>
-            <option value="subscription">{t('cards.settings.plan.subscription')}</option>
-            <option value="off">{t('cards.settings.plan.off')}</option>
-          </Select>
-        )}
-      </Field>
+      <div>
+        <Checkbox label={t('cards.settings.planDownloads')} checked={draft.planDownloads} onChange={(e) => set('planDownloads', e.target.checked)} />
+        <p className="ml-6.5 text-xs text-stone-500">{t('cards.settings.planDownloadsHint')}</p>
+      </div>
     </SettingsCard>
   );
 }

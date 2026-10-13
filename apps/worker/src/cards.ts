@@ -5,6 +5,11 @@ import type { WorkerDeps } from './processors';
 
 const DAY = 86_400_000;
 
+/** A card's PDF, kept beside its image once asked for (the API's cardPdfKey): deleted with it. */
+export function cardPdfKey(imageKey: string): string {
+  return `${imageKey.replace(/\.[A-Za-z0-9]+$/, '')}.pdf`;
+}
+
 /** The order page of a paid card (the token after #, so it is never sent to a server or logged). */
 export function cardOrderUrl(webOrigin: string, orderId: string, tokenKey: string): string {
   return `${webOrigin.replace(/\/$/, '')}/cards/order#${cardOrderToken(orderId, tokenKey)}`;
@@ -66,7 +71,7 @@ export async function cardEmailFailed(prisma: PrismaClient, cardOrderId: string,
 /**
  * Retention for digital cards (docs/cards.md#retention), run daily in batches:
  * images past their keep date (free 7 days, plan 30, paid a year after
- * payment), unfinished and rejected photos, checkouts never paid, cards left
+ * payment) with their PDFs, unfinished and rejected photos, checkouts never paid, cards left
  * for a month (a year when bought), contacts with nothing left to keep, and
  * funnel steps after two years. Rows that count (exports, orders) stay.
  */
@@ -80,6 +85,8 @@ export async function cardRetention(deps: Pick<WorkerDeps, 'prisma' | 'log'> & {
   for (const image of images) {
     try {
       await remove(image.storageKey);
+      // Its PDF, if one was made (deleting a file that is not there is not an error).
+      if (image.storageKey) await remove(cardPdfKey(image.storageKey));
       await prisma.cardExport.update({ where: { id: image.id }, data: { status: 'EXPIRED', storageKey: null } });
     } catch (err) {
       log.warn({ err, exportId: image.id }, 'Could not delete an expired card image; trying again tomorrow');
