@@ -7,6 +7,7 @@ import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import type { EventAccessContext } from '../../common/request-context';
 import { AuditService } from '../audit/audit.service';
 import { AudienceService, type EventAudienceFacts, type GuestAudienceFacts } from '../audience/audience.service';
+import { MessagesService } from '../notifications/messages.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /**
@@ -21,6 +22,7 @@ export class AnnouncementsService {
     private readonly audience: AudienceService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly messages: MessagesService,
   ) {}
 
   list(access: EventAccessContext) {
@@ -55,8 +57,20 @@ export class AnnouncementsService {
       );
       return row;
     });
-    const recipients = input.publish ? await this.notifications.fanOutAnnouncement(announcement.id, { email: input.notifyByEmail }) : 0;
-    return { announcement, recipients };
+    const sent = input.publish ? await this.send(announcement.id, access.eventId, { email: input.notifyByEmail, whatsapp: input.notifyByWhatsApp }) : null;
+    return { announcement, recipients: sent?.recipients ?? 0, ...(sent ? { delivery: sent.delivery } : {}) };
+  }
+
+  /**
+   * A published update reaches its audience (ADR-073): on each guest's
+   * invitation page, by email, and on WhatsApp to guests whose number reaches
+   * it, while the plan has messages left.
+   */
+  private async send(announcementId: string, eventId: string, channels: { email: boolean; whatsapp: boolean }) {
+    const guestIds = await this.notifications.fanOutAnnouncement(announcementId);
+    const announcement = await this.prisma.announcement.findUniqueOrThrow({ where: { id: announcementId }, select: { title: true } });
+    const delivery = await this.messages.toGuests({ eventId, guestIds, type: 'EVENT_UPDATE', payload: { announcementId, title: announcement.title }, ...channels });
+    return { recipients: guestIds.length, delivery: { email: delivery.email, whatsapp: delivery.whatsapp, whatsappSkipped: delivery.whatsappSkipped } };
   }
 
   async publish(access: EventAccessContext, id: string, meta: RequestMeta) {
@@ -65,8 +79,8 @@ export class AnnouncementsService {
     if (row.publishedAt) return { announcement: row, recipients: 0 };
     const updated = await this.prisma.announcement.update({ where: { id }, data: { publishedAt: new Date() } });
     await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'announcement.published', targetType: 'Announcement', targetId: id, eventId: access.eventId, meta });
-    const recipients = await this.notifications.fanOutAnnouncement(id, { email: true });
-    return { announcement: updated, recipients };
+    const sent = await this.send(id, access.eventId, { email: true, whatsapp: true });
+    return { announcement: updated, recipients: sent.recipients, delivery: sent.delivery };
   }
 
   async remove(access: EventAccessContext, id: string) {

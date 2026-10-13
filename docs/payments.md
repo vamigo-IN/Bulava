@@ -88,6 +88,10 @@ Every checkout that gets as far as paying ends on `/dashboard/payments/:orderId`
 
 **Try again** calls `POST /orders/:id/checkout`, which reopens Razorpay for the same gateway order (creating it if the first attempt failed before the gateway answered) and moves a `FAILED` order back to `CREATED`. Razorpay accepts several attempts on one order and captures at most one, so a retry can never charge twice, and a late webhook for an earlier attempt still finalises the order. The status page never decides that a payment succeeded; it only shows what the API recorded. Payment notifications link to it.
 
+## Messages to buyers
+
+The buyer hears about their purchase by email and, when their WhatsApp number is confirmed and reaches WhatsApp, on WhatsApp ([notifications.md](notifications.md#follow-ups), ADR-073), each linking this page: the receipt when an order is paid (`PLAN_PURCHASED`), a failed payment when Razorpay reports one (`PAYMENT_FAILED`, at most once in 6 hours per order), and, once, a checkout opened at the gateway and still unpaid 30 minutes later (`PAYMENT_PENDING`, sent by the worker; not when the buyer paid for another order since). These messages never count against an event's WhatsApp allowance.
+
 ## Coupons
 
 A coupon has either a percentage or an amount off, an optional maximum number of uses, and an optional validity window (end dates are inclusive of the whole day, IST). A coupon that brings the price to ₹0 completes the order without the gateway (provider `COUPON`).

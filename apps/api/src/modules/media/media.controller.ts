@@ -59,6 +59,14 @@ export class MediaController {
     return this.album.qrSvg(access.eventId);
   }
 
+  /** The album's link to every guest (email, and WhatsApp while the plan has messages): at most once in 12 hours. */
+  @Post('album/share')
+  @HttpCode(200)
+  @RequireEventPermission('invitation.send')
+  shareAlbum(@EventAccess() access: EventAccessContext, @ReqMeta() meta: RequestMeta) {
+    return this.album.shareWithGuests(access, meta);
+  }
+
   /** New secret link for the live photo wall; screens using the old link stop updating. */
   @Post('album/wall/rotate')
   @HttpCode(200)

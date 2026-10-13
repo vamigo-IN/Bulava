@@ -917,6 +917,8 @@ export const CreateAnnouncementSchema = z.object({
   publish: z.boolean().default(true),
   /** Also email guests who have an email address. */
   notifyByEmail: z.boolean().default(true),
+  /** Also on WhatsApp, to guests whose number reaches it, while the plan has messages (ADR-073). */
+  notifyByWhatsApp: z.boolean().default(true),
 });
 export type CreateAnnouncementInput = z.infer<typeof CreateAnnouncementSchema>;
 
@@ -1068,6 +1070,8 @@ export const UpdateAlbumSchema = z.object({
   guestsCanDownload: z.boolean().optional(),
   originalQuality: z.boolean().optional(),
   liveWallEnabled: z.boolean().optional(),
+  /** Send the album's link to the guests the morning after the last function, when it has photos (ADR-073). */
+  autoShareGallery: z.boolean().optional(),
 });
 export type UpdateAlbumInput = z.infer<typeof UpdateAlbumSchema>;
 

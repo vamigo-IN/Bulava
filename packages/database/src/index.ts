@@ -7,6 +7,7 @@ export { loadEventAudienceFacts, loadGuestAudienceFacts, type EventAudienceFacts
 export {
   ADDON_SOURCE,
   featureLimit,
+  galleryIncluded,
   loadEventFeatures,
   loadUserFeatures,
   lockWhatsAppAllowance,
@@ -17,3 +18,16 @@ export {
   type FeatureValue,
 } from './features';
 export { recordWhatsAppDelivery, type WhatsAppDeliveryReport } from './whatsapp-delivery';
+export {
+  isUnreachableError,
+  markWhatsAppUnreachable,
+  recordWhatsAppInbound,
+  UNREACHABLE_RETRY_DAYS,
+  whatsappKeyword,
+  whatsappNumbersToSkip,
+  whatsappPhone,
+  whatsappEmailFallback,
+  whatsappMessageFailed,
+  whatsappReachable,
+  type WhatsAppNumberStatus,
+} from './whatsapp-numbers';

@@ -104,8 +104,10 @@ import { SettingsStore, type SettingsDb } from '@bulava/settings';
 import { AdminSettingsController, PublicSiteController } from './modules/settings/settings.controller';
 import { SettingsChecksService } from './modules/settings/settings-checks.service';
 import { PlatformSettingsService, SETTINGS_STORE } from './modules/settings/settings.service';
+import { MessagesService } from './modules/notifications/messages.service';
 import { WhatsAppWebhookController } from './modules/whatsapp/whatsapp-webhook.controller';
 import { WhatsAppWebhookService } from './modules/whatsapp/whatsapp-webhook.service';
+import { WhatsAppInboxService } from './modules/whatsapp/whatsapp-inbox.service';
 import { AdminSitePagesController, PublicSitePagesController } from './modules/site-pages/site-pages.controller';
 import { SitePagesService } from './modules/site-pages/site-pages.service';
 import { AdminShowcaseController, PublicShowcaseController } from './modules/showcase/showcase.controller';
@@ -267,6 +269,7 @@ const bootConfig = loadConfig();
       useFactory: (prisma: PrismaService, config: AppConfig) => new SettingsStore(prisma as unknown as SettingsDb, config.TOKEN_ENCRYPTION_KEY),
     },
     PlatformSettingsService,
+    MessagesService,
     SettingsChecksService,
     SessionService,
     MfaService,
@@ -301,6 +304,7 @@ const bootConfig = loadConfig();
     VideosService,
     PaymentsService,
     WhatsAppWebhookService,
+    WhatsAppInboxService,
     AdminService,
     AdminUsersService,
     AdminTemplatesService,

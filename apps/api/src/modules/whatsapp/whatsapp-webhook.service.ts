@@ -6,6 +6,7 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import { SETTINGS_STORE } from '../settings/settings.service';
 import { WhatsAppDeliveryService } from './whatsapp-delivery.service';
+import { WhatsAppInboxService } from './whatsapp-inbox.service';
 
 /** A WhatsApp message id ("wamid."), as Meta and GetGabs report them. */
 const WAMID = /^wamid\.[A-Za-z0-9+/=_-]{8,300}$/;
@@ -64,6 +65,7 @@ export class WhatsAppWebhookService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly deliveries: WhatsAppDeliveryService,
+    private readonly inbox: WhatsAppInboxService,
     @Inject(SETTINGS_STORE) private readonly settings: SettingsStore,
   ) {}
 
@@ -110,8 +112,21 @@ export class WhatsAppWebhookService {
           if (!status.id || !status.status) continue;
           // Meta's wamid is the message id the worker stored when it sent the invitation.
           await recordWhatsAppDelivery(this.prisma, { providerMessageId: status.id }, status.status, status.errors?.[0]?.title ?? null);
-          // Sign-in codes have no delivery row: someone may be waiting for one (a number not on WhatsApp fails here).
-          if (status.status === 'failed') await this.deliveries.recordFailure(status.id, status.errors?.[0]?.title ?? null);
+          if (status.status === 'failed') {
+            // Sign-in codes have no delivery row: someone may be waiting for one (a number not on WhatsApp fails here).
+            await this.deliveries.recordFailure(status.id, status.errors?.[0]?.title ?? null);
+            const error = status.errors?.[0];
+            await this.inbox.failed(status.id, { code: error?.code ?? null, reason: error?.title ?? error?.message ?? 'failed', phone: status.recipient_id ?? null });
+          }
+        }
+        // Messages people send to the number (ADR-073).
+        for (const message of change.value?.messages ?? []) {
+          if (!message.from) continue;
+          const text = message.text?.body ?? message.button?.text ?? message.interactive?.button_reply?.title ?? message.interactive?.list_reply?.title ?? null;
+          const replyTo = message.context?.id && WAMID.test(message.context.id) ? [message.context.id] : [];
+          // A reply to an invitation proves it was read.
+          for (const id of replyTo) await recordWhatsAppDelivery(this.prisma, { providerMessageId: id }, 'read');
+          await this.inbox.inbound(message.from, text, replyTo);
         }
       }
     }
@@ -132,13 +147,19 @@ export class WhatsAppWebhookService {
         const report = typeof event.status === 'string' ? event.status : null;
         const error = typeof event.error_message === 'string' ? event.error_message : null;
         changed = await recordWhatsAppDelivery(this.prisma, { providerMessageId: event.message_id }, report, error);
-        if (report?.toLowerCase() === 'failed') await this.deliveries.recordFailure(event.message_id, error);
+        if (report?.toLowerCase() === 'failed') {
+          await this.deliveries.recordFailure(event.message_id, error);
+          await this.inbox.failed(event.message_id, { reason: error ?? 'failed' });
+        }
       }
     } else {
-      for (const id of repliedTo(event)) {
+      const answers = repliedTo(event);
+      for (const id of answers) {
         const count = await recordWhatsAppDelivery(this.prisma, { providerMessageId: id }, 'read');
         changed += count;
       }
+      // Whoever wrote: reachable again (or opted out), and their host hears it (ADR-073).
+      if (typeof event.message_from === 'string' && event.message_from.trim()) await this.inbox.inbound(event.message_from, chatText(event), answers);
     }
     if (changed) this.logger.debug({ changed }, 'GetGabs webhook updated invitation deliveries');
     return { ok: true };
@@ -157,6 +178,7 @@ interface WhatsAppWebhookBody {
         messaging_product?: string;
         metadata?: { display_phone_number?: string; phone_number_id?: string };
         statuses?: WhatsAppStatus[];
+        messages?: WhatsAppInboundMessage[];
       };
     }>;
   }>;
@@ -167,7 +189,31 @@ interface WhatsAppStatus {
   status?: string;
   timestamp?: string;
   recipient_id?: string;
-  errors?: Array<{ code?: number; title?: string }>;
+  errors?: Array<{ code?: number; title?: string; message?: string }>;
+}
+
+/** A message someone sent to the number (text, a quick-reply button, an interactive reply). */
+interface WhatsAppInboundMessage {
+  from?: string;
+  id?: string;
+  type?: string;
+  text?: { body?: string };
+  button?: { text?: string; payload?: string };
+  interactive?: { button_reply?: { id?: string; title?: string }; list_reply?: { id?: string; title?: string } };
+  /** The message this one replies to. */
+  context?: { id?: string };
+}
+
+/** The words of an incoming GetGabs chat: plain text, or the body inside GetGabs' JSON (a quoted reply, a button). */
+export function chatText(event: GetGabsWebhookEvent): string | null {
+  const parsed = parseJson(event.message_text);
+  if (parsed) {
+    for (const value of [parsed.body, parsed.text, (parsed.text as { body?: unknown } | undefined)?.body, (parsed.button as { text?: unknown } | undefined)?.text]) {
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+    return null;
+  }
+  return typeof event.message_text === 'string' ? event.message_text : null;
 }
 
 // ───── GetGabs webhook payload (its "All Chats" webhook; every field optional) ─────

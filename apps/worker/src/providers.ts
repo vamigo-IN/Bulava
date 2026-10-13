@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { CloudflareSaasProvider, ManualHostnameProvider, type HostnameProvider, type RoutingTarget } from '@bulava/domains';
+import type { JobPayloads } from '@bulava/queue';
 import { WHATSAPP_DELIVERY_TAG, whatsappReady, type ResolvedSetting, type SettingsStore } from '@bulava/settings';
 
 export interface EmailMessage {
@@ -264,8 +265,8 @@ export class GetGabsWhatsAppProvider implements WhatsAppProvider {
 
 export interface WhatsAppChannel {
   provider: WhatsAppProvider;
-  /** Approved template names by purpose; a missing one keeps that message off WhatsApp. */
-  templates: { invitation?: string; reminder?: string; preview?: string; otp?: string };
+  /** Approved template names by kind (the settings' WHATSAPP_TEMPLATE_KINDS); a missing one keeps that message off WhatsApp. */
+  templates: Partial<Record<JobPayloads['whatsapp']['template'], string>>;
   language: string;
 }
 

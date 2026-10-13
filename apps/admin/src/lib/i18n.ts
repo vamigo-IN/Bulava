@@ -337,7 +337,7 @@ const en = {
   'int.email.replyTo': 'Reply-to address',
   'int.email.testTo': 'Send the test email to',
   'int.whatsapp': 'WhatsApp Business',
-  'int.whatsapp.hint': 'Hosts can send invitations and reminders from your WhatsApp Business number. Messages use templates approved by Meta and count against each plan’s WhatsApp allowance (Plans & coupons).',
+  'int.whatsapp.hint': 'Invitations, reminders, guests’ confirmations, hosts’ updates, the album and buyers’ payment messages go from your WhatsApp Business number. Messages use templates approved by Meta; guest messages count against each plan’s WhatsApp allowance (Plans & coupons). Numbers that are not on WhatsApp or that send STOP are skipped and get email.',
   'int.whatsapp.enabled': 'Send WhatsApp messages',
   'int.whatsapp.provider': 'Provider',
   'int.whatsapp.provider.getgabs': 'GetGabs (Meta business partner)',
@@ -353,7 +353,7 @@ const en = {
   'int.whatsapp.templatesWhere.getgabs': 'Create each template in GetGabs → Templates and wait for Meta’s approval, then enter its exact name and language here.',
   'int.whatsapp.templatesWhere.meta': 'Create each template in WhatsApp Manager and wait for Meta’s approval, then enter its exact name and language here.',
   'int.whatsapp.getgabs.webhookHint':
-    'Optional. GetGabs posts every chat to one address (Settings → Developer Tools → Webhook URL for All Chats). When a guest replies to an invitation or taps one of its buttons, Bulava marks it read. Delivery reports are read back from GetGabs either way.',
+    'GetGabs posts every chat to one address (Settings → Developer Tools → Webhook URL for All Chats). With it, guests’ replies reach their hosts (in the dashboard and by email), STOP and START work, and a number that writes in is messaged again. Delivery reports are read back from GetGabs either way.',
   'int.whatsapp.getgabs.generate': 'Generate webhook token',
   'int.whatsapp.getgabs.regenerate': 'Generate a new token',
   'int.whatsapp.getgabs.webhookNew': 'Webhook URL with the new token: paste it into GetGabs, then save here.',
@@ -370,9 +370,18 @@ const en = {
   'int.whatsapp.templatesHint': 'Body variables: {{1}} guest name, {{2}} event (for reminders: function · event), {{3}} the guest’s personal invitation link. Leave a name empty to keep that message on email.',
   'int.whatsapp.invitationTemplate': 'Invitation template',
   'int.whatsapp.reminderTemplate': 'Reminder template',
+  'int.whatsapp.guestFollowUpsHint':
+    'Follow-ups to guests, sent with the same email. Registration confirmed: {{1}} guest name, {{2}} event, {{3}} date and time, {{4}} venue, {{5}} personal invitation link. Host’s update: {{1}} guest name, {{2}} event, {{3}} the update, {{4}} personal invitation link. Album: {{1}} guest name, {{2}} event, {{3}} the album’s link. Leave a name empty to send that message by email only.',
+  'int.whatsapp.registrationConfirmedTemplate': 'Registration confirmed template',
+  'int.whatsapp.eventUpdateTemplate': 'Host update template',
+  'int.whatsapp.galleryTemplate': 'Album template',
+  'int.whatsapp.paymentTemplatesHint':
+    'Messages to buyers, on the number they confirmed (never counted against an event). Purchase: {{1}} first name, {{2}} plan, {{3}} amount paid, {{4}} receipt link. Failed or unfinished payment: {{1}} first name, {{2}} plan, {{3}} link to try again.',
+  'int.whatsapp.planPurchasedTemplate': 'Purchase receipt template',
+  'int.whatsapp.paymentFailedTemplate': 'Payment failed template',
+  'int.whatsapp.paymentPendingTemplate': 'Unfinished payment template',
   'int.whatsapp.hostTemplatesHint':
-    'Messages to hosts. Preview link: {{1}} the host’s first name, {{2}} the design’s name, {{3}} the preview link. Sign-in code: an Authentication template with a copy-code button; the code fills {{1}} and the button. Without them, previews are not sent and hosts sign in with email.',
-  'int.whatsapp.previewTemplate': 'Preview link template',
+    'Sign-in code: an Authentication template with a copy-code button; the code fills {{1}} and the button. Without it, hosts sign in with email.',
   'int.whatsapp.otpTemplate': 'Sign-in code template',
   'int.whatsapp.language': 'Template language code',
   'int.whatsapp.testTo': 'Also send a test message to (optional; your invitation template with sample details)',

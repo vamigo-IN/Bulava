@@ -204,6 +204,38 @@ export type WhatsAppProviderName = (typeof WHATSAPP_PROVIDERS)[number];
 /** The `provider` recorded on an invitation's delivery row. */
 export const WHATSAPP_DELIVERY_TAG: Record<WhatsAppProviderName, string> = { GETGABS: 'getgabs', META_CLOUD: 'meta' };
 
+/**
+ * The kinds of WhatsApp message Bulava sends (ADR-073), each through its own
+ * approved template named in the settings, with how many body variables
+ * ({{1}}, {{2}}, …) Bulava fills in it. A kind without a template goes by
+ * email alone.
+ */
+export const WHATSAPP_TEMPLATE_KINDS = [
+  'invitation',
+  'reminder',
+  'registrationConfirmed',
+  'eventUpdate',
+  'galleryShared',
+  'planPurchased',
+  'paymentFailed',
+  'paymentPending',
+  'otp',
+] as const;
+export type WhatsAppTemplateKind = (typeof WHATSAPP_TEMPLATE_KINDS)[number];
+export const WHATSAPP_TEMPLATE_VARIABLES: Record<WhatsAppTemplateKind, number> = {
+  invitation: 3,
+  reminder: 3,
+  registrationConfirmed: 5,
+  eventUpdate: 4,
+  galleryShared: 3,
+  planPurchased: 4,
+  paymentFailed: 3,
+  paymentPending: 3,
+  otp: 1,
+};
+
+const templateName = opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _'));
+
 export const WhatsAppSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   provider: z.enum(WHATSAPP_PROVIDERS).default('GETGABS'),
@@ -216,15 +248,27 @@ export const WhatsAppSettingsSchema = z.object({
   phoneNumberId: opt(z.string().trim().regex(/^\d{5,20}$/, 'The phone number ID from WhatsApp Manager (digits)')),
   businessAccountId: opt(z.string().trim().regex(/^\d{5,20}$/, 'Digits only')),
   apiVersion: z.string().trim().regex(/^v\d{1,2}\.\d$/, 'Like v21.0').default('v21.0'),
-  /** Approved message templates (names from WhatsApp Manager). */
+  /** Approved message templates (names from WhatsApp Manager or GetGabs), one per kind (WHATSAPP_TEMPLATE_KINDS). */
   templates: z
     .object({
-      invitation: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
-      reminder: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
-      /** The host's preview link after the quick start: {{1}} name, {{2}} design, {{3}} link. */
-      preview: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
+      /** Guests: {{1}} name, {{2}} event, {{3}} their personal link. */
+      invitation: templateName,
+      /** Guests: {{1}} name, {{2}} event (a function reminder: "function · event"), {{3}} their personal link. */
+      reminder: templateName,
+      /** Guests who registered on the event's page: {{1}} name, {{2}} event, {{3}} when, {{4}} where, {{5}} their personal link. */
+      registrationConfirmed: templateName,
+      /** Guests: a host's update: {{1}} name, {{2}} event, {{3}} the update, {{4}} their personal link. */
+      eventUpdate: templateName,
+      /** Guests: the photo album: {{1}} name, {{2}} event, {{3}} the album's link. */
+      galleryShared: templateName,
+      /** Buyers: a plan unlocked: {{1}} name, {{2}} plan, {{3}} amount paid, {{4}} the receipt's link. */
+      planPurchased: templateName,
+      /** Buyers: a payment that failed: {{1}} name, {{2}} plan, {{3}} the link to try again. */
+      paymentFailed: templateName,
+      /** Buyers: a checkout waiting for payment: {{1}} name, {{2}} plan, {{3}} the link to finish it. */
+      paymentPending: templateName,
       /** An "authentication" template with a copy-code button: {{1}} the code. */
-      otp: opt(z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Lower-case letters, digits and _')),
+      otp: templateName,
     })
     .default({}),
   templateLanguage: z.string().trim().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, 'Like en or en_US').default('en'),

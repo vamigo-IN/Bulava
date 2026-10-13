@@ -21,6 +21,7 @@ export default function UpdatesPage() {
   const [kind, setKind] = useState<AudienceKind>('all');
   const [target, setTarget] = useState('');
   const [email, setEmail] = useState(true);
+  const [whatsapp, setWhatsapp] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
 
@@ -33,8 +34,23 @@ export default function UpdatesPage() {
     setMessage(null);
     const audience = kind === 'all' ? { all: true } : kind === 'function' ? { functionIds: [target] } : { groupIds: [target] };
     try {
-      const res = await apiPost<{ recipients: number }>(`/events/${eventId}/announcements`, { title, body, audience, publish: true, notifyByEmail: email });
-      setMessage({ tone: 'success', text: t('updates.sent', { count: res.recipients }) });
+      const res = await apiPost<{ recipients: number; delivery?: { email: number; whatsapp: number; whatsappSkipped: number } }>(`/events/${eventId}/announcements`, {
+        title,
+        body,
+        audience,
+        publish: true,
+        notifyByEmail: email,
+        notifyByWhatsApp: whatsapp,
+      });
+      const d = res.delivery;
+      setMessage({
+        tone: 'success',
+        text: [
+          t('updates.sent', { count: res.recipients }),
+          ...(d ? [t('updates.delivery', { email: d.email, whatsapp: d.whatsapp })] : []),
+          ...(d?.whatsappSkipped ? [t('updates.whatsappSkipped', { count: d.whatsappSkipped })] : []),
+        ].join(' '),
+      });
       setTitle('');
       setBody('');
       await invalidate();
@@ -115,6 +131,7 @@ export default function UpdatesPage() {
             </Select>
           ) : null}
           <Checkbox label={t('updates.email')} checked={email} onChange={(e) => setEmail(e.target.checked)} />
+          <Checkbox label={t('updates.whatsapp')} checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} />
           {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
           <Button type="submit" className="w-full rounded-full" disabled={busy || !title.trim() || !body.trim() || (kind !== 'all' && !target)}>
             {t('updates.send')}

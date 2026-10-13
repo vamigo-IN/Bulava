@@ -17,6 +17,7 @@ import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { ALL_GUESTS_SLUG } from '../events/events.service';
 import { InvitationTokenService } from '../invitations/invitation-token.service';
+import { MessagesService } from '../notifications/messages.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PublicEventsService } from '../templates/public-events.service';
 import { ensureRegisteredGroup, openRegistrationByDefault } from './registration-defaults';
@@ -46,6 +47,7 @@ export class RegistrationsService {
     private readonly tokens: InvitationTokenService,
     private readonly notifications: NotificationsService,
     private readonly publicEvents: PublicEventsService,
+    private readonly messages: MessagesService,
   ) {}
 
   // ───────────────────────── Host ─────────────────────────
@@ -309,10 +311,15 @@ export class RegistrationsService {
     for (const guestId of promoted) await this.notifyRegistrant(eventId, guestId, 'CONFIRMED');
   }
 
-  /** Email the registrant: their invitation link once confirmed, otherwise a status update. */
+  /**
+   * Tell the registrant: once confirmed, the confirmation with the event, its
+   * time and place and their personal link, by email and on WhatsApp (ADR-073:
+   * WhatsApp while the plan has messages and the number reaches WhatsApp);
+   * otherwise a status update by email.
+   */
   private async notifyRegistrant(eventId: string, guestId: string, status: RegistrationStatus): Promise<void> {
     if (status === 'CONFIRMED') {
-      await this.notifications.notify({ type: 'INVITATION', channel: 'EMAIL', eventId, guestId, payload: { reason: 'registration_confirmed' } });
+      await this.messages.toGuests({ eventId, guestIds: [guestId], type: 'REGISTRATION_CONFIRMED', payload: { reason: 'registration_confirmed' } });
     } else {
       await this.notifications.notify({ type: 'REGISTRATION_UPDATE', channel: 'EMAIL', eventId, guestId, payload: { status } });
     }

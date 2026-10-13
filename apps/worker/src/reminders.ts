@@ -1,5 +1,5 @@
 import { authorizedFunctions } from '@bulava/auth';
-import { loadEventAudienceFacts, loadGuestAudienceFacts, lockWhatsAppAllowance, whatsappMessagesLeft, type PrismaClient } from '@bulava/database';
+import { loadEventAudienceFacts, loadGuestAudienceFacts, lockWhatsAppAllowance, whatsappMessagesLeft, whatsappNumbersToSkip, whatsappPhone, type PrismaClient } from '@bulava/database';
 
 export interface ReminderDeps {
   prisma: PrismaClient;
@@ -51,7 +51,8 @@ function reachableGuestWhere(eventId: string, now: Date, whatsapp: boolean) {
 
 /**
  * One reminder per guest: on WhatsApp when it is set up, the guest has a phone
- * number and the event's plan has WhatsApp messages left; otherwise by email.
+ * number that reaches WhatsApp (not marked unreachable or opted out, ADR-073)
+ * and the event's plan has WhatsApp messages left; otherwise by email.
  */
 async function createNotifications(
   tx: Tx,
@@ -65,9 +66,10 @@ async function createNotifications(
   // Host sends take the same lock, so the two cannot overspend the plan's allowance together.
   if (whatsapp) await lockWhatsAppAllowance(tx, eventId);
   let left = whatsapp ? await whatsappMessagesLeft(tx, eventId) : 0;
+  const skip = whatsapp ? await whatsappNumbersToSkip(tx, guests.map((g) => g.phone)) : new Set<string>();
   const data: Array<{ eventId: string; guestId: string; type: string; channel: string; payload: object; status: string }> = [];
   for (const g of guests) {
-    if (g.phone && left > 0) {
+    if (g.phone && left > 0 && !skip.has(whatsappPhone(g.phone))) {
       data.push({ eventId, guestId: g.id, type, channel: 'WHATSAPP', payload, status: 'QUEUED' });
       left--;
     } else if (g.email) {

@@ -84,7 +84,7 @@ function Notifications() {
             <ul className="max-h-96 overflow-y-auto">
               {list.data?.length ? (
                 list.data.map((n, i) => {
-                  const { icon: Icon, text, href } = notificationView(t, n);
+                  const { icon: Icon, text, href, reply } = notificationView(t, n);
                   return (
                     <motion.li key={n.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="border-b border-gold-100 last:border-0">
                       <div className="flex gap-3 px-5 py-3.5 text-sm transition-colors duration-200 hover:bg-gold-100/30">
@@ -100,6 +100,11 @@ function Notifications() {
                             <span className="font-medium text-ink">{text}</span>
                           )}
                           <p className="mt-0.5 text-xs text-stone-500">{new Date(n.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                          {reply ? (
+                            <a href={reply} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-semibold text-brand-700 hover:underline">
+                              {t('notif.replyOnWhatsApp')}
+                            </a>
+                          ) : null}
                         </div>
                       </div>
                     </motion.li>

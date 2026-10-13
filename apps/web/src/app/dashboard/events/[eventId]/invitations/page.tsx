@@ -28,6 +28,8 @@ interface WhatsAppResult {
   skippedNoPhone: number;
   skippedRecent: number;
   skippedLimit: number;
+  /** Numbers not on WhatsApp, or that sent STOP (ADR-073). */
+  skippedNotOnWhatsApp?: number;
   remaining: number | null;
 }
 
@@ -162,6 +164,7 @@ export default function InvitationsPage() {
                     setWhatsappResult([
                       r.queued ? t('invitation.whatsapp.queued', { count: r.queued }) : t('invitation.whatsapp.none'),
                       ...(r.skippedLimit ? [t('invitation.whatsapp.skippedLimit', { count: r.skippedLimit })] : []),
+                      ...(r.skippedNotOnWhatsApp ? [t('invitation.whatsapp.skippedUnreachable', { count: r.skippedNotOnWhatsApp })] : []),
                     ]);
                     await channels.refetch();
                   })

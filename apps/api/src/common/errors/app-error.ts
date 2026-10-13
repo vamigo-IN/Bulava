@@ -92,6 +92,10 @@ export const ErrorCode = {
   GOOGLE_ALREADY_LINKED: HttpStatus.CONFLICT,
   GOOGLE_UNLINK_BLOCKED: HttpStatus.BAD_REQUEST,
   REMINDER_TOO_SOON: HttpStatus.CONFLICT,
+  /** The album's link cannot go to the guests: the event is a draft, or its gallery is private. */
+  ALBUM_SHARE_UNAVAILABLE: HttpStatus.CONFLICT,
+  /** The album's link went to the guests less than 12 hours ago. */
+  ALBUM_SHARED_RECENTLY: HttpStatus.CONFLICT,
   SUPER_ADMIN_PROTECTED: HttpStatus.CONFLICT,
   WHATSAPP_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   CONSENT_REQUIRED: HttpStatus.BAD_REQUEST,

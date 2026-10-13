@@ -14,6 +14,7 @@ import {
   ImageUp,
   Pencil,
   Printer,
+  Send,
   Trash2,
   X,
 } from 'lucide-react';
@@ -65,8 +66,81 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
+const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+
+/**
+ * Sends the album's link to every guest with a live invitation (email, and
+ * WhatsApp within the event's messages), at most every 12 hours.
+ */
+function ShareAlbum({ eventId, album, published, onChanged }: { eventId: string; album: EventAlbum; published: boolean; onChanged: () => Promise<unknown> }) {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ tone: 'success' | 'danger'; lines: string[] } | null>(null);
+  const blocked = !published ? t('photos.share.draft') : album.galleryVisibility === 'PRIVATE' ? t('photos.share.private') : null;
+
+  const send = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      const r = await apiPost<{ guests: number; email: number; whatsapp: number; whatsappSkipped: number }>(`/events/${eventId}/album/share`, {});
+      setResult({
+        tone: 'success',
+        lines: [
+          t('photos.share.sent', { count: r.guests, email: r.email, whatsapp: r.whatsapp }),
+          ...(r.whatsappSkipped ? [t('photos.share.skipped', { count: r.whatsappSkipped })] : []),
+        ],
+      });
+      await onChanged();
+    } catch (err) {
+      setResult({ tone: 'danger', lines: [errorMessage(t, err)] });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-w-0 rounded-2xl border border-gold-200/80 bg-white p-3 sm:max-w-xl">
+      <p className="text-xs font-semibold tracking-[0.14em] text-stone-500 uppercase">{t('photos.share.title')}</p>
+      <p className="mt-1 text-xs leading-relaxed text-stone-600">{t('photos.share.hint')}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <Button size="sm" disabled={busy || !!blocked} onClick={() => void send()}>
+          <Send aria-hidden className="size-4" />
+          {t('photos.share.send')}
+        </Button>
+        {album.gallerySharedAt ? <span className="text-xs text-stone-500">{t('photos.share.last', { date: when(album.gallerySharedAt) })}</span> : null}
+      </div>
+      {blocked ? <p className="mt-2 text-xs text-stone-600">{blocked}</p> : null}
+      {result ? (
+        <div className="mt-2">
+          <Alert tone={result.tone}>
+            {result.lines.map((line) => (
+              <span key={line} className="block">
+                {line}
+              </span>
+            ))}
+          </Alert>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** The album's one QR code and links, and (for photo managers) its settings and live wall. */
-function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string; album: EventAlbum; canModerate: boolean; onChanged: () => Promise<unknown> }) {
+function AlbumCard({
+  eventId,
+  album,
+  canModerate,
+  canShare,
+  published,
+  onChanged,
+}: {
+  eventId: string;
+  album: EventAlbum;
+  canModerate: boolean;
+  canShare: boolean;
+  published: boolean;
+  onChanged: () => Promise<unknown>;
+}) {
   const t = useT();
   const save = (patch: Record<string, unknown>) => apiPatch(`/events/${eventId}/album`, patch).then(onChanged);
   return (
@@ -98,6 +172,7 @@ function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string
               <p className="mt-2 text-xs leading-relaxed text-stone-600">{t('photos.galleryLinkHint')}</p>
             </div>
           ) : null}
+          {album.galleryUrl && canShare ? <ShareAlbum eventId={eventId} album={album} published={published} onChanged={onChanged} /> : null}
         </div>
       </div>
 
@@ -134,6 +209,10 @@ function AlbumCard({ eventId, album, canModerate, onChanged }: { eventId: string
               <Checkbox label={t('photos.guestUploads')} checked={album.uploadsEnabled} onChange={(e) => void save({ uploadsEnabled: e.target.checked })} />
               <Checkbox label={t('photos.downloads')} checked={album.downloadPolicy.guestsCanDownload} onChange={(e) => void save({ guestsCanDownload: e.target.checked })} />
               <Checkbox label={t('photos.original')} checked={album.downloadPolicy.originalQuality} onChange={(e) => void save({ originalQuality: e.target.checked })} />
+            </div>
+            <div>
+              <Checkbox label={t('photos.share.auto')} checked={album.autoShareGallery} onChange={(e) => void save({ autoShareGallery: e.target.checked })} />
+              {album.galleryAutoSharedAt ? <p className="mt-1 text-xs text-stone-500">{t('photos.share.autoSent', { date: when(album.galleryAutoSharedAt) })}</p> : null}
             </div>
           </div>
           <LiveWallControls eventId={eventId} room={album} onChanged={onChanged} />
@@ -482,7 +561,14 @@ export default function PhotosPage() {
       <PlanNotice eventId={eventId} feature="gallery.enabled" message="plan.notice.gallery" canPay={can(event.data, 'payment.read')} />
       {canModerate && data.pendingCount ? <Alert tone="warning">{t(data.pendingCount === 1 ? 'album.pendingTitleOne' : 'album.pendingTitle', { count: data.pendingCount })}</Alert> : null}
 
-      <AlbumCard eventId={eventId} album={data} canModerate={canModerate} onChanged={invalidate} />
+      <AlbumCard
+        eventId={eventId}
+        album={data}
+        canModerate={canModerate}
+        canShare={can(event.data, 'invitation.send')}
+        published={!!event.data && event.data.status !== 'DRAFT'}
+        onChanged={invalidate}
+      />
       {canUpload ? <TeamUploader eventId={eventId} album={data} onUploaded={invalidate} /> : null}
 
       <section aria-labelledby="folders-title" className="space-y-4">

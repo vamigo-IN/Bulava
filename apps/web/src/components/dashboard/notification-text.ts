@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Clapperboard, UserCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { Bell, CheckCircle2, Clapperboard, MessageCircle, UserCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
 import type { Translator } from '@bulava/localization';
 
 /** One of the host's notifications (GET /notifications). */
@@ -17,10 +17,21 @@ const ICONS: Record<string, LucideIcon> = {
   PAYMENT: Wallet,
   REGISTRATION_RECEIVED: UserCheck,
   MEMBER_ADDED: Users,
+  GUEST_REPLY: MessageCircle,
 };
 
-/** The icon, sentence and link of a notification, shared by the bell's panel and the home page. */
-export function notificationView(t: Translator, n: HostNotification): { icon: LucideIcon; text: string; href: string | null } {
+/** A guest's WhatsApp message, shortened for a one-line list. */
+function quote(text: unknown): string {
+  const flat = String(text ?? '').replace(/\s+/g, ' ').trim();
+  return flat.length > 140 ? `${flat.slice(0, 139)}…` : flat;
+}
+
+/**
+ * The icon, sentence and link of a notification, shared by the bell's panel and
+ * the home page; `reply` opens a chat with a guest who wrote on WhatsApp, from
+ * the host's own WhatsApp (ADR-073).
+ */
+export function notificationView(t: Translator, n: HostNotification): { icon: LucideIcon; text: string; href: string | null; reply: string | null } {
   const p = n.payload;
   const text =
     n.type === 'RSVP_RECEIVED'
@@ -33,14 +44,19 @@ export function notificationView(t: Translator, n: HostNotification): { icon: Lu
             ? t('notif.REGISTRATION_RECEIVED', { guest: String(p.guestName ?? ''), event: String(p.eventTitle ?? '') })
             : n.type === 'MEMBER_ADDED'
               ? t('notif.MEMBER_ADDED', { event: String(p.eventTitle ?? '') })
-              : n.type;
+              : n.type === 'GUEST_REPLY'
+                ? p.optedOut === true && p.keyword === 'STOP'
+                  ? t('notif.GUEST_REPLY.optedOut', { guest: String(p.guestName ?? ''), event: String(p.eventTitle ?? '') })
+                  : t('notif.GUEST_REPLY', { guest: String(p.guestName ?? ''), text: quote(p.text) })
+                : n.type;
   const href =
     n.type === 'PAYMENT' && typeof p.orderId === 'string'
       ? `/dashboard/payments/${p.orderId}`
       : n.eventId
-        ? `/dashboard/events/${n.eventId}${n.type === 'RSVP_RECEIVED' ? '/rsvps' : n.type === 'RENDER_COMPLETE' ? '/video' : n.type === 'REGISTRATION_RECEIVED' ? '/registrations' : ''}`
+        ? `/dashboard/events/${n.eventId}${n.type === 'RSVP_RECEIVED' ? '/rsvps' : n.type === 'RENDER_COMPLETE' ? '/video' : n.type === 'REGISTRATION_RECEIVED' ? '/registrations' : n.type === 'GUEST_REPLY' ? '/guests' : ''}`
         : null;
-  return { icon: ICONS[n.type] ?? Bell, text, href };
+  const phone = n.type === 'GUEST_REPLY' ? String(p.phone ?? '').replace(/[^\d]/g, '') : '';
+  return { icon: ICONS[n.type] ?? Bell, text, href, reply: phone ? `https://wa.me/${phone}` : null };
 }
 
 /** "5 min ago", "Yesterday", "12 Oct": short, for activity lists. */

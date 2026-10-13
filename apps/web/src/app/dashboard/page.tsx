@@ -262,7 +262,7 @@ function Activity() {
       {items.length ? (
         <ul className="mt-3 divide-y divide-gold-100">
           {items.map((n) => {
-            const { icon: Icon, text, href } = notificationView(t, n);
+            const { icon: Icon, text, href, reply } = notificationView(t, n);
             const body = (
               <>
                 <span aria-hidden className={cn('mt-0.5 grid size-8 shrink-0 place-items-center rounded-full ring-1', n.readAt ? 'bg-sand text-stone-500 ring-gold-200' : 'bg-brand-50 text-brand-700 ring-brand-100')}>
@@ -283,6 +283,11 @@ function Activity() {
                 ) : (
                   <div className="flex gap-3 py-3">{body}</div>
                 )}
+                {reply ? (
+                  <a href={reply} target="_blank" rel="noopener noreferrer" className="ml-11 inline-block pb-2 text-xs font-semibold text-brand-700 hover:underline">
+                    {t('notif.replyOnWhatsApp')}
+                  </a>
+                ) : null}
               </li>
             );
           })}

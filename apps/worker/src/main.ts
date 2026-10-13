@@ -98,6 +98,9 @@ async function main(): Promise<void> {
   await cleanup.add('card-retention', { task: 'card-retention' }, { repeat: { pattern: '25 3 * * *' }, jobId: 'cleanup-card-retention' });
   // Delivery reports from providers that give them on request (GetGabs); the interval must match STATUS_SWEEP_MINUTES.
   await cleanup.add('whatsapp-status', { task: 'whatsapp-status' }, { repeat: { pattern: `*/${STATUS_SWEEP_MINUTES} * * * *` }, jobId: 'cleanup-whatsapp-status' });
+  // Follow-ups (ADR-073): an unfinished checkout after 30 minutes, the album the morning after the event.
+  await cleanup.add('payment-follow-ups', { task: 'payment-follow-ups' }, { repeat: { pattern: '*/5 * * * *' }, jobId: 'cleanup-payment-follow-ups' });
+  await cleanup.add('gallery-follow-ups', { task: 'gallery-follow-ups' }, { repeat: { pattern: '7 * * * *' }, jobId: 'cleanup-gallery-follow-ups' });
   log.info({ concurrency }, 'Worker started');
 
   const health = createServer((_, res) => {

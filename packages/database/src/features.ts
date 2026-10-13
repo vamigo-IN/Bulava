@@ -110,6 +110,12 @@ export async function loadUserFeatures(prisma: Db, userId: string, now: Date = n
   );
 }
 
+/** Whether an event's plan includes the photo gallery: on unless its plan turns it off, as the API checks it. */
+export async function galleryIncluded(prisma: Db, eventId: string, now: Date = new Date()): Promise<boolean> {
+  const features = await loadEventFeatures(prisma, eventId, now);
+  return !!features && (features.get(FEATURE_KEYS.GALLERY)?.enabled ?? true);
+}
+
 /** A count limit: 0 when the feature is off, null when unlimited. */
 export function featureLimit(features: Map<string, FeatureValue>, key: string): number | null {
   const f = features.get(key);

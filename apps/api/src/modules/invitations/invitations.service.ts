@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { lockWhatsAppAllowance, whatsappMessagesLeft, whatsappMessagesUsed, type Prisma } from '@bulava/database';
+import { lockWhatsAppAllowance, whatsappMessagesLeft, whatsappMessagesUsed, whatsappNumbersToSkip, whatsappPhone, type Prisma } from '@bulava/database';
 import { FEATURE_KEYS, WHATSAPP_DELIVERY_TAG, type BulkCreateInvitationsInput, type CreateInvitationInput } from '@bulava/validation';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
@@ -88,6 +88,8 @@ export class InvitationsService {
       skippedNoPhone: r.missing,
       skippedRecent: r.recent,
       skippedLimit: r.overLimit,
+      /** Numbers WhatsApp cannot reach (not on WhatsApp) or that sent STOP: email them instead (ADR-073). */
+      skippedNotOnWhatsApp: r.unreachable,
       remaining: Number.isFinite(r.quota) ? Math.max(0, r.quota - r.queued) : null,
     };
   }
@@ -146,10 +148,17 @@ export class InvitationsService {
         let missing = 0;
         let recent = 0;
         let overLimit = 0;
+        let unreachable = 0;
         const seenGuests = new Set<string>();
+        const skip = channel === 'WHATSAPP' ? await whatsappNumbersToSkip(tx, invitations.map((inv) => inv.guest.phone)) : new Set<string>();
         for (const inv of invitations) {
           if (!(channel === 'EMAIL' ? inv.guest.email : inv.guest.phone)) {
             missing++;
+            continue;
+          }
+          if (channel === 'WHATSAPP' && skip.has(whatsappPhone(inv.guest.phone!))) {
+            if (!seenGuests.has(inv.guestId)) unreachable++;
+            seenGuests.add(inv.guestId);
             continue;
           }
           // One message per guest: the worker links their event-wide invitation first.
@@ -164,7 +173,7 @@ export class InvitationsService {
           }
           chosen.push(inv);
         }
-        if (!chosen.length) return { ids: [] as string[], quota, missing, recent, overLimit };
+        if (!chosen.length) return { ids: [] as string[], quota, missing, recent, overLimit, unreachable };
 
         const now = new Date();
         const ids = chosen.map((inv) => inv.id);
@@ -187,7 +196,7 @@ export class InvitationsService {
           data: chosen.map((inv) => ({ type: 'INVITATION', channel, eventId: access.eventId, guestId: inv.guestId, payload: { invitationId: inv.id }, status: 'QUEUED' })),
           select: { id: true },
         });
-        return { ids: rows.map((row) => row.id), quota, missing, recent, overLimit };
+        return { ids: rows.map((row) => row.id), quota, missing, recent, overLimit, unreachable };
       },
       { maxWait: 10_000, timeout: 60_000 },
     );
@@ -202,7 +211,7 @@ export class InvitationsService {
       metadata: { queued: r.ids.length, missingContact: r.missing, recent: r.recent, overLimit: r.overLimit },
       meta,
     });
-    return { queued: r.ids.length, missing: r.missing, recent: r.recent, overLimit: r.overLimit, quota: r.quota };
+    return { queued: r.ids.length, missing: r.missing, recent: r.recent, overLimit: r.overLimit, quota: r.quota, unreachable: r.unreachable };
   }
 
   async list(access: EventAccessContext): Promise<InvitationDto[]> {

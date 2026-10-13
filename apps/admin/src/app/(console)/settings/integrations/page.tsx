@@ -255,16 +255,62 @@ function WhatsAppForm({ view, origins }: { view: SettingGroupView; origins: Sett
         />
         <TextField label={t('int.whatsapp.language')} placeholder="en" spellCheck={false} className="[&_input]:font-mono" value={draft.templateLanguage} onChange={(v) => set('templateLanguage', v)} />
       </div>
-      <p className="text-xs text-stone-500">{t('int.whatsapp.hostTemplatesHint')}</p>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <p className="text-xs text-stone-500">{t('int.whatsapp.guestFollowUpsHint')}</p>
+      <div className="grid gap-4 sm:grid-cols-3">
         <TextField
-          label={t('int.whatsapp.previewTemplate')}
-          placeholder="host_preview_link"
+          label={t('int.whatsapp.registrationConfirmedTemplate')}
+          placeholder="registration_confirmed"
           spellCheck={false}
           className="[&_input]:font-mono"
-          value={templates.preview}
-          onChange={(v) => set('templates', { ...templates, preview: v })}
+          value={templates.registrationConfirmed}
+          onChange={(v) => set('templates', { ...templates, registrationConfirmed: v })}
         />
+        <TextField
+          label={t('int.whatsapp.eventUpdateTemplate')}
+          placeholder="event_update"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.eventUpdate}
+          onChange={(v) => set('templates', { ...templates, eventUpdate: v })}
+        />
+        <TextField
+          label={t('int.whatsapp.galleryTemplate')}
+          placeholder="event_album"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.galleryShared}
+          onChange={(v) => set('templates', { ...templates, galleryShared: v })}
+        />
+      </div>
+      <p className="text-xs text-stone-500">{t('int.whatsapp.paymentTemplatesHint')}</p>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <TextField
+          label={t('int.whatsapp.planPurchasedTemplate')}
+          placeholder="plan_purchased"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.planPurchased}
+          onChange={(v) => set('templates', { ...templates, planPurchased: v })}
+        />
+        <TextField
+          label={t('int.whatsapp.paymentFailedTemplate')}
+          placeholder="payment_failed"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.paymentFailed}
+          onChange={(v) => set('templates', { ...templates, paymentFailed: v })}
+        />
+        <TextField
+          label={t('int.whatsapp.paymentPendingTemplate')}
+          placeholder="payment_pending"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.paymentPending}
+          onChange={(v) => set('templates', { ...templates, paymentPending: v })}
+        />
+      </div>
+      <p className="text-xs text-stone-500">{t('int.whatsapp.hostTemplatesHint')}</p>
+      <div className="grid gap-4 sm:grid-cols-3">
         <TextField
           label={t('int.whatsapp.otpTemplate')}
           placeholder="host_sign_in_code"

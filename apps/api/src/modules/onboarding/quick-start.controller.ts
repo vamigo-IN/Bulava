@@ -14,7 +14,7 @@ const QUICK_START_THROTTLE = { default: { limit: 6, ttl: 60_000 } };
 
 function finish(res: Response, result: QuickStartResult, config: AppConfig) {
   setSessionCookies(res, result.session, config);
-  return { user: result.user, event: result.event, whatsappSent: result.whatsappSent, accessToken: result.session.accessToken, accessExpiresAt: result.session.accessExpiresAt };
+  return { user: result.user, event: result.event, accessToken: result.session.accessToken, accessExpiresAt: result.session.accessExpiresAt };
 }
 
 @ApiTags('quick-start')

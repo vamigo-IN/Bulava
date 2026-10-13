@@ -1201,6 +1201,12 @@ model MediaRoom {
   uploadsEnabled      Boolean           @default(false)
   downloadPolicy      Json              @default("{\"guestsCanDownload\":true,\"originalQuality\":false}")
   liveWallEnabled     Boolean           @default(false)
+  /// Send the album's link to the guests the morning after the last function, when it has photos (ADR-073).
+  autoShareGallery    Boolean           @default(true)
+  /// When the host last sent the album's link to the guests.
+  gallerySharedAt     DateTime?
+  /// When the automatic message went (once per event).
+  galleryAutoSharedAt DateTime?
   /// Secret link for the live photo wall (/wall/<token>): SHA-256 for lookup,
   /// AES-GCM ciphertext so the host can copy it again. Rotating replaces both.
   wallTokenHash       String?           @unique
@@ -1444,6 +1450,10 @@ model Order {
   quantity        Int         @default(1)
   /// What the plan the account already had was worth, taken off the price (unlocking a bigger plan pays the difference).
   creditMinor     Int         @default(0)
+  /// When the buyer was told the checkout is waiting for payment (once, 30 minutes after it was left unpaid; ADR-073).
+  pendingNoticeAt DateTime?
+  /// When the buyer was last told a payment failed (at most once in 6 hours, however many attempts fail).
+  failedNoticeAt  DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -1529,22 +1539,44 @@ model PlatformSetting {
 }
 
 model Notification {
-  id        String    @id @default(uuid(7)) @db.Uuid
-  eventId   String?   @db.Uuid
-  userId    String?   @db.Uuid
-  guestId   String?   @db.Uuid
-  type      String
-  channel   String
-  payload   Json
-  status    String    @default("QUEUED")
-  error     String?
-  sentAt    DateTime?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
+  id                String    @id @default(uuid(7)) @db.Uuid
+  eventId           String?   @db.Uuid
+  userId            String?   @db.Uuid
+  guestId           String?   @db.Uuid
+  type              String
+  channel           String
+  payload           Json
+  status            String    @default("QUEUED")
+  error             String?
+  sentAt            DateTime?
+  readAt            DateTime?
+  /// A WhatsApp message's id at its provider ("wamid."): delivery reports and replies find the message by it.
+  providerMessageId String?
+  createdAt         DateTime  @default(now())
 
   @@index([userId, readAt])
   @@index([eventId])
+  @@index([providerMessageId])
   @@map("notifications")
+}
+
+/// A phone number's standing with WhatsApp (ADR-073): UNREACHABLE once WhatsApp says it cannot
+/// take messages (not on WhatsApp), OPTED_OUT after the person sends STOP; a message from the
+/// number makes it REACHABLE again. Numbers are E.164, as guests' and users' phones are stored.
+model WhatsAppNumber {
+  phone         String    @id
+  status        String    @default("REACHABLE")
+  /// The provider's reason, or the keyword the person sent.
+  reason        String?
+  failures      Int       @default(0)
+  lastFailureAt DateTime?
+  /// The last message from this number (it opens WhatsApp's 24-hour service window).
+  lastInboundAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@map("whatsapp_numbers")
 }
 
 model AnalyticsEvent {

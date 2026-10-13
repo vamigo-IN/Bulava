@@ -58,11 +58,16 @@ function RegistrationInner({ slug, info, timeZone }: { slug: string; info: Publi
         consent,
       });
       setResult(res);
+      // Confirmed: straight to their own invitation (the link also comes by email and WhatsApp). Replaced,
+      // so going back does not land on the form again.
+      if (res.status === 'CONFIRMED' && res.invitationUrl) {
+        window.location.replace(res.invitationUrl);
+        return;
+      }
     } catch (err) {
       setError(errorMessage(t, err));
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   if (result) {
@@ -70,6 +75,7 @@ function RegistrationInner({ slug, info, timeZone }: { slug: string; info: Publi
       <div className="mx-auto max-w-md space-y-4 text-center" role="status">
         <p className="text-2xl [font-family:var(--t-heading)]">{t(`register.done.${result.status}`)}</p>
         {result.status === 'CONFIRMED' ? <p className="text-sm text-[var(--t-muted)]">{t('register.done.CONFIRMED.body')}</p> : null}
+        {result.status === 'CONFIRMED' && result.invitationUrl ? <p className="text-sm text-[var(--t-muted)]">{t('register.redirecting')}</p> : null}
         {result.invitationUrl ? (
           <a
             href={result.invitationUrl}
@@ -115,6 +121,7 @@ function RegistrationInner({ slug, info, timeZone }: { slug: string; info: Publi
         <span className="mb-1 block text-sm font-medium text-stone-700">{t('register.phone')}</span>
         <PhoneInput maxLength={20} value={phone} onChange={setPhone} placeholder="98765 43210" />
         <span className="mt-1 block text-xs text-stone-500">{t('register.contactHint')}</span>
+        <span className="mt-1 block text-xs text-stone-500">{t('register.messagesNote')}</span>
       </label>
 
       {questions.map((q) => (

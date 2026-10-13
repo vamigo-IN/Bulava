@@ -18,7 +18,15 @@ export type NotificationType =
   | 'RSVP_RECEIVED'
   | 'REGISTRATION_RECEIVED'
   | 'REGISTRATION_UPDATE'
-  | 'MEMBER_ADDED';
+  | 'MEMBER_ADDED'
+  // ADR-073: follow-ups on email and WhatsApp.
+  | 'REGISTRATION_CONFIRMED'
+  | 'GALLERY_SHARED'
+  | 'PLAN_PURCHASED'
+  | 'PAYMENT_FAILED'
+  | 'PAYMENT_PENDING'
+  /** A guest answered a WhatsApp message: shown to the host (in-app and email). */
+  | 'GUEST_REPLY';
 
 export type Channel = 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH';
 
@@ -65,33 +73,25 @@ export class NotificationsService {
     await this.queues.add('notifications', { notificationId }, { jobId: `notification-${notificationId}` });
   }
 
-  /** Notify every guest in an announcement's audience. Returns the number of guests reached. */
-  async fanOutAnnouncement(announcementId: string, options: { email: boolean }): Promise<number> {
+  /**
+   * The guests in a published announcement's audience (the same access rules
+   * as invitations), each with an in-app row for their invitation page. The
+   * email and WhatsApp messages are the caller's (MessagesService).
+   */
+  async fanOutAnnouncement(announcementId: string): Promise<string[]> {
     const announcement = await this.prisma.announcement.findUnique({ where: { id: announcementId } });
-    if (!announcement?.publishedAt) return 0;
+    if (!announcement?.publishedAt) return [];
     const audience = AnnouncementAudienceSchema.safeParse(announcement.audience);
-    if (!audience.success) return 0;
+    if (!audience.success) return [];
     const [eventFacts, guests] = await Promise.all([
       this.audience.loadEventFacts(announcement.eventId),
       this.audience.loadGuestFacts(announcement.eventId),
     ]);
-    const contacts = new Map(
-      (
-        await this.prisma.guest.findMany({
-          where: { eventId: announcement.eventId, deletedAt: null },
-          select: { id: true, email: true },
-        })
-      ).map((g) => [g.id, g.email]),
-    );
-    let reached = 0;
+    const reached: string[] = [];
     for (const guest of guests) {
       if (!AudienceService.announcementIncludes(audience.data, guest, eventFacts)) continue;
-      reached++;
-      const payload = { announcementId, title: announcement.title };
-      await this.notify({ type: 'EVENT_UPDATE', channel: 'IN_APP', eventId: announcement.eventId, guestId: guest.guestId, payload });
-      if (options.email && contacts.get(guest.guestId)) {
-        await this.notify({ type: 'EVENT_UPDATE', channel: 'EMAIL', eventId: announcement.eventId, guestId: guest.guestId, payload });
-      }
+      reached.push(guest.guestId);
+      await this.notify({ type: 'EVENT_UPDATE', channel: 'IN_APP', eventId: announcement.eventId, guestId: guest.guestId, payload: { announcementId, title: announcement.title } });
     }
     return reached;
   }

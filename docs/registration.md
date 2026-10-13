@@ -45,9 +45,9 @@ Enabling registration creates a **Registered guests** group. Every registrant jo
    - an email or phone already registered, or already on the guest list, returns `ALREADY_REGISTERED` (people already invited are told to use their own link; no link is ever handed out for an existing guest);
    - the plan's guest limit and the capacity decide the status: `PENDING` (approval required), `CONFIRMED`, `WAITLISTED`, or `REGISTRATION_FULL`.
 4. The guest, the registration and a consent record (`event_registration`, versioned) are created. A confirmed registrant gets an event-wide invitation.
-5. The registrant is emailed their invitation (confirmed) or a status update (pending, waitlisted). The host gets an in-app notification.
+5. A confirmed registrant gets their confirmation (`REGISTRATION_CONFIRMED`: the event, the first function they can attend with its date, time and venue, and their own invitation link) by email and on WhatsApp, the second while the event's plan has WhatsApp messages and the number reaches WhatsApp ([notifications.md](notifications.md#follow-ups)); a pending or waitlisted one gets a status update by email. The host gets an in-app notification.
 
-The response shows the registrant their own invitation link once, when confirmed. The endpoint is rate limited to 5 requests per minute per IP. Every step is audited.
+The response carries the registrant's own invitation link once, when confirmed, and the page takes them straight to it (replacing the form in the browser's history). The endpoint is rate limited to 5 requests per minute per IP. Every step is audited.
 
 ## Host decisions
 
@@ -59,7 +59,7 @@ The response shows the registrant their own invitation link once, when confirmed
 | `WAITLISTED` | confirm, reject |
 | `CONFIRMED` | cancel |
 
-Confirming respects the cap (`REGISTRATION_FULL`). Rejecting or cancelling revokes the guest's invitation links. When a confirmed place frees up and approval is not required, the oldest waitlisted registrants are confirmed automatically and emailed. Raising the cap does the same.
+Confirming respects the cap (`REGISTRATION_FULL`). Rejecting or cancelling revokes the guest's invitation links. When a confirmed place frees up and approval is not required, the oldest waitlisted registrants are confirmed automatically and get their confirmation. Raising the cap does the same.
 
 ## Public page
 

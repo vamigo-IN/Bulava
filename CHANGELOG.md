@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Messages that follow up, on WhatsApp and by email
+
+- **Registered? Straight to your invitation.** After registering on an event's page, guests go straight to their own invitation, and get a confirmation with the date, time, venue and their personal link by email and on WhatsApp.
+- **Updates on WhatsApp too.** The updates you post reach guests on WhatsApp as well as by email (switch either off for an update), and you see how many got it each way.
+- **Send the album.** *Send to guests* on the Photos page sends everyone the album's link. Bulava also sends it the morning after your last function, once the album has photos; switch that off on the Photos page if you prefer.
+- **Replies come to you.** When a guest answers a WhatsApp message, you see it in your notifications and by email, with a button to reply from your own WhatsApp. Guests can send STOP to stop WhatsApp messages, and START to get them again.
+- **Numbers that aren't on WhatsApp are skipped.** Those guests get your invitations and reminders by email instead, nothing waits on them, and they don't use your WhatsApp messages.
+- **Your purchase, confirmed.** A receipt by email and on WhatsApp when you unlock a plan, a message if a payment doesn't go through, and one reminder if you leave a checkout unfinished, each with a link to your payment page.
+
 ### Designs for every faith, pages that match their design, and cards your way
 
 - **Every faith, at the very top.** Hindu designs open with Lord Ganesha, Muslim designs with the crescent and star, Sikh designs with the Khanda and Christian designs with the cross. New Muslim, Sikh and Christian wedding designs use each tradition's own words: The Nikah of, The Anand Karaj of, United in Holy Matrimony.

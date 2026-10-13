@@ -13,6 +13,7 @@ import type { EventAccessContext } from '../../common/request-context';
 import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { EventLinksService } from '../domains/event-links.service';
+import { MessagesService } from '../notifications/messages.service';
 import { LiveWallService } from './live-wall.service';
 
 /** The hidden album for the host's design photos: never the main album, never in guest galleries. */
@@ -100,6 +101,7 @@ export class AlbumService {
     private readonly audit: AuditService,
     private readonly wall: LiveWallService,
     private readonly links: EventLinksService,
+    private readonly messages: MessagesService,
   ) {}
 
   // ─────────────────────────── The main album ───────────────────────────
@@ -222,6 +224,10 @@ export class AlbumService {
       uploadsEnabled: room.uploadsEnabled,
       downloadPolicy: downloadPolicy(room),
       liveWallEnabled: room.liveWallEnabled,
+      /** The album's link goes to the guests the morning after the last function (ADR-073). */
+      autoShareGallery: room.autoShareGallery,
+      gallerySharedAt: room.gallerySharedAt,
+      galleryAutoSharedAt: room.galleryAutoSharedAt,
       wallUrl: this.wall.hostWallUrl(room),
       qrCode: code,
       uploadUrl: code ? `${origin}/p/${code}` : null,
@@ -258,11 +264,53 @@ export class AlbumService {
         moderationMode: input.moderationMode,
         uploadsEnabled: input.uploadsEnabled,
         liveWallEnabled: input.liveWallEnabled,
+        autoShareGallery: input.autoShareGallery,
         downloadPolicy: { guestsCanDownload: input.guestsCanDownload ?? current.guestsCanDownload, originalQuality: input.originalQuality ?? current.originalQuality },
       },
     });
     await this.audit.record({ actorType: 'USER', actorId: access.userId, action: 'album.updated', targetType: 'MediaRoom', targetId: main.id, eventId: access.eventId, metadata: { fields: Object.keys(input) }, meta });
     return this.get(access);
+  }
+
+  /**
+   * The album's link to every guest with a live invitation (ADR-073): by email,
+   * and on WhatsApp while the plan has messages, each with their own link (an
+   * invite-only gallery knows them). Only for a published event whose plan has
+   * the gallery and whose gallery guests may see, and at most once in 12 hours.
+   */
+  async shareWithGuests(access: EventAccessContext, meta: RequestMeta) {
+    const main = await this.ensure(access.eventId);
+    const [event, features] = await Promise.all([
+      this.prisma.event.findUniqueOrThrow({ where: { id: access.eventId }, select: { status: true } }),
+      this.entitlements.forEvent(access.eventId),
+    ]);
+    if (!(features.get(FEATURE_KEYS.GALLERY)?.enabled ?? true)) {
+      throw new AppError('PLAN_UPGRADE_REQUIRED', 'The photo gallery comes with a plan.', { feature: FEATURE_KEYS.GALLERY });
+    }
+    if (event.status === 'DRAFT') throw new AppError('ALBUM_SHARE_UNAVAILABLE', 'Publish your event first: guests open the album from their invitation.');
+    if (main.galleryVisibility === 'PRIVATE') throw new AppError('ALBUM_SHARE_UNAVAILABLE', 'The gallery is private. Let guests see it first, then send it.');
+    const since = new Date(Date.now() - 12 * 3_600_000);
+    const claimed = await this.prisma.mediaRoom.updateMany({
+      where: { id: main.id, OR: [{ gallerySharedAt: null }, { gallerySharedAt: { lt: since } }] },
+      data: { gallerySharedAt: new Date() },
+    });
+    if (!claimed.count) throw new AppError('ALBUM_SHARED_RECENTLY', 'The album went to your guests less than 12 hours ago.');
+    const guests = await this.prisma.guest.findMany({
+      where: { eventId: access.eventId, deletedAt: null, invitations: { some: { status: { not: 'REVOKED' } } } },
+      select: { id: true },
+    });
+    const delivery = await this.messages.toGuests({ eventId: access.eventId, guestIds: guests.map((g) => g.id), type: 'GALLERY_SHARED', payload: { roomId: main.id } });
+    await this.audit.record({
+      actorType: 'USER',
+      actorId: access.userId,
+      action: 'album.shared',
+      targetType: 'MediaRoom',
+      targetId: main.id,
+      eventId: access.eventId,
+      metadata: { guests: delivery.guests, email: delivery.email, whatsapp: delivery.whatsapp },
+      meta,
+    });
+    return delivery;
   }
 
   /** The album's printable QR code: the gallery, where anyone with it sees (and may download) the photos. */

@@ -329,6 +329,12 @@ export interface EventAlbum {
   qrCode: string | null;
   uploadUrl: string | null;
   galleryUrl: string | null;
+  /** The album's link goes to the guests the morning after the last function, when it has photos (ADR-073). */
+  autoShareGallery: boolean;
+  /** When the host last sent the album to the guests. */
+  gallerySharedAt: string | null;
+  /** When the automatic message went (once per event). */
+  galleryAutoSharedAt: string | null;
   itemCount: number;
   pendingCount: number;
   albums: SubAlbum[];

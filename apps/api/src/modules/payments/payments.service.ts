@@ -14,6 +14,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditService } from '../audit/audit.service';
 import { ContactService } from '../contact/contact.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { MessagesService } from '../notifications/messages.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { assertVerifiedAccount } from '../users/account-gate';
 import { ConsentService } from '../users/consent.service';
@@ -88,6 +89,11 @@ const planCard = (plan: PlanWithFeatures) => ({
  * idempotent, so the callback and the webhook can race safely. Nothing here
  * renews: Razorpay Orders only, never subscriptions.
  */
+/** A plan's name as receipts show it: "Extra 100 guests × 2" for several of a stackable add-on. */
+function planLabel(name: string, quantity: number): string {
+  return quantity > 1 ? `${name} × ${quantity}` : name;
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -103,6 +109,7 @@ export class PaymentsService {
     private readonly consents: ConsentService,
     private readonly entitlements: EntitlementsService,
     private readonly contact: ContactService,
+    private readonly messages: MessagesService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     /** Set by tests only; production reads Razorpay from the Super Admin's settings. */
     @Optional() @Inject(PAYMENT_PROVIDER) private readonly override: PaymentProvider | null,
@@ -561,8 +568,30 @@ export class PaymentsService {
     } else if (body.event === 'payment.failed' && order.status === 'CREATED') {
       await this.prisma.order.update({ where: { id: order.id }, data: { status: 'FAILED' } });
       this.analytics.track('payment_failed', { eventId: order.eventId, userId: order.userId }, { reason: 'gateway' });
+      await this.tellBuyerItFailed(order.id);
     }
     return { ok: true };
+  }
+
+  /**
+   * The buyer hears that a payment failed, with the link to try again (email
+   * and WhatsApp, ADR-073): at most once in 6 hours per order, however many
+   * attempts fail, and never once it is paid.
+   */
+  private async tellBuyerItFailed(orderId: string): Promise<void> {
+    const since = new Date(Date.now() - 6 * 3_600_000);
+    const claimed = await this.prisma.order.updateMany({
+      where: { id: orderId, status: 'FAILED', kind: 'PURCHASE', OR: [{ failedNoticeAt: null }, { failedNoticeAt: { lt: since } }] },
+      data: { failedNoticeAt: new Date() },
+    });
+    if (!claimed.count) return;
+    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { plan: { select: { name: true } } } });
+    try {
+      await this.messages.toBuyer({ userId: order.userId, type: 'PAYMENT_FAILED', payload: { orderId, plan: planLabel(order.plan.name, order.quantity), amountMinor: order.amountMinor } });
+    } catch (error) {
+      // The order's state stands; the status page offers the retry either way.
+      this.logger.error({ err: error, orderId }, 'Could not queue the payment-failed message');
+    }
   }
 
   /** Idempotent: records the payment, marks the order paid and grants entitlements exactly once. */
@@ -595,6 +624,18 @@ export class PaymentsService {
         eventId: granted.eventId,
         payload: { orderId, plan: granted.plan.name, amountMinor: payment.amountMinor },
       });
+      // The receipt on email and WhatsApp (ADR-073): only for a purchase, not a complimentary upgrade (the console tells those).
+      if (granted.kind === 'PURCHASE') {
+        try {
+          await this.messages.toBuyer({
+            userId: granted.userId,
+            type: 'PLAN_PURCHASED',
+            payload: { orderId, plan: planLabel(granted.plan.name, granted.quantity), amountMinor: payment.amountMinor, couponOff: granted.couponId !== null },
+          });
+        } catch (error) {
+          this.logger.error({ err: error, orderId }, 'Could not queue the purchase receipt');
+        }
+      }
       await this.tellTheTeam(granted);
     }
   }

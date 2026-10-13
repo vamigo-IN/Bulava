@@ -5,7 +5,7 @@ import { request as httpsRequest } from 'node:https';
 import { Inject, Injectable } from '@nestjs/common';
 import { SettingsStore, type ResolvedSetting } from '@bulava/settings';
 import { ObjectStorage, StorageKeys } from '@bulava/storage';
-import { z, type SettingCheckResult, type SettingCheckStep, type SettingGroup } from '@bulava/validation';
+import { WHATSAPP_TEMPLATE_KINDS, WHATSAPP_TEMPLATE_VARIABLES, z, type SettingCheckResult, type SettingCheckStep, type SettingGroup, type WhatsAppTemplateKind } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { QueueService } from '../../infrastructure/queue/queue.service';
 import { STORAGE } from '../../infrastructure/storage/storage.module';
@@ -76,9 +76,34 @@ function errorText(body: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-/** How many variables ({{1}}, {{2}}, …) Bulava fills in each kind of template. */
-const TEMPLATE_VARIABLES = { invitation: 3, reminder: 3, preview: 3, otp: 1 } as const;
-const TEMPLATE_KIND_LABEL = { invitation: 'invitation', reminder: 'reminder', preview: 'preview link', otp: 'sign-in code' } as const;
+/** Each kind of WhatsApp template, as the checks name it (WHATSAPP_TEMPLATE_VARIABLES says how many variables Bulava fills). */
+const TEMPLATE_KIND_LABEL: Record<WhatsAppTemplateKind, string> = {
+  invitation: 'invitation',
+  reminder: 'reminder',
+  registrationConfirmed: 'registration confirmed',
+  eventUpdate: 'host update',
+  galleryShared: 'photo album',
+  planPurchased: 'plan purchased',
+  paymentFailed: 'payment failed',
+  paymentPending: 'payment pending',
+  otp: 'sign-in code',
+};
+
+/** Sample details for a test message of each kind, as many as its template has variables. */
+function sampleParams(kind: WhatsAppTemplateKind, site: string, web: string): string[] {
+  const samples: Record<WhatsAppTemplateKind, string[]> = {
+    invitation: ['Test guest', `${site} test event`, `${web}/`],
+    reminder: ['Test guest', `Sangeet · ${site} test event`, `${web}/`],
+    registrationConfirmed: ['Test guest', `${site} test event`, 'Sat, 14 Dec 2026, 7:30 pm', 'Rambagh Palace, Jaipur', `${web}/`],
+    eventUpdate: ['Test guest', `${site} test event`, 'Venue changed: the sangeet moves to the lawn.', `${web}/`],
+    galleryShared: ['Test guest', `${site} test event`, `${web}/`],
+    planPurchased: ['Test', 'Standard', '₹599', `${web}/dashboard/payments`],
+    paymentFailed: ['Test', 'Standard', `${web}/dashboard/payments`],
+    paymentPending: ['Test', 'Standard', `${web}/dashboard/payments`],
+    otp: ['123456'],
+  };
+  return samples[kind];
+}
 
 function describe(error: unknown): string {
   if (error instanceof Error) return error.name === 'TimeoutError' ? 'No answer within 10 seconds' : error.message.slice(0, 300);
@@ -221,19 +246,25 @@ export class SettingsChecksService {
     steps.push({ label: 'WhatsApp switched on', ok: s.value.enabled ? true : null, detail: s.value.enabled ? undefined : 'Off: nothing is sent on WhatsApp.' });
     const connected = s.value.provider === 'GETGABS' ? await this.getgabs(steps, s) : await this.metaCloud(steps, s);
     if (!connected) return;
-    const { invitation, reminder, preview, otp } = s.value.templates;
+    const { invitation, reminder, otp } = s.value.templates;
     steps.push({
       label: 'Message templates',
       ok: invitation && reminder ? true : null,
       detail: invitation && reminder ? `${invitation}, ${reminder}` : 'Add the approved template names for invitations and reminders.',
     });
+    // Every other kind goes by email alone until its template is named (ADR-073).
+    const missing = WHATSAPP_TEMPLATE_KINDS.filter((kind) => kind !== 'invitation' && kind !== 'reminder' && kind !== 'otp' && !s.value.templates[kind]);
     steps.push({
-      label: 'Host messages',
+      label: 'Follow-up messages',
+      ok: missing.length ? null : true,
+      detail: missing.length
+        ? `Sent by email only until their templates are named: ${missing.map((kind) => TEMPLATE_KIND_LABEL[kind]).join(', ')}.`
+        : 'Registration confirmations, host updates, album links and payment messages all go on WhatsApp too.',
+    });
+    steps.push({
+      label: 'Sign-in codes',
       ok: null,
-      detail: [
-        preview ? `Preview links: ${preview}.` : 'No preview link template: quick-start previews are not sent on WhatsApp.',
-        otp ? `Sign-in codes: ${otp}.` : 'No sign-in code template: hosts sign in with email or Google only.',
-      ].join(' '),
+      detail: otp ? `Sign-in codes: ${otp}.` : 'No sign-in code template: hosts sign in with email or Google only.',
     });
     if (to) await this.whatsappTest(steps, s, to);
   }
@@ -286,7 +317,7 @@ export class SettingsChecksService {
 
   /** Each template as GetGabs has it: approved, in the language Bulava sends, with as many variables as Bulava fills. */
   private async getgabsTemplates(steps: SettingCheckStep[], base: string, token: string, apiKey: string, v: ResolvedSetting<'whatsapp'>['value']) {
-    for (const kind of ['invitation', 'reminder', 'preview', 'otp'] as const) {
+    for (const kind of WHATSAPP_TEMPLATE_KINDS) {
       const name = v.templates[kind];
       if (!name) continue;
       const label = `Template ${name} (${TEMPLATE_KIND_LABEL[kind]})`;
@@ -313,7 +344,7 @@ export class SettingsChecksService {
       const variables = typeof body === 'string' ? new Set((body.match(/\{\{\s*\d+\s*\}\}/g) ?? []).map((m) => m.replace(/\s/g, ''))).size : null;
       const failures = [
         status && status !== 'APPROVED' ? `Meta has not approved it (${status})` : null,
-        variables !== null && variables !== TEMPLATE_VARIABLES[kind] ? `it has ${variables} variables; Bulava fills ${TEMPLATE_VARIABLES[kind]}` : null,
+        variables !== null && variables !== WHATSAPP_TEMPLATE_VARIABLES[kind] ? `it has ${variables} variables; Bulava fills ${WHATSAPP_TEMPLATE_VARIABLES[kind]}` : null,
       ].filter((f): f is string => Boolean(f));
       const languageNote =
         language && language !== v.templateLanguage
@@ -355,8 +386,8 @@ export class SettingsChecksService {
 
   /**
    * A real message, sent by the worker with its settings exactly as guests and
-   * hosts get them: the first template set (invitation, reminder, preview link,
-   * sign-in code) with sample details in its variables.
+   * hosts get them: the first template set (in WHATSAPP_TEMPLATE_KINDS' order)
+   * with sample details in its variables.
    */
   private async whatsappTest(steps: SettingCheckStep[], s: ResolvedSetting<'whatsapp'>, to: string) {
     const number = `+${to.replace(/[^\d]/g, '')}`;
@@ -364,19 +395,14 @@ export class SettingsChecksService {
       steps.push({ label: 'Test message', ok: false, detail: 'Enter the number in international format, like +919876543210.' });
       return;
     }
-    const kind = (['invitation', 'reminder', 'preview', 'otp'] as const).find((k) => s.value.templates[k]);
+    const kind = WHATSAPP_TEMPLATE_KINDS.find((k) => s.value.templates[k]);
     if (!kind) {
       steps.push({ label: 'Test message', ok: false, detail: 'Add a template name first: the test sends one of your approved templates.' });
       return;
     }
     const site = (await this.store.get('site')).value.name;
     const web = this.config.WEB_ORIGIN.replace(/\/$/, '');
-    const params =
-      kind === 'otp'
-        ? ['123456']
-        : kind === 'preview'
-          ? ['Test', `${site} sample design`, `${web}/templates`]
-          : ['Test guest', kind === 'reminder' ? `Sangeet · ${site} test event` : `${site} test event`, `${web}/`];
+    const params = sampleParams(kind, site, web);
     try {
       const result = (await this.queues.runAndWait('whatsapp', { to: number, template: kind, params, ...(kind === 'otp' ? { copyCode: '123456' } : {}) }, 45_000)) as {
         outcome?: string;

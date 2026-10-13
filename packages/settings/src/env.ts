@@ -57,7 +57,6 @@ export function envFallback(group: SettingGroup, env: NodeJS.ProcessEnv): EnvFal
           templates: {
             invitation: env.WHATSAPP_INVITATION_TEMPLATE || undefined,
             reminder: env.WHATSAPP_REMINDER_TEMPLATE || undefined,
-            preview: env.WHATSAPP_PREVIEW_TEMPLATE || undefined,
             otp: env.WHATSAPP_OTP_TEMPLATE || undefined,
           },
           ...(env.WHATSAPP_TEMPLATE_LANGUAGE ? { templateLanguage: env.WHATSAPP_TEMPLATE_LANGUAGE } : {}),

@@ -30,4 +30,12 @@ export const hiLatn: Catalog = {
   'error.EVENT_LINK_EXPIRED': 'Yeh invitation link expire ho gaya hai. Naye link ke liye apne host se poochhiye.',
   'error.PLAN_LIMIT_REACHED': 'Is event mein ab aur nahin joda ja sakta. Apne host se baat kijiye.',
   'limit.media.photos.max': 'Is album mein zyada se zyada {limit} photos jud sakti hain, aur yeh bhar gaya hai.',
+  'email.registration.CONFIRMED.subject': '{event} ke liye aapka registration ho gaya',
+  'email.registration.CONFIRMED': '{event} mein aapki jagah pakki ho gayi hai. Aapke personal invitation mein saari details hain, aur hosts ke updates bhi wahin dikhenge.',
+  'email.registration.keepLink': 'Yeh link sirf aapke liye hai: ise sambhal kar rakhiye aur share mat kijiye.',
+  'email.gallery.subject': '{event} ki photos',
+  'email.gallery.body': '{event} ki photos album mein aa gayi hain: dekhiye aur apni favourite photos save kijiye.',
+  'email.gallery.cta': 'Album kholiye',
+  'register.messagesNote': 'Aapka confirmation aur hosts ke updates yahan diye gaye email address aur WhatsApp number par bheje jaayenge.',
+  'register.redirecting': 'Aapka invitation khul raha hai…',
 };

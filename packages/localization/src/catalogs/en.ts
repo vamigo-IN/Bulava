@@ -436,6 +436,14 @@ const core = {
   'email.registration.WAITLISTED': 'All places are currently taken, so you are on the waiting list. We will email you if a place opens up.',
   'email.registration.REJECTED': 'Unfortunately the hosts could not confirm your registration this time.',
   'email.registration.CANCELLED': 'Your registration has been cancelled by the hosts.',
+  'email.registration.CONFIRMED.subject': 'You\'re registered: {event}',
+  'email.registration.CONFIRMED': 'Your place at {event} is confirmed. Your personal invitation has every detail, and the hosts’ updates appear there too.',
+  'email.registration.keepLink': 'This link is yours alone: please keep it and do not share it.',
+  'email.gallery.subject': 'Photos from {event}',
+  'email.gallery.body': 'The photos from {event} are in the album: see them, and save your favourites.',
+  'email.gallery.cta': 'Open the album',
+  'register.messagesNote': 'We send your confirmation and the hosts’ updates to the email address and WhatsApp number you give here.',
+  'register.redirecting': 'Opening your invitation…',
 
   // public registration
   'register.title': 'Register to attend',
@@ -572,6 +580,8 @@ const core = {
   'error.TEAM_INVITE_WRONG_ACCOUNT': 'This invitation was sent to another email. Sign in with that account to join.',
   'error.UPLOADS_CLOSED': 'Only the hosts and their team add photos to this album.',
   'error.UPLOAD_NEEDS_INVITATION': 'Open the album from your invitation to add photos.',
+  'error.ALBUM_SHARE_UNAVAILABLE': 'Guests cannot open the album yet: publish the event and let guests see the gallery first.',
+  'error.ALBUM_SHARED_RECENTLY': 'The album went to your guests less than 12 hours ago.',
 } as const;
 
 export const en = { ...core, ...enMarketing, ...enDashboard, ...enCards } as const;

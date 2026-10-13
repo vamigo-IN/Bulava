@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { permissionsForEventRole } from '@bulava/auth';
 import { validateEventDetails, type QuickStartInput, type QuickStartVerifyInput } from '@bulava/validation';
 import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
-import { QueueService } from '../../infrastructure/queue/queue.service';
 import { AppError } from '../../common/errors/app-error';
 import type { RequestMeta } from '../../common/decorators/auth.decorators';
 import type { EventAccessContext } from '../../common/request-context';
@@ -11,7 +10,6 @@ import { toPublicUser, type PublicUser } from '../auth/public-user';
 import { SessionService, type IssuedSession } from '../auth/session.service';
 import { EventLinksService } from '../domains/event-links.service';
 import { EventsService } from '../events/events.service';
-import { PlatformSettingsService } from '../settings/settings.service';
 import { DesignService } from '../templates/design.service';
 import { ConsentService } from '../users/consent.service';
 import { PhoneOtpService } from './phone-otp.service';
@@ -20,8 +18,6 @@ export interface QuickStartResult {
   user: PublicUser;
   session: IssuedSession;
   event: { id: string; previewToken: string; previewUrl: string };
-  /** The preview link was queued to the host's WhatsApp (needs the integration and its template). */
-  whatsappSent: boolean;
 }
 
 export type QuickStartOutcome = QuickStartResult | { requiresOtp: true; target: string };
@@ -44,9 +40,7 @@ export class QuickStartService {
     private readonly sessions: SessionService,
     private readonly consents: ConsentService,
     private readonly audit: AuditService,
-    private readonly queues: QueueService,
     private readonly links: EventLinksService,
-    private readonly settings: PlatformSettingsService,
     private readonly otp: PhoneOtpService,
   ) {}
 
@@ -170,15 +164,9 @@ export class QuickStartService {
     // The chosen design, whatever its tier: drafts carry a watermark until the plan allows it.
     await this.design.select(access, 'WEBSITE', { templateKey: resolved.template.key }, meta);
 
+    // The preview opens in the dashboard straight away; it is no longer sent on WhatsApp (ADR-073).
     const previewUrl = `${await this.links.guestOrigin(created.id)}/preview/${created.previewToken}`;
-    let whatsappSent = false;
-    if ((await this.settings.whatsappHost()).preview) {
-      await this.queues.add('whatsapp', { to: user.phone!, template: 'preview', params: [this.hostName(resolved.details, title), resolved.template.name, previewUrl] });
-      whatsappSent = true;
-      await this.audit.record({ actorType: 'USER', actorId: user.id, action: 'event.preview_link_sent', targetType: 'Event', targetId: created.id, eventId: created.id, metadata: { channel: 'whatsapp' }, meta });
-    }
-
     const session = await this.sessions.issue(user, meta);
-    return { user: toPublicUser(user), session, event: { id: created.id, previewToken: created.previewToken, previewUrl }, whatsappSent };
+    return { user: toPublicUser(user), session, event: { id: created.id, previewToken: created.previewToken, previewUrl } };
   }
 }

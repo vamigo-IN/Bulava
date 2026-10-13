@@ -6,9 +6,11 @@ import {
   SETTING_GROUPS,
   SETTING_SECRETS,
   trackerSources,
+  WHATSAPP_TEMPLATE_KINDS,
   whatsappReady,
   z,
   type PublicSiteConfig,
+  type WhatsAppTemplateKind,
   type SaveSettingsInput,
   type SettingGroup,
   type SiteAssetKind,
@@ -62,23 +64,27 @@ export class PlatformSettingsService {
   }
 
   /** Which ways hosts can reach guests right now (Integrations: Email and WhatsApp). */
-  async messaging(): Promise<{ email: boolean; whatsappInvitations: boolean; whatsappReminders: boolean }> {
+  /**
+   * What can be sent now: email, and each kind of WhatsApp message (switched
+   * on, connected, and its approved template named; ADR-073). A kind that
+   * cannot go on WhatsApp goes by email alone.
+   */
+  async messaging(): Promise<{ email: boolean; whatsappInvitations: boolean; whatsappReminders: boolean; whatsapp: Record<WhatsAppTemplateKind, boolean> }> {
     const [email, whatsapp] = await Promise.all([this.store.get('email'), this.store.get('whatsapp')]);
     const w = whatsapp.value;
     const live = whatsappReady(w, whatsapp.secrets);
+    const kinds = Object.fromEntries(WHATSAPP_TEMPLATE_KINDS.map((kind) => [kind, live && !!w.templates[kind]])) as Record<WhatsAppTemplateKind, boolean>;
     return {
       email: email.value.enabled && !!email.value.host,
-      whatsappInvitations: live && !!w.templates.invitation,
-      whatsappReminders: live && !!w.templates.reminder,
+      whatsappInvitations: kinds.invitation,
+      whatsappReminders: kinds.reminder,
+      whatsapp: kinds,
     };
   }
 
-  /** Platform messages to hosts on WhatsApp (the preview link, sign-in codes), each needing its approved template. */
-  async whatsappHost(): Promise<{ preview: boolean; otp: boolean }> {
-    const whatsapp = await this.store.get('whatsapp');
-    const w = whatsapp.value;
-    const live = whatsappReady(w, whatsapp.secrets);
-    return { preview: live && !!w.templates.preview, otp: live && !!w.templates.otp };
+  /** Sign-in codes on WhatsApp: switched on, connected, and the authentication template named. */
+  async whatsappHost(): Promise<{ otp: boolean }> {
+    return { otp: (await this.messaging()).whatsapp.otp };
   }
 
   private view(s: ResolvedSetting<SettingGroup>, editors: Map<string, string>) {

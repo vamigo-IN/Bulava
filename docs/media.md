@@ -17,13 +17,16 @@ Every event has **one photo album**: one link and QR code (they open the guest g
 | Route (`/events/:id/…`) | Permission |
 |---|---|
 | `GET album`, `GET album/qr.svg`, `GET album/sub-albums/:albumId/items` | `media.view` |
-| `PATCH album` (name, uploads, moderation, gallery visibility, downloads, live wall), `POST album/wall/rotate` | `media.moderate` |
+| `PATCH album` (name, uploads, moderation, gallery visibility, downloads, live wall, `autoShareGallery`), `POST album/wall/rotate` | `media.moderate` |
+| `POST album/share` (send the album to the guests) | `invitation.send` |
 | `POST album/sub-albums`, `PATCH`/`DELETE album/sub-albums/:albumId` (name, `showInGallery`, `showOnWall`) | `media.moderate` |
 | `POST media/:itemId/move`, `POST media/:itemId/moderate` | `media.moderate` |
 | `POST album/uploads`, `POST album/uploads/:itemId/complete` | `media.upload` |
 | `DELETE media/:itemId` | `media.delete` |
 
 The dashboard's Photos page shows the folders with their photos; members with `media.upload` only (photographers) see the folders and an upload button, nothing else.
+
+**Sending the album to guests** (ADR-073). *Send to guests* on the Photos page (`POST album/share`) sends every guest with a live invitation the album's link by email and on WhatsApp (within the event's allowance), each with the guest's own invitation key after the `#` so an invite-only gallery knows them. It needs a published event, a gallery that is not private (`ALBUM_SHARE_UNAVAILABLE`) and the plan's gallery (`PLAN_UPGRADE_REQUIRED`), goes at most every 12 hours (`ALBUM_SHARED_RECENTLY`) and is audited (`album.shared`). Unless the host switches it off (`autoShareGallery`), the worker also sends it once the morning after the last function, when the album has an approved photo ([notifications.md](notifications.md#follow-ups)).
 
 ## Storage
 

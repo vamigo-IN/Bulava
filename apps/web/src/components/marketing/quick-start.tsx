@@ -121,9 +121,9 @@ export function QuickStartModal({ template, open, onClose }: { template: Templat
     whatsappUpdates: updates,
   });
 
-  const finish = (result: { event: { id: string }; whatsappSent: boolean }) => {
-    track('quick_start_completed', { template: template.key, type: type?.key, whatsapp: result.whatsappSent });
-    router.push(`/dashboard/events/${result.event.id}/design?welcome=1${result.whatsappSent ? '&whatsapp=1' : ''}`);
+  const finish = (result: { event: { id: string } }) => {
+    track('quick_start_completed', { template: template.key, type: type?.key });
+    router.push(`/dashboard/events/${result.event.id}/design?welcome=1`);
     router.refresh();
   };
 
@@ -136,13 +136,13 @@ export function QuickStartModal({ template, open, onClose }: { template: Templat
     }
     setBusy(true);
     try {
-      const result = await apiPost<{ requiresOtp?: true; target?: string; event?: { id: string }; whatsappSent?: boolean }>('/public/quick-start', payload());
+      const result = await apiPost<{ requiresOtp?: true; target?: string; event?: { id: string } }>('/public/quick-start', payload());
       if (result.requiresOtp) {
         setTarget(result.target ?? '');
         setStep('otp');
         return;
       }
-      if (result.event) finish({ event: result.event, whatsappSent: !!result.whatsappSent });
+      if (result.event) finish({ event: result.event });
     } catch (err) {
       setError(message(err));
     } finally {
@@ -155,7 +155,7 @@ export function QuickStartModal({ template, open, onClose }: { template: Templat
     setError(null);
     setBusy(true);
     try {
-      const result = await apiPost<{ event: { id: string }; whatsappSent: boolean }>('/public/quick-start/verify', { ...payload(), code });
+      const result = await apiPost<{ event: { id: string } }>('/public/quick-start/verify', { ...payload(), code });
       finish(result);
     } catch (err) {
       setError(message(err));

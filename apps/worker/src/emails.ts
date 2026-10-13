@@ -154,3 +154,118 @@ export function cardOrderEmail(input: { site: string; name: string; reference: s
     text: [greeting, '', intro, '', ...rows.map(([k, v]) => `${k}: ${v}`), '', later, input.orderUrl].join('\n'),
   };
 }
+
+/** A registrant's place is confirmed (ADR-073): the event, when and where they are expected, and their own link. */
+export function registrationConfirmedEmail(input: {
+  site: string;
+  language: string;
+  guestName: string;
+  eventTitle: string;
+  when: string | null;
+  venue: { name: string; address: string | null; city: string | null; mapUrl: string | null } | null;
+  inviteUrl: string;
+}) {
+  const t = createTranslator(input.language);
+  const where = input.venue ? [input.venue.name, input.venue.address, input.venue.city].filter(Boolean).join(', ') : null;
+  const dear = t('invitation.dear', { guestName: input.guestName });
+  const body = t('email.registration.CONFIRMED', { event: input.eventTitle });
+  const details = [
+    input.when ? `<strong>${escapeHtml(t('invitation.when'))}:</strong> ${escapeHtml(input.when)}` : null,
+    where ? `<strong>${escapeHtml(t('invitation.venue'))}:</strong> ${escapeHtml(where)}` : null,
+  ]
+    .filter(Boolean)
+    .join('<br>');
+  const map = input.venue?.mapUrl ? `<p style="margin:12px 0 0"><a href="${escapeHtml(input.venue.mapUrl)}" style="color:#6b0f1a">${escapeHtml(t('invitation.viewMap'))}</a></p>` : '';
+  const keep = t('email.registration.keepLink');
+  return {
+    subject: t('email.registration.CONFIRMED.subject', { event: input.eventTitle }),
+    html: layout(
+      input.site,
+      input.eventTitle,
+      `<p style="line-height:1.5">${escapeHtml(dear)}</p><p style="line-height:1.5">${escapeHtml(body)}</p>${details ? `<p style="line-height:1.7;background:#f6f1e9;border-radius:8px;padding:12px 14px">${details}</p>` : ''}${map}<p style="line-height:1.5;color:#57534e;font-size:13px">${escapeHtml(keep)}</p>`,
+      { label: t('email.openInvitation'), url: input.inviteUrl },
+    ),
+    text: [dear, '', body, '', ...(input.when ? [`${t('invitation.when')}: ${input.when}`] : []), ...(where ? [`${t('invitation.venue')}: ${where}`] : []), ...(input.venue?.mapUrl ? [input.venue.mapUrl] : []), '', input.inviteUrl, '', keep].join('\n'),
+  };
+}
+
+/** The photo album, sent by the host or the morning after the last function (ADR-073). */
+export function galleryEmail(input: { site: string; language: string; guestName: string; eventTitle: string; galleryUrl: string }) {
+  const t = createTranslator(input.language);
+  const dear = t('invitation.dear', { guestName: input.guestName });
+  const body = t('email.gallery.body', { event: input.eventTitle });
+  return {
+    subject: t('email.gallery.subject', { event: input.eventTitle }),
+    html: layout(input.site, input.eventTitle, `<p style="line-height:1.5">${escapeHtml(dear)}</p><p style="line-height:1.5">${escapeHtml(body)}</p>`, { label: t('email.gallery.cta'), url: input.galleryUrl }),
+    text: `${dear}\n\n${body}\n\n${input.galleryUrl}`,
+  };
+}
+
+/** "₹599", "₹1,250.50": the amount in rupees, as receipts show it. */
+export function formatRupees(minor: number): string {
+  const rupees = minor / 100;
+  return `₹${rupees.toLocaleString('en-IN', { minimumFractionDigits: Number.isInteger(rupees) ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
+/** A plan unlocked (ADR-073): the receipt, one-time with GST, and what to do next. */
+export function planPurchasedEmail(input: { site: string; name: string; plan: string; amountMinor: number; orderUrl: string }) {
+  const amount = formatRupees(input.amountMinor);
+  const greeting = `Hello ${input.name},`;
+  const intro =
+    input.amountMinor > 0
+      ? `Thank you! Your ${input.plan} plan is unlocked. You paid ${amount} once, GST included: nothing renews.`
+      : `Your ${input.plan} plan is unlocked with your coupon: there was nothing to pay, and nothing renews.`;
+  const next = 'Your receipt and invoice details are on your payments page. Publish your invitation whenever you are ready.';
+  return {
+    subject: `Your ${input.plan} plan is unlocked`,
+    html: layout(
+      input.site,
+      `Your ${input.plan} plan is unlocked`,
+      `<p style="line-height:1.5;margin:0 0 12px">${escapeHtml(greeting)}</p><p style="line-height:1.5;margin:0 0 12px">${escapeHtml(intro)}</p><p style="line-height:1.5;margin:0">${escapeHtml(next)}</p>`,
+      { label: 'View my receipt', url: input.orderUrl },
+      `You received this because you bought a plan on ${input.site}.`,
+    ),
+    text: [greeting, '', intro, '', next, '', input.orderUrl].join('\n'),
+  };
+}
+
+/** A payment that did not go through, or a checkout left waiting (ADR-073): the plan is still there to finish. */
+export function paymentIncompleteEmail(input: { site: string; name: string; plan: string; amountMinor: number; orderUrl: string; state: 'failed' | 'pending' }) {
+  const amount = formatRupees(input.amountMinor);
+  const greeting = `Hello ${input.name},`;
+  const intro =
+    input.state === 'failed'
+      ? `Your payment of ${amount} for the ${input.plan} plan did not go through. If any money left your account, your bank returns it automatically.`
+      : `Your ${input.plan} plan (${amount}, paid once) is waiting for payment. It takes a minute to finish.`;
+  const next = input.state === 'failed' ? 'You can try again with UPI, a card or net banking: your design and guests are safe.' : 'Your design and guests are saved: pick up where you left off.';
+  const title = input.state === 'failed' ? 'Your payment did not go through' : `Finish unlocking ${input.plan}`;
+  return {
+    subject: title,
+    html: layout(
+      input.site,
+      title,
+      `<p style="line-height:1.5;margin:0 0 12px">${escapeHtml(greeting)}</p><p style="line-height:1.5;margin:0 0 12px">${escapeHtml(intro)}</p><p style="line-height:1.5;margin:0">${escapeHtml(next)}</p>`,
+      { label: input.state === 'failed' ? 'Try again' : 'Finish payment', url: input.orderUrl },
+      `You received this because you started a checkout on ${input.site}.`,
+    ),
+    text: [greeting, '', intro, '', next, '', input.orderUrl].join('\n'),
+  };
+}
+
+/** A guest answered a WhatsApp message (ADR-073): their words, and a link to answer from the host's own WhatsApp. */
+export function guestReplyEmail(input: { site: string; guestName: string; eventTitle: string; text: string; optedOut: boolean; replyUrl: string; dashboardUrl: string }) {
+  const said = input.text.trim() || '(a reaction or a file)';
+  const intro = `${input.guestName} replied on WhatsApp about ${input.eventTitle}:`;
+  const note = input.optedOut ? `${input.guestName} asked not to get WhatsApp messages: they get email from now on.` : 'Answer them from your own WhatsApp:';
+  return {
+    subject: `${input.guestName} replied on WhatsApp`,
+    html: layout(
+      input.site,
+      `${input.guestName} replied`,
+      `<p style="line-height:1.5;margin:0 0 12px">${escapeHtml(intro)}</p><blockquote style="margin:0 0 12px;padding:10px 14px;background:#f6f1e9;border-left:3px solid #6b0f1a;border-radius:6px;line-height:1.5">${escapeHtml(said).replace(/\n/g, '<br>')}</blockquote><p style="line-height:1.5;margin:0">${escapeHtml(note)}</p>`,
+      input.optedOut ? { label: 'Open your event', url: input.dashboardUrl } : { label: 'Reply on WhatsApp', url: input.replyUrl },
+      `You received this because a guest of ${input.eventTitle} wrote to ${input.site}'s WhatsApp number.`,
+    ),
+    text: [intro, '', said, '', note, input.optedOut ? input.dashboardUrl : input.replyUrl].join('\n'),
+  };
+}

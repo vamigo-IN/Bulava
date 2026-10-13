@@ -9,7 +9,7 @@ export const QueueName = {
   VIDEO_RENDER: 'video-render',
   NOTIFICATIONS: 'notifications',
   EMAIL: 'email',
-  /** Platform WhatsApp messages to hosts (preview links, sign-in codes); guest messages go through `notifications`. */
+  /** Platform WhatsApp messages without a notification row (sign-in codes, the console's test); the others go through `notifications`. */
   WHATSAPP: 'whatsapp',
   ANALYTICS: 'analytics',
   EXPORTS: 'exports',
@@ -30,12 +30,18 @@ export interface JobPayloads {
    */
   email: { to: string; subject: string; html: string; text: string; notificationId?: string; replyTo?: string } | { cardOrderId: string };
   /**
-   * One approved WhatsApp template to a host's number: `template` names the kind
-   * (the admin's settings map it to the approved template name), `params` fill
+   * One approved WhatsApp template to a number, with nothing stored: `template`
+   * names the kind (the admin's settings map it to the approved template name;
+   * the kinds are @bulava/validation's WHATSAPP_TEMPLATE_KINDS), `params` fill
    * its body variables and `copyCode` an authentication template's copy button.
-   * Invitation and reminder kinds come only from the console's connection test.
+   * Sign-in codes, and every kind from the console's connection test.
    */
-  whatsapp: { to: string; template: 'invitation' | 'reminder' | 'preview' | 'otp'; params: string[]; copyCode?: string };
+  whatsapp: {
+    to: string;
+    template: 'invitation' | 'reminder' | 'registrationConfirmed' | 'eventUpdate' | 'galleryShared' | 'planPurchased' | 'paymentFailed' | 'paymentPending' | 'otp';
+    params: string[];
+    copyCode?: string;
+  };
   analytics: {
     name: string;
     eventId?: string | null;
@@ -46,7 +52,9 @@ export interface JobPayloads {
     occurredAt: string;
   };
   exports: { exportType: 'GUESTS_CSV' | 'RSVPS_CSV'; eventId: string; requestedById: string };
-  cleanup: { task: 'expired-sessions' | 'stale-uploads' | 'deleted-events' | 'event-lifecycle' | 'reminders' | 'domains' | 'whatsapp-status' | 'card-retention' };
+  cleanup: {
+    task: 'expired-sessions' | 'stale-uploads' | 'deleted-events' | 'event-lifecycle' | 'reminders' | 'domains' | 'whatsapp-status' | 'card-retention' | 'payment-follow-ups' | 'gallery-follow-ups';
+  };
   'card-render': { exportId: string };
 }
 
