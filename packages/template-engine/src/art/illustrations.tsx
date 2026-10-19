@@ -11,6 +11,7 @@ import { Champagne, Cupcake, Dhol, Dino, Doli, HaldiBowl, Rocket, Stork, TeddyBe
 import { Alpana, Ghungroo, Kuthuvilakku, LaalPaar, MarigoldSwag, MarigoldWreath, Mihrab, Phulkari, Prabhavali, ZariBand } from './illustrations-regional';
 import { CrescentStar, Cross, Ganesha, Khanda } from './illustrations-faith';
 import { Fanoos, GirihRosette, GoldenTemple, JaaliArch, LancetWindow, Lilies, PhulkariBagh, WeddingBells } from './illustrations-sacred';
+import { SatinBow, SatinRibbon, ScallopTag, WaxSeal, Zipper, ZipperPull } from './illustrations-atelier';
 
 export type { IllustrationProps } from './kit';
 export { foilCss, metalStops } from './kit';
@@ -102,10 +103,16 @@ const COMPONENTS: Record<IllustrationName, (props: IllustrationProps) => ReactNo
   lancetWindow: LancetWindow,
   lilies: Lilies,
   weddingBells: WeddingBells,
+  zipper: Zipper,
+  zipperPull: ZipperPull,
+  scallopTag: ScallopTag,
+  satinRibbon: SatinRibbon,
+  satinBow: SatinBow,
+  waxSeal: WaxSeal,
 };
 
 /** Drawn to the layer's own size (frames, garlands, strings); the others keep their proportions inside it. */
-export const FRAME_SIZED: ReadonlySet<IllustrationName> = new Set<IllustrationName>(['ornateFrame', 'floralGarland', 'jasmineStrand', 'bunting', 'fairyLights', 'hairlineFrame', 'goldVine', 'sparkles', 'zariBand', 'mihrab', 'phulkari', 'marigoldSwag', 'decoFrame', 'laalPaar', 'ghungroo']);
+export const FRAME_SIZED: ReadonlySet<IllustrationName> = new Set<IllustrationName>(['ornateFrame', 'floralGarland', 'jasmineStrand', 'bunting', 'fairyLights', 'hairlineFrame', 'goldVine', 'sparkles', 'zariBand', 'mihrab', 'phulkari', 'marigoldSwag', 'decoFrame', 'laalPaar', 'ghungroo', 'zipper', 'satinRibbon']);
 
 /** Width ÷ height of each illustration as drawn (new layers in the editor start at it). */
 export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
@@ -190,6 +197,12 @@ export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
   lancetWindow: 260 / 440,
   lilies: 240 / 300,
   weddingBells: 220 / 190,
+  zipper: 0.04,
+  zipperPull: 60 / 140,
+  scallopTag: 200 / 260,
+  satinRibbon: 6,
+  satinBow: 300 / 210,
+  waxSeal: 1,
 };
 
 export { JAALI_ARCH_OPENING, LANCET_OPENING } from './illustrations-sacred';

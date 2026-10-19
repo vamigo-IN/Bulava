@@ -1,4 +1,4 @@
-import { bindingsIn, fitBoard, TemplateDefinitionSchema, type Artboard, type EffectName, type TemplateDefinitionInput } from '@bulava/template-schema';
+import { bindingsIn, fitBoard, SCENE_REVEALS, TemplateDefinitionSchema, type Artboard, type EffectName, type SceneReveal, type TemplateDefinitionInput } from '@bulava/template-schema';
 import type { CatalogEntry } from './builder';
 
 /**
@@ -12,6 +12,11 @@ import type { CatalogEntry } from './builder';
 
 /** The invitations filmed: the strongest designs across traditions and occasions. */
 export const CANVAS_FILM_SOURCES = [
+  // The atelier collection (atelier.ts, ADR-074): each film opens the way its invitation does.
+  'olive-zip-invite',
+  'noir-zip-reception',
+  'satin-bow-engagement',
+  'velvet-seal-invite',
   'shahi-gajraj-card',
   'mor-pankh-card',
   'kovil-mani-card',
@@ -44,7 +49,10 @@ const STORY = { width: 450, height: 800 } as const;
 /** Words that name the people or the event: what the closing keeps. */
 const NAMES = /^(couple\.|honoree\.|event\.title$)/;
 
-export const canvasFilmKey = (sourceKey: string) => `${sourceKey.replace(/-(card|invite)$/, '')}-film`;
+export const canvasFilmKey = (sourceKey: string) => `${sourceKey.replace(/-(card|invite|reception|engagement)$/, '')}-film`;
+
+/** Seconds a scene opening under a cover runs longer: the cover is held, pulled open and moved off before the words settle. */
+const REVEAL_EXTRA_SEC = 2;
 
 /** Long enough for every layer to come in (staggered) and to be read, rounded to half seconds. */
 function sceneSeconds(board: Artboard, stagger: number, hold: number, min: number, max: number): number {
@@ -71,6 +79,9 @@ function film(source: CatalogEntry, sortOrder: number): CatalogEntry {
   const closing = closingBoard(opening);
   const festive = source.meta.eventTypes.some((e) => ['BIRTHDAY', 'BABY_SHOWER', 'NAMING_CEREMONY'].includes(e));
   const particles: EffectName = hero.mobile.effect !== 'none' ? hero.mobile.effect : festive ? 'confetti' : 'goldDust';
+  // A zipper or a ribbon opens the film as it opens the website (ADR-074).
+  const intro = parsed.website?.intro;
+  const reveal: SceneReveal = intro && (SCENE_REVEALS as readonly string[]).includes(intro) ? (intro as SceneReveal) : 'none';
   const key = canvasFilmKey(source.meta.key);
   const name = `${source.meta.name} Film`;
   const description = `The ${source.meta.name} invitation as a film: its art and words come in one by one as the camera drifts, then a card for each function and your names to close.`;
@@ -96,7 +107,15 @@ function film(source: CatalogEntry, sortOrder: number): CatalogEntry {
     music: { allowCustomerChoice: true },
     canvas: { width: 1080, height: 1920, fps: 30 },
     scenes: [
-      { id: 'opening', durationSec: sceneSeconds(opening, 0.14, 2.5, 6, 10), transition: 'fade', particles, canvas: { board: opening, stagger: 0.14, camera: 'push', intensity: 0.7 }, elements: [] },
+      {
+        id: 'opening',
+        durationSec: sceneSeconds(opening, 0.14, 2.5, 6, 10) + (reveal === 'none' ? 0 : REVEAL_EXTRA_SEC),
+        transition: 'fade',
+        particles,
+        canvas: { board: opening, stagger: 0.14, camera: 'push', intensity: 0.7 },
+        ...(reveal === 'none' ? {} : { reveal }),
+        elements: [],
+      },
       ...(card
         ? [{ id: 'function', durationSec: 5, transition: 'fade' as const, repeatPerFunction: true, particles: 'none' as const, canvas: { board: fitBoard(card.mobile, STORY.width, STORY.height), stagger: 0.1, camera: 'pull' as const, intensity: 0.5 }, elements: [] }]
         : []),

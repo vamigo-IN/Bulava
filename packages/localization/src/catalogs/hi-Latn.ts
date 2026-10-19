@@ -38,4 +38,6 @@ export const hiLatn: Catalog = {
   'email.gallery.cta': 'Album kholiye',
   'register.messagesNote': 'Aapka confirmation aur hosts ke updates yahan diye gaye email address aur WhatsApp number par bheje jaayenge.',
   'register.redirecting': 'Aapka invitation khul raha hai…',
+  'template.intro.zipper': 'Kholne ke liye tag neeche kheenchiye',
+  'template.intro.ribbon': 'Kholne ke liye ribbon kheenchiye',
 };

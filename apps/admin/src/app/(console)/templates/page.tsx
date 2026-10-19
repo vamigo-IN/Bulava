@@ -15,6 +15,8 @@ import { formatDate, formatNumber } from '@/lib/utils';
 
 const TYPE_ICONS = { WEBSITE: Globe, VIDEO: Film, DIGITAL_CARD: IdCard } as const;
 const CREATABLE_TYPES = ['WEBSITE', 'VIDEO', 'DIGITAL_CARD'] as const;
+/** An image card's frame (films are 9:16; hosts pick square or wide when they make theirs). */
+const CARD_FORMATS = ['portrait', 'square', 'story', 'landscape'] as const;
 
 export default function TemplatesPage() {
   return (
@@ -256,16 +258,19 @@ function CreateTemplateForm({ templates, onDone }: { templates: AdminTemplate[];
   const [category, setCategory] = useState('');
   const [type, setType] = useState<(typeof CREATABLE_TYPES)[number]>('WEBSITE');
   const [from, setFrom] = useState('');
+  const [start, setStart] = useState<'canvas' | 'classic'>('canvas');
+  const [format, setFormat] = useState<(typeof CARD_FORMATS)[number]>('portrait');
   const categories = useMemo(() => [...new Set(templates.map((tpl) => tpl.category))].sort(), [templates]);
   const sources = templates.filter((tpl) => tpl.outputs.includes(type) && tpl.currentVersionId);
 
   const create = useMutation({
     mutationFn: () =>
-      apiPost<{ template: { id: string } }>('/admin/templates', { key, name, category, type, ...(from ? { fromTemplateKey: from } : {}) }),
+      apiPost<{ template: { id: string } }>('/admin/templates', { key, name, category, type, ...(from ? { fromTemplateKey: from } : { start, ...(type === 'DIGITAL_CARD' ? { format } : {}) }) }),
     onSuccess: async (res) => {
       await invalidate(['admin', 'templates']);
       onDone();
-      router.push(`/templates/${res.template.id}`);
+      // A blank canvas opens straight in the Design Studio.
+      router.push(`/templates/${res.template.id}${!from && start === 'canvas' ? '?design=1' : ''}`);
     },
   });
 
@@ -351,6 +356,33 @@ function CreateTemplateForm({ templates, onDone }: { templates: AdminTemplate[];
           </Select>
         )}
       </Field>
+      {!from ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t('templates.start')}>
+            {(p) => (
+              <Select {...p} value={start} onChange={(e) => setStart(e.target.value as 'canvas' | 'classic')}>
+                <option value="canvas">{t('templates.start.canvas')}</option>
+                <option value="classic">{t(type === 'WEBSITE' ? 'templates.start.sections' : 'templates.start.elements')}</option>
+              </Select>
+            )}
+          </Field>
+          {type === 'DIGITAL_CARD' ? (
+            <Field label={t('templates.format')}>
+              {(p) => (
+                <Select {...p} value={format} onChange={(e) => setFormat(e.target.value as (typeof CARD_FORMATS)[number])}>
+                  {CARD_FORMATS.map((f) => (
+                    <option key={f} value={f}>
+                      {t(`templates.format.${f}`)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          ) : type === 'VIDEO' ? (
+            <p className="self-end pb-2 text-xs text-stone-500">{t('templates.format.film')}</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone}>
           {t('common.cancel')}

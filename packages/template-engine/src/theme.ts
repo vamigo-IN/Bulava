@@ -53,7 +53,7 @@ export function mix(a: string, b: string, amount: number): string {
  * contrasts most with it (so a dark palette gets its own cream text, not a
  * nudged grey), then nudge only if still needed.
  */
-function onFill(fill: string, candidates: string[]): string {
+export function onFill(fill: string, candidates: string[]): string {
   const best = candidates.reduce((a, b) => (contrastRatio(b, fill) > contrastRatio(a, fill) ? b : a));
   return ensureContrast(best, [fill], AA_TEXT);
 }

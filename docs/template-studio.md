@@ -66,12 +66,12 @@ Every path writes to the audit log, and `set-role` signs the people it changes o
 
 Templates are data (see [templates.md](templates.md)). A template has immutable **published versions** and at most one **working draft**.
 
-1. **Create** a template (blank starter for its type, or a copy of an existing template), or **duplicate** one.
+1. **Create** a template, or **duplicate** one. A new template starts from a copy of an existing one, or blank: a **blank canvas** (the default) opens straight in the [Design Studio](#design-studio) with plain boards to design on (a website's opening and function card, then RSVP and footer; a film's 9:16 opening and function scenes; a card in portrait 4:5, square, story 9:16 or landscape 5:4), or **ready-made sections** (websites) and **film elements** (films and cards).
 2. **Edit** the draft in the Studio:
    - *Details* — catalog listing (name, category, style, tier, badge, featured, tags, event types, sort order) saves immediately and does not create a version. The definition's display name, description and supported languages are part of the draft.
    - *Theme & fonts* — colours, corner radius, ornament, background pattern, hero tone, opening animation, and fonts with a Devanagari fallback.
-   - *Sections* (websites) — add, reorder, remove sections, pick a layout variant, and edit each section's content bindings as JSON. A *canvas* section is a free-form design and opens the [Canvas editor](#canvas-editor).
-   - *Scenes* (videos and cards) — canvas size and fps, scene length, background, transition, the illustrated scene the scene is filmed in with its camera move, particles, per-function repetition, and element JSON.
+   - *Sections* (websites) — add, reorder, remove sections, pick a layout variant, and edit each section's content bindings as JSON. A *canvas* section is a free-form design and opens in the [Design Studio](#design-studio).
+   - *Scenes* (videos and cards) — canvas size and fps, scene length, background, transition, the illustrated scene the scene is filmed in with its camera move, particles, per-function repetition, and element JSON. *Design* opens a scene in the Design Studio; a new scene is an empty board there.
    - *Artwork* — painted scenes from commissioned layers (approved image assets, category `artwork`): order, depth and label per layer, loading colour, light or dark text, where text starts; then *Use as website hero* or *Use behind every scene*. It keeps the definition's `assets` in step so publishing checks every layer's licence, and flags layers that are not approved or not 3:2. See [templates.md](templates.md#painted-artwork) and the artist brief, [illustration-brief.md](illustration-brief.md).
    - *Customization* — what customers may change (colours, photos, text, music…), custom text fields and colour presets.
    - *JSON* — the whole definition, validated before it is applied.
@@ -84,15 +84,38 @@ Templates are data (see [templates.md](templates.md)). A template has immutable 
 
 Every create, publish, status change, delete, restore and listing change is written to the audit log, and the public catalog cache is invalidated on publish, delete and restore.
 
-### Canvas editor
+### Design Studio
 
-*Sections → Add section → canvas* creates an empty phone artboard and opens the full-screen Canvas editor; *Open in Canvas editor* reopens it. The editor works on the same draft as the Studio, so Save draft, checks and publishing are unchanged. What a canvas section stores is in [templates.md](templates.md#canvas-sections).
+*Design Studio* (in the Studio's header, on any canvas section, or *Design* on a scene) opens the full-screen editor for every board of the template, after Canva ([ADR-075](decisions.md#adr-075-the-design-studio-and-designs-from-other-software-2026-10-19)). It works on the same draft as the Studio, so Save draft, checks and publishing are unchanged, and Ctrl+Z undoes any change made in it. What a board stores is in [templates.md](templates.md#canvas-sections).
 
-- **Stage**: the artboard with sample data (language, sample event, long names, no photos, as in the preview). Drag to move, handles to resize (Shift keeps proportions), the ring to rotate (Shift snaps to 15°). Layers snap to the artboard's edges and centre and to other layers (Alt disables); guides show what snapped. Arrow keys nudge (Shift = 10), Delete removes, Ctrl+D duplicates, `[` and `]` reorder, Ctrl+Z / Ctrl+Y undo and redo, Ctrl+S saves the draft, Escape deselects.
-- **Layers**: top-most first; drag to reorder, eye and lock toggles. *Add layer* offers text presets (heading, names in script, small label, paragraph, date line), images (from the library, or the host's cover or first photo), widgets (countdown, button, date/time/venue rows), shapes, illustrations, ornaments, scenes and icons, each previewed as the engine draws it. A new illustration starts at its own proportions (garlands and strings across the top, a frame around the board), a scene across the bottom of the board.
-- **Properties**: with nothing selected, the artboard (size, background fill, paper texture and its strength, ambient effect) and the section (repeat once per function, max width on desktop, add or remove the desktop artboard, which starts as the phone design scaled to 1440 × 900). With a layer selected: position and size, blend mode, alignment, the layer's own properties (foil on text and ornaments, a soft shadow or a glow on ornaments, the scene and its sky), when it shows (a binding that must have a value, event types) and its animation. Fills can be a colour, a linear or radial gradient through an optional middle colour, a pattern or a library image.
-- **Images**: the picker lists library images (approved first) and uploads new ones with their licence (category `canvas` by default). Picking an image adds it to the definition's `assets` (role `canvas`), so publishing checks its licence; an unapproved image can be placed but blocks publishing until it is approved.
-- **Phone first**: every canvas section has a phone artboard; the desktop artboard is optional, and without one the phone design is shown centred on wide screens.
+- **Pages** (the strip along the foot): a website's canvas sections and a film's or card's scenes, each drawn small. *Add page* puts an empty board after the current one (a canvas section before the RSVP and footer; a scene in the frame's shape: 450 wide, 9:16 for films, the card's own frame), and the current page can be duplicated, moved earlier or later, or deleted. A scene made of film elements shows its elements laid out as layers; *Move onto the canvas* makes them layers to edit. A scene's illustrated backdrop is drawn behind its board.
+- **Elements** (left): search everything the engine draws by name or by what it is for (*zip*, *frame*, *faith*…), or browse text styles, photo spots, shapes, illustrations, ornaments, icons, scenes and widgets, each previewed as the engine draws it. Click to add in the middle of the page, or drag onto the page to drop it where it goes. *Photos* adds library images (licensed assets) or spots for the host's own photos; *Layers* lists the page's layers (Shift-click to pick several; drag to reorder; hide and lock); *Import* brings in designs from other software ([Imports](#imports)).
+- **The page**: sample data as in the preview (language, event type, long names, no photos). Click to pick a layer, Shift- or Ctrl-click to add one, or drag a box over empty board to pick every layer it touches. Drag to move, handles to resize (Shift keeps proportions; corners of a group keep them and scale its words too), the ring to rotate (Shift snaps to 15°). Layers snap to the board's edges and centre and to each other (Alt disables). Double-click words with fixed text (or a `{{template}}`) to type them on the page; Ctrl+Enter or clicking away keeps them, Escape drops the change.
+- **Several layers** get a toolbar: align (to each other, or to the page for one layer), space evenly (three or more), group (Ctrl+G; grouped layers are picked, moved and resized together, `layer.group`) and ungroup (Ctrl+Shift+G), bring to front, send to back, lock, duplicate (Ctrl+D) and delete. Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste through the clipboard (as JSON), so layers move between pages, templates and browser tabs; pasted onto a board of another width they are scaled, and they always land on the page.
+- **Zoom**: Fit, the zoom steps, Ctrl+= / Ctrl+- / Ctrl+0, or Ctrl+wheel at the pointer; hold Space (or the middle button) and drag to pan.
+- **Properties** (right): with nothing picked, the board (size, fill, paper texture, ambient effect) and the page: a section's settings (repeat once per function, desktop artboard) or a scene's (length, how it comes in, how it opens: a zipper or a ribbon, particles, camera move and strength, the gap between layers' entrances, once per function). With a layer picked, its position, size, blend and own properties, when it shows and its animation.
+- **Images**: library images are placed through the picker (approved first; uploads take their licence). Every image on any board is listed in the definition's `assets` (role `canvas`), so publishing checks each licence; an unapproved image can be placed but blocks publishing until it is approved.
+- **Phone first**: every canvas section has a phone board; the desktop board is optional, and without one the phone design is shown centred on wide screens.
+
+### Imports
+
+The Design Studio's *Import* tab (or a file dropped on the page) reads a design made elsewhere in the browser (`canvas-editor/import/`); nothing leaves the browser until it is placed. It shows what it found (pages, words, shapes, pictures) and what could not come across, then places it as new pages (after the current page) or on the current page (its first page, fitted inside the board).
+
+| Made in | Export | What comes in |
+|---|---|---|
+| Canva, Illustrator (an `.ai` saved with PDF content), InDesign, Affinity, CorelDRAW | PDF | each page: its art as one picture, its words as text layers in their font, size, colour and spacing (read from where the words were drawn), turned words turned |
+| Figma, Illustrator, Inkscape, CorelDRAW, Canva | SVG | words as text layers, plain rectangles, circles and lines as shapes, embedded photos as pictures, and the art between them as pictures, in paint order. Files are cleaned first: drawing only, no scripts, handlers, outside links or foreign content |
+| Photoshop, Affinity, Photopea, Procreate | PSD | every visible layer in its place, groups kept as groups, layer masks and clipping masks applied, blend modes, type layers as text layers. Layer styles and adjustment layers are listed as left out |
+| PowerPoint, Keynote, Google Slides, Canva | PPTX | each slide over its layout's and master's art: text boxes, shapes, pictures (cropped and masked), groups, backgrounds, theme colours and fonts. Tables, charts and SmartArt are listed as left out |
+| anything | PNG, JPG, WebP | the picture, on a page of its shape |
+| Bulava | JSON | layers copied from a board, or a whole board |
+
+- **Fonts**: a font the template uses takes that role (heading, body, script), so it follows the host's font pairing; one of the engine's families is kept; any other becomes the role of its kind (scripts, serif headings, sans body text). Check the words' fonts after importing.
+- **Colours** close to one of the template's colours take its name (*Use the template's colours where they are close*), so they follow the host's colour choices; the rest keep their exact colour.
+- **Words** come in as fixed text. Bind names, dates and venues to the event in Properties (or retype them as `{{couple.partnerOne}}`…) before publishing.
+- **Pictures** are uploaded to the library as licensed assets (category `canvas`, tagged `imported`) with one licence given for the whole file, and wait for review in Assets like any other upload.
+- **Other formats**: CorelDRAW (`.cdr`), Figma, Sketch and XD files, and Keynote decks are read only by their own software; the Studio says what to export instead.
+- **Without editable words** (*Keep words editable* off), PDF and PSD pages come in as one picture each, exactly as designed.
 
 ## Assets and licences
 

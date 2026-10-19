@@ -17,6 +17,15 @@ import { TemplatesService } from '../templates/templates.service';
 
 const keySchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(80);
 
+/** Frames a new image card can start in. */
+const CARD_FORMATS = ['portrait', 'square', 'story', 'landscape'] as const;
+const CARD_FRAMES: Record<(typeof CARD_FORMATS)[number], { width: number; height: number }> = {
+  portrait: { width: 1080, height: 1350 },
+  square: { width: 1080, height: 1080 },
+  story: { width: 1080, height: 1920 },
+  landscape: { width: 1350, height: 1080 },
+};
+
 export const CreateTemplateSchema = z.object({
   key: keySchema,
   name: z.string().trim().min(1).max(80),
@@ -24,6 +33,10 @@ export const CreateTemplateSchema = z.object({
   type: z.enum(['WEBSITE', 'VIDEO', 'DIGITAL_CARD']),
   /** Start from an existing template's current definition. */
   fromTemplateKey: keySchema.optional(),
+  /** Without a source: blank canvas boards for the Design Studio (default), or the classic sections and film elements. */
+  start: z.enum(['canvas', 'classic']).optional(),
+  /** An image card's frame (films are 9:16, the frame hosts' phones play them in). */
+  format: z.enum(CARD_FORMATS).optional(),
 });
 export type CreateTemplateInput = z.infer<typeof CreateTemplateSchema>;
 
@@ -61,8 +74,74 @@ const FONTS = {
   script: { family: 'Great Vibes', scripts: ['Latn'], fallbacks: { Deva: 'Tiro Devanagari Hindi' } },
 };
 
+const NAMES = { template: '{{couple.partnerOne}} & {{couple.partnerTwo}}', fallback: { binding: 'honoree.name', fallback: { binding: 'event.title' } } };
+const at = (x: number, y: number, w: number, h: number) => ({ x, y, w, h, rotate: 0 });
+
+/** An opening board: the names, a rule and the date, on plain paper (the Design Studio adds the rest). */
+function openingBoard(width: number, height: number) {
+  const u = width / 390;
+  const mid = height / 2;
+  return {
+    width,
+    height,
+    background: { type: 'color', color: 'background' },
+    layers: [
+      { id: 'names', kind: 'text', frame: at(30 * u, mid - 110 * u, 330 * u, 130 * u), content: NAMES, style: { font: 'script', size: 46 * u, color: 'primary', lineHeight: 1.08 }, overflow: 'shrink', animation: { entrance: 'fadeUp' } },
+      { id: 'rule', kind: 'shape', shape: 'line', frame: at(165 * u, mid + 36 * u, 60 * u, 2 * u), fill: { type: 'color', color: 'secondary' }, stroke: { width: Math.max(1, u), color: 'secondary' }, animation: { entrance: 'fade', delaySec: 0.2 } },
+      { id: 'date', kind: 'text', frame: at(30 * u, mid + 52 * u, 330 * u, 24 * u), content: { binding: 'event.startDate', format: 'dateWithWeekday' }, style: { font: 'body', size: 14 * u, weight: 500, color: 'muted', letterSpacing: 0.12, transform: 'upper' }, overflow: 'shrink', animation: { entrance: 'fadeUp', delaySec: 0.3 } },
+    ],
+  };
+}
+
+/** A function's board: its name and its date, time and venue (repeated once per function). */
+function functionBoard(width: number, height: number) {
+  const u = width / 390;
+  const top = (height - 300 * u) / 2;
+  return {
+    width,
+    height,
+    background: { type: 'color', color: 'surface' },
+    layers: [
+      { id: 'name', kind: 'text', frame: at(30 * u, top, 330 * u, 56 * u), content: { binding: 'function.name' }, style: { font: 'heading', size: 32 * u, color: 'text', lineHeight: 1.1 }, overflow: 'shrink', animation: { entrance: 'fadeUp' } },
+      { id: 'details', kind: 'widget', frame: at(36 * u, top + 76 * u, 318 * u, 190 * u), widget: { type: 'details', rows: ['date', 'time', 'venue'], icons: true, iconColor: 'primary', iconCircle: 'background', labelColor: 'muted', valueColor: 'text', labelSize: 9 * u, valueSize: 15 * u, font: 'body', dividers: true, dividerColor: 'muted' }, animation: { entrance: 'fadeUp', delaySec: 0.2 } },
+    ],
+  };
+}
+
+/** Blank canvas boards (ADR-075): a website's opening and function card, or a film's or card's scenes on its frame. */
+function canvasStarter(type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', format: (typeof CARD_FORMATS)[number] | undefined) {
+  if (type === 'WEBSITE') {
+    return {
+      website: {
+        pages: [
+          {
+            id: 'home',
+            sections: [
+              { id: 'hero', section: 'canvas', canvas: { mobile: openingBoard(390, 844), desktopMaxWidth: 480, repeatPerFunction: false } },
+              { id: 'functions', section: 'canvas', canvas: { mobile: functionBoard(390, 520), desktopMaxWidth: 520, repeatPerFunction: true } },
+              { id: 'rsvp', section: 'rsvp' },
+              { id: 'footer', section: 'footer' },
+            ],
+          },
+        ],
+      },
+    };
+  }
+  const frame = type === 'VIDEO' ? CARD_FRAMES.story : CARD_FRAMES[format ?? 'portrait'];
+  // Scenes are drawn 450 wide, in the shape of the frame (the film board).
+  const board = { width: 450, height: Math.round((450 * frame.height) / frame.width) };
+  const scene = (id: string, durationSec: number, b: object, extra: object = {}) => ({ id, durationSec, background: 'background', transition: 'fade', canvas: { board: b, stagger: 0.14, camera: type === 'VIDEO' ? 'push' : 'still', intensity: type === 'VIDEO' ? 0.6 : 0 }, elements: [], ...extra });
+  return {
+    canvas: { ...frame, fps: 30 },
+    scenes:
+      type === 'VIDEO'
+        ? [scene('opening', 5, openingBoard(board.width, board.height)), scene('function', 5, functionBoard(board.width, board.height), { repeatPerFunction: true })]
+        : [scene('card', 1, openingBoard(board.width, board.height))],
+  };
+}
+
 /** A minimal, valid starting point for a new template of each type. */
-function starter(key: string, name: string, type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD'): unknown {
+export function starter(key: string, name: string, type: 'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD', start: 'canvas' | 'classic' = 'classic', format?: (typeof CARD_FORMATS)[number]): unknown {
   const base = {
     schemaVersion: 1 as const,
     templateKey: key,
@@ -73,6 +152,7 @@ function starter(key: string, name: string, type: 'WEBSITE' | 'VIDEO' | 'DIGITAL
     fonts: FONTS,
     capabilities: { editable: { colors: true, text: true }, textSlots: [{ key: 'tagline', label: 'Tagline', maxLength: 80 }] },
   };
+  if (start === 'canvas') return { ...base, ...canvasStarter(type, format) };
   if (type === 'WEBSITE') {
     return {
       ...base,
@@ -146,7 +226,7 @@ export class AdminTemplatesService {
 
   async create(adminId: string, input: CreateTemplateInput, meta: RequestMeta) {
     if (await this.prisma.template.findUnique({ where: { key: input.key } })) throw new AppError('CONFLICT', 'A template with this key exists.');
-    let definition: unknown = starter(input.key, input.name, input.type);
+    let definition: unknown = starter(input.key, input.name, input.type, input.start, input.format);
     if (input.fromTemplateKey) {
       const source = await this.prisma.template.findUnique({ where: { key: input.fromTemplateKey }, include: { currentVersion: true } });
       if (!source?.currentVersion) throw AppError.notFound('Source template');

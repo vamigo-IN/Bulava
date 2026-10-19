@@ -1,9 +1,10 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, Palette, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { CAMERA_MOVES, EFFECTS, ElementSchema, SCENE_NAMES, type Scene } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
+import { addPage } from '../canvas-editor/pages';
 import { Badge, Button, Card, CardTitle, Checkbox, Field, Input, Label, Select } from '../ui';
 import { EditError, firstIssue, JsonField, type EditorProps } from './common';
 
@@ -11,13 +12,8 @@ const BACKGROUNDS = ['background', 'surface', 'primary', 'secondary', 'accent', 
 const TRANSITIONS = ['none', 'fade', 'slide', 'wipe'] as const;
 const ElementsSchema = ElementSchema.array().max(40);
 
-function uniqueId(base: string, taken: Set<string>): string {
-  let i = taken.size + 1;
-  while (taken.has(`${base}-${i}`)) i += 1;
-  return `${base}-${i}`;
-}
-
-export function ScenesTab({ definition, edit }: EditorProps) {
+/** The scenes of a film or an image card: their timing and look here, their boards in the Design Studio. */
+export function ScenesTab({ definition, edit, onOpenDesign }: EditorProps & { onOpenDesign: (sceneId: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(definition.scenes?.[0]?.id ?? null);
   const scenes = definition.scenes ?? [];
@@ -54,12 +50,11 @@ export function ScenesTab({ definition, edit }: EditorProps) {
             variant="secondary"
             disabled={isCard && scenes.length >= 1}
             onClick={() => {
-              const id = uniqueId('scene', new Set(scenes.map((s) => s.id)));
-              run((d) => {
-                const scene: Scene = { id, durationSec: 3, background: 'background', transition: 'fade', repeatPerFunction: false, particles: 'none', elements: [] };
-                d.scenes = [...(d.scenes ?? []), scene];
-              });
-              setOpen(id);
+              // A new scene is an empty board, drawn in the Design Studio.
+              let page = '';
+              const failed = edit((d) => void (page = addPage(d, null)));
+              setError(failed);
+              if (!failed) setOpen(page.slice('scene:'.length));
             }}
           >
             <Plus className="size-3.5" /> {t('scenes.add')}
@@ -76,8 +71,12 @@ export function ScenesTab({ definition, edit }: EditorProps) {
                     <span className="font-mono text-sm font-medium">{scene.id}</span>
                     <span className="text-xs text-stone-500">{scene.durationSec}s</span>
                     {scene.repeatPerFunction ? <Badge tone="brand">×fn</Badge> : null}
-                    <Badge>{scene.elements.length}</Badge>
+                    {scene.canvas ? <Badge tone="brand">{t('scenes.onCanvas')}</Badge> : null}
+                    <Badge>{scene.canvas ? scene.canvas.board.layers.length : scene.elements.length}</Badge>
                   </button>
+                  <Button size="sm" variant="ghost" onClick={() => onOpenDesign(scene.id)}>
+                    <Palette className="size-4" /> {t('scenes.design')}
+                  </Button>
                   <Button size="icon" variant="ghost" aria-label={t('sections.moveUp')} disabled={i === 0} onClick={() => run((d) => move(d.scenes!, i, -1))}>
                     <ArrowUp className="size-4" />
                   </Button>
@@ -217,21 +216,25 @@ export function ScenesTab({ definition, edit }: EditorProps) {
                         onChange={(e) => run((d) => void (d.scenes![i]!.repeatPerFunction = e.target.checked))}
                       />
                     ) : null}
-                    <div>
-                      <Label>{t('scenes.elements')}</Label>
-                      <p className="mb-2 text-xs text-stone-500">{t('scenes.elementsHint')}</p>
-                      <JsonField
-                        key={JSON.stringify(scene.elements)}
-                        label={t('scenes.elements')}
-                        value={scene.elements}
-                        rows={18}
-                        onCommit={(parsed) => {
-                          const check = ElementsSchema.safeParse(parsed);
-                          if (!check.success) return firstIssue(check.error);
-                          return edit((d) => void (d.scenes![i]!.elements = check.data));
-                        }}
-                      />
-                    </div>
+                    {scene.canvas ? (
+                      <p className="text-xs text-stone-600">{t('scenes.canvasHint')}</p>
+                    ) : (
+                      <div>
+                        <Label>{t('scenes.elements')}</Label>
+                        <p className="mb-2 text-xs text-stone-500">{t('scenes.elementsHint')}</p>
+                        <JsonField
+                          key={JSON.stringify(scene.elements)}
+                          label={t('scenes.elements')}
+                          value={scene.elements}
+                          rows={18}
+                          onCommit={(parsed) => {
+                            const check = ElementsSchema.safeParse(parsed);
+                            if (!check.success) return firstIssue(check.error);
+                            return edit((d) => void (d.scenes![i]!.elements = check.data));
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </li>

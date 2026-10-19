@@ -1,6 +1,6 @@
 'use client';
 
-import { Component, Eye, EyeOff, Flower2, GripVertical, Image as ImageIcon, Landmark, LayoutTemplate, Lock, LockOpen, Shapes, Sparkles, Type, type LucideIcon } from 'lucide-react';
+import { Component, Eye, EyeOff, Flower2, GripVertical, Image as ImageIcon, Landmark, LayoutTemplate, Link2, Lock, LockOpen, Shapes, Sparkles, Type, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { Artboard, Layer } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
@@ -11,9 +11,10 @@ const KIND_ICON: Record<Layer['kind'], LucideIcon> = { text: Type, image: ImageI
 
 /**
  * The layer list, top-most first (as drawn). Drag a row to reorder, click to
- * select; the eye and lock toggles keep a layer out of the way while working.
+ * select (Shift or Ctrl-click adds to the selection); the eye and lock toggles
+ * keep a layer out of the way while working. Grouped layers carry a link mark.
  */
-export function LayersPanel({ board, selectedId, onSelect, onChange }: { board: Artboard; selectedId: string | null; onSelect: (id: string | null) => void; onChange: (board: Artboard) => void }) {
+export function LayersPanel({ board, selection, onSelect, onChange }: { board: Artboard; selection: readonly string[]; onSelect: (id: string, add: boolean) => void; onChange: (board: Artboard) => void }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const layers = [...board.layers].reverse();
@@ -37,7 +38,7 @@ export function LayersPanel({ board, selectedId, onSelect, onChange }: { board: 
     <ol className="py-1" aria-label={t('canvas.layers')}>
       {layers.map((layer) => {
         const Icon = KIND_ICON[layer.kind];
-        const selected = layer.id === selectedId;
+        const selected = selection.includes(layer.id);
         return (
           <li
             key={layer.id}
@@ -64,9 +65,10 @@ export function LayersPanel({ board, selectedId, onSelect, onChange }: { board: 
             className={cn('group flex items-center gap-1 border-l-2 px-2 py-1 text-xs', selected ? 'border-brand-600 bg-brand-50' : 'border-transparent hover:bg-stone-50', over === layer.id && dragging !== layer.id ? 'border-t border-t-brand-400' : '', layer.hidden ? 'opacity-50' : '')}
           >
             <GripVertical className="size-3.5 shrink-0 cursor-grab text-stone-300" aria-hidden />
-            <button type="button" onClick={() => onSelect(layer.id)} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+            <button type="button" onClick={(e) => onSelect(layer.id, e.shiftKey || e.ctrlKey || e.metaKey)} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
               <Icon className="size-3.5 shrink-0 text-stone-500" aria-hidden />
               <span className="truncate">{layerLabel(layer)}</span>
+              {layer.group ? <Link2 className="size-3 shrink-0 text-brand-600" aria-label={t('design.grouped')} /> : null}
             </button>
             <button type="button" className={cn('rounded p-1 text-stone-400 hover:text-stone-700', layer.hidden ? '' : 'opacity-0 group-hover:opacity-100 focus:opacity-100')} aria-label={layer.hidden ? t('canvas.show') : t('canvas.hide')} aria-pressed={layer.hidden} onClick={() => toggle(layer.id, 'hidden')}>
               {layer.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}

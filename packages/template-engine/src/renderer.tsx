@@ -26,6 +26,7 @@ import { Hero } from './sections/hero';
 import { Countdown, Footer, Gallery, PhotoShare, Rsvp } from './sections/misc';
 import { EventTimeline, Venue } from './sections/schedule';
 import { Menu, Quote } from './sections/signature';
+import { coverMonogram } from './covers';
 import { initials } from './sections/shared';
 import { CanvasSection } from './canvas/section';
 import { themeStyle } from './theme';
@@ -186,9 +187,13 @@ export function TemplateRenderer({ definition: template, context, customization,
             seal: t('template.intro.seal'),
             scratch: t('template.intro.scratch'),
             reveal: t('template.intro.reveal'),
+            zipper: t('template.intro.zipper'),
+            ribbon: t('template.intro.ribbon'),
           }}
           revealText={ctx.event.startDate ? formatEventDateWithWeekday(ctx.event.startDate, { language, timeZone }) : undefined}
           storageKey={`bulava-intro:${introKey ?? definition.templateKey}`}
+          colors={colors}
+          coverMonogram={coverMonogram(ctx.couple, initials(ctx.couple ? `${ctx.couple.partnerOne} & ${ctx.couple.partnerTwo}` : (ctx.honoree?.name ?? ctx.event.title)))}
         />
       ) : null}
       {mode === 'live' && ctx.music?.url ? (

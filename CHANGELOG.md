@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Invitations you pull open, and a design studio for our team
+
+- **Pull to open.** Four new designs feel like stationery in the hand. Guests unzip *Olive Zip*'s linen pouch by its blush tag and *Noir Zip*'s black-tie clutch by its tag, untie *Satin Bow*'s ribbon, and open *Velvet Seal* from under its wax seal. Each comes in four colourways and has a film that opens the same way.
+- **Zippers, ribbons, bows and seals** join the illustrations every canvas design can use, in the design's own colours.
+- **The Design Studio** (for our team): templates, cards and films designed the way Canva works. Every page sits along the foot, and elements can be searched or dragged on. Several layers can be picked at once to align, group, copy and paste between pages, and words are typed on the page. New templates can start as a blank canvas in the size you need: a website, a 9:16 film, or a card in portrait, square, story or landscape.
+- **Bring designs in** (for our team): PDF, SVG, Photoshop and PowerPoint files from Canva, Figma, Illustrator, Photoshop, CorelDRAW, Keynote or Google Slides come in as pages. Their words stay editable, and their pictures go to the library with their licence.
+
 ### Messages that follow up, on WhatsApp and by email
 
 - **Registered? Straight to your invitation.** After registering on an event's page, guests go straight to their own invitation, and get a confirmation with the date, time, venue and their personal link by email and on WhatsApp.

@@ -15,7 +15,7 @@ import {
   type TemplateDefinition,
   type ThemeColors,
 } from '@bulava/template-schema';
-import { Bell, Crescent, Diya, fontStack, initials, Kalash, Lantern, MarigoldStrand, Ornament, PeacockFeather, Toran } from '@bulava/template-engine';
+import { Bell, coverMonogram, Crescent, Diya, easeInOut, fontStack, initials, Kalash, Lantern, MarigoldStrand, Ornament, PeacockFeather, RibbonCover, Toran, ZipperCover } from '@bulava/template-engine';
 import { Particles, SceneBackdrop } from './backdrop';
 import { CanvasScene } from './canvas-scene';
 import { fitFontSize } from './fit';
@@ -281,6 +281,38 @@ function VideoOrnament({ name }: { name: string }) {
   }
 }
 
+/** A scene's cover (ADR-074): held, pulled open, then moved off, in seconds from the scene's start. */
+export const REVEAL_TIMING = { hold: 0.7, pull: 1.9, release: 0.7 } as const;
+/** When the scene's own layers start to come in under a cover: as it opens. */
+export const REVEAL_CONTENT_DELAY = REVEAL_TIMING.hold + REVEAL_TIMING.pull * 0.25;
+
+/** A triangle wave in [-1, 1]: the tag's swing, from the frame alone. */
+const swingAt = (t: number) => 1 - 4 * Math.abs(t - Math.floor(t) - 0.5);
+
+function SceneReveal({ reveal, ctx, colors, definition }: { reveal: Exclude<Scene['reveal'], 'none'>; ctx: RenderContext; colors: ThemeColors; definition: TemplateDefinition }) {
+  const frame = useCurrentFrame();
+  const { fps, width, height } = useVideoConfig();
+  const { hold, pull, release } = REVEAL_TIMING;
+  const progress = easeInOut(interpolate(frame, [hold * fps, (hold + pull) * fps], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }));
+  const gone = interpolate(frame, [(hold + pull) * fps, (hold + pull + release) * fps], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  if (gone >= 1) return null;
+  const names = ctx.couple ? `${ctx.couple.partnerOne} & ${ctx.couple.partnerTwo}` : (ctx.honoree?.name ?? ctx.event.title);
+  const Cover = reveal === 'zipper' ? ZipperCover : RibbonCover;
+  return (
+    <Cover
+      progress={progress}
+      release={gone}
+      width={width}
+      height={height}
+      colors={colors}
+      monogram={coverMonogram(ctx.couple, initials(names))}
+      script={fontStack(definition.fonts.script ?? definition.fonts.heading, definition.fonts.script ? 'cursive' : 'serif')}
+      heading={fontStack(definition.fonts.heading, 'serif')}
+      swing={progress > 0 ? 0 : 3 * swingAt(frame / (fps * 3.4))}
+    />
+  );
+}
+
 function SceneView({ planned, colors, definition, language }: { planned: PlannedScene; colors: ThemeColors; definition: TemplateDefinition; language: string }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -295,7 +327,19 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
   const canvas = planned.scene.canvas;
   // A board without a background is words and art over the scene (a host's redrawn scene): it goes over the particles, as elements do.
   const overlay = canvas?.board.background.type === 'none';
-  const board = canvas ? <CanvasScene canvas={canvas} ctx={planned.ctx} colors={colors} fonts={definition.fonts} theme={definition.theme} language={language} frames={planned.frames} /> : null;
+  const reveal = planned.scene.reveal;
+  const board = canvas ? (
+    <CanvasScene
+      canvas={canvas}
+      ctx={planned.ctx}
+      colors={colors}
+      fonts={definition.fonts}
+      theme={definition.theme}
+      language={language}
+      frames={planned.frames}
+      offsetSec={reveal !== 'none' ? REVEAL_CONTENT_DELAY : 0}
+    />
+  ) : null;
   return (
     <AbsoluteFill style={{ background, opacity }}>
       {backdrop ? (
@@ -319,6 +363,7 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
           ))}
         </Stage>
       ) : null}
+      {reveal !== 'none' ? <SceneReveal reveal={reveal} ctx={planned.ctx} colors={colors} definition={definition} /> : null}
     </AbsoluteFill>
   );
 }

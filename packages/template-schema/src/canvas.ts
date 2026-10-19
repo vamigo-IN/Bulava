@@ -95,6 +95,11 @@ const base = {
   locked: z.boolean().default(false),
   /** Kept in the design but not rendered. */
   hidden: z.boolean().default(false),
+  /** Editor only: layers that share a group are picked, moved and resized together. */
+  group: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,40}$/)
+    .optional(),
   visibleWhen: ConditionSchema.optional(),
   animation: LayerAnimationSchema.default({ entrance: 'none', delaySec: 0, durationSec: 0.8, motion: 'none' }),
   blend: z.enum(BLEND_MODES).default('normal'),
@@ -267,6 +272,13 @@ export const ILLUSTRATIONS = [
   'lancetWindow',
   'lilies',
   'weddingBells',
+  // The atelier's haberdashery (illustrations-atelier.tsx, ADR-074): tactile invitations of linen, satin and wax.
+  'zipper',
+  'zipperPull',
+  'scallopTag',
+  'satinRibbon',
+  'satinBow',
+  'waxSeal',
 ] as const;
 export type IllustrationName = (typeof ILLUSTRATIONS)[number];
 

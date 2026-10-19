@@ -130,9 +130,12 @@ function PreviewOpening({
           seal: tr('template.intro.seal'),
           scratch: tr('template.intro.scratch'),
           reveal: tr('template.intro.reveal'),
+          zipper: tr('template.intro.zipper'),
+          ribbon: tr('template.intro.ribbon'),
         }}
         revealText={ctx.event.startDate ? formatEventDateWithWeekday(ctx.event.startDate, { language, timeZone: ctx.event.timezone }) : undefined}
         storageKey={`bulava-preview-intro:${definition.templateKey}:${Date.now()}`}
+        colors={definition.theme.colors}
       />
     </div>
   );

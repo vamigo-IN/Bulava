@@ -14,20 +14,20 @@ import { at, b, lit, orn, photo, sec, shape, t, text, widget, type CanvasSpec, t
  * card drops the buttons and keeps the words.
  */
 
-type Role = 'primary' | 'secondary' | 'accent' | 'background' | 'surface' | 'text' | 'muted';
+export type Role = 'primary' | 'secondary' | 'accent' | 'background' | 'surface' | 'text' | 'muted';
 
 /** The couple's initials ("R & A"), or the honoree's, or the event's. */
-const MONOGRAM: Value = {
+export const MONOGRAM: Value = {
   template: '{{couple.partnerOne|initial}} & {{couple.partnerTwo|initial}}',
   fallback: { binding: 'honoree.name', format: 'initial', fallback: { binding: 'event.title', format: 'initial' } },
 };
 
 /** "Rambagh Palace, Jaipur", or whichever of the two the host gave. */
-const VENUE_LINE: Value = { template: '{{venue.name}}, {{venue.city}}', fallback: { binding: 'venue.name', fallback: b('venue.city') } };
+export const VENUE_LINE: Value = { template: '{{venue.name}}, {{venue.city}}', fallback: { binding: 'venue.name', fallback: b('venue.city') } };
 
 // ─────────────────────────── Shared pieces ───────────────────────────
 
-interface RsvpStyle {
+export interface RsvpStyle {
   /** Centre of the block and the top of the pill. */
   cx: number;
   y: number;
@@ -50,7 +50,7 @@ interface RsvpStyle {
  * A pill reading RSVP over a panel with Accept | Decline. On websites each of
  * the three is a button to the RSVP form; on a card the printed words stay.
  */
-function rsvpBlock(s: RsvpStyle): LayerInput[] {
+export function rsvpBlock(s: RsvpStyle): LayerInput[] {
   const k = s.scale ?? 1;
   const d = s.delay ?? 0.7;
   const pw = 124 * k;
@@ -80,7 +80,7 @@ function rsvpBlock(s: RsvpStyle): LayerInput[] {
   ];
 }
 
-interface TimelineStyle {
+export interface TimelineStyle {
   /** The three columns' centres, the top of the names row and the column width. */
   xs: [number, number, number];
   y: number;
@@ -109,7 +109,7 @@ interface TimelineStyle {
  * line with a dot for each and their dates below. A function that is missing
  * hides its column and the line that leads to it.
  */
-function timeline(s: TimelineStyle): LayerInput[] {
+export function timeline(s: TimelineStyle): LayerInput[] {
   const k = s.scale ?? 1;
   const d = s.delay ?? 0.85;
   const lineY = s.y + 36 * k;
@@ -132,7 +132,7 @@ function timeline(s: TimelineStyle): LayerInput[] {
   return out;
 }
 
-interface ButtonStyle {
+export interface ButtonStyle {
   /** The filled button's colour and its lettering; the outlined one is drawn in `fill`. */
   fill: Role;
   ink: Role;
@@ -352,7 +352,7 @@ const zariCard: ArtboardInput = {
 
 // ─────────────────────────── A card for every function ───────────────────────────
 
-interface FnStyle {
+export interface FnStyle {
   height: number;
   background: NonNullable<ArtboardInput['background']>;
   texture: NonNullable<ArtboardInput['texture']>;
@@ -376,7 +376,7 @@ interface FnStyle {
 }
 
 /** One function's card: its name, a line about it, the date and time, the venue and address, directions and the calendar. */
-function fnCard(s: FnStyle): ArtboardInput {
+export function fnCard(s: FnStyle): ArtboardInput {
   const y = s.top;
   return {
     width: 390,
@@ -991,9 +991,9 @@ const sangeetCard = fnCard({
 
 // ─────────────────────────── The collection ───────────────────────────
 
-const COUPLE_SLOTS: CanvasSpec['slots'] = ['tagline', 'story', 'partnerOneParents', 'partnerTwoParents', 'hashtag', 'closing'];
-const COUPLE_PHOTOS: CanvasSpec['photoSlots'] = ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing'];
-const coupleMiddle = (couple: string, story: string, gallery: string): CanvasSpec['middle'] => [
+export const COUPLE_SLOTS: CanvasSpec['slots'] = ['tagline', 'story', 'partnerOneParents', 'partnerTwoParents', 'hashtag', 'closing'];
+export const COUPLE_PHOTOS: CanvasSpec['photoSlots'] = ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing'];
+export const coupleMiddle = (couple: string, story: string, gallery: string): CanvasSpec['middle'] => [
   { id: 'couple', section: 'couple', variant: couple, props: { partnerOneParents: b('custom.partnerOneParents'), partnerTwoParents: b('custom.partnerTwoParents') } },
   { id: 'story', section: 'story', variant: story, props: { text: b('custom.story'), image: b('photo.story', { fallback: b('photos[1]') }) } },
   { id: 'gallery', section: 'gallery', variant: gallery },

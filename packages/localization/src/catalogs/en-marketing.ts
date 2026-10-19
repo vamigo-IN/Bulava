@@ -152,6 +152,8 @@ export const enMarketing = {
   'intro.name.petals': 'a shower of petals',
   'intro.name.celestial': 'a starry night',
   'intro.name.scratch': 'a scratch-to-reveal card',
+  'intro.name.zipper': 'a zipper to pull open',
+  'intro.name.ribbon': 'a satin ribbon to untie',
   'home.spotlight.eyebrow': 'Spotlight',
   'home.spotlight.point2': 'One page per guest, showing only their functions',
   'home.spotlight.point3': 'Per-function RSVP with headcount and meal choice',

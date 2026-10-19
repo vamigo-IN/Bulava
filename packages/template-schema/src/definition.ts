@@ -50,7 +50,7 @@ export type CameraMove = (typeof CAMERA_MOVES)[number];
 export const PHOTO_SLOTS = ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing'] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 /** Opening animations played before a website invitation is revealed. */
-export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch'] as const;
+export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch', 'zipper', 'ribbon'] as const;
 export type IntroName = (typeof INTROS)[number];
 
 /** A suite's pieces a theme swaps (base.ts SUITE_*): no defaults, so an omitted piece stays the suite's own. */
@@ -286,6 +286,10 @@ export const SceneCanvasSchema = z.object({
 });
 export type SceneCanvas = z.infer<typeof SceneCanvasSchema>;
 
+/** How a film's scene can open, like its invitation's website (ADR-074): a zipper pulled open, a satin ribbon untied. */
+export const SCENE_REVEALS = ['none', 'zipper', 'ribbon'] as const;
+export type SceneReveal = (typeof SCENE_REVEALS)[number];
+
 export const SceneSchema = z.object({
   id,
   durationSec: z.number().min(0.5).max(60),
@@ -311,6 +315,8 @@ export const SceneSchema = z.object({
   particles: z.enum(EFFECTS).default('none'),
   /** A canvas artboard filmed in this scene, under the elements. */
   canvas: SceneCanvasSchema.optional(),
+  /** The scene opens under a cover the film pulls away over its first seconds (its words come in as it opens). */
+  reveal: z.enum(SCENE_REVEALS).default('none'),
   elements: z.array(ElementSchema).max(40),
 });
 export type Scene = z.infer<typeof SceneSchema>;

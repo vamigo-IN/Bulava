@@ -1,6 +1,7 @@
 import type { ArtboardInput, LayerInput } from '@bulava/template-schema';
 import { palette, TITLE } from './builder';
 import { CARD_SPECS } from './canvas-cards';
+import { ATELIER_SPECS } from './atelier';
 import { BLANK_SPEC } from './blank';
 import { at, b, canvasWebsite, eyebrows, t, text, type CanvasSpec } from './canvas-kit';
 import { FACTORY_SPECS } from './factory/collection';
@@ -268,10 +269,10 @@ export function foldLookalikes(specs: CanvasSpec[], lookalikes: Readonly<Record<
 }
 
 /** Sort after the standard website templates (index.ts passes the offset); the blank canvas comes last, so no other template moves. */
-export const canvasTemplates = (offset: number) => [...foldLookalikes([...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]), BLANK_SPEC].map((spec, i) => canvasWebsite(spec, offset + i));
+export const canvasTemplates = (offset: number) => [...foldLookalikes([...ATELIER_SPECS, ...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS]), BLANK_SPEC].map((spec, i) => canvasWebsite(spec, offset + i));
 
 /**
  * The canvas designs retired from the website catalog as lookalikes (lookalikes.ts). A film made
  * from one (canvas-films.ts) is a product of its own and stays: films are built from these too.
  */
-export const retiredCanvasDesigns = () => [...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS].filter((spec) => LOOKALIKES[spec.key]).map((spec) => canvasWebsite(spec, 0));
+export const retiredCanvasDesigns = () => [...ATELIER_SPECS, ...PREMIUM_SPECS, ...SPECS, ...CARD_SPECS, ...FACTORY_SPECS].filter((spec) => LOOKALIKES[spec.key]).map((spec) => canvasWebsite(spec, 0));

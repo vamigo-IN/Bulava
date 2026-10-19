@@ -1,14 +1,15 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { Archive, ArrowLeft, EyeOff, Rocket, Save, ShieldCheck } from 'lucide-react';
+import { Archive, ArrowLeft, EyeOff, Palette, Rocket, Save, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TemplateDefinitionSchema, validateTemplateDefinition, type TemplateDefinition } from '@bulava/template-schema';
 import { ApiError, apiPost, apiPut, errorMessage } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import type { CheckReport, TemplateDetail } from '@/lib/types';
-import { CanvasEditor } from '../canvas-editor/editor';
+import { DesignStudio } from '../canvas-editor/editor';
+import { pageId } from '../canvas-editor/pages';
 import { useInvalidate } from '../shell';
 import { Alert, Badge, Button, statusTone, Tabs } from '../ui';
 import { ArtworkTab } from './artwork-tab';
@@ -38,8 +39,8 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
   const [tab, setTab] = useState<TabKey>('theme');
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string; items?: string[] } | null>(null);
   const [report, setReport] = useState<CheckReport | null>(null);
-  /** The canvas section open in the full-screen editor. */
-  const [canvasId, setCanvasId] = useState<string | null>(null);
+  /** The Design Studio, open on a page (`section:<id>`, `scene:<id>`; null: the first). */
+  const [design, setDesign] = useState<{ page: string | null } | null>(null);
   /** Bumped on every local change so the preview retries after a render error. */
   const [revision, setRevision] = useState(0);
   const dirtyRef = useRef(dirty);
@@ -49,6 +50,15 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
   useEffect(() => {
     if (!dirtyRef.current) setDraft(parseStored(working.definition));
   }, [working.id, working.definition]);
+
+  // A template made from a blank canvas opens in the Design Studio (`?design=1` from the create form).
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('design') !== '1') return;
+    setDesign({ page: null });
+    url.searchParams.delete('design');
+    window.history.replaceState(null, '', url);
+  }, []);
 
   // Warn before leaving the page with unsaved edits.
   useEffect(() => {
@@ -141,6 +151,9 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setDesign({ page: null })} disabled={!draft}>
+              <Palette className="size-4" /> {t('design.open')}
+            </Button>
             <Button variant="secondary" onClick={() => save.mutate()} disabled={!dirty || !draft || busy}>
               <Save className="size-4" /> {save.isPending ? t('common.saving') : t('studio.saveDraft')}
             </Button>
@@ -227,7 +240,13 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
           {!draft && tab !== 'json' && tab !== 'versions' ? <Alert>{t('studio.invalid', { count: 1 })}</Alert> : null}
           {draft && tab === 'details' ? <DetailsTab template={template} definition={draft} edit={edit} /> : null}
           {draft && tab === 'theme' ? <ThemeTab definition={draft} edit={edit} /> : null}
-          {draft && tab === 'layout' ? isWebsite ? <SectionsTab definition={draft} edit={edit} onOpenCanvas={setCanvasId} /> : <ScenesTab definition={draft} edit={edit} /> : null}
+          {draft && tab === 'layout' ? (
+            isWebsite ? (
+              <SectionsTab definition={draft} edit={edit} onOpenCanvas={(id) => setDesign({ page: pageId('section', id) })} />
+            ) : (
+              <ScenesTab definition={draft} edit={edit} onOpenDesign={(id) => setDesign({ page: pageId('scene', id) })} />
+            )
+          ) : null}
           {draft && tab === 'artwork' ? <ArtworkTab definition={draft} edit={edit} /> : null}
           {draft && tab === 'capabilities' ? <CapabilitiesTab definition={draft} edit={edit} /> : null}
           {tab === 'json' ? (
@@ -251,7 +270,7 @@ export function Studio({ detail }: { detail: TemplateDetail }) {
         </aside>
       </div>
 
-      {draft && canvasId ? <CanvasEditor definition={draft} sectionId={canvasId} edit={edit} onClose={() => setCanvasId(null)} onSave={() => save.mutate()} saving={save.isPending} dirty={dirty} /> : null}
+      {draft && design ? <DesignStudio definition={draft} pageId={design.page} edit={edit} onClose={() => setDesign(null)} onSave={() => save.mutate()} saving={save.isPending} dirty={dirty} /> : null}
     </div>
   );
 }

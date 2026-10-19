@@ -288,6 +288,8 @@ const core = {
   'template.intro.seal': 'Tap to break the seal',
   'template.intro.scratch': 'Scratch to reveal',
   'template.intro.reveal': 'Reveal',
+  'template.intro.zipper': 'Pull the tag to open',
+  'template.intro.ribbon': 'Pull the ribbon to open',
   'template.music.play': 'Play music',
   'template.music.pause': 'Pause music',
   'template.menu.title': 'The Menu',

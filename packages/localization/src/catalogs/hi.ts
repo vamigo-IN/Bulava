@@ -275,6 +275,8 @@ export const hi: Catalog = {
   'template.intro.seal': 'मुहर खोलने के लिए टैप करें',
   'template.intro.scratch': 'खुरचकर देखें',
   'template.intro.reveal': 'देखें',
+  'template.intro.zipper': 'खोलने के लिए टैग नीचे खींचें',
+  'template.intro.ribbon': 'खोलने के लिए रिबन खींचें',
   'template.music.play': 'संगीत चलाएँ',
   'template.music.pause': 'संगीत रोकें',
   'template.menu.title': 'भोज सूची',

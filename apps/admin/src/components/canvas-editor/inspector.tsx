@@ -5,6 +5,7 @@ import {
   BINDINGS,
   BLEND_MODES,
   BUTTON_ACTIONS,
+  CAMERA_MOVES,
   CANVAS_SCENES,
   EFFECTS,
   ICONS,
@@ -13,6 +14,7 @@ import {
   LAYER_MOTIONS,
   ORNAMENT_LAYERS,
   ORNAMENT_SHADOWS,
+  SCENE_REVEALS,
   SHAPES,
   TEXT_SHADOWS,
   TEXT_TRANSFORMS,
@@ -23,6 +25,7 @@ import {
   type ImageLayer,
   type Layer,
   type OrnamentLayer,
+  type Scene,
   type SceneLayer,
   type ShapeLayer,
   type TextLayer,
@@ -42,7 +45,8 @@ type ButtonWidget = Extract<WidgetLayer['widget'], { type: 'button' }>;
 type DetailsWidget = Extract<WidgetLayer['widget'], { type: 'details' }>;
 
 export interface InspectorProps {
-  canvas: CanvasSection;
+  /** A website's canvas section (its phone and desktop boards); absent on a film's scene. */
+  canvas?: CanvasSection;
   device: 'mobile' | 'desktop';
   board: Artboard;
   layer: Layer | null;
@@ -50,7 +54,12 @@ export interface InspectorProps {
   textSlots: Array<{ key: string; label: string }>;
   onLayer: (mutate: (layer: Layer) => void) => void;
   onBoard: (mutate: (board: Artboard) => void) => void;
-  onCanvas: (mutate: (canvas: CanvasSection) => void) => void;
+  onCanvas?: (mutate: (canvas: CanvasSection) => void) => void;
+  /** A film's or a card's scene (its length, transition, camera…); absent on a website. */
+  scene?: Scene;
+  onScene?: (mutate: (scene: Scene) => void) => void;
+  /** Layers picked besides `layer` (the Design Studio picks several). */
+  selectionCount?: number;
   onPickAsset: (cb: (assetId: string) => void) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -63,7 +72,30 @@ export function Inspector(p: InspectorProps) {
   return <LayerInspector {...p} layer={p.layer} />;
 }
 
-function BoardInspector({ canvas, device, board, colors, onBoard, onCanvas, onPickAsset }: InspectorProps) {
+const TRANSITIONS = ['none', 'fade', 'slide', 'wipe'] as const;
+
+/** A film's scene: how long it plays, how it comes in and opens, how the camera and its layers move. */
+function SceneSettings({ scene, onScene }: { scene: Scene; onScene: (mutate: (scene: Scene) => void) => void }) {
+  return (
+    <Group title={t('design.scene.settings')}>
+      <NumberField label={t('scenes.duration')} value={scene.durationSec} min={0.5} max={60} step={0.5} suffix="s" onChange={(n) => onScene((s) => void (s.durationSec = Math.round(n * 2) / 2))} />
+      <SelectField label={t('design.scene.transition')} value={scene.transition} onChange={(v) => onScene((s) => void (s.transition = v))} options={TRANSITIONS} />
+      <SelectField label={t('design.scene.reveal')} value={scene.reveal} onChange={(v) => onScene((s) => void (s.reveal = v))} options={SCENE_REVEALS.map((r) => ({ value: r, label: t(`design.scene.reveal.${r}`) }))} />
+      <SelectField label={t('design.scene.particles')} value={scene.particles} onChange={(v) => onScene((s) => void (s.particles = v))} options={EFFECTS} />
+      {scene.canvas ? (
+        <>
+          <SelectField label={t('design.scene.camera')} value={scene.canvas.camera} onChange={(v) => onScene((s) => void (s.canvas!.camera = v))} options={CAMERA_MOVES} />
+          <NumberField label={t('design.scene.intensity')} value={scene.canvas.intensity} min={0} max={3} step={0.1} onChange={(n) => onScene((s) => void (s.canvas!.intensity = n))} />
+          <NumberField label={t('design.scene.stagger')} value={scene.canvas.stagger} min={0} max={2} step={0.02} suffix="s" onChange={(n) => onScene((s) => void (s.canvas!.stagger = n))} />
+        </>
+      ) : null}
+      <ToggleField label={t('design.scene.perFunction')} checked={scene.repeatPerFunction} onChange={(v) => onScene((s) => void (s.repeatPerFunction = v))} />
+      <p className="text-[11px] text-stone-500">{t('design.scene.hint')}</p>
+    </Group>
+  );
+}
+
+function BoardInspector({ canvas, device, board, colors, onBoard, onCanvas, onPickAsset, scene, onScene }: InspectorProps) {
   return (
     <div>
       <Group title={t('canvas.artboard')}>
@@ -74,6 +106,8 @@ function BoardInspector({ canvas, device, board, colors, onBoard, onCanvas, onPi
         <SelectField label={t('canvas.texture')} value={board.texture} onChange={(texture) => onBoard((b) => void (b.texture = texture))} options={TEXTURES.map((x) => ({ value: x, label: t(`canvas.texture.${x}`) }))} />
         {board.texture !== 'none' ? <NumberField label={t('canvas.textureStrength')} value={board.textureStrength} min={0} max={1} step={0.05} onChange={(n) => onBoard((b) => void (b.textureStrength = n))} /> : null}
       </Group>
+      {scene && onScene ? <SceneSettings scene={scene} onScene={onScene} /> : null}
+      {canvas && onCanvas ? (
       <Group title={t('canvas.canvasSettings')}>
         <ToggleField label={t('canvas.repeat')} checked={canvas.repeatPerFunction} onChange={(v) => onCanvas((c) => void (c.repeatPerFunction = v))} />
         {canvas.desktop ? (
@@ -92,7 +126,8 @@ function BoardInspector({ canvas, device, board, colors, onBoard, onCanvas, onPi
         )}
         {device === 'desktop' ? <p className="text-[11px] text-stone-500">{t('canvas.device.desktop')}</p> : null}
       </Group>
-      <div className="px-3 py-3 text-[11px] leading-relaxed text-stone-500">{t('canvas.help')}</div>
+      ) : null}
+      <div className="px-3 py-3 text-[11px] leading-relaxed text-stone-500">{t('design.help')}</div>
     </div>
   );
 }

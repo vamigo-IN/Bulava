@@ -24,12 +24,31 @@ export { Effects } from './effects';
 export { Mandala, Paisley, FloralCorner, GeometricStar, Confetti, ArchFrame, TempleBorder, Ornament, Divider, PeacockPair } from './ornaments';
 export { Lotus, PeacockFeather, StarField, Laurel, Lantern, RoseWindow, GothicArch, SeaWaves, Crescent, CrestFrame, GateLeaf } from './ornaments-signature';
 export { INTRO_OPEN_EVENT, IntroOverlay, type IntroLabels, type IntroVariant } from './intro';
+export { coverMonogram, easeInOut, RibbonCover, ZipperCover, type CoverProps } from './covers';
 export type { RenderSlots, RenderMode, SectionProps } from './types';
 export { CanvasArtboard, type ArtboardMode, type CanvasArtboardProps } from './canvas/artboard';
 export { CardView, watermarkBandHeight, type CardViewProps } from './canvas/card';
 export { fillBackdrop, fillStyle, fontFamilyFor, resolveColor, solidHex, textInk } from './canvas/colors';
 export { Icon as CanvasIcon } from './canvas/icons';
-export { clampFrame, layerLabel, moveFrame, resizeFrame, rotationFor, snapLines, Stage, useHistory, type Guide, type HandleName } from './canvas/editing';
+export {
+  alignFrames,
+  boundsOf,
+  clampFrame,
+  distributeFrames,
+  frameBox,
+  layerLabel,
+  moveFrame,
+  resizeFrame,
+  rotationFor,
+  scaleFrame,
+  snapLines,
+  Stage,
+  touches,
+  useHistory,
+  type AlignMode,
+  type Guide,
+  type HandleName,
+} from './canvas/editing';
 export { Illustration, ILLUSTRATION_ASPECT, FRAME_SIZED, JHAROKHA_OPENING } from './art/illustrations';
 
 /**

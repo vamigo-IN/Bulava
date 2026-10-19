@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { IntroName } from '@bulava/template-schema';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import type { IntroName, ThemeColors } from '@bulava/template-schema';
+import { easeInOut, RibbonCover, ZipperCover, type CoverProps } from './covers';
 import { Crescent, GateLeaf, Lantern, StarField } from './ornaments-signature';
 
 export type IntroVariant = Exclude<IntroName, 'none'>;
@@ -20,7 +21,13 @@ const DURATION: Record<IntroVariant, number> = {
   petals: 2400,
   celestial: 1900,
   scratch: 900,
+  // The cover has already moved off when these open: the overlay only fades.
+  zipper: 500,
+  ribbon: 500,
 };
+
+/** Openings the guest pulls (ADR-074): the invitation shows through them as they open. */
+const PULLED = new Set<IntroVariant>(['zipper', 'ribbon']);
 
 /** Deterministic pseudo-random in [0, 1): identical on server and client (no hydration drift). */
 const rand = (i: number, salt = 1) => {
@@ -34,6 +41,10 @@ export interface IntroLabels {
   seal: string;
   scratch: string;
   reveal: string;
+  /** "Pull the tag to open" (the zipper). */
+  zipper?: string;
+  /** "Pull the ribbon to open". */
+  ribbon?: string;
 }
 
 /**
@@ -46,6 +57,8 @@ export function IntroOverlay({
   labels,
   revealText,
   storageKey,
+  colors,
+  coverMonogram,
   children,
 }: {
   variant: IntroVariant;
@@ -54,9 +67,14 @@ export function IntroOverlay({
   /** Shown under the scratch card (usually the date). */
   revealText?: string;
   storageKey: string;
+  /** The invitation's palette: the pulled openings draw their fabric, metal and satin from it. */
+  colors?: ThemeColors;
+  /** The monogram the pulled openings print ("R & A"); the medallions' `monogram` otherwise. */
+  coverMonogram?: string;
   children?: ReactNode;
 }) {
   const [state, setState] = useState<'closed' | 'opening' | 'gone'>('closed');
+  const announced = useRef(false);
 
   useEffect(() => {
     try {
@@ -73,6 +91,13 @@ export function IntroOverlay({
     };
   }, [state]);
 
+  /** The guest's first touch: the music may start (once). */
+  const announce = useCallback(() => {
+    if (announced.current) return;
+    announced.current = true;
+    window.dispatchEvent(new CustomEvent(INTRO_OPEN_EVENT));
+  }, []);
+
   const open = useCallback(() => {
     setState((s) => (s === 'closed' ? 'opening' : s));
     try {
@@ -80,17 +105,18 @@ export function IntroOverlay({
     } catch {
       /* ignore */
     }
-    window.dispatchEvent(new CustomEvent(INTRO_OPEN_EVENT));
+    announce();
     setTimeout(() => setState('gone'), DURATION[variant]);
-  }, [storageKey, variant]);
+  }, [announce, storageKey, variant]);
 
   if (state === 'gone') return null;
   const opening = state === 'opening';
   const fadeDelay = Math.max(0, DURATION[variant] - 700);
+  const pulled = PULLED.has(variant) && !!colors;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[var(--t-bg)] transition-opacity duration-700"
+      className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${pulled ? '' : 'bg-[var(--t-bg)]'}`}
       style={{ opacity: opening ? 0 : 1, transitionDelay: opening ? `${fadeDelay}ms` : '0ms' }}
     >
       {variant === 'envelope' ? <Envelope opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
@@ -101,6 +127,10 @@ export function IntroOverlay({
       {variant === 'petals' ? <Petals opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
       {variant === 'celestial' ? <Celestial opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
       {variant === 'scratch' ? <Scratch opening={opening} monogram={monogram} labels={labels} revealText={revealText} onOpen={open} /> : null}
+      {pulled && variant === 'zipper' ? <Pulled cover={ZipperCover} colors={colors} monogram={coverMonogram ?? monogram} label={labels.zipper ?? labels.open} hintAt={0.2} onGesture={announce} onOpen={open} /> : null}
+      {pulled && variant === 'ribbon' ? <Pulled cover={RibbonCover} colors={colors} monogram={coverMonogram ?? monogram} label={labels.ribbon ?? labels.open} hintAt={0.13} onGesture={announce} onOpen={open} /> : null}
+      {/* Without a palette (an older caller) a pulled opening falls back to the envelope. */}
+      {PULLED.has(variant) && !colors ? <Envelope opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
       {children}
     </div>
   );
@@ -431,6 +461,138 @@ function Scratch({ opening, monogram, labels, revealText, onOpen }: { opening: b
       <button type="button" onClick={finish} className="mt-6 rounded-full border border-[var(--t-primary)] px-5 py-2 text-xs font-semibold tracking-[0.3em] uppercase text-[var(--t-primary-ink)]">
         {labels.reveal}
       </button>
+    </div>
+  );
+}
+
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+/**
+ * An opening the guest pulls (ADR-074): drag down to open it as far as the
+ * finger goes, and let go past a third to finish (or before, to let it fall
+ * back); a tap, Enter or Space opens it all the way. The cover itself is a
+ * pure drawing of the moment (covers.tsx), shared with the films.
+ */
+function Pulled({
+  cover: Cover,
+  colors,
+  monogram,
+  label,
+  hintAt,
+  onGesture,
+  onOpen,
+}: {
+  cover: (props: CoverProps) => ReactNode;
+  colors: ThemeColors;
+  monogram: string;
+  label: string;
+  /** Where the hint sits, as a fraction of the screen's height from its foot. */
+  hintAt: number;
+  onGesture: () => void;
+  onOpen: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 390, h: 844 });
+  const [progress, setProgress] = useState(0);
+  const [release, setRelease] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const frame = useRef<number | null>(null);
+  const drag = useRef<{ y: number; from: number; moved: boolean } | null>(null);
+  const finished = useRef(false);
+  const now = useRef(0);
+  now.current = progress;
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => setSize({ w: el.clientWidth || 390, h: el.clientHeight || 844 });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
+
+  const animate = (from: number, to: number, ms: number, set: (n: number) => void, then?: () => void) => {
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    const start = performance.now();
+    const step = (t: number) => {
+      const k = clamp01((t - start) / Math.max(1, ms));
+      set(from + (to - from) * easeInOut(k));
+      if (k < 1) frame.current = requestAnimationFrame(step);
+      else {
+        frame.current = null;
+        then?.();
+      }
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+
+  const finish = () => {
+    if (finished.current) return;
+    finished.current = true;
+    onGesture();
+    const from = now.current;
+    animate(from, 1, 300 + 1500 * (1 - from), setProgress, () => animate(0, 1, 650, setRelease, onOpen));
+  };
+
+  const down = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (finished.current || e.button !== 0) return;
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    drag.current = { y: e.clientY, from: now.current, moved: false };
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const move = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const dy = e.clientY - d.y;
+    if (Math.abs(dy) > 5) d.moved = true;
+    if (!d.moved) return;
+    const p = clamp01(d.from + dy / (size.h * 0.78));
+    setProgress(p);
+    if (p > 0.02) onGesture();
+  };
+  const up = () => {
+    const d = drag.current;
+    drag.current = null;
+    setDragging(false);
+    if (!d || finished.current) return;
+    if (!d.moved || now.current > 0.32) finish();
+    else animate(now.current, 0, 380, setProgress);
+  };
+  const key = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      finish();
+    }
+  };
+
+  return (
+    <div
+      ref={box}
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      className="absolute inset-0 cursor-grab touch-none select-none focus-visible:outline-none active:cursor-grabbing"
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onKeyDown={key}
+    >
+      <Cover progress={progress} release={release} width={size.w} height={size.h} colors={colors} monogram={monogram} script="var(--t-script)" heading="var(--t-heading)" swing={progress === 0 && !dragging} />
+      <span
+        className="pointer-events-none absolute inset-x-0 flex justify-center transition-opacity duration-300"
+        style={{ bottom: `${hintAt * 100}%`, opacity: progress > 0.04 || finished.current ? 0 : 1 }}
+      >
+        <span className="bulava-breathe rounded-full bg-black/35 px-4 py-1.5 text-xs font-semibold tracking-[0.28em] text-white uppercase backdrop-blur-sm">{label}</span>
+      </span>
     </div>
   );
 }

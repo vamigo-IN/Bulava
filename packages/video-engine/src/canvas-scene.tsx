@@ -83,6 +83,7 @@ export function CanvasScene({
   theme,
   language,
   frames,
+  offsetSec = 0,
 }: {
   canvas: SceneCanvas;
   ctx: RenderContext;
@@ -91,6 +92,8 @@ export function CanvasScene({
   theme: TemplateDefinition['theme'];
   language: string;
   frames: number;
+  /** Seconds before the first layer comes in (a scene that opens under a cover waits for it to open). */
+  offsetSec?: number;
 }) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -103,8 +106,8 @@ export function CanvasScene({
     const moving = board.layers.filter((l) => !omit.has(l.id) && entranceOf(l, board) !== 'none');
     const own = moving.some((l) => l.animation.delaySec > 0);
     const sorted = [...moving].sort((a, b) => (own ? a.animation.delaySec - b.animation.delaySec : a.frame.y - b.frame.y || a.frame.x - b.frame.x));
-    return new Map(sorted.map((l, i) => [l.id, own ? 0.3 + l.animation.delaySec : 0.35 + i * canvas.stagger]));
-  }, [board, omit, canvas.stagger]);
+    return new Map(sorted.map((l, i) => [l.id, offsetSec + (own ? 0.3 + l.animation.delaySec : 0.35 + i * canvas.stagger)]));
+  }, [board, omit, canvas.stagger, offsetSec]);
 
   const layerStyle = (layer: Layer): CSSProperties | undefined => {
     const start = starts.get(layer.id);

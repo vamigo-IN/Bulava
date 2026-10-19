@@ -179,3 +179,75 @@ export function layerLabel(layer: Layer): string {
       return 'Layer';
   }
 }
+
+// ─────────────────────────── Several layers at once ───────────────────────────
+
+/** The axis-aligned box around a frame as drawn (a rotated frame's corners included). */
+export function frameBox(frame: Frame): Frame {
+  const deg = frame.rotate ?? 0;
+  if (!deg) return { x: frame.x, y: frame.y, w: frame.w, h: frame.h, rotate: 0 };
+  const rad = (deg * Math.PI) / 180;
+  const c = Math.abs(Math.cos(rad));
+  const s = Math.abs(Math.sin(rad));
+  const w = frame.w * c + frame.h * s;
+  const h = frame.w * s + frame.h * c;
+  return { x: frame.x + frame.w / 2 - w / 2, y: frame.y + frame.h / 2 - h / 2, w, h, rotate: 0 };
+}
+
+/** The box around several frames (as drawn). */
+export function boundsOf(frames: readonly Frame[]): Frame {
+  if (!frames.length) return { x: 0, y: 0, w: 0, h: 0, rotate: 0 };
+  const boxes = frames.map(frameBox);
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  const x2 = Math.max(...boxes.map((b) => b.x + b.w));
+  const y2 = Math.max(...boxes.map((b) => b.y + b.h));
+  return { x, y, w: x2 - x, h: y2 - y, rotate: 0 };
+}
+
+/** Whether a frame (as drawn) touches a rectangle: what a marquee picks. */
+export function touches(frame: Frame, rect: Frame): boolean {
+  const b = frameBox(frame);
+  return b.x < rect.x + rect.w && b.x + b.w > rect.x && b.y < rect.y + rect.h && b.y + b.h > rect.y;
+}
+
+/** A frame inside `from` moved and scaled as `from` becomes `to` (a group resized). */
+export function scaleFrame(frame: Frame, from: Frame, to: Frame): Frame {
+  const sx = from.w ? to.w / from.w : 1;
+  const sy = from.h ? to.h / from.h : 1;
+  return { ...frame, x: round(to.x + (frame.x - from.x) * sx), y: round(to.y + (frame.y - from.y) * sy), w: round(Math.max(1, frame.w * sx)), h: round(Math.max(1, frame.h * sy)) };
+}
+
+export type AlignMode = 'left' | 'centre' | 'right' | 'top' | 'middle' | 'bottom';
+
+/** Frames lined up along one edge or centre of `to` (the selection's box, or the board). */
+export function alignFrames(frames: readonly Frame[], mode: AlignMode, to: Frame): Frame[] {
+  return frames.map((f) => {
+    const b = frameBox(f);
+    const dx = mode === 'left' ? to.x - b.x : mode === 'right' ? to.x + to.w - (b.x + b.w) : mode === 'centre' ? to.x + to.w / 2 - (b.x + b.w / 2) : 0;
+    const dy = mode === 'top' ? to.y - b.y : mode === 'bottom' ? to.y + to.h - (b.y + b.h) : mode === 'middle' ? to.y + to.h / 2 - (b.y + b.h / 2) : 0;
+    return { ...f, x: round(f.x + dx), y: round(f.y + dy) };
+  });
+}
+
+/** Frames spaced evenly between the first and the last along an axis (their order on it kept). */
+export function distributeFrames(frames: readonly Frame[], axis: 'x' | 'y'): Frame[] {
+  if (frames.length < 3) return [...frames];
+  const boxes = frames.map(frameBox);
+  const order = boxes.map((b, i) => ({ b, i })).sort((p, q) => (axis === 'x' ? p.b.x - q.b.x : p.b.y - q.b.y));
+  const size = (b: Frame) => (axis === 'x' ? b.w : b.h);
+  const start = (b: Frame) => (axis === 'x' ? b.x : b.y);
+  const first = order[0]!.b;
+  const last = order[order.length - 1]!.b;
+  const span = start(last) + size(last) - start(first);
+  const gap = (span - order.reduce((sum, o) => sum + size(o.b), 0)) / (order.length - 1);
+  const out = [...frames];
+  let at = start(first);
+  for (const { b, i } of order) {
+    const delta = at - start(b);
+    const f = frames[i]!;
+    out[i] = axis === 'x' ? { ...f, x: round(f.x + delta) } : { ...f, y: round(f.y + delta) };
+    at += size(b) + gap;
+  }
+  return out;
+}

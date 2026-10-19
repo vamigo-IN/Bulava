@@ -60,6 +60,9 @@ export function illustrationTint(name: IllustrationName): ColorRef {
     doli: 'primary',
     dhol: 'primary',
     champagne: '#f3d38a',
+    scallopTag: 'accent',
+    satinRibbon: 'accent',
+    satinBow: 'accent',
   };
   return tints[name] ?? 'secondary';
 }
@@ -73,6 +76,9 @@ const STRANDS = new Set<IllustrationName>(['goldVine', 'ghungroo']);
 function illustrationFrame(name: IllustrationName, board: Pick<Artboard, 'width' | 'height'>, u: (n: number) => number) {
   if (FULL_FRAMES.has(name)) return { x: u(12), y: u(12), w: board.width - 2 * u(12), h: board.height - 2 * u(12) };
   if (name === 'jasmineStrand') return centred(board, u(30), u(300));
+  // A zipper runs down the board (turn it for one across); satin ribbon crosses it as a band.
+  if (name === 'zipper') return centred(board, u(28), u(420));
+  if (name === 'satinRibbon') return { x: 0, y: Math.round(board.height / 2 - u(22)), w: board.width, h: u(44) };
   if (STRANDS.has(name)) return centred(board, Math.max(u(18), Math.round(u(480) * ILLUSTRATION_ASPECT[name])), u(480));
   if (FRAME_SIZED.has(name)) return { x: 0, y: 0, w: board.width, h: u(110) };
   const aspect = ILLUSTRATION_ASPECT[name];

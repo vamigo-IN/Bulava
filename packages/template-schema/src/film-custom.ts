@@ -207,6 +207,7 @@ export function addedSceneOf(added: AddedScene, follows: Scene | undefined): Sce
     ...(follows?.backdrop ? { backdrop: follows.backdrop } : {}),
     particles: follows?.particles ?? 'none',
     canvas: { board: added.board, stagger: 0.14, camera: 'still', intensity: 0 },
+    reveal: 'none',
     elements: [],
   };
 }
