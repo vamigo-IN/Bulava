@@ -1,10 +1,11 @@
 'use client';
 
-import { History, Receipt } from 'lucide-react';
+import { GalleryVerticalEnd, History, Receipt } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useOptionalT } from '@/lib/i18n';
 import { recentCards, storedOrders, type StoredOrder } from '@/lib/card-store';
+import { useSession } from '@/lib/session';
 
 /**
  * A template picked from the gallery: the funnel's first step is recorded as
@@ -40,13 +41,21 @@ export function RecentCards() {
   const t = useOptionalT();
   const [recent, setRecent] = useState<Array<{ templateKey: string; templateName: string; savedAt: number }>>([]);
   const [orders, setOrders] = useState<StoredOrder[]>([]);
+  // Signed in, every card saved in the account is one tap away, from any device (ADR-077).
+  const signedIn = useSession().status === 'signed-in';
   useEffect(() => {
     setRecent(recentCards().slice(0, 4));
     setOrders(storedOrders().slice(0, 4));
   }, []);
-  if (!recent.length && !orders.length) return null;
+  if (!recent.length && !orders.length && !signedIn) return null;
   return (
     <div className="mx-auto mt-8 grid max-w-4xl gap-3 sm:grid-cols-2">
+      {signedIn ? (
+        <Link href="/dashboard/cards" className="clay flex min-h-12 items-center justify-center gap-2 rounded-3xl px-4 text-sm font-semibold text-brand-700 hover:text-brand-800 sm:col-span-2">
+          <GalleryVerticalEnd aria-hidden className="size-4" />
+          {t('dash.nav.myCards')}
+        </Link>
+      ) : null}
       {recent.length ? (
         <div className="clay rounded-3xl p-4">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink">

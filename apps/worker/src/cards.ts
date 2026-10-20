@@ -1,6 +1,7 @@
 import { cardOrderToken } from '@bulava/auth';
 import type { Prisma, PrismaClient } from '@bulava/database';
 import { cardOrderEmail } from './emails';
+import { OPEN_PREVIEW_STATUSES } from './previews';
 import type { WorkerDeps } from './processors';
 
 const DAY = 86_400_000;
@@ -120,7 +121,16 @@ export async function cardRetention(deps: Pick<WorkerDeps, 'prisma' | 'log'> & {
   const checkouts = await prisma.cardOrder.updateMany({ where: { status: 'PENDING', createdAt: { lt: new Date(now - 2 * DAY) } }, data: { status: 'EXPIRED' } });
 
   const sessions = await prisma.cardSession.findMany({
-    where: { lastSeenAt: { lt: new Date(now - 30 * DAY) }, orders: { none: { status: 'PAID', paidAt: { gt: new Date(now - 365 * DAY) } } } },
+    where: {
+      // A card saved in an account stays a year after it was last opened (ADR-077); one made without signing in, 30 days.
+      OR: [
+        { userId: null, lastSeenAt: { lt: new Date(now - 30 * DAY) } },
+        { userId: { not: null }, lastSeenAt: { lt: new Date(now - 365 * DAY) } },
+      ],
+      orders: { none: { status: 'PAID', paidAt: { gt: new Date(now - 365 * DAY) } } },
+      // A preview made for a customer stays while their request is open (ADR-076).
+      previewItems: { none: { request: { status: { in: [...OPEN_PREVIEW_STATUSES] } } } },
+    },
     take: 200,
     select: { id: true, uploads: { select: { originalKey: true, storageKey: true } } },
   });

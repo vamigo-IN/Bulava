@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, Clapperboard, MessageCircle, UserCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { Bell, CheckCircle2, Clapperboard, Gift, Inbox, MessageCircle, PenLine, Sparkles, UserCheck, Users, Wallet, type LucideIcon } from 'lucide-react';
 import type { Translator } from '@bulava/localization';
 
 /** One of the host's notifications (GET /notifications). */
@@ -18,7 +18,38 @@ const ICONS: Record<string, LucideIcon> = {
   REGISTRATION_RECEIVED: UserCheck,
   MEMBER_ADDED: Users,
   GUEST_REPLY: MessageCircle,
+  PREVIEW_NEW: Inbox,
+  PREVIEW_ASSIGNED: Inbox,
+  PREVIEW_CHANGES: PenLine,
+  PREVIEW_REPLY: MessageCircle,
+  PREVIEW_OWNED: Gift,
+  PREVIEW_WELCOME: Sparkles,
 };
+
+/** The preview desk's notifications (ADR-076): their sentence and where they lead. */
+function previewView(t: Translator, n: HostNotification): { text: string; href: string | null } | null {
+  const p = n.payload;
+  const title = String(p.title ?? '');
+  const desk = typeof p.requestId === 'string' ? `/dashboard/desk/${p.requestId}` : '/dashboard/desk';
+  switch (n.type) {
+    case 'PREVIEW_NEW':
+      return { text: t('notif.PREVIEW_NEW', { title }), href: desk };
+    case 'PREVIEW_ASSIGNED':
+      return { text: t('notif.PREVIEW_ASSIGNED', { title }), href: desk };
+    case 'PREVIEW_CHANGES':
+      return { text: t('notif.PREVIEW_CHANGES', { title, message: quote(p.message) }), href: desk };
+    case 'PREVIEW_REPLY':
+      return { text: t('notif.PREVIEW_REPLY', { title, text: quote(p.text) }), href: desk };
+    case 'PREVIEW_OWNED':
+      return p.role === 'owner'
+        ? { text: t('notif.PREVIEW_OWNED.owner', { title }), href: typeof p.eventId === 'string' ? `/dashboard/events/${p.eventId}` : '/dashboard/cards' }
+        : { text: t('notif.PREVIEW_OWNED.provider', { title }), href: desk };
+    case 'PREVIEW_WELCOME':
+      return { text: t('notif.PREVIEW_WELCOME', { name: String(p.name ?? '') }), href: '/dashboard/desk' };
+    default:
+      return null;
+  }
+}
 
 /** A guest's WhatsApp message, shortened for a one-line list. */
 function quote(text: unknown): string {
@@ -33,6 +64,12 @@ function quote(text: unknown): string {
  */
 export function notificationView(t: Translator, n: HostNotification): { icon: LucideIcon; text: string; href: string | null; reply: string | null } {
   const p = n.payload;
+  const preview = previewView(t, n);
+  if (preview) {
+    // A customer who wrote on WhatsApp is answered from the provider's own WhatsApp.
+    const phone = n.type === 'PREVIEW_REPLY' ? String(p.phone ?? '').replace(/[^\d]/g, '') : '';
+    return { icon: ICONS[n.type] ?? Bell, ...preview, reply: phone ? `https://wa.me/${phone}` : null };
+  }
   const text =
     n.type === 'RSVP_RECEIVED'
       ? t('notif.RSVP_RECEIVED', { guest: String(p.guestName ?? ''), event: String(p.eventTitle ?? '') })

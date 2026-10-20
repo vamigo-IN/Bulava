@@ -31,6 +31,11 @@ export interface GatewayPayment {
 }
 
 /** Settles a webhook for a gateway order that is not a plan purchase; true when it was its own. */
+/** A preview page's offer (ADR-076): the request a plan order bought from its link owns, and the plan it offers. */
+export type LookOfferResolver = (look: string, userId: string) => Promise<{ requestId: string; planKey: string } | null>;
+/** Told inside the transaction that settles a plan order (a preview's designs then move into the buyer's account). */
+export type OrderPaidHandler = (tx: Tx, order: Order) => Promise<void>;
+
 export type OtherPaymentHandler = (event: string | undefined, payment: GatewayPayment & { id: string; order_id: string }, raw: Prisma.InputJsonValue) => Promise<boolean>;
 
 type PlanWithFeatures = PricingPlan & { features: Array<{ featureKey: string; enabled: boolean; limit: number | null }> };
@@ -100,6 +105,9 @@ export class PaymentsService {
   private built: { fingerprint: string; provider: PaymentProvider } | null = null;
   /** Other purchases over the same gateway and webhook (digital cards register theirs). */
   private readonly otherPayments: OtherPaymentHandler[] = [];
+  /** The preview desk's offers and what it does once a preview's plan is paid (ADR-076). */
+  private lookOffers: LookOfferResolver | null = null;
+  private readonly paidHandlers: OrderPaidHandler[] = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -147,6 +155,28 @@ export class PaymentsService {
   /** Webhooks for gateway orders that are not plan purchases go to the handler that owns them. */
   onOtherPayment(handler: OtherPaymentHandler): void {
     this.otherPayments.push(handler);
+  }
+
+  /** How a preview page's link (`look`) names its request and offered plan (the preview desk registers it). */
+  onLookOrder(resolver: LookOfferResolver): void {
+    this.lookOffers = resolver;
+  }
+
+  /** Something to do when a plan order is paid, in the same transaction. */
+  onOrderPaid(handler: OrderPaidHandler): void {
+    this.paidHandlers.push(handler);
+  }
+
+  /**
+   * A plan bought from a preview page: its request, when the plan is the one
+   * the page offers (a hidden plan too: the link is the offer). Another plan,
+   * or a link that no longer offers one, is refused.
+   */
+  private async lookOffer(input: { look?: string; planKey: string }, userId: string): Promise<{ requestId: string } | null> {
+    if (!input.look) return null;
+    const offer = this.lookOffers ? await this.lookOffers(input.look, userId) : null;
+    if (!offer || offer.planKey !== input.planKey) throw new AppError('PREVIEW_ENDED', 'This preview’s offer is no longer available.');
+    return { requestId: offer.requestId };
   }
 
   private async withCoupon(amountMinor: number, couponCode?: string) {
@@ -205,7 +235,7 @@ export class PaymentsService {
    * for this account. An add-on: only with a plan it is offered to, once (or
    * as many as wanted when stackable).
    */
-  private async purchase(userId: string, plan: PlanWithFeatures, input: { quantity?: number; offerToken?: string; eventId?: string }): Promise<Purchase> {
+  private async purchase(userId: string, plan: PlanWithFeatures, input: { quantity?: number; offerToken?: string; eventId?: string; viaPreview?: boolean }): Promise<Purchase> {
     const plans = await this.accountPlans(userId);
     const current = this.currentPlan(plans);
     if (plan.kind === 'ADDON') {
@@ -231,7 +261,7 @@ export class PaymentsService {
       const quantity = plan.stackable ? Math.min(ADDON_MAX_QUANTITY, Math.max(1, input.quantity ?? 1)) : 1;
       return { plan, quantity, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor * quantity, included: owned, eventId };
     }
-    if (plan.visibility === 'HIDDEN' && !(input.offerToken && verifyPlanOfferToken(input.offerToken, userId, plan.key, this.config.TOKEN_ENCRYPTION_KEY))) {
+    if (plan.visibility === 'HIDDEN' && !input.viaPreview && !(input.offerToken && verifyPlanOfferToken(input.offerToken, userId, plan.key, this.config.TOKEN_ENCRYPTION_KEY))) {
       throw new AppError('NOT_FOUND', 'Plan not found.');
     }
     // A yearly plan (Studio) is sold whole, never against a one-time plan.
@@ -250,7 +280,8 @@ export class PaymentsService {
    */
   async quote(user: AuthUser, input: OrderQuoteInput) {
     const plan = await this.planForSale(input.planKey);
-    const p = await this.purchase(user.id, plan, input);
+    const preview = await this.lookOffer(input, user.id);
+    const p = await this.purchase(user.id, plan, { ...input, viaPreview: Boolean(preview) });
     const { amountMinor } = await this.withCoupon(p.subtotalMinor, input.couponCode || undefined);
     return {
       plan: planCard(plan),
@@ -279,12 +310,14 @@ export class PaymentsService {
     // Receipts and refunds need a reachable account, not a number alone.
     await assertVerifiedAccount(this.prisma, user.id);
     const plan = await this.planForSale(input.planKey);
+    // Bought from a preview page (ADR-076): once paid, the preview's designs move into this account.
+    const preview = access ? null : await this.lookOffer(input, user.id);
     let p: Purchase;
     if (access) {
       if (plan.kind !== 'PLAN' || plan.interval !== 'ONE_TIME' || plan.visibility === 'HIDDEN') throw new AppError('BAD_REQUEST', 'This is not bought for one event.');
       p = { plan, quantity: 1, upgradeFrom: null, creditMinor: 0, subtotalMinor: plan.priceMinor, included: false, eventId: access.eventId };
     } else {
-      p = await this.purchase(user.id, plan, input);
+      p = await this.purchase(user.id, plan, { ...input, viaPreview: Boolean(preview) });
     }
     // Never sold twice: a plan the account already has (or a bigger one), an add-on bought once.
     if (p.included) {
@@ -305,6 +338,7 @@ export class PaymentsService {
           quantity: p.quantity,
           creditMinor: p.creditMinor,
           termsAcceptedAt: new Date(),
+          previewRequestId: preview?.requestId ?? null,
         },
       });
       // The buyer's ticked box (an explicit action, as the e-commerce rules require), kept with the order.
@@ -483,9 +517,13 @@ export class PaymentsService {
       },
     });
     if (!order) throw AppError.notFound('Order');
-    const [event, entitlement] = await Promise.all([
+    const [event, entitlement, preview] = await Promise.all([
       order.eventId ? this.prisma.event.findFirst({ where: { id: order.eventId, deletedAt: null }, select: { id: true, title: true } }) : null,
       order.status === 'PAID' ? this.prisma.entitlement.findFirst({ where: { sourceType: { in: ORDER_SOURCES }, sourceId: order.id }, select: { validUntil: true } }) : null,
+      // Bought from a preview page: the designs it moved into the account.
+      order.previewRequestId
+        ? this.prisma.previewRequest.findUnique({ where: { id: order.previewRequestId }, select: { reference: true, status: true, ownerId: true, items: { where: { eventId: { not: null } }, select: { eventId: true }, take: 1 } } })
+        : null,
     ]);
     const payment = order.payments[0];
     return {
@@ -504,6 +542,8 @@ export class PaymentsService {
       payment: payment ? { provider: payment.provider, reference: payment.provider === 'RAZORPAY' ? payment.providerPaymentId : null, paidAt: payment.verifiedAt } : null,
       /** Yearly plans: when the access ends. */
       validUntil: entitlement?.validUntil ?? null,
+      /** A preview's designs this purchase owns (ADR-076), once they are in the account. */
+      preview: preview ? { reference: preview.reference, owned: preview.status === 'OWNED' && preview.ownerId === user.id, eventId: preview.status === 'OWNED' && preview.ownerId === user.id ? (preview.items[0]?.eventId ?? null) : null } : null,
     };
   }
 
@@ -609,6 +649,7 @@ export class PaymentsService {
       await tx.order.update({ where: { id: orderId }, data: { status: 'PAID' } });
       if (order.couponId) await tx.coupon.update({ where: { id: order.couponId }, data: { redemptions: { increment: 1 } } });
       await this.grant(tx, order);
+      for (const handler of this.paidHandlers) await handler(tx, order);
       await this.audit.record(
         { actorType: 'SYSTEM', action: 'payment.captured', targetType: 'Order', targetId: orderId, eventId: order.eventId, metadata: { plan: order.plan.key, amountMinor: payment.amountMinor, provider: payment.provider, quantity: order.quantity } },
         tx,

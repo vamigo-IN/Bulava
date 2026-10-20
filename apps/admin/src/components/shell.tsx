@@ -26,6 +26,7 @@ import {
   Tags,
   UserCog,
   Users,
+  Wand2,
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -68,7 +69,11 @@ const NAV: Array<{ group: AdminMessageKey | null; items: NavItem[] }> = [
   },
   {
     group: 'nav.group.support',
-    items: [{ href: '/messages', label: 'nav.messages', icon: Inbox, permission: 'contact.manage', badge: 'contact' }],
+    items: [
+      { href: '/messages', label: 'nav.messages', icon: Inbox, permission: 'contact.manage', badge: 'contact' },
+      // Customers who asked for a preview, customers from outside, and the preview providers (ADR-076).
+      { href: '/previews', label: 'nav.previews', icon: Wand2, permission: 'preview.manage' },
+    ],
   },
   {
     group: 'nav.group.people',

@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  CheckCheck,
   ChevronDown,
   ChevronUp,
   Cloud,
@@ -11,6 +12,7 @@ import {
   Eye,
   EyeOff,
   Image as ImageIcon,
+  Inbox,
   LoaderCircle,
   NotebookPen,
   Palette,
@@ -37,6 +39,7 @@ import {
   type Layer,
 } from '@bulava/template-schema';
 import { CanvasToolbar, ThemeToggle, useEditorTheme } from '@/components/editor/editor-chrome';
+import { apiPost } from '@/lib/api';
 import { errorMessage, useOptionalT } from '@/lib/i18n';
 import { cardApi, isSessionGone, loadStoredCard, saveStoredCard, type CardSessionOrder } from '@/lib/cards';
 import { cn } from '@/lib/utils';
@@ -67,6 +70,8 @@ interface Start {
   design: CardDesign;
   token: string | null;
   savedAt: number;
+  /** Opened from the account by its id (ADR-077): the server's copy is the card; a preview is a customer's (ADR-076). */
+  account?: { id: string; preview: { requestId: string; reference: string } | null };
 }
 
 /**
@@ -76,9 +81,43 @@ interface Start {
  * after (only once it differs from the template), and the download dialog
  * works from the saved card, so what is downloaded is what is on screen.
  */
-export function CardEditor({ template, occasions, initialEvent, siteName }: { template: CardTemplateInfo; occasions: Array<{ key: string; name: string }>; initialEvent?: string; siteName: string }) {
+export function CardEditor({
+  template,
+  occasions,
+  initialEvent,
+  cardId,
+  siteName,
+}: {
+  template: CardTemplateInfo;
+  occasions: Array<{ key: string; name: string }>;
+  initialEvent?: string;
+  cardId?: string;
+  siteName: string;
+}) {
   const [start, setStart] = useState<Start | null>(null);
   useEffect(() => {
+    let cancelled = false;
+    const fresh = (): Start => ({ design: cardFromTemplate(template.definition, { format: 'phone', tags: template.tags }), token: null, savedAt: 0 });
+    if (cardId) {
+      // A card saved in the account: its token from the account, then the card as the server keeps it.
+      void (async () => {
+        try {
+          const opened = await apiPost<{ token: string; templateKey: string }>(`/cards/mine/${cardId}/open`);
+          const session = await cardApi.openSession(opened.token);
+          const design = CardDesignSchema.safeParse(session.design);
+          if (!cancelled && design.success && opened.templateKey === template.key) {
+            setStart({ design: design.data, token: opened.token, savedAt: new Date(session.updatedAt).getTime(), account: { id: cardId, preview: session.preview ?? null } });
+            return;
+          }
+        } catch {
+          // Not this account's card any more: a fresh card from the template instead.
+        }
+        if (!cancelled) setStart(fresh());
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
     const stored = loadStoredCard(template.key);
     const eventType = initialEvent && template.eventTypes.includes(initialEvent) ? initialEvent : undefined;
     // A card opened for another occasion than the saved one starts fresh for that occasion.
@@ -89,7 +128,10 @@ export function CardEditor({ template, occasions, initialEvent, siteName }: { te
         : { design: cardFromTemplate(template.definition, { format: 'phone', eventType, tags: template.tags }), token: stored?.token ?? null, savedAt: 0 },
     );
     void cardApi.event({ type: 'EDITOR_OPENED', templateKey: template.key, ...(stored?.token ? { session: stored.token } : {}) });
-  }, [template, initialEvent]);
+    return () => {
+      cancelled = true;
+    };
+  }, [template, initialEvent, cardId]);
 
   if (!start) {
     return (
@@ -211,10 +253,14 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
       });
   }, [start, apply, forget]);
 
+  // A card opened from the account lives on the server; this device keeps only the cards made on it.
+  const account = start.account ?? null;
+  const preview = account?.preview ?? null;
   useEffect(() => {
+    if (account) return;
     const id = setTimeout(() => saveStoredCard({ templateKey: template.key, templateName: template.name, design, token, savedAt: Date.now() }), 300);
     return () => clearTimeout(id);
-  }, [design, token, template]);
+  }, [design, token, template, account]);
 
   const sync = useCallback(
     async (force: boolean): Promise<string | null> => {
@@ -562,11 +608,24 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
       <TemplateStyles />
       {/* ── Top bar ── */}
       <header className="editor-chrome relative z-20 flex min-h-16 items-center gap-2 border-b border-[var(--ed-line)] bg-surface/95 px-2 text-ink shadow-clay-sm backdrop-blur sm:gap-3 sm:px-4">
-        <Link href="/cards" className="btn-3d btn-3d-light size-10 shrink-0 rounded-xl" aria-label={t('cards.editor.back')} title={t('cards.editor.back')}>
+        <Link
+          href={preview ? `/dashboard/desk/${preview.requestId}` : account ? '/dashboard/cards' : '/cards'}
+          className="btn-3d btn-3d-light size-10 shrink-0 rounded-xl"
+          aria-label={preview ? t('desk.card.done') : t('cards.editor.back')}
+          title={preview ? t('desk.card.done') : t('cards.editor.back')}
+        >
           <ArrowLeft aria-hidden className="size-4" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold sm:text-base">{template.name}</h1>
+          <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold sm:text-base">
+            <span className="truncate">{template.name}</span>
+            {preview ? (
+              <span className="hidden shrink-0 items-center gap-1 rounded-full bg-gold-100 px-2 py-0.5 text-[11px] font-semibold text-gold-800 ring-1 ring-gold-200 sm:inline-flex">
+                <Inbox aria-hidden className="size-3" />
+                {t('desk.card.chip', { reference: preview.reference })}
+              </span>
+            ) : null}
+          </h1>
           <p className="flex items-center gap-1.5 truncate text-xs text-stone-500">
             <span>
               {t(`cards.format.${design.format}`)}
@@ -604,11 +663,24 @@ function Editor({ template, occasions, start, siteName }: { template: CardTempla
             {previewing ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
           </IconButton>
         </div>
-        <button type="button" onClick={() => void openDownload()} disabled={opening} className="btn-3d min-h-11 shrink-0 gap-2 rounded-xl px-3 text-sm sm:px-5">
-          {opening ? <LoaderCircle aria-hidden className="size-4 animate-spin" /> : <Download aria-hidden className="size-4" />}
-          <span className="hidden sm:inline">{t('cards.editor.download')}</span>
-          <span className="sr-only sm:hidden">{t('cards.editor.download')}</span>
-        </button>
+        {preview ? (
+          // A preview card is shared from the desk and seen on the customer's page, never downloaded from here.
+          <Link
+            href={`/dashboard/desk/${preview.requestId}`}
+            onClick={() => void save().catch(() => undefined)}
+            className="btn-3d min-h-11 shrink-0 gap-2 rounded-xl px-3 text-sm sm:px-5"
+          >
+            <CheckCheck aria-hidden className="size-4" />
+            <span className="hidden sm:inline">{t('desk.card.done')}</span>
+            <span className="sr-only sm:hidden">{t('desk.card.done')}</span>
+          </Link>
+        ) : (
+          <button type="button" onClick={() => void openDownload()} disabled={opening} className="btn-3d min-h-11 shrink-0 gap-2 rounded-xl px-3 text-sm sm:px-5">
+            {opening ? <LoaderCircle aria-hidden className="size-4 animate-spin" /> : <Download aria-hidden className="size-4" />}
+            <span className="hidden sm:inline">{t('cards.editor.download')}</span>
+            <span className="sr-only sm:hidden">{t('cards.editor.download')}</span>
+          </button>
+        )}
       </header>
 
       {/* Phones stack the canvas over the sheet, so the sheet never covers the card. */}

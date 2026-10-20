@@ -25,6 +25,9 @@ import { FEATURE_KEYS } from '@bulava/validation';
 /** An unguessable preview link (/preview/<token>): 144 bits, URL-safe. */
 export const newPreviewToken = () => randomBytes(18).toString('base64url');
 
+/** A preview a provider is making for a customer (ADR-076): held by the provider, never published by them. */
+export const HELD_PREVIEW = 'preview_desk';
+
 const eventInclude = {
   accessPolicy: { select: { mode: true, pinHash: true, requireOtp: true } },
   _count: { select: { guests: { where: { deletedAt: null } } } },
@@ -32,6 +35,8 @@ const eventInclude = {
   functions: { where: { deletedAt: null }, select: { startsAt: true, venueId: true } },
   // The chosen website design, for the dashboard's event cards (none until the host picks one).
   templateSelections: { where: { output: 'WEBSITE' }, take: 1, select: { templateVersion: { select: { template: { select: { key: true, name: true, tier: true } } } } } },
+  // A preview a provider is making for a customer (ADR-076): its request, while the customer does not own it.
+  previewItems: { where: { request: { status: { not: 'OWNED' } } }, take: 1, select: { request: { select: { id: true, reference: true } } } },
 } satisfies Prisma.EventInclude;
 
 type EventWithPolicy = Prisma.EventGetPayload<{ include: typeof eventInclude }>;
@@ -60,8 +65,10 @@ export interface EventDto {
   design: { templateKey: string; templateName: string; tier: string } | null;
   /** The host's shareable, watermarked preview link token (members only see this DTO). */
   previewToken: string;
-  /** "quick_start" when it began on the template page. */
+  /** "quick_start" when it began on the template page; "preview_desk" for a preview held by its provider, "preview" once its customer owns it. */
   source: string | null;
+  /** A preview being made for a customer (ADR-076): never published from here, and back to the desk from its pages. */
+  preview: { requestId: string; reference: string } | null;
   role?: string;
   /** What the caller may do in this event; the dashboard shows only what they can use. */
   permissions?: EventPermission[];
@@ -91,6 +98,7 @@ function toDto(event: EventWithPolicy, role?: string): EventDto {
     design: designOf(event),
     previewToken: event.previewToken,
     source: event.source,
+    preview: event.source === HELD_PREVIEW && event.previewItems[0] ? { requestId: event.previewItems[0].request.id, reference: event.previewItems[0].request.reference } : null,
     ...(role ? { role, permissions: permissionsForEventRole(role as EventRole) } : {}),
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
@@ -131,7 +139,8 @@ export class EventsService {
 
   async listForUser(userId: string): Promise<EventDto[]> {
     const memberships = await this.prisma.eventMember.findMany({
-      where: { userId, event: { deletedAt: null } },
+      // Previews a provider is making for customers live on the preview desk, not in their events (ADR-076).
+      where: { userId, event: { deletedAt: null, OR: [{ source: null }, { source: { not: HELD_PREVIEW } }] } },
       include: { event: { include: eventInclude } },
       orderBy: { event: { createdAt: 'desc' } },
     });
@@ -169,7 +178,7 @@ export class EventsService {
     EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.EVENTS_MAX, live.filter((e) => !own.has(e.id)).length);
   }
 
-  async create(userId: string, input: CreateEventInput, meta: RequestMeta, options: { source?: 'quick_start' } = {}): Promise<EventDto> {
+  async create(userId: string, input: CreateEventInput, meta: RequestMeta, options: { source?: 'quick_start' | typeof HELD_PREVIEW } = {}): Promise<EventDto> {
     const type = await this.prisma.eventType.findFirst({ where: { key: input.typeKey, enabled: true } });
     if (!type) throw new AppError('INVALID_EVENT_TYPE', 'Unknown event type.');
     if (!isSupportedLanguage(input.language)) throw new AppError('UNSUPPORTED_LANGUAGE', 'Unsupported language.');
@@ -350,6 +359,10 @@ export class EventsService {
 
     if (input.status && input.status !== event.status && !access.permissions.includes('event.publish')) {
       throw AppError.forbidden('You cannot change the event status.');
+    }
+    // A preview is its customer's to publish, once they own it (ADR-076).
+    if (input.status && input.status !== event.status && event.source === HELD_PREVIEW) {
+      throw new AppError('PREVIEW_HELD', 'This is a preview for a customer: they publish it once they own it.');
     }
     // Guests can open every event that is not a draft (the public page, invitations, the album), so leaving
     // draft for any status is publishing; becoming active or completed again also takes a place in the plan.

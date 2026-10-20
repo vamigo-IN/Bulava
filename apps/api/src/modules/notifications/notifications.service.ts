@@ -26,7 +26,24 @@ export type NotificationType =
   | 'PAYMENT_FAILED'
   | 'PAYMENT_PENDING'
   /** A guest answered a WhatsApp message: shown to the host (in-app and email). */
-  | 'GUEST_REPLY';
+  | 'GUEST_REPLY'
+  // ADR-076: the preview desk.
+  /** To the customer: their request arrived (email, WhatsApp). */
+  | 'PREVIEW_REQUESTED'
+  /** To the customer: previews are on their page (email, WhatsApp). */
+  | 'PREVIEW_READY'
+  /** To preview providers: a new request in the open queue (in-app). */
+  | 'PREVIEW_NEW'
+  /** To a preview provider: a request was given to them (in-app, email). */
+  | 'PREVIEW_ASSIGNED'
+  /** To the provider: the customer asked for changes (in-app, email). */
+  | 'PREVIEW_CHANGES'
+  /** To the provider: the customer answered a preview message on WhatsApp (in-app, email at most hourly). */
+  | 'PREVIEW_REPLY'
+  /** To the provider and the new owner: the designs are owned (in-app). */
+  | 'PREVIEW_OWNED'
+  /** To a new preview provider: their account and where to start (in-app, email). */
+  | 'PREVIEW_WELCOME';
 
 export type Channel = 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH';
 
@@ -69,8 +86,9 @@ export class NotificationsService {
   }
 
   /** Hand a QUEUED notification to the worker, e.g. after the transaction that created it commits. Idempotent. */
-  async enqueue(notificationId: string): Promise<void> {
-    await this.queues.add('notifications', { notificationId }, { jobId: `notification-${notificationId}` });
+  /** `delayMs`: held back (a preview's link waits a minute, so previews shared together go in one message). */
+  async enqueue(notificationId: string, delayMs = 0): Promise<void> {
+    await this.queues.add('notifications', { notificationId }, { jobId: `notification-${notificationId}`, ...(delayMs > 0 ? { delay: delayMs } : {}) });
   }
 
   /**

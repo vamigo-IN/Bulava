@@ -41,6 +41,8 @@ enum PlatformRole {
   SUPER_ADMIN
   CONTENT_MANAGER
   FINANCE_MANAGER
+  /// Makes previews for customers on the preview desk (ADR-076); created only by an admin.
+  PREVIEW_PROVIDER
 }
 
 model User {
@@ -86,6 +88,10 @@ model User {
   memberInvites    EventMemberInvite[]  @relation("MemberInvitesSent")
   cardSessions     CardSession[]
   templateLikes    TemplateLike[]
+  /// Previews this account asked for (ADR-076).
+  previewRequests  PreviewRequest[]     @relation("PreviewRequester")
+  /// Previews this preview provider is making.
+  previewWork      PreviewRequest[]     @relation("PreviewAssignee")
 
   @@index([status, deletionScheduledAt])
   @@map("users")
@@ -146,24 +152,28 @@ model OtpChallenge {
 }
 
 model Consent {
-  id         String   @id @default(uuid(7)) @db.Uuid
-  userId     String?  @db.Uuid
-  guestId    String?  @db.Uuid
+  id               String   @id @default(uuid(7)) @db.Uuid
+  userId           String?  @db.Uuid
+  guestId          String?  @db.Uuid
   /// A contact from the digital card flow (no account): its purchase terms and offers on WhatsApp.
-  cardLeadId String?  @db.Uuid
-  kind       String
-  granted    Boolean
-  version    String
-  source     String?
-  createdAt  DateTime @default(now())
+  cardLeadId       String?  @db.Uuid
+  /// A preview request (ADR-076): the requester's tick to be contacted about it.
+  previewRequestId String?  @db.Uuid
+  kind             String
+  granted          Boolean
+  version          String
+  source           String?
+  createdAt        DateTime @default(now())
 
-  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  guest    Guest?    @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  cardLead CardLead? @relation(fields: [cardLeadId], references: [id], onDelete: Cascade)
+  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guest          Guest?          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  cardLead       CardLead?       @relation(fields: [cardLeadId], references: [id], onDelete: Cascade)
+  previewRequest PreviewRequest? @relation(fields: [previewRequestId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([guestId])
   @@index([cardLeadId])
+  @@index([previewRequestId])
   @@map("consents")
 }
 
@@ -272,7 +282,9 @@ model Event {
   /// The host's shareable preview link (/preview/<token>): the invitation with a watermark,
   /// before the event is published and whatever its access mode. Unguessable, replaceable.
   previewToken       String      @unique
-  /// How the event was started: "quick_start" (the template page) or null (the dashboard).
+  /// How the event was started: "quick_start" (the template page), "preview_desk" (a preview a provider is
+  /// making for a customer; held by the provider, never published by them), "preview" (a preview its customer
+  /// owns now, ADR-076) or null (the dashboard).
   source             String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
@@ -309,6 +321,7 @@ model Event {
   domain               EventDomain?
   memberInvites        EventMemberInvite[]
   slugAliases          EventSlugAlias[]
+  previewItems         PreviewItem[]
 
   @@index([ownerId, deletedAt])
   @@index([organizationId])
@@ -1430,32 +1443,34 @@ enum OrderStatus {
 }
 
 model Order {
-  id              String      @id @default(uuid(7)) @db.Uuid
-  userId          String      @db.Uuid
-  eventId         String?     @db.Uuid
-  planId          String      @db.Uuid
-  couponId        String?     @db.Uuid
-  amountMinor     Int
-  currency        String      @default("INR")
-  status          OrderStatus @default(CREATED)
-  providerOrderId String?     @unique
+  id               String      @id @default(uuid(7)) @db.Uuid
+  userId           String      @db.Uuid
+  eventId          String?     @db.Uuid
+  planId           String      @db.Uuid
+  couponId         String?     @db.Uuid
+  amountMinor      Int
+  currency         String      @default("INR")
+  status           OrderStatus @default(CREATED)
+  providerOrderId  String?     @unique
   /// PURCHASE (checkout) or ADMIN_GRANT (a complimentary upgrade by the Super Admin).
-  kind            String      @default("PURCHASE")
+  kind             String      @default("PURCHASE")
   /// Why a grant was made (required for ADMIN_GRANT).
-  note            String?
-  grantedById     String?     @db.Uuid
+  note             String?
+  grantedById      String?     @db.Uuid
   /// When the buyer ticked the Terms and the Refund Policy for this purchase (also kept as a Consent).
-  termsAcceptedAt DateTime?
+  termsAcceptedAt  DateTime?
   /// How many of a stackable add-on (each adds its limits again).
-  quantity        Int         @default(1)
+  quantity         Int         @default(1)
   /// What the plan the account already had was worth, taken off the price (unlocking a bigger plan pays the difference).
-  creditMinor     Int         @default(0)
+  creditMinor      Int         @default(0)
+  /// The preview request this purchase owns (ADR-076): once paid, its designs move into the buyer's account.
+  previewRequestId String?     @db.Uuid
   /// When the buyer was told the checkout is waiting for payment (once, 30 minutes after it was left unpaid; ADR-073).
-  pendingNoticeAt DateTime?
+  pendingNoticeAt  DateTime?
   /// When the buyer was last told a payment failed (at most once in 6 hours, however many attempts fail).
-  failedNoticeAt  DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  failedNoticeAt   DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   user     User        @relation(fields: [userId], references: [id])
   plan     PricingPlan @relation(fields: [planId], references: [id])
@@ -2002,7 +2017,10 @@ model CardSession {
   /// The card design (@bulava/template-schema CardDesignSchema).
   design            Json
   designHash        String
-  /// The signed-in customer who designed it, if any.
+  /// The token, AES-GCM encrypted (TOKEN_ENCRYPTION_KEY), so the account the card is saved in opens it on
+  /// any device (ADR-077); cards saved before have none until their account first opens them.
+  tokenCiphertext   String?
+  /// The signed-in customer who designed it, if any: the account it is saved in.
   userId            String?   @db.Uuid
   /// The contact who downloaded or bought it, once known.
   leadId            String?   @db.Uuid
@@ -2014,12 +2032,13 @@ model CardSession {
   updatedAt         DateTime  @updatedAt
   lastSeenAt        DateTime  @default(now())
 
-  user    User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  lead    CardLead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  uploads CardUpload[]
-  orders  CardOrder[]
-  exports CardExport[]
-  events  CardEvent[]
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lead         CardLead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  uploads      CardUpload[]
+  orders       CardOrder[]
+  exports      CardExport[]
+  events       CardEvent[]
+  previewItems PreviewItem[]
 
   @@index([lastSeenAt])
   @@index([templateKey, createdAt])
@@ -2089,6 +2108,8 @@ model CardOrder {
   /// The bank's or gateway's reason for the last failed attempt.
   failureReason     String?
   refundedAt        DateTime?
+  /// The preview request this card was bought from (ADR-076): once paid, the card moves into the buyer's account.
+  previewRequestId  String?         @db.Uuid
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -2189,4 +2210,164 @@ model CardEvent {
   @@index([sessionId])
   @@index([orderId])
   @@map("card_events")
+}
+
+// ───────────────────────────── Preview desk ─────────────────────────────
+// Previews made by Bulava's preview providers (ADR-076, docs/previews.md): a customer
+// asks (or staff enter a customer from outside), a provider designs the website, card
+// or film in the same editors customers use, the customer gets one link on WhatsApp,
+// and paying moves the designs into their account. Nothing a provider makes is ever
+// published or downloaded watermark-free before the customer owns it.
+
+enum PreviewRequestStatus {
+  /// Waiting for a preview provider.
+  NEW
+  /// A provider has it.
+  ASSIGNED
+  /// The provider is designing.
+  IN_PROGRESS
+  /// At least one preview is on the customer's page.
+  SENT
+  /// The customer asked for changes from their page.
+  CHANGES_REQUESTED
+  /// Paid for (or had through the customer's plan): the designs are in their account.
+  OWNED
+  /// Ended without a sale.
+  CLOSED
+  /// Withdrawn, a duplicate or spam.
+  CANCELLED
+}
+
+enum PreviewKind {
+  WEBSITE
+  CARD
+  FILM
+}
+
+enum PreviewItemStatus {
+  /// Being designed: not on the customer's page.
+  DRAFT
+  /// On the customer's page.
+  SHARED
+  /// Taken off the customer's page.
+  WITHDRAWN
+}
+
+model PreviewRequest {
+  id              String               @id @default(uuid(7)) @db.Uuid
+  /// Read out on calls and shown to the customer: PV-XXXXXX.
+  reference       String               @unique
+  status          PreviewRequestStatus @default(NEW)
+  /// WEBSITE (the request form) or STAFF (entered in the console for a customer from outside).
+  source          String               @default("WEBSITE")
+  /// SHA-256 of the customer's link token (an HMAC of the id and linkVersion: @bulava/auth previewLookToken).
+  tokenHash       String               @unique
+  /// Bumped to replace the link: the old one stops working at once.
+  linkVersion     Int                  @default(1)
+  // ── Who asked ──
+  name            String
+  /// E.164, as users' and guests' numbers are stored.
+  phone           String
+  email           String?              @db.Citext
+  /// The signed-in account that asked, if any.
+  userId          String?              @db.Uuid
+  // ── Their celebration ──
+  eventTypeKey    String
+  /// The event's name for occasions without names (a housewarming, a festival).
+  title           String?
+  /// Names as the event type's details schema has them (couple: partnerOne, partnerTwo; honoree: name).
+  details         Json                 @default("{}")
+  /// YYYY-MM-DD.
+  date            String?
+  venue           String?
+  city            String?
+  /// The functions they told us about: [{ name, date?, time?, venue? }].
+  functions       Json                 @default("[]")
+  /// What they would like made.
+  wants           PreviewKind[]
+  /// A design they liked (a template key).
+  templateKey     String?
+  language        String               @default("en")
+  notes           String?
+  // ── The work ──
+  assigneeId      String?              @db.Uuid
+  assignedAt      DateTime?
+  // ── The offer ──
+  /// The plan that owns the designs (a key, public or hidden); null when there are only cards, each bought at the card price.
+  offerPlanKey    String?
+  /// A coupon the checkout starts with.
+  offerCouponCode String?
+  // ── What happened ──
+  sentAt          DateTime?
+  firstViewedAt   DateTime?
+  lastViewedAt    DateTime?
+  views           Int                  @default(0)
+  ownedAt         DateTime?
+  /// The account the designs moved into.
+  ownerId         String?              @db.Uuid
+  /// The purchase that bought them: a plan order, or a card order.
+  orderId         String?              @db.Uuid
+  cardOrderId     String?              @db.Uuid
+  /// When they (or staff for them) agreed to be contacted about it; the versions are in Consent.
+  consentAt       DateTime
+  /// Staff who entered it (source STAFF).
+  createdById     String?              @db.Uuid
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  user       User?             @relation("PreviewRequester", fields: [userId], references: [id], onDelete: SetNull)
+  assignee   User?             @relation("PreviewAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  items      PreviewItem[]
+  activities PreviewActivity[]
+  consents   Consent[]
+
+  @@index([status, createdAt])
+  @@index([assigneeId, status])
+  @@index([phone])
+  @@index([userId])
+  @@map("preview_requests")
+}
+
+/// One preview: a website or a film (designed on the request's draft event) or a card.
+model PreviewItem {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  requestId     String            @db.Uuid
+  kind          PreviewKind
+  status        PreviewItemStatus @default(DRAFT)
+  /// The design it is made from.
+  templateKey   String
+  /// WEBSITE and FILM: the request's draft event (one per request, held by its provider until owned).
+  eventId       String?           @db.Uuid
+  /// CARD: the card, designed in the card editor.
+  cardSessionId String?           @db.Uuid
+  sharedAt      DateTime?
+  createdById   String            @db.Uuid
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  request     PreviewRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  event       Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  cardSession CardSession?   @relation(fields: [cardSessionId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([eventId])
+  @@index([cardSessionId])
+  @@map("preview_items")
+}
+
+/// A request's timeline: notes, assignments, shares, views, the customer's change requests, ownership.
+model PreviewActivity {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  requestId String   @db.Uuid
+  /// The staff member or provider; null for the customer and the system.
+  actorId   String?  @db.Uuid
+  kind      String
+  text      String?
+  meta      Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  request PreviewRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("preview_activities")
 }

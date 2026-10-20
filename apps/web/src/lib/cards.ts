@@ -95,6 +95,8 @@ export interface OpenedSession {
   orders: CardSessionOrder[];
   /** Signed in: this design was had through their plan before (downloading it again takes nothing more). */
   planCounted: boolean;
+  /** A preview a provider is making for a customer (ADR-076): designed here, never downloaded from here. */
+  preview?: { requestId: string; reference: string } | null;
 }
 
 export interface CardExportView {

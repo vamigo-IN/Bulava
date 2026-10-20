@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ASSIGNABLE_PLATFORM_ROLES, platformRoleHasPermission } from '@bulava/auth';
 import { ADDON_SOURCE, type Prisma } from '@bulava/database';
-import { z } from '@bulava/validation';
+import { OPEN_PREVIEW_STATUSES, z } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
@@ -12,7 +12,7 @@ import { MfaService } from '../auth/mfa.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
 
-const ALL_ROLES = ['USER', 'SUPPORT', 'CONTENT_MANAGER', 'FINANCE_MANAGER', 'PLATFORM_ADMIN', 'SUPER_ADMIN'] as const;
+const ALL_ROLES = ['USER', 'PREVIEW_PROVIDER', 'SUPPORT', 'CONTENT_MANAGER', 'FINANCE_MANAGER', 'PLATFORM_ADMIN', 'SUPER_ADMIN'] as const;
 
 export const UsersQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
@@ -254,6 +254,9 @@ export class AdminUsersService {
     if (input.status === 'SUSPENDED' && target.platformRole !== 'USER' && !staffManager) throw AppError.forbidden('Only the Super Admin can suspend staff.');
     const user = await this.prisma.user.update({ where: { id: userId }, data: input });
     if (input.status === 'SUSPENDED') await this.prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    // Someone who can no longer make previews gives their open requests back to the queue (ADR-076).
+    const leftDesk = platformRoleHasPermission(target.platformRole, 'preview.work') && (input.status === 'SUSPENDED' || (input.platformRole !== undefined && !platformRoleHasPermission(input.platformRole, 'preview.work')));
+    if (leftDesk) await this.releasePreviews(userId, actor.id);
     await this.audit.record({
       actorType: 'USER',
       actorId: actor.id,
@@ -264,6 +267,17 @@ export class AdminUsersService {
       meta,
     });
     return { id: user.id, status: user.status, platformRole: user.platformRole };
+  }
+
+  /** Open preview requests of someone who left the preview desk: back to the open queue, what they started going to whoever takes each. */
+  private async releasePreviews(userId: string, actorId: string): Promise<void> {
+    const open = await this.prisma.previewRequest.findMany({ where: { assigneeId: userId, status: { in: [...OPEN_PREVIEW_STATUSES] } }, select: { id: true, status: true } });
+    for (const r of open) {
+      await this.prisma.$transaction([
+        this.prisma.previewRequest.update({ where: { id: r.id }, data: { assigneeId: null, assignedAt: null, ...(r.status === 'ASSIGNED' || r.status === 'IN_PROGRESS' ? { status: 'NEW' as const } : {}) } }),
+        this.prisma.previewActivity.create({ data: { requestId: r.id, actorId, kind: 'RELEASED', meta: { reason: 'role_changed' } } }),
+      ]);
+    }
   }
 
   /**

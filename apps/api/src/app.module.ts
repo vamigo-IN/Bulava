@@ -125,6 +125,8 @@ import { CardOrdersService } from './modules/cards/card-orders.service';
 import { CardsService } from './modules/cards/cards.service';
 import { StockController } from './modules/stock/stock.controller';
 import { StockService } from './modules/stock/stock.service';
+import { AdminPreviewsController, DeskController, LooksController, PublicLooksController, PublicPreviewRequestsController } from './modules/previews/previews.controller';
+import { PreviewsService } from './modules/previews/previews.service';
 
 /** Invitation tokens, card render tokens and the GetGabs webhook token travel in URLs; keep them out of logs. */
 function redactUrl(url: string | undefined): string | undefined {
@@ -246,6 +248,11 @@ const bootConfig = loadConfig();
     CardsController,
     AdminCardsController,
     StockController,
+    PublicPreviewRequestsController,
+    PublicLooksController,
+    LooksController,
+    DeskController,
+    AdminPreviewsController,
   ],
   providers: [
     // Guards run in this order: rate limit -> authenticate -> CSRF -> event permission.
@@ -326,6 +333,7 @@ const bootConfig = loadConfig();
     StockService,
     CardOrdersService,
     CardAdminService,
+    PreviewsService,
     { provide: DNS_RESOLVER, useValue: systemResolver },
     {
       // Customer-domain certificates come from the Super Admin's settings (Cloudflare for SaaS,

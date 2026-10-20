@@ -25,6 +25,8 @@ interface OrderStatusView {
   event: { id: string; title: string } | null;
   payment: { provider: string; reference: string | null; paidAt: string | null } | null;
   validUntil: string | null;
+  /** Bought from a preview page (ADR-076): the designs made for the buyer, once they are in the account. */
+  preview?: { reference: string; owned: boolean; eventId: string | null } | null;
 }
 
 /** What the page shows. "confirming" turns into "waiting" when confirmation takes longer than usual. */
@@ -197,6 +199,11 @@ export default function PaymentStatusPage() {
             <Palette aria-hidden className="size-4" /> {t('payment.templateApplied')}
           </p>
         ) : null}
+        {view === 'paid' && data.preview?.owned ? (
+          <p className="mx-auto mt-3 inline-flex items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-medium text-emerald-800 shadow-clay-sm">
+            <CheckCircle2 aria-hidden className="size-4" /> {t('payment.preview.owned')}
+          </p>
+        ) : null}
 
         {error ? (
           <div className="mx-auto mt-5 max-w-xl text-left">
@@ -215,8 +222,13 @@ export default function PaymentStatusPage() {
               </Link>
             </>
           ) : null}
+          {view === 'paid' && !data.event && data.preview?.owned ? (
+            <Link href={data.preview.eventId ? `/dashboard/events/${data.preview.eventId}` : '/dashboard/cards'} className="btn-3d min-h-12 rounded-2xl px-6">
+              {data.preview.eventId ? t('payment.preview.open') : t('payment.preview.cards')}
+            </Link>
+          ) : null}
           {view === 'paid' && !data.event ? (
-            <Link href="/dashboard" className="btn-3d min-h-12 rounded-2xl px-6">
+            <Link href="/dashboard" className={data.preview?.owned ? 'btn-3d btn-3d-light min-h-12 rounded-2xl px-6' : 'btn-3d min-h-12 rounded-2xl px-6'}>
               {t('payment.action.dashboard')}
             </Link>
           ) : null}

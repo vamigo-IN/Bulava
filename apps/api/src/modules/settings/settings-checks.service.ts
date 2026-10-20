@@ -86,6 +86,8 @@ const TEMPLATE_KIND_LABEL: Record<WhatsAppTemplateKind, string> = {
   planPurchased: 'plan purchased',
   paymentFailed: 'payment failed',
   paymentPending: 'payment pending',
+  previewRequested: 'preview requested',
+  previewReady: 'preview ready',
   otp: 'sign-in code',
 };
 
@@ -100,6 +102,8 @@ function sampleParams(kind: WhatsAppTemplateKind, site: string, web: string): st
     planPurchased: ['Test', 'Standard', '₹599', `${web}/dashboard/payments`],
     paymentFailed: ['Test', 'Standard', `${web}/dashboard/payments`],
     paymentPending: ['Test', 'Standard', `${web}/dashboard/payments`],
+    previewRequested: ['Test', 'PV-TEST01'],
+    previewReady: ['Test', 'your invitation website and card', `${web}/`],
     otp: ['123456'],
   };
   return samples[kind];

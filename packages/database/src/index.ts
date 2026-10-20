@@ -18,6 +18,7 @@ export {
   type FeatureValue,
 } from './features';
 export { recordWhatsAppDelivery, type WhatsAppDeliveryReport } from './whatsapp-delivery';
+export { firstName, previewMadeList, previewTitle } from './previews';
 export {
   isUnreachableError,
   markWhatsAppUnreachable,

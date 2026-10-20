@@ -26,6 +26,7 @@ Bulava is an event platform with a template engine, invitation engine, media pla
 | Super Admin console: branding, SEO and AI crawlers, trackers and custom code, integrations (Razorpay, SMTP, WhatsApp, Google sign-in, Google Maps, custom domains, storage test), staff roles, user profiles, payment states, complimentary upgrades | Done |
 | WhatsApp Business delivery (GetGabs by default, or Meta's Cloud API) with per-plan allowances and delivery/read status; Google Maps on invitations | Done |
 | Site pages edited in the console (About, Contact, policies, new pages), contact form with a staff inbox, payment status page | Done |
+| Preview desk: preview requests, preview providers, previews made in the customers' editors, the customer's page with *Make it yours*, ownership moved on payment ([previews.md](previews.md)); cards saved in the account (My cards) | Done |
 | SMS delivery, AI assistant | Not started (see Roadmap) |
 
 ## Core domain
@@ -105,7 +106,8 @@ All routes live under `/api/v1`, except health (`/health`, `/health/db`, `/healt
 | domains | `/events/:id/domain` (+ `/check`), `/public/domains/resolve` | `event.read` / `event.update` / public (used by the web middleware) |
 | announcements, notifications | `/events/:id/announcements`, `/notifications` | event permissions / signed in |
 | payments | `/events/:id/orders`, `/orders/:id` (+ `/verify`, `/checkout`), `/payments/razorpay/webhook` | signed in (the buyer's own orders) / HMAC |
-| cards | `/public/cards/*` (config, sessions, photos, downloads, orders, recovery, the renderer's data), `/cards/session/plan-download`, `/admin/cards/*` ([cards.md](cards.md#api)) | public with the card's or order's token in a header / signed in / `cards.view`, `cards.manage` |
+| cards | `/public/cards/*` (config, sessions, photos, downloads, orders, recovery, the renderer's data), `/cards/session/plan-download`, `/cards/mine/*` (My cards), `/admin/cards/*` ([cards.md](cards.md#api)) | public with the card's or order's token in a header / signed in / `cards.view`, `cards.manage` |
+| previews | `/public/preview-requests`, `/public/looks/*`, `/looks/own`, `/previews/mine`, `/desk/*`, `/admin/previews/*` ([previews.md](previews.md#routes)) | public (rate limited) / the page's token in a header / signed in / `preview.work` / `preview.manage` |
 | site pages | `/public/pages` (+ `/:slug`), `/admin/pages` | public / `page.manage` |
 | home page showcase | `/public/showcase`, `/admin/showcase` (+ `/:section`) | public / `showcase.manage` |
 | contact | `/public/contact`, `/admin/contact-messages` | public (rate limited) / `contact.manage` |

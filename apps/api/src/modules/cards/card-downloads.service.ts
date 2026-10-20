@@ -44,6 +44,7 @@ export class CardDownloadsService {
       throw new AppError('CARD_PLAN_REQUIRED', 'Downloading a card comes with a plan. Choose a plan, or buy this card on its own.');
     }
     const session = await this.cards.session(token);
+    await this.cards.assertNotHeld(session.id);
     const lead = await this.prisma.$transaction(async (tx) => {
       const contact = await this.cards.upsertLead(tx, input.phone, { choice: 'FREE', marketingConsent: input.marketingConsent, source: `card-free:${session.id}` });
       await tx.cardSession.update({ where: { id: session.id }, data: { leadId: contact.id, lastSeenAt: new Date() } });
@@ -66,6 +67,7 @@ export class CardDownloadsService {
     const options = await this.cards.requireEnabled();
     if (!options.planDownloads) throw new AppError('CARD_PLAN_REQUIRED', 'Watermark-free cards are bought one by one at the moment.', { included: 0 });
     const session = await this.cards.session(token);
+    await this.cards.assertNotHeld(session.id);
     const allowance = await this.cards.allowance(user.id);
     if (allowance.included === 0) throw new AppError('CARD_PLAN_REQUIRED', 'Your plan does not include watermark-free cards. Buy this card on its own, or unlock a plan that includes them.', { included: 0 });
     let result: { card: CardExport; created: boolean; used: number };

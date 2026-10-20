@@ -30,6 +30,9 @@ Payloads never contain secrets. Invitation links are rebuilt by the worker from 
 | `PAYMENT_PENDING` | email and WhatsApp | buyer | a checkout opened at the gateway is still unpaid 30 minutes later (once) |
 | `RSVP_REMINDER` | WhatsApp or email | invited guests who have not replied | the host's scheduled time, or *Send reminder now* |
 | `FUNCTION_REMINDER` | WhatsApp or email | guests who can attend the function and have not declined | N hours before each function |
+| `PREVIEW_REQUESTED` | email and WhatsApp | someone who asked for a preview | their request arrived ([previews.md](previews.md#messages)) |
+| `PREVIEW_READY` | email and WhatsApp | someone who asked for a preview | a preview was shared with them: the link to their page, a minute later so previews shared together go in one message |
+| `PREVIEW_NEW`, `PREVIEW_ASSIGNED`, `PREVIEW_CHANGES`, `PREVIEW_REPLY`, `PREVIEW_OWNED`, `PREVIEW_WELCOME` | in-app (and email, but `NEW` and `OWNED`) | preview providers (admins while nobody has a request), owners | the preview desk's work |
 
 "Email and WhatsApp" messages go by email to everyone with an address and on WhatsApp to everyone whose number reaches it (see [Follow-ups](#follow-ups)); "WhatsApp or email" messages take one channel per guest.
 
@@ -77,6 +80,8 @@ Both send the same templates, approved by Meta (created in GetGabs → Templates
 | `galleryShared` | `{{1}}` guest's name, `{{2}}` event, `{{3}}` the album's link with the guest's key |
 | `planPurchased` | `{{1}}` buyer's first name, `{{2}}` plan, `{{3}}` amount paid, `{{4}}` receipt link |
 | `paymentFailed`, `paymentPending` | `{{1}}` buyer's first name, `{{2}}` plan, `{{3}}` link to finish the payment |
+| `previewRequested` | `{{1}}` customer's first name, `{{2}}` the request's reference |
+| `previewReady` | `{{1}}` customer's first name, `{{2}}` what was made ("your invitation website and card"), `{{3}}` the link to their preview page |
 | `otp` | an *Authentication* template with a copy-code button: the six-digit code fills `{{1}}` and the button |
 
 The suggested wording for each, ready to submit in GetGabs, is in [Template texts](#template-texts). Variables are never empty and never contain line breaks (WhatsApp refuses both): the worker flattens them and writes "See your invitation" when a function has no date or venue.
@@ -98,7 +103,7 @@ The **sign-in code** goes to hosts rather than guests, through the `whatsapp` qu
 
 ### Replies
 
-Bulava's number never answers on its own: a guest's message goes to their host. `WhatsAppInboxService` finds the guest (the message it answers, by the provider's message id, else the guest this number last got a message as, in a live event within 30 days) and tells the event's owner: a `GUEST_REPLY` in the dashboard (the bell and the home page, with *Reply on WhatsApp*, a `wa.me` link that opens a chat with the guest from the host's own WhatsApp) and an email with the message and the same button, at most once an hour per guest. A message from a number Bulava cannot tie to a guest only updates the number's standing.
+Bulava's number never answers on its own: a guest's message goes to their host, and someone who asked for a preview reaches whoever is making it (the message answers a preview message, or the last message their number got was one; [previews.md](previews.md#messages)). `WhatsAppInboxService` finds the guest (the message it answers, by the provider's message id, else the guest this number last got a message as, in a live event within 30 days) and tells the event's owner: a `GUEST_REPLY` in the dashboard (the bell and the home page, with *Reply on WhatsApp*, a `wa.me` link that opens a chat with the guest from the host's own WhatsApp) and an email with the message and the same button, at most once an hour per guest. A message from a number Bulava cannot tie to a guest only updates the number's standing.
 
 ## Follow-ups
 
@@ -106,6 +111,7 @@ Bulava's number never answers on its own: a guest's message goes to their host. 
 
 - **To guests** (`toGuests`): an email to each guest with an address, and the same message on WhatsApp to each whose number reaches it (not unreachable or opted out), while the kind's template is set and the event's plan has WhatsApp messages left, counted under the allowance lock. The confirmation of a registration, a host's update and the album go this way; the API answers with what went where (`delivery: { email, whatsapp, whatsappSkipped }`), which the dashboard shows.
 - **To buyers** (`toBuyer`): an email to their address and WhatsApp to their confirmed number (`phoneVerifiedAt`), outside any event's allowance (the rows have no event): the receipt (`PLAN_PURCHASED`) when a purchase is paid, `PAYMENT_FAILED` when Razorpay reports a failed payment (claimed with `failedNoticeAt`, so at most once in 6 hours per order), and `PAYMENT_PENDING` from the worker.
+- **To someone who asked for a preview** (`toPreviewCustomer`, [ADR-076](decisions.md)): an email when they gave one and WhatsApp to their number while the kind's template is set and the number reaches it, outside any allowance. The rows carry only the request's id (`previewRequestId`); the worker reads the number, the email and the link from the request when it sends.
 - **Scheduled by the worker** (`apps/worker/src/follow-ups.ts`): `payment-follow-ups` (every 5 minutes) reminds a buyer once about a purchase checkout opened at the gateway 30 minutes to a day ago and still unpaid, unless they paid for another order since or were told it failed (`pendingNoticeAt`); `gallery-follow-ups` (hourly) sends the album to an event's guests the morning after its last function (from 09:00 to 20:00 in the event's time zone, within 7 days) when the album has an approved photo, the host left the message on (`autoShareGallery`) and has not sent the album since the last function began, the gallery is not private and the plan includes it, once per event (`galleryAutoSharedAt`).
 
 At delivery the worker checks again: a payment reminder is dropped once the order is paid, the album once the gallery is private, an update once it is deleted.
@@ -122,6 +128,8 @@ Submit these in GetGabs → Templates (or WhatsApp Manager), category **Utility*
 | `plan_purchased` | Hello {{1}}, thank you! Your {{2}} plan is unlocked. You paid {{3}} once (GST included): nothing renews. Your receipt: {{4}} Happy celebrating! |
 | `payment_failed` | Hello {{1}}, your payment for the {{2}} plan did not go through. If any money left your account, your bank returns it automatically. Try again here: {{3}} Your design and guests are safe. |
 | `payment_pending` | Hello {{1}}, your {{2}} plan is waiting for payment. It takes a minute to finish here: {{3}} Your design and guests are saved. |
+| `preview_requested` | Hello {{1}}, thank you for asking for a preview of your invitation. Our designer is working on it and will send your preview link here, usually within a day. Your reference is {{2}}. |
+| `preview_ready` | Hello {{1}}, we have made {{2}} for you. See it here: {{3}} You can ask for changes or make it yours from that page. Please keep this link to yourself. |
 
 A receipt for a fully discounted order says "₹0".
 

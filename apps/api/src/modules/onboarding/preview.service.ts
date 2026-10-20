@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { HELD_PREVIEW } from '../events/events.service';
 import { MediaService } from '../media/media.service';
+import { PreviewsService } from '../previews/previews.service';
 import { RenderContextService } from '../templates/render-context.service';
 
 /**
@@ -20,6 +22,7 @@ export class PreviewService {
     private readonly renderContext: RenderContextService,
     private readonly media: MediaService,
     private readonly entitlements: EntitlementsService,
+    private readonly previews: PreviewsService,
   ) {}
 
   async view(token: string) {
@@ -46,6 +49,11 @@ export class PreviewService {
     // The preview shows what guests will see once published: the plan's sections, music and mark.
     const show = EntitlementsService.invitation(features, event);
     const info = await this.prisma.template.findUnique({ where: { key: template.templateKey }, select: { name: true, tier: true } });
+    // A website a provider made for a customer (ADR-076): the customer's page, where they own it.
+    const shared =
+      event.source === HELD_PREVIEW
+        ? await this.prisma.previewItem.findFirst({ where: { eventId: event.id, kind: 'WEBSITE', status: 'SHARED', request: { status: { notIn: ['OWNED', 'CLOSED', 'CANCELLED'] } } }, select: { request: { select: { id: true, linkVersion: true } } } })
+        : null;
 
     return {
       event: {
@@ -73,6 +81,7 @@ export class PreviewService {
       veil: show.watermark ? this.renderContext.siteAddress() : null,
       without: show.without,
       preview: true,
+      look: shared ? { href: this.previews.lookPath(shared.request) } : null,
     };
   }
 }

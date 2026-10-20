@@ -219,6 +219,8 @@ export const WHATSAPP_TEMPLATE_KINDS = [
   'planPurchased',
   'paymentFailed',
   'paymentPending',
+  'previewRequested',
+  'previewReady',
   'otp',
 ] as const;
 export type WhatsAppTemplateKind = (typeof WHATSAPP_TEMPLATE_KINDS)[number];
@@ -231,6 +233,8 @@ export const WHATSAPP_TEMPLATE_VARIABLES: Record<WhatsAppTemplateKind, number> =
   planPurchased: 4,
   paymentFailed: 3,
   paymentPending: 3,
+  previewRequested: 2,
+  previewReady: 3,
   otp: 1,
 };
 
@@ -267,6 +271,10 @@ export const WhatsAppSettingsSchema = z.object({
       paymentFailed: templateName,
       /** Buyers: a checkout waiting for payment: {{1}} name, {{2}} plan, {{3}} the link to finish it. */
       paymentPending: templateName,
+      /** Preview requests (ADR-076): the request arrived: {{1}} name, {{2}} its reference. */
+      previewRequested: templateName,
+      /** Preview requests: previews are ready: {{1}} name, {{2}} what was made ("your invitation website and card"), {{3}} the link to see them. */
+      previewReady: templateName,
       /** An "authentication" template with a copy-code button: {{1}} the code. */
       otp: templateName,
     })

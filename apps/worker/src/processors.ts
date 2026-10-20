@@ -24,6 +24,7 @@ import { checkDueDomains, type DnsResolver, type HostnameProvider, type RoutingT
 import { WhatsAppSendError, type EmailMessage, type EmailProvider, type WhatsAppChannel } from './providers';
 import { refreshWhatsAppStatuses } from './whatsapp-status';
 import { cardRetention, sendCardOrderEmail } from './cards';
+import { composePreviewCustomer, composePreviewWork, previewRecipient, previewRequestOf } from './previews';
 
 export interface WorkerDeps {
   prisma: PrismaClient;
@@ -81,9 +82,11 @@ function oneLine(text: string, max = 300): string {
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat || '-';
 }
 
-/** Who a WhatsApp notification goes to: its guest's number, or an account holder's confirmed number. */
+/** Who a WhatsApp notification goes to: its guest's number, an account holder's confirmed number, or the number on a preview request. */
 async function whatsappRecipient(deps: WorkerDeps, n: NotificationRow): Promise<string | null> {
   if (n.guestId) return (await deps.prisma.guest.findUnique({ where: { id: n.guestId }, select: { phone: true } }))?.phone ?? null;
+  const previewRequestId = n.userId ? null : previewRequestOf(n.payload);
+  if (previewRequestId) return previewRecipient(deps, previewRequestId);
   if (n.userId) {
     const user = await deps.prisma.user.findUnique({ where: { id: n.userId }, select: { phone: true, phoneVerifiedAt: true, deletedAt: true } });
     return user?.phone && user.phoneVerifiedAt && !user.deletedAt ? user.phone : null;
@@ -91,7 +94,7 @@ async function whatsappRecipient(deps: WorkerDeps, n: NotificationRow): Promise<
   return null;
 }
 
-type Outcome = { skip: string } | { email: EmailMessage } | { whatsapp: WhatsAppMessage };
+export type Outcome = { skip: string } | { email: EmailMessage } | { whatsapp: WhatsAppMessage };
 
 /**
  * Delivers one Notification row on its channel (EMAIL, or WHATSAPP through the
@@ -250,6 +253,10 @@ async function galleryUrlFor(deps: WorkerDeps, eventId: string, token: string | 
 
 /** Works out what to send (and re-checks that it is still wanted); the same rules for every channel. */
 async function compose(deps: WorkerDeps, n: NotificationRow, payload: Record<string, unknown>, channel: 'EMAIL' | 'WHATSAPP'): Promise<Outcome> {
+  // To someone who asked for a preview (ADR-076): their number and email are on the request.
+  const previewRequestId = n.guestId || n.userId ? null : previewRequestOf(payload);
+  if (previewRequestId) return composePreviewCustomer(deps, n.type, previewRequestId, channel, oneLine);
+
   if (n.guestId) {
     const guest = await deps.prisma.guest.findUnique({ where: { id: n.guestId }, include: { event: { select: { title: true, language: true, timezone: true, status: true, deletedAt: true } } } });
     if (!guest || guest.deletedAt) return { skip: 'Guest removed' };
@@ -348,6 +355,9 @@ async function compose(deps: WorkerDeps, n: NotificationRow, payload: Record<str
     }
     if (channel !== 'EMAIL') return { skip: `No WhatsApp message for ${n.type}` };
     if (!user.email) return { skip: 'User has no email' };
+    if (n.type === 'PREVIEW_ASSIGNED' || n.type === 'PREVIEW_CHANGES' || n.type === 'PREVIEW_REPLY' || n.type === 'PREVIEW_WELCOME') {
+      return composePreviewWork(deps, n, payload, { email: user.email, name: firstName });
+    }
     if (n.type === 'GUEST_REPLY') {
       const phone = String(payload.phone ?? '').replace(/[^\d]/g, '');
       return {

@@ -11,6 +11,7 @@ import {
   ContactRound,
   ExternalLink,
   Images,
+  Inbox,
   LayoutDashboard,
   MailOpen,
   Megaphone,
@@ -79,8 +80,22 @@ const GROUPS: Array<{ label: MessageKey; tabs: Tab[] }> = [
   },
 ];
 
+/** A preview made for a customer (ADR-076): what its provider designs, and nothing about guests or publishing. */
+const PREVIEW_GROUPS: Array<{ label: MessageKey; tabs: Tab[] }> = [
+  {
+    label: 'desk.event.group',
+    tabs: [
+      { href: '/design', label: 'dash.nav.design', icon: Palette },
+      { href: '/functions', label: 'dashboard.nav.functions', icon: CalendarDays },
+      { href: '/photos', label: 'dash.nav.photos', icon: Images },
+      { href: '/video', label: 'dash.nav.video', icon: Clapperboard },
+    ],
+  },
+];
+
 /** The groups and sections this member's role can use (a photographer sees only Photos); replies only while the host takes them (ADR-068). */
 function visibleGroups(event: EventSummary | undefined) {
+  if (event?.preview) return PREVIEW_GROUPS;
   return GROUPS.map((g) => ({ ...g, tabs: g.tabs.filter((tab) => canOpenSection(event, tab.href) && (tab.href !== '/rsvps' || event?.rsvpEnabled !== false)) })).filter((g) => g.tabs.length);
 }
 
@@ -106,7 +121,8 @@ export default function EventLayout({ children }: { children: ReactNode }) {
   if (event.isPending) return <Spinner label={t('common.loading')} />;
   if (event.isError) return <Alert>{errorMessage(t, event.error)}</Alert>;
   return (
-    <PublishProvider event={event.data} enabled={can(event.data, 'event.publish')}>
+    // A preview made for a customer is theirs to publish, once they own it (ADR-076).
+    <PublishProvider event={event.data} enabled={can(event.data, 'event.publish') && !event.data.preview}>
       <EventFrame event={event.data}>{children}</EventFrame>
     </PublishProvider>
   );
@@ -126,11 +142,12 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
   const first = groups[0]?.tabs[0] ?? null;
   const allowedHere = canOpenSection(event, section);
   const overview = section === '';
+  const held = event.preview ?? null;
 
-  // A role without the overview (a photographer) starts in its first section.
+  // A role without the overview (a photographer) starts in its first section; a preview, on its design.
   useEffect(() => {
-    if (section === '' && !allowedHere && first) router.replace(`${base}${first.href}`);
-  }, [section, allowedHere, first, base, router]);
+    if (section === '' && (!allowedHere || held) && first) router.replace(`${base}${first.href}`);
+  }, [section, allowedHere, held, first, base, router]);
 
   // The plan the event runs on, by its own name (the owner's account plan, or one of the event's own).
   const plan = useEventPlan(event.id);
@@ -177,17 +194,18 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
           <div className="absolute -bottom-40 -left-20 h-[320px] w-[420px] rounded-full bg-[radial-gradient(closest-side,rgba(184,137,43,0.16),transparent)]" />
         </div>
         <Mandala className="pointer-events-none absolute -top-28 -right-20 -z-10 w-80 animate-spin-slow text-gold-300 opacity-[0.1]" />
-        <Link href="/dashboard/events" className="group/back inline-flex items-center gap-1.5 text-sm text-ivory/70 transition-colors hover:text-ivory">
+        <Link href={held ? `/dashboard/desk/${held.requestId}` : '/dashboard/events'} className="group/back inline-flex items-center gap-1.5 text-sm text-ivory/70 transition-colors hover:text-ivory">
           <ArrowLeft aria-hidden className="size-4 transition-transform duration-300 group-hover/back:-translate-x-0.5" />
-          {t('dash.nav.events')}
+          {held ? t('desk.event.back') : t('dash.nav.events')}
         </Link>
         <div className={cn('flex flex-wrap items-end justify-between gap-5', overview ? 'mt-3' : 'mt-2')}>
           <div className="min-w-0">
             <h1 className={cn('font-display leading-[1.05] tracking-tight text-balance', overview ? 'text-4xl sm:text-5xl' : 'text-3xl sm:text-4xl')}>{event.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              {held ? <Chip icon={Inbox}>{t('desk.event.chip', { reference: held.reference })}</Chip> : null}
               <Chip dot={status === 'ACTIVE' ? 'bg-emerald-400' : status === 'DRAFT' ? 'bg-amber-300' : 'bg-stone-400'}>{t(`event.status.${status}`)}</Chip>
               {event.startDate ? <Chip icon={CalendarDays}>{formatEventDate(event.startDate, { language: 'en', timeZone: event.timezone })}</Chip> : null}
-              {planName ? <Chip dot={paid ? 'bg-gold-300' : undefined}>{planName}</Chip> : null}
+              {planName && !held ? <Chip dot={paid ? 'bg-gold-300' : undefined}>{planName}</Chip> : null}
               {/* Before publishing nothing is open to guests; the mode is chosen when publishing. */}
               {status !== 'DRAFT' ? <Chip>{t(`access.short.${event.accessMode}`)}</Chip> : null}
             </div>
@@ -206,7 +224,7 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
                 <ExternalLink aria-hidden className="size-4" />
               </a>
             ) : null}
-            {plan.data && can(event, 'payment.read') ? (
+            {plan.data && can(event, 'payment.read') && !held ? (
               paid ? (
                 <Link href={`${base}/unlock`} className={HEADER_BUTTON}>
                   <PackagePlus aria-hidden className="size-4" />
@@ -227,6 +245,7 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
             ) : null}
           </div>
         </div>
+        {held ? <p className="mt-4 max-w-2xl text-sm text-ivory/70">{t('desk.event.note')}</p> : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[232px_minmax(0,1fr)]">
@@ -237,7 +256,7 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
         {/* Desktop: a sticky sidebar, grouped, with the setup's progress on top. */}
         <nav aria-label={t('dash.nav.sections')} className="hidden lg:block">
           <div className="sticky top-20 max-h-[calc(100dvh-6rem)] space-y-4 overflow-y-auto rounded-[1.5rem] border border-gold-200/60 bg-sand/40 p-3 [scrollbar-width:thin]">
-            {progress ? (
+            {progress && !held ? (
               <div className="rounded-xl bg-white/70 px-3 py-2.5 ring-1 ring-gold-200/70">
                 <p className="flex items-center justify-between text-[11px] font-semibold tracking-[0.14em] text-stone-500 uppercase">
                   {t('next.setup')}
@@ -263,7 +282,7 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
             <>
               {children}
               {/* The overview has the full checklist; every other page ends with the way forward. */}
-              {!overview && canEdit ? <NextStepBar event={event} section={section} /> : null}
+              {!overview && canEdit && !held ? <NextStepBar event={event} section={section} /> : null}
             </>
           ) : section === '' && first ? (
             <Spinner label={t('common.loading')} />
@@ -273,7 +292,7 @@ function EventFrame({ event, children }: { event: EventSummary; children: ReactN
         </div>
       </div>
       {/* A plan limit met on any of the event's pages: the way to unlock more. */}
-      <PlanLimitPrompt eventId={event.id} canPay={can(event, 'billing.manage')} />
+      <PlanLimitPrompt eventId={event.id} canPay={can(event, 'billing.manage') && !held} />
     </div>
   );
 }

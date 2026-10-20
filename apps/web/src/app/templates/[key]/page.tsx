@@ -132,6 +132,15 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
                       </p>
                     </>
                   ) : null}
+                  {/* Or have it made: a designer sends a preview with their names on WhatsApp (ADR-076). */}
+                  <p className="mt-3 text-center text-sm text-stone-600">
+                    <Link
+                      href={`/get-preview?template=${tpl.key}${tpl.eventTypes[0] ? `&event=${tpl.eventTypes[0]}` : ''}${tpl.definition.type === 'VIDEO' ? '&want=FILM' : ''}`}
+                      className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700"
+                    >
+                      {t('previewReq.ctaShort')}
+                    </Link>
+                  </p>
                 </div>
               </div>
               <dl className="clay-inset mt-5 space-y-5 rounded-[2rem] p-7 text-sm">

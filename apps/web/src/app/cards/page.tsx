@@ -1,5 +1,6 @@
 import { Download, Paintbrush, Search, Sparkles } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { createTranslator, type MessageKey } from '@bulava/localization';
 import { Mandala } from '@bulava/template-engine/src/ornaments';
 import { CardTemplateLink, RecentCards } from '@/components/cards/gallery-client';
@@ -163,6 +164,12 @@ export default async function CardsPage({ searchParams }: { searchParams: Promis
                 </li>
               ))}
             </ol>
+            {/* Or have one made: a designer sends a preview card on WhatsApp (ADR-076). */}
+            <p className="mt-5 text-center text-sm text-stone-600">
+              <Link href="/get-preview?want=CARD" className="font-semibold text-brand-700 underline decoration-gold-300 underline-offset-4 hover:decoration-brand-700">
+                {t('previewReq.ctaShort')}
+              </Link>
+            </p>
             <RecentCards />
 
             <h2 className="sr-only">{t('cards.gallery.heading')}</h2>

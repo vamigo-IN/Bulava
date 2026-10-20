@@ -17,12 +17,84 @@ export type PlatformPermission =
   | 'payment.refund'
   | 'plan.grant'
   | 'settings.manage'
-  | 'staff.manage';
-export type PlatformRole = 'USER' | 'SUPPORT' | 'CONTENT_MANAGER' | 'FINANCE_MANAGER' | 'PLATFORM_ADMIN' | 'SUPER_ADMIN';
+  | 'staff.manage'
+  | 'preview.work'
+  | 'preview.manage';
+export type PlatformRole = 'USER' | 'PREVIEW_PROVIDER' | 'SUPPORT' | 'CONTENT_MANAGER' | 'FINANCE_MANAGER' | 'PLATFORM_ADMIN' | 'SUPER_ADMIN';
 /** Roles the Super Admin can give; SUPER_ADMIN itself is handed over, never assigned. */
-export const ASSIGNABLE_ROLES: PlatformRole[] = ['USER', 'SUPPORT', 'CONTENT_MANAGER', 'FINANCE_MANAGER', 'PLATFORM_ADMIN'];
+export const ASSIGNABLE_ROLES: PlatformRole[] = ['USER', 'PREVIEW_PROVIDER', 'SUPPORT', 'CONTENT_MANAGER', 'FINANCE_MANAGER', 'PLATFORM_ADMIN'];
 /** Most senior first. */
-export const ROLE_RANK: Record<PlatformRole, number> = { SUPER_ADMIN: 0, PLATFORM_ADMIN: 1, FINANCE_MANAGER: 2, CONTENT_MANAGER: 3, SUPPORT: 4, USER: 5 };
+export const ROLE_RANK: Record<PlatformRole, number> = { SUPER_ADMIN: 0, PLATFORM_ADMIN: 1, FINANCE_MANAGER: 2, CONTENT_MANAGER: 3, SUPPORT: 4, PREVIEW_PROVIDER: 5, USER: 6 };
+
+// ─────────── The preview desk (ADR-076) ───────────
+
+export type PreviewStatus = 'NEW' | 'ASSIGNED' | 'IN_PROGRESS' | 'SENT' | 'CHANGES_REQUESTED' | 'OWNED' | 'CLOSED' | 'CANCELLED';
+export type PreviewKind = 'WEBSITE' | 'CARD' | 'FILM';
+
+export interface PreviewRow {
+  id: string;
+  reference: string;
+  status: PreviewStatus;
+  source: 'WEBSITE' | 'STAFF';
+  name: string;
+  title: string;
+  eventTypeKey: string;
+  date: string | null;
+  city: string | null;
+  wants: PreviewKind[];
+  templateKey: string | null;
+  assignee: { id: string; name: string } | null;
+  items: number;
+  views: number;
+  lastViewedAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PreviewDetail {
+  id: string;
+  reference: string;
+  status: PreviewStatus;
+  source: 'WEBSITE' | 'STAFF';
+  customer: { name: string; phone: string; email: string | null };
+  celebration: {
+    eventTypeKey: string;
+    eventTypeName: string;
+    detailsSchemaKey: string | null;
+    title: string;
+    details: Record<string, string>;
+    date: string | null;
+    venue: string | null;
+    city: string | null;
+    functions: Array<{ name: string; date?: string; time?: string; venue?: string }>;
+    language: string;
+  };
+  wants: PreviewKind[];
+  template: { key: string; name: string } | null;
+  notes: string | null;
+  assignee: { id: string; name: string } | null;
+  offer: { planKey: string | null; couponCode: string | null; plans: Array<{ key: string; name: string; priceMinor: number; visibility: 'PUBLIC' | 'HIDDEN' }> };
+  link: { path: string; url: string } | null;
+  items: Array<{ id: string; kind: PreviewKind; status: 'DRAFT' | 'SHARED' | 'WITHDRAWN'; templateKey: string; templateName: string; sharedAt: string | null; view: string | null }>;
+  views: number;
+  sentAt: string | null;
+  ownedAt: string | null;
+  createdAt: string;
+  activity: Array<{ id: string; kind: string; text: string | null; at: string; actor: string | null }>;
+}
+
+export interface PreviewProvider {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  createdAt: string;
+  twoStep: boolean;
+  open: number;
+  owned: number;
+}
 
 export interface Me {
   id: string;

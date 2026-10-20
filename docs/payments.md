@@ -45,6 +45,8 @@ Plans are chosen on the pricing page or an event's plans page, and bought on `/d
 
 `POST /events/:id/orders` still buys a one-time plan for one event (API clients; orders from before ADR-053 keep their event).
 
+**From a preview page** ([previews.md](previews.md#the-offer-and-owning), ADR-076) the checkout carries the page's link (`?look=`, and the offer's `coupon`, applied once): quotes and the order send it (`look`), the plan must be the one the preview offers (`PREVIEW_ENDED` otherwise; a hidden plan too, the link being the offer), the order keeps the request (`previewRequestId`), there is no exit offer, and the way back is the preview page. When the account already has a plan that covers it, the page offers *Add the designs to my account* instead of paying. Paying runs the preview desk's handler in the same transaction that settles the order (`onOrderPaid`), which moves the designs into the buyer's account; the status page then says so and opens the invitation (`GET /orders/:id` answers `preview: { reference, owned, eventId }`).
+
 An event runs on the bigger of the owner's account plan and a plan bought or given for that event alone (`GET /events/:id/plan`, ADR-066); its header and plan page name it. An add-on bought from an event (`eventId`) adds to that event's plan when the event's own plan is the bigger (the order is the event's), else to the account's. The console's complimentary grants are the account's unless an event is chosen; revoking one ends an add-on's entitlements as well as a plan's.
 
 ## Checkout (Razorpay)
@@ -126,4 +128,4 @@ Subscribe the webhook to `payment.captured`, `order.paid` and `payment.failed` (
 
 ## Digital cards
 
-Watermark-free cards are bought per card without an account ([cards.md](cards.md#paid-cards)). They use the same gateway, keys and webhook as plans: `PaymentsService.handleWebhook` hands gateway orders it does not know to the card orders (`onOtherPayment`), which settle them the same way (verified signature or webhook, idempotent under a row lock, amounts below the price refused). Card orders are `CardOrder` rows, not `Order`s: they have no user or plan, and their entitlement is the paid image itself. The price is the `cards` settings group (₹50 at least).
+Watermark-free cards are bought per card without an account ([cards.md](cards.md#paid-cards)). They use the same gateway, keys and webhook as plans: `PaymentsService.handleWebhook` hands gateway orders it does not know to the card orders (`onOtherPayment`), which settle them the same way (verified signature or webhook, idempotent under a row lock, amounts below the price refused). Card orders are `CardOrder` rows, not `Order`s: they have no plan, and their entitlement is the paid image itself. A card bought from a preview page keeps its request (`previewRequestId`), and paying it moves the request's cards into the buyer's account (`onPaid`, in the same transaction). The price is the `cards` settings group (₹50 at least).

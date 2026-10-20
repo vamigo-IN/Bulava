@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, Palette, Rocket } from 'lucide-react';
+import { Eye, Palette, Rocket, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { createTranslator } from '@bulava/localization';
@@ -16,8 +16,10 @@ interface HostRights {
  * A small mark over a preview: "Preview · Not published yet", and nothing
  * else for visitors. The host (signed in, allowed to edit or publish the
  * event) also gets the two ways forward: back to the design, and publishing.
+ * A preview made for a customer (`look`, ADR-076) offers "Make it yours"
+ * instead, back on their preview page; its provider edits but never publishes.
  */
-export function PreviewBar({ eventId, language, status }: { eventId: string; language: string; status: string }) {
+export function PreviewBar({ eventId, language, status, look = null }: { eventId: string; language: string; status: string; look?: string | null }) {
   const t = useMemo(() => createTranslator(language), [language]);
   const [rights, setRights] = useState<HostRights | null>(null);
 
@@ -35,17 +37,18 @@ export function PreviewBar({ eventId, language, status }: { eventId: string; lan
 
   const base = `/dashboard/events/${eventId}`;
   const edit = !!rights?.edit;
-  const publish = !!rights?.publish && status === 'DRAFT';
+  const publish = !!rights?.publish && status === 'DRAFT' && !look;
+  const own = Boolean(look) && !edit;
   const button = 'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors duration-200';
 
   return (
     <aside aria-label={t('preview.badge')} className="pointer-events-none fixed inset-x-0 bottom-3 z-[60] flex justify-center px-3">
-      <div className={cn('pointer-events-auto flex max-w-full items-center gap-2 rounded-full bg-night-900/90 py-1.5 pl-3.5 text-ivory shadow-lift ring-1 ring-white/10 backdrop-blur', edit || publish ? 'pr-1.5' : 'pr-3.5 min-h-9')}>
+      <div className={cn('pointer-events-auto flex max-w-full items-center gap-2 rounded-full bg-night-900/90 py-1.5 pl-3.5 text-ivory shadow-lift ring-1 ring-white/10 backdrop-blur', edit || publish || own ? 'pr-1.5' : 'pr-3.5 min-h-9')}>
         <Eye aria-hidden className="size-3.5 shrink-0 text-gold-200" />
         <p className="min-w-0 truncate text-xs">
           <span className="font-semibold tracking-[0.14em] text-gold-200 uppercase">{t('preview.badge')}</span>
           {/* Hosts on phones see the buttons instead; the mark says enough. */}
-          <span className={cn(edit || publish ? 'hidden sm:inline' : undefined)}>
+          <span className={cn(edit || publish || own ? 'hidden sm:inline' : undefined)}>
             <span aria-hidden className="mx-1.5 text-ivory/40">
               ·
             </span>
@@ -56,6 +59,12 @@ export function PreviewBar({ eventId, language, status }: { eventId: string; lan
           <Link href={`${base}/design`} className={`${button} bg-white/10 text-ivory hover:bg-white/20`}>
             <Palette aria-hidden className="size-3.5" />
             {t('preview.edit')}
+          </Link>
+        ) : null}
+        {own && look ? (
+          <Link href={look} className={`${button} bg-gradient-to-b from-gold-200 to-gold-300 text-night-900 hover:from-gold-100 hover:to-gold-200`}>
+            <Sparkles aria-hidden className="size-3.5" />
+            {t('preview.own')}
           </Link>
         ) : null}
         {publish ? (

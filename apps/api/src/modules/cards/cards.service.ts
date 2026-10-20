@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { cardOrderToken, generateSecureToken, hashToken, verifyCardRenderToken } from '@bulava/auth';
+import { cardOrderToken, decryptSecret, encryptSecret, generateSecureToken, hashToken, verifyCardRenderToken } from '@bulava/auth';
 import { featureLimit, loadEventFeatures, loadUserFeatures, type CardSession, type Prisma } from '@bulava/database';
 import { ObjectStorage, StorageKeys } from '@bulava/storage';
-import { CARD_FORMATS, CardDesignSchema, cardPixelSize, templateAssetIds, type CardDesign, type TemplateDefinition } from '@bulava/template-schema';
+import { CARD_FORMATS, CardDesignSchema, CardDetailsSchema, cardFromTemplate, cardPixelSize, templateAssetIds, type CardDesign, type CardDetails, type TemplateDefinition } from '@bulava/template-schema';
 import { FEATURE_KEYS, type CardDesignBody, type CardEventInput, type CardEventType, type CardUploadInput } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
@@ -293,6 +293,8 @@ export class CardsService {
     const session = await this.prisma.cardSession.create({
       data: {
         tokenHash: hashToken(token),
+        // So the account it is saved in can open it on any device (ADR-077).
+        tokenCiphertext: encryptSecret(token, this.config.TOKEN_ENCRYPTION_KEY),
         templateKey: template.key,
         templateVersionId: template.versionId,
         eventType: design.eventType,
@@ -325,9 +327,12 @@ export class CardsService {
         : Promise.resolve(null),
     ]);
     await this.prisma.cardSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
+    const preview = await this.heldPreview(session.id);
     return {
       ...this.sessionView(session),
       design: session.design,
+      // A preview a provider is making for a customer (ADR-076): designed here, never downloaded from here.
+      preview,
       uploads: await Promise.all(uploads.map((u) => this.uploadView(u))),
       orders: orders.map((o) => ({
         reference: o.reference,
@@ -338,6 +343,17 @@ export class CardsService {
       })),
       planCounted: Boolean(counted),
     };
+  }
+
+  /** The preview request a card is being made for, while its customer does not own it yet (ADR-076). */
+  async heldPreview(sessionId: string): Promise<{ requestId: string; reference: string } | null> {
+    const item = await this.prisma.previewItem.findFirst({ where: { cardSessionId: sessionId, request: { status: { not: 'OWNED' } } }, select: { request: { select: { id: true, reference: true } } } });
+    return item ? { requestId: item.request.id, reference: item.request.reference } : null;
+  }
+
+  /** Cards a provider makes for a customer are seen on the customer's preview page, never downloaded from the editor. */
+  async assertNotHeld(sessionId: string): Promise<void> {
+    if (await this.heldPreview(sessionId)) throw new AppError('PREVIEW_HELD', 'This card is a preview for a customer: they see it on their preview page.');
   }
 
   private sessionView(session: CardSession) {
@@ -518,7 +534,174 @@ export class CardsService {
     const photos = Object.fromEntries(Object.entries(design.photos).flatMap(([binding, id]) => (urls.has(id) ? [[binding, urls.get(id)!]] : [])));
     return { design, photos, watermark: card.kind === 'FREE' ? await this.watermarkText() : null, scale: CARD_FORMATS[design.format].scale };
   }
+
+  /** Signed links to a design's photos (the uploads it places), for drawing it in a browser. */
+  private async photoLinks(design: CardDesign, expiresInSeconds = 3600): Promise<Record<string, string>> {
+    const ids = [...new Set(Object.values(design.photos))];
+    if (!ids.length) return {};
+    const uploads = await this.prisma.cardUpload.findMany({ where: { id: { in: ids }, status: 'READY' }, select: { id: true, storageKey: true } });
+    const urls = new Map(await Promise.all(uploads.flatMap((u) => (u.storageKey ? [this.storage.presignDownload(u.storageKey, { expiresInSeconds, signingDate: hourStart() }).then((url) => [u.id, url] as const)] : []))));
+    return Object.fromEntries(Object.entries(design.photos).flatMap(([binding, id]) => (urls.has(id) ? [[binding, urls.get(id)!]] : [])));
+  }
+
+  // ─────────────────────────── Previews (ADR-076) ───────────────────────────
+
+  /**
+   * A card a preview provider starts for a customer: the design's card in the
+   * phone format, its details filled in from the request, saved for the
+   * provider (who opens it in the card editor from the desk).
+   */
+  async createForPreview(templateKey: string, input: { eventType: string; language: string; userId: string; details: Partial<CardDetails> }): Promise<{ id: string; token: string }> {
+    const template = await this.template(templateKey);
+    const language = template.definition.languages.includes(input.language) ? input.language : (template.definition.languages[0] ?? 'en');
+    const eventType = !template.eventTypes.length || template.eventTypes.includes(input.eventType) ? input.eventType : template.eventTypes[0]!;
+    const blank = cardFromTemplate(template.definition, { format: 'phone', eventType, language, tags: template.tags });
+    // Only what the customer told us replaces the sample: empty details keep the design's own words.
+    const given = Object.fromEntries(Object.entries(input.details).filter(([, v]) => (Array.isArray(v) ? v.length > 0 : Boolean(v))));
+    const details = CardDetailsSchema.parse({ ...blank.details, ...given });
+    const design = checkDesign({ ...blank, details }, template);
+    const token = generateSecureToken();
+    const session = await this.prisma.cardSession.create({
+      data: {
+        tokenHash: hashToken(token),
+        tokenCiphertext: encryptSecret(token, this.config.TOKEN_ENCRYPTION_KEY),
+        templateKey: template.key,
+        templateVersionId: template.versionId,
+        eventType: design.eventType,
+        format: design.format,
+        design: design as unknown as Prisma.InputJsonValue,
+        designHash: designHash(design),
+        userId: input.userId,
+        customizedAt: new Date(),
+      },
+    });
+    return { id: session.id, token };
+  }
+
+  /** A preview card as its customer sees it: the design with the watermark, and its photos. */
+  async previewRenderData(sessionId: string) {
+    const session = await this.prisma.cardSession.findUnique({ where: { id: sessionId } });
+    if (!session) throw AppError.notFound('Card');
+    const design = CardDesignSchema.parse(session.design);
+    const template = await this.template(session.templateKey).catch(() => null);
+    return { design, photos: await this.photoLinks(design), watermark: await this.watermarkText(), scale: CARD_FORMATS[design.format].scale, templateName: template?.name ?? session.templateKey };
+  }
+
+  // ─────────────────────────── The account's cards (ADR-077) ───────────────────────────
+
+  /**
+   * Cards saved in the account: those made or opened while signed in, cards
+   * from the preview desk once owned, and cards bought while signed in. Drafts
+   * nobody changed (a template opened) are left out.
+   */
+  async mine(userId: string) {
+    const sessions = await this.prisma.cardSession.findMany({
+      where: {
+        userId,
+        OR: [{ customizedAt: { not: null } }, { orders: { some: {} } }, { exports: { some: {} } }],
+        // A provider's previews for customers live on the preview desk until their customer owns them (ADR-076).
+        previewItems: { none: { request: { status: { not: 'OWNED' } } } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 48,
+      include: {
+        orders: { where: { status: 'PAID' }, orderBy: { paidAt: 'desc' }, select: { id: true, reference: true, paidAt: true, designHash: true } },
+        exports: { select: { kind: true, status: true, downloads: true, firstDownloadedAt: true, designHash: true } },
+        previewItems: { select: { request: { select: { reference: true, status: true } } }, take: 1 },
+      },
+    });
+    const keys = [...new Set(sessions.map((s) => s.templateKey))];
+    const templates = keys.length ? await this.prisma.template.findMany({ where: { key: { in: keys } }, select: { key: true, name: true } }) : [];
+    const names = new Map(templates.map((t) => [t.key, t.name]));
+    // Bought cards whose saved design was cleaned up long ago are still theirs, through their order.
+    const orphans = await this.prisma.cardOrder.findMany({ where: { userId, status: 'PAID', sessionId: null }, orderBy: { paidAt: 'desc' }, take: 24, select: { id: true, reference: true, paidAt: true, templateKey: true, design: true } });
+    const cards = await Promise.all(
+      sessions.map(async (s) => {
+        const design = CardDesignSchema.safeParse(s.design);
+        const preview = s.previewItems[0]?.request;
+        const downloads = s.exports.reduce((n, e) => n + e.downloads, 0);
+        return {
+          id: s.id,
+          templateKey: s.templateKey,
+          templateName: names.get(s.templateKey) ?? s.templateKey,
+          format: s.format,
+          eventType: s.eventType,
+          design: design.success ? design.data : null,
+          photos: design.success ? await this.photoLinks(design.data) : {},
+          status: s.orders.length ? ('BOUGHT' as const) : downloads ? ('DOWNLOADED' as const) : ('DRAFT' as const),
+          fromDesigner: preview ? { reference: preview.reference } : null,
+          bought: s.orders.map((o) => ({ reference: o.reference, paidAt: o.paidAt, orderToken: cardOrderToken(o.id, this.config.TOKEN_ENCRYPTION_KEY), current: o.designHash === s.designHash })),
+          downloads,
+          planCards: s.exports.some((e) => e.kind === 'PLAN' && e.status !== 'FAILED'),
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        };
+      }),
+    );
+    return {
+      cards,
+      orders: orphans.map((o) => {
+        const design = CardDesignSchema.safeParse(o.design);
+        return { reference: o.reference, paidAt: o.paidAt, templateKey: o.templateKey, templateName: names.get(o.templateKey) ?? o.templateKey, design: design.success ? design.data : null, orderToken: cardOrderToken(o.id, this.config.TOKEN_ENCRYPTION_KEY) };
+      }),
+    };
+  }
+
+  private async ownSession(userId: string, id: string): Promise<CardSession> {
+    const session = await this.prisma.cardSession.findFirst({ where: { id, userId } });
+    if (!session) throw AppError.notFound('Card');
+    return session;
+  }
+
+  /** One saved card's story: made, changed, downloaded, bought, emailed (the funnel's facts, newest first). */
+  async history(userId: string, id: string) {
+    const session = await this.ownSession(userId, id);
+    const events = await this.prisma.cardEvent.findMany({ where: { sessionId: session.id }, orderBy: { createdAt: 'desc' }, take: 100, select: { type: true, createdAt: true, meta: true } });
+    return { id: session.id, createdAt: session.createdAt, updatedAt: session.updatedAt, events: events.filter((e) => ACCOUNT_HISTORY.has(e.type)).map((e) => ({ type: e.type, at: e.createdAt, meta: e.meta })) };
+  }
+
+  /**
+   * Opening a saved card on any device: its token, for the editor. A card
+   * saved before its token was kept gets a new one (the old one, on the device
+   * it was made on, stops working; that editor saves its copy again).
+   */
+  async openMine(userId: string, id: string): Promise<{ token: string; templateKey: string }> {
+    const session = await this.ownSession(userId, id);
+    if (session.tokenCiphertext) {
+      try {
+        return { token: decryptSecret(session.tokenCiphertext, this.config.TOKEN_ENCRYPTION_KEY), templateKey: session.templateKey };
+      } catch {
+        /* a key rotated since: a new token below */
+      }
+    }
+    const token = generateSecureToken();
+    await this.prisma.cardSession.update({ where: { id: session.id }, data: { tokenHash: hashToken(token), tokenCiphertext: encryptSecret(token, this.config.TOKEN_ENCRYPTION_KEY), lastSeenAt: new Date() } });
+    return { token, templateKey: session.templateKey };
+  }
+
+  /** A saved card the customer does not want: drafts go; a bought card stays (its order is their receipt). */
+  async removeMine(userId: string, id: string): Promise<{ ok: true }> {
+    const session = await this.ownSession(userId, id);
+    const paid = await this.prisma.cardOrder.count({ where: { sessionId: session.id, status: 'PAID' } });
+    if (paid) throw new AppError('BAD_REQUEST', 'A card you bought stays in your account.');
+    if (await this.heldPreview(session.id)) throw new AppError('PREVIEW_HELD', 'This card is a preview for a customer.');
+    await this.prisma.cardSession.delete({ where: { id: session.id } });
+    return { ok: true };
+  }
 }
+
+/** What a saved card's history shows the customer (not the browser-only funnel steps). */
+const ACCOUNT_HISTORY: ReadonlySet<string> = new Set([
+  'CARD_CUSTOMIZED',
+  'FREE_DOWNLOAD_COMPLETED',
+  'PLAN_DOWNLOAD_COMPLETED',
+  'PAID_DOWNLOAD_COMPLETED',
+  'PAYMENT_SUCCEEDED',
+  'EMAIL_SENT',
+  'FREE_CARD_GENERATED',
+  'PLAN_CARD_GENERATED',
+  'PAID_CARD_GENERATED',
+]);
 
 /** The start of the hour: links signed from it stay the same for an hour (and work for one more), so browsers reuse their copy. */
 function hourStart(): Date {

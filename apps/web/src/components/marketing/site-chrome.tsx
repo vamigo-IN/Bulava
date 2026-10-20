@@ -18,10 +18,12 @@ export { Logo };
 
 const t = createTranslator('en');
 
-const NAV = [
+const NAV: Array<{ href: string; label: string; wide?: boolean }> = [
   { href: '/templates', label: t('nav.templates') },
   { href: '/cards', label: t('nav.cards') },
   { href: '/design', label: t('nav.design') },
+  // A designer makes it for them (ADR-076); in the bar from wide screens, always in the menu and the footer.
+  { href: '/get-preview', label: t('nav.freePreview'), wide: true },
   { href: '/#how-it-works', label: t('nav.howItWorks') },
   { href: '/#features', label: t('nav.features') },
   { href: '/pricing', label: t('nav.pricing') },
@@ -71,7 +73,10 @@ export async function SiteHeader({ tone = 'light' }: { tone?: 'dark' | 'light' }
               <Link
                 key={n.href}
                 href={n.href}
-                className="rounded-xl px-3.5 py-2 text-[0.9375rem] font-medium text-[var(--hdr-muted)] transition-colors duration-300 hover:bg-[var(--hdr-hover)] hover:text-[var(--hdr-text)]"
+                className={cn(
+                  'rounded-xl px-3.5 py-2 text-[0.9375rem] font-medium text-[var(--hdr-muted)] transition-colors duration-300 hover:bg-[var(--hdr-hover)] hover:text-[var(--hdr-text)]',
+                  n.wide && 'hidden xl:inline-block',
+                )}
               >
                 {n.label}
               </Link>
@@ -187,6 +192,7 @@ export async function SiteFooter() {
             <FooterLink href="/templates">{t('nav.templates')}</FooterLink>
             <FooterLink href="/cards">{t('nav.cards')}</FooterLink>
             <FooterLink href="/design">{t('nav.design')}</FooterLink>
+            <FooterLink href="/get-preview">{t('nav.freePreview')}</FooterLink>
             <FooterLink href="/#how-it-works">{t('nav.howItWorks')}</FooterLink>
             <FooterLink href="/#features">{t('nav.features')}</FooterLink>
             <FooterLink href="/pricing">{t('nav.pricing')}</FooterLink>

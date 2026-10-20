@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { cardOrderToken, generateSecureToken, hashToken } from '@bulava/auth';
-import { Prisma, type CardOrder } from '@bulava/database';
+import { Prisma, type CardOrder, type CardSession } from '@bulava/database';
 import { ObjectStorage } from '@bulava/storage';
 import { cardPixelSize, type CardFormat } from '@bulava/template-schema';
 import type { CardCheckoutEventInput, CardFileType, CardOrderInput, CardRecoverInput, VerifyPaymentInput } from '@bulava/validation';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { PrismaService, type Tx } from '../../infrastructure/prisma/prisma.service';
 import { QueueService } from '../../infrastructure/queue/queue.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
 import { STORAGE } from '../../infrastructure/storage/storage.module';
@@ -26,6 +26,9 @@ const DAY = 86_400_000;
 /** Emails a customer may ask for again per order and hour. */
 const RESENDS_PER_HOUR = 3;
 
+/** Told inside the transaction that settles an order (a preview's card then moves into the buyer's account). */
+export type CardPaidHandler = (tx: Tx, order: CardOrder) => Promise<void>;
+
 /**
  * Watermark-free cards (docs/cards.md#paid-cards). An order freezes the design
  * it buys, and nothing is unlocked until Razorpay's signature (checkout) or
@@ -37,6 +40,7 @@ const RESENDS_PER_HOUR = 3;
 @Injectable()
 export class CardOrdersService implements OnModuleInit {
   private readonly logger = new Logger(CardOrdersService.name);
+  private readonly paidHandlers: CardPaidHandler[] = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -54,6 +58,11 @@ export class CardOrdersService implements OnModuleInit {
 
   onModuleInit(): void {
     this.payments.onOtherPayment((event, payment) => this.webhook(event, payment));
+  }
+
+  /** Something to do when an order is paid, in the same transaction (the preview desk, ADR-076). */
+  onPaid(handler: CardPaidHandler): void {
+    this.paidHandlers.push(handler);
   }
 
   /** The order page's link token (an HMAC of the id; only its hash is stored). */
@@ -81,8 +90,15 @@ export class CardOrdersService implements OnModuleInit {
    * never be paid twice); a design already bought is returned as paid.
    */
   async create(token: string, input: CardOrderInput, user: AuthUser | null, meta: RequestMeta) {
-    const options = await this.cards.requireEnabled();
     const session = await this.cards.session(token);
+    // A provider's preview is bought by its customer from their preview page, never from the editor.
+    await this.cards.assertNotHeld(session.id);
+    return this.createForSession(session, input, user, meta);
+  }
+
+  /** The order for a card known by its session (the editor's, or a preview's bought from its customer's page). */
+  async createForSession(session: CardSession, input: CardOrderInput, user: AuthUser | null, meta: RequestMeta, extra: { previewRequestId?: string } = {}) {
+    const options = await this.cards.requireEnabled();
     const existing = await this.prisma.cardOrder.findFirst({
       where: { sessionId: session.id, designHash: session.designHash, status: { in: ['PAID', 'PENDING'] } },
       orderBy: { createdAt: 'desc' },
@@ -93,7 +109,7 @@ export class CardOrdersService implements OnModuleInit {
     if (existing && existing.amountMinor === options.priceMinor) {
       const updated = await this.prisma.$transaction(async (tx) => {
         await this.cards.upsertLead(tx, input.phone, { choice: 'PAID', marketingConsent: input.marketingConsent, name: input.name, email: input.email, source: `card-order:${existing.id}` });
-        return tx.cardOrder.update({ where: { id: existing.id }, data: { name: input.name, email: input.email, phoneE164: input.phone.e164 } });
+        return tx.cardOrder.update({ where: { id: existing.id }, data: { name: input.name, email: input.email, phoneE164: input.phone.e164, ...(user ? { userId: user.id } : {}), ...(extra.previewRequestId ? { previewRequestId: extra.previewRequestId } : {}) } });
       });
       await this.cards.event('CUSTOMER_DETAILS_SUBMITTED', this.refs(updated));
       return this.checkout(updated);
@@ -114,6 +130,7 @@ export class CardOrdersService implements OnModuleInit {
             sessionId: session.id,
             leadId: lead.id,
             userId: user?.id ?? session.userId,
+            previewRequestId: extra.previewRequestId ?? null,
             amountMinor: options.priceMinor,
             design: session.design as Prisma.InputJsonValue,
             designHash: session.designHash,
@@ -254,6 +271,7 @@ export class CardOrdersService implements OnModuleInit {
         },
       });
       await tx.cardLead.update({ where: { id: order.leadId }, data: { lastChoice: 'PAID', lastSeenAt: paidAt } });
+      for (const handler of this.paidHandlers) await handler(tx, { ...order, status: 'PAID', paidAt });
       await this.cards.event('PAYMENT_SUCCEEDED', { ...this.refs(order), meta: { amountMinor: payment.amountMinor, via: payment.via } }, tx);
       await this.audit.record({ actorType: 'SYSTEM', action: 'card_order.paid', targetType: 'CardOrder', targetId: orderId, metadata: { reference: order.reference, amountMinor: payment.amountMinor, via: payment.via } }, tx);
       return card;

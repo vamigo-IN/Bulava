@@ -4,7 +4,7 @@ import { getSiteConfig } from '@/lib/site-config';
 export const revalidate = 60;
 
 /** Pages that are personal or behind a sign-in; never crawled, whatever the settings say. */
-const ALWAYS_DISALLOWED = ['/invite/', '/p/', '/checkin/', '/wall/', '/dashboard', '/api/', '/login', '/signup'];
+const ALWAYS_DISALLOWED = ['/invite/', '/look/', '/p/', '/checkin/', '/wall/', '/dashboard', '/api/', '/login', '/signup'];
 
 /** robots.txt from the admin console (Site settings > SEO): indexing, extra disallowed paths and AI crawlers. */
 export default async function robots(): Promise<MetadataRoute.Robots> {

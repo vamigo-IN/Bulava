@@ -123,6 +123,18 @@ export const ErrorCode = {
   MAP_LINK_INVALID: HttpStatus.BAD_REQUEST,
   /** A Google Maps link without a spot in it (a dropped pin's share link has one). */
   MAP_LINK_UNREADABLE: HttpStatus.BAD_REQUEST,
+  /** A preview request another provider took first (ADR-076). */
+  PREVIEW_TAKEN: HttpStatus.CONFLICT,
+  /** A preview being made for a customer: they publish it, or buy its card, once they own it. */
+  PREVIEW_HELD: HttpStatus.CONFLICT,
+  /** The customer's previews are not on their page yet. */
+  PREVIEW_NOT_READY: HttpStatus.CONFLICT,
+  /** The preview's request was closed or cancelled, or its offer is gone. */
+  PREVIEW_ENDED: HttpStatus.GONE,
+  /** The designs belong to another account now. */
+  PREVIEW_OWNED: HttpStatus.CONFLICT,
+  /** The preview's link was sent a few minutes ago. */
+  PREVIEW_TOO_SOON: HttpStatus.TOO_MANY_REQUESTS,
   SERVICE_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   INTERNAL_ERROR: HttpStatus.INTERNAL_SERVER_ERROR,
 } as const;

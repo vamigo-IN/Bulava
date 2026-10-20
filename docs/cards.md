@@ -58,6 +58,12 @@ Switching format in the editor (`withCardFormat`, one undo step) lays the card o
 
 The design is kept in `localStorage` (`bulava.card.<templateKey>`) on every change, and on the server 1.5 s after the last one, but only once it differs from the template: an opened template is not a card. The first save creates a **card session** (`POST /public/cards/sessions`), whose 32-byte token the browser keeps; the database stores its SHA-256. A refresh, a closed dialog or a payment redirect resumes from the device copy and the server copy (the newer wins). Opening the download dialog saves first, so every download is of the design on screen.
 
+### My cards
+
+A card made or saved while signed in is saved in the account (`userId`), its token also kept encrypted (`tokenCiphertext`, AES-GCM under `TOKEN_ENCRYPTION_KEY`) so the account opens it on any device ([ADR-077](decisions.md)). **My cards** (`/dashboard/cards`, from the account menu and the card gallery) lists them: drafts, downloaded and watermark-free cards, cards made by a designer on the preview desk, and bought cards whose designs were tidied away (their order page still downloads them). Each card opens in the editor by its id (`/cards/editor/<key>?card=<id>`: `POST /cards/mine/:id/open` answers with the token, which never goes in an address), downloads from its order page once bought, shows its story (designed, downloaded, bought, emailed: `GET /cards/mine/:id/history`), and a draft can be deleted (`DELETE /cards/mine/:id`; a bought card stays). A card opened from the account is kept on the server only, not in the device's copy.
+
+A preview provider's cards for customers ([previews.md](previews.md)) are opened the same way, in preview mode: the request's reference and *Back to the request* instead of *Download*; downloading or buying them is refused (`PREVIEW_HELD`) until their customer owns them, when they move into the customer's account.
+
 ## Downloads
 
 | | Free | Watermark-free | Plan |
@@ -153,7 +159,7 @@ The worker's daily `card-retention` task (batches, logged):
 | Paid images | a year after payment (the order stays) |
 | Photos never uploaded, or rejected | after a day |
 | Checkouts never paid | closed (`EXPIRED`) after two days; a late payment still settles |
-| Cards (sessions) with their photos | 30 days after they were last touched, a year after a payment |
+| Cards (sessions) with their photos | 30 days after they were last touched (a year for cards saved in an account), a year after a payment; a preview card while its request is open |
 | Contacts without offers consent or orders | a year after they were last seen |
 | Funnel steps | after two years |
 
@@ -173,6 +179,6 @@ Public (`@Public()`; the card's token in `x-card-session`, an order's in `x-card
 | `POST /public/cards/recover` | links to bought cards, by email |
 | `GET /public/cards/render/:token` | the export renderer only |
 
-Signed in: `POST /cards/session/plan-download` (the export, and the `allowance` after it). Console: `GET /admin/cards/{stats,leads,leads.csv,leads/:id,orders,orders/:id}`, `POST /admin/cards/leads/:id/withdraw-offers`, `POST /admin/cards/orders/:id/{resend-email,regenerate,refund}`.
+Signed in: `POST /cards/session/plan-download` (the export, and the `allowance` after it); My cards: `GET /cards/mine`, `GET /cards/mine/:id/history`, `POST /cards/mine/:id/open`, `DELETE /cards/mine/:id`. Console: `GET /admin/cards/{stats,leads,leads.csv,leads/:id,orders,orders/:id}`, `POST /admin/cards/leads/:id/withdraw-offers`, `POST /admin/cards/orders/:id/{resend-email,regenerate,refund}`.
 
-Errors: `CARDS_UNAVAILABLE` (switched off), `CARD_SESSION_EXPIRED` (cleaned up: the editor starts the server copy again from the device copy), `CARD_NOT_READY` (also while an older card is made again as a PNG), `CARD_PDF_LOCKED` (a PDF of the free card), `CARD_PLAN_REQUIRED` (a download the plan does not include: no free downloads without a plan, or no watermark-free cards left, `details: { included, used }`), plus `CUSTOMIZATION_INVALID`, `UPLOAD_REJECTED`, `PAYMENTS_UNAVAILABLE`, `PAYMENT_VERIFICATION_FAILED` and `ORDER_NOT_PAYABLE`.
+Errors: `CARDS_UNAVAILABLE` (switched off), `CARD_SESSION_EXPIRED` (cleaned up: the editor starts the server copy again from the device copy), `CARD_NOT_READY` (also while an older card is made again as a PNG), `CARD_PDF_LOCKED` (a PDF of the free card), `CARD_PLAN_REQUIRED` (a download the plan does not include: no free downloads without a plan, or no watermark-free cards left, `details: { included, used }`), `PREVIEW_HELD` (a preview card for a customer), plus `CUSTOMIZATION_INVALID`, `UPLOAD_REJECTED`, `PAYMENTS_UNAVAILABLE`, `PAYMENT_VERIFICATION_FAILED` and `ORDER_NOT_PAYABLE`.

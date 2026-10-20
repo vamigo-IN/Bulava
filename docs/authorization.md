@@ -36,22 +36,24 @@ Code checks permissions, never role names. `@RequireEventPermission('guest.write
 
 Staff access to the admin console is a separate system: `User.platformRole` maps to platform permissions in `packages/auth/src/permissions.ts`, and staff routes are decorated with `@RequirePlatformPermission(...)`. `PlatformPermissionGuard` re-reads the role from the database on every request, so a role change or suspension applies to the very next request, and it answers 404 (not 403) to anyone without the permission, so the admin surface is not advertised. Platform roles never bypass event tenancy: staff see customer data only through the admin routes.
 
-| Permission | Support | Content manager | Finance manager | Platform admin | Super Admin |
-|---|---|---|---|---|---|
-| `admin.read`: open the console, look up accounts and events | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `billing.read`: payments, revenue, payment history | ✓ | | ✓ | ✓ | ✓ |
-| `media.moderate` | ✓ | ✓ | | ✓ | ✓ |
-| `contact.manage`: the contact-form inbox (read, reply, resolve) | ✓ | | | ✓ | ✓ |
-| `template.manage`, `asset.manage`, `content.manage` (testimonials) | | ✓ | | ✓ | ✓ |
-| `page.manage`: site pages (About, Contact, policies, new pages) | | ✓ | | ✓ | ✓ |
-| `showcase.manage`: the templates each home page section shows, and the card gallery's first cards | | ✓ | | ✓ | ✓ |
-| `pricing.manage`, `payment.refund` | | | ✓ | ✓ | ✓ |
-| `user.manage`: suspend customers, sign them out | | | | ✓ | ✓ |
-| `plan.grant`: complimentary upgrades | | | | | ✓ |
-| `settings.manage`: site settings and integrations | | | | | ✓ |
-| `staff.manage`: staff roles, two-step resets, the handover | | | | | ✓ |
+| Permission | Preview provider | Support | Content manager | Finance manager | Platform admin | Super Admin |
+|---|---|---|---|---|---|---|
+| `preview.work`: the preview desk in the dashboard (take requests, design and share previews) | ✓ | | | | ✓ | ✓ |
+| `admin.read`: open the console, look up accounts and events | | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `billing.read`: payments, revenue, payment history | | ✓ | | ✓ | ✓ | ✓ |
+| `media.moderate` | | ✓ | ✓ | | ✓ | ✓ |
+| `contact.manage`: the contact-form inbox (read, reply, resolve) | | ✓ | | | ✓ | ✓ |
+| `template.manage`, `asset.manage`, `content.manage` (testimonials) | | | ✓ | | ✓ | ✓ |
+| `page.manage`: site pages (About, Contact, policies, new pages) | | | ✓ | | ✓ | ✓ |
+| `showcase.manage`: the templates each home page section shows, and the card gallery's first cards | | | ✓ | | ✓ | ✓ |
+| `pricing.manage`, `payment.refund` | | | | ✓ | ✓ | ✓ |
+| `user.manage`: suspend customers, sign them out | | | | | ✓ | ✓ |
+| `preview.manage`: every preview request, customers from outside, assigning work, offers and coupons, adding and removing preview providers | | | | | ✓ | ✓ |
+| `plan.grant`: complimentary upgrades | | | | | | ✓ |
+| `settings.manage`: site settings and integrations | | | | | | ✓ |
+| `staff.manage`: staff roles, two-step resets, the handover | | | | | | ✓ |
 
-`USER` (every customer) has no platform permissions.
+`USER` (every customer) has no platform permissions. **Preview providers** (`PREVIEW_PROVIDER`, [previews.md](previews.md)) make previews for customers on the preview desk in the dashboard and never reach the console; admins add and remove them on the console's Previews page. Their desk routes are staff routes (two-step sign-in in production), and they see a customer's number and email only on requests they have. The events they make previews on are held for the customer (`source: preview_desk`): their own team role there is OWNER, but publishing is refused until the customer owns the event, and then it moves to the customer's account ([ADR-076](decisions.md)).
 
 **Exactly one Super Admin.** A partial unique index (`users_one_super_admin_key`, over a constant, limited to `SUPER_ADMIN` rows) makes a second one impossible whatever the code does. The role is never assigned through the API (`ASSIGNABLE_PLATFORM_ROLES` leaves it out); it changes hands with `POST /admin/staff/transfer-super-admin`, which needs the Super Admin's password and, when they use two-step sign-in, a code, and demotes them to `PLATFORM_ADMIN` in the same transaction. When staff two-step sign-in is required, only someone with it turned on can take over. The seed makes `ADMIN_EMAIL` the Super Admin only while there is none, so a deploy never takes the role back. For recovery on the server, `pnpm admin:set-role <email> SUPER_ADMIN --replace` moves it and signs both people out.
 

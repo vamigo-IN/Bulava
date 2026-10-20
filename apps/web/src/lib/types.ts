@@ -23,6 +23,8 @@ export interface User {
   provisional: boolean;
   /** Agreed to updates on WhatsApp. */
   whatsappUpdates: boolean;
+  /** Staff tools this role opens (UI hints only: every route checks again); preview providers have `preview.work`. */
+  platformPermissions?: string[];
 }
 
 export interface EventType {
@@ -65,8 +67,10 @@ export interface EventSummary {
   design: { templateKey: string; templateName: string; tier: 'FREE' | 'PREMIUM' | 'SIGNATURE' } | null;
   /** The host's shareable, watermarked preview link: /preview/<token>. */
   previewToken: string;
-  /** "quick_start" when it began on the template page. */
+  /** "quick_start" when it began on the template page; "preview_desk" while a provider makes it for a customer (ADR-076). */
   source: string | null;
+  /** A preview being made for a customer: back to its request, and never published from here. */
+  preview?: { requestId: string; reference: string } | null;
   role?: string;
   /** What the signed-in member may do in this event (the dashboard shows only that). */
   permissions?: string[];
@@ -393,7 +397,7 @@ export interface TemplateSummaryLite {
   eventTypes: string[];
   outputs: Array<'WEBSITE' | 'VIDEO' | 'DIGITAL_CARD'>;
   /** What a card shows without the definition: the theme's colours, the hero section's variant, and the design's look (shared by one design's versions for other occasions). */
-  preview?: { colors: import('@bulava/template-schema').ThemeColors | null; heroVariant: string | null; look?: string | null };
+  preview?: { colors: import('@bulava/template-schema').ThemeColors | null; heroVariant: string | null; heroSection?: string | null; look?: string | null };
   definition?: import('@bulava/template-schema').TemplateDefinition;
 }
 

@@ -875,6 +875,8 @@ const purchase = {
    * alone). Plans are always the account's.
    */
   eventId: IdSchema.optional(),
+  /** Bought from a preview page (ADR-076): its link token. The plan is the preview's offer (a hidden one too); paying moves its designs into the account. */
+  look: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
 };
 
 export const CreateOrderSchema = z.object({
@@ -1321,6 +1323,134 @@ export const CardOrdersQuerySchema = z.object({
   emailFailed: z.enum(['true']).optional(),
   page: z.coerce.number().int().min(1).max(1000).default(1),
 });
+
+// ───────────────────────────── Preview desk (ADR-076) ─────────────────────────────
+
+/** What a preview provider makes: the invitation website, a card, a film. */
+export const PREVIEW_KINDS = ['WEBSITE', 'CARD', 'FILM'] as const;
+export type PreviewKindName = (typeof PREVIEW_KINDS)[number];
+
+export const PREVIEW_STATUSES = ['NEW', 'ASSIGNED', 'IN_PROGRESS', 'SENT', 'CHANGES_REQUESTED', 'OWNED', 'CLOSED', 'CANCELLED'] as const;
+export type PreviewStatusName = (typeof PREVIEW_STATUSES)[number];
+/** Requests still being worked on: a number with one of these gets that request back instead of a second one. */
+export const OPEN_PREVIEW_STATUSES = ['NEW', 'ASSIGNED', 'IN_PROGRESS', 'SENT', 'CHANGES_REQUESTED'] as const;
+
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Choose a time');
+const blankTo = <T extends z.ZodType>(schema: T) => z.union([z.literal(''), schema]).transform((v) => (v === '' ? undefined : v)).optional();
+
+/** A function as the customer describes it: its name, and when and where if they know. */
+export const PreviewFunctionSchema = z.object({
+  name: trimmed(80),
+  date: blankTo(dateOnly),
+  time: blankTo(clockTime),
+  venue: optionalText(160),
+});
+export type PreviewFunctionInput = z.infer<typeof PreviewFunctionSchema>;
+
+const previewRequestFields = {
+  name: trimmed(120),
+  phone: PhoneSchema,
+  email: optionalEmail,
+  eventTypeKey: z.string().trim().min(1).max(40),
+  /** Names, as the occasion's details schema has them (couple: partnerOne and partnerTwo; honoree: name). */
+  details: z.record(z.string(), z.string().trim().max(120)).default({}),
+  /** The celebration's name, for occasions without names (a housewarming, a festival). */
+  title: optionalText(160),
+  date: blankTo(dateOnly),
+  venue: optionalText(160),
+  city: optionalText(80),
+  functions: z.array(PreviewFunctionSchema).max(12).default([]),
+  wants: z.array(z.enum(PREVIEW_KINDS)).min(1, 'Choose what you would like made').max(3),
+  templateKey: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9-]{1,80}$/)
+    .optional(),
+  language: LanguageCodeSchema.default('en'),
+  notes: optionalText(1000),
+};
+
+/** POST /public/preview-requests: the request form. */
+export const PreviewRequestSchema = z.object({
+  ...previewRequestFields,
+  /** The Terms and the Privacy Policy, and being contacted on WhatsApp about this request: one unticked box. */
+  acceptTerms: agreed('Please agree to the Terms and to being contacted about your preview'),
+  /** Never shown to people (bots fill it in): a request that has it is quietly dropped. */
+  website: z.string().max(200).optional(),
+});
+export type PreviewRequestInput = z.infer<typeof PreviewRequestSchema>;
+
+/** POST /admin/previews/requests: a customer from outside (a call, a visit, a partner), entered by staff. */
+export const StaffPreviewRequestSchema = z.object({
+  ...previewRequestFields,
+  /** Staff confirm the customer agreed to be contacted about their preview on WhatsApp. */
+  contactConsent: agreed('Confirm the customer agreed to be contacted about their preview'),
+  assigneeId: IdSchema.optional(),
+  offerPlanKey: z.string().trim().min(1).max(40).optional(),
+  offerCouponCode: z.string().trim().toUpperCase().max(40).optional(),
+});
+export type StaffPreviewRequestInput = z.infer<typeof StaffPreviewRequestSchema>;
+
+/** POST /desk/requests/:id/items: a preview to make from a design. */
+export const PreviewItemCreateSchema = z.object({
+  kind: z.enum(PREVIEW_KINDS),
+  templateKey: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9-]{1,80}$/),
+});
+export type PreviewItemCreateInput = z.infer<typeof PreviewItemCreateSchema>;
+
+/** PUT /desk/requests/:id/offer: the plan that owns the designs (null: each card at the card price), and a coupon. */
+export const PreviewOfferSchema = z.object({
+  planKey: z.string().trim().min(1).max(40).nullable(),
+  couponCode: z.string().trim().toUpperCase().max(40).nullable().optional(),
+});
+export type PreviewOfferInput = z.infer<typeof PreviewOfferSchema>;
+
+/** Status changes by hand: providers start and hand back work; staff close, cancel or reopen. */
+export const PreviewStatusSchema = z.object({ status: z.enum(['NEW', 'IN_PROGRESS', 'CLOSED', 'CANCELLED']) });
+export type PreviewStatusInput = z.infer<typeof PreviewStatusSchema>;
+
+export const PreviewNoteSchema = z.object({ text: trimmed(2000) });
+export type PreviewNoteInput = z.infer<typeof PreviewNoteSchema>;
+
+/** POST /admin/previews/requests/:id/assign: a preview provider, or null for the open queue. */
+export const PreviewAssignSchema = z.object({ assigneeId: IdSchema.nullable() });
+export type PreviewAssignInput = z.infer<typeof PreviewAssignSchema>;
+
+/** POST /admin/previews/providers: a preview provider's account, made by an admin (an email, a WhatsApp number or both). */
+export const PreviewProviderCreateSchema = z
+  .object({ name: trimmed(120), email: optionalEmail, phone: optionalPhone })
+  .refine((v) => Boolean(v.email || v.phone), { message: 'Give an email address or a WhatsApp number', path: ['email'] });
+export type PreviewProviderCreateInput = z.infer<typeof PreviewProviderCreateSchema>;
+
+/** POST /public/looks/changes (the page's token in a header): the customer asks for changes from their preview page. */
+export const PreviewChangesSchema = z.object({ message: trimmed(1000) });
+export type PreviewChangesInput = z.infer<typeof PreviewChangesSchema>;
+
+/**
+ * POST /looks/own (the page's token in a header): owning the previews, signed in. With a plan as the
+ * offer: had at once when the account's plan covers it, else the checkout.
+ * With cards at the card price: the card to buy (`itemId`), a name and email
+ * for the receipt, and the ticked Terms.
+ */
+export const PreviewOwnSchema = z.object({
+  itemId: IdSchema.optional(),
+  name: z.string().trim().min(2, 'Enter your full name').max(80).optional(),
+  email: optionalEmail,
+  acceptTerms: z.boolean().optional(),
+});
+export type PreviewOwnInput = z.infer<typeof PreviewOwnSchema>;
+
+export const DeskRequestsQuerySchema = z.object({
+  /** mine: assigned to me; open: waiting for a provider; all: everything (preview.manage). */
+  scope: z.enum(['mine', 'open', 'all']).default('mine'),
+  status: z.enum(PREVIEW_STATUSES).optional(),
+  q: z.string().trim().max(80).optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+});
+export type DeskRequestsQuery = z.infer<typeof DeskRequestsQuerySchema>;
 
 // Site pages (About, Contact, policies and pages staff create).
 export * from './pages';

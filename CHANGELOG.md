@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Previews made for you, and your cards in your account
+
+- **Ask for a free preview.** On the new *Free preview* page, tell us what you'd like (an invitation website, a card, a video invitation), the names, the date, the venue and your functions. A designer makes it with your details and sends you the link on WhatsApp and by email, usually within a day. Template pages and the card gallery offer it too: *Or let our designers make it for you, free*.
+- **Your own preview page.** Everything made for you, on your phone: your website as it will look, your card and your film, each marked as a preview. Ask for changes right there, and your designer updates it. A message back on WhatsApp reaches your designer too.
+- **Make it yours.** One tap shows the price, paid once with GST included. Pay, and the designs move into your account, ready to publish, download and share. A plan you already have covers it at once; cards made for you can also be bought one by one.
+- **The preview desk** (for our designers): requests from the website wait in a queue, and our admins can enter customers who called or visited and give them to a designer. Designers make previews in the same editors you use, share them in one tap (the customer gets one message for everything shared together), see when the customer opened the page, and follow every request's timeline.
+- **My cards.** Every card you design while signed in is saved in your account: open it on any device, download it again, and see what became of it, from designed to bought and emailed. Cards a designer made for you are there too.
+
 ### Invitations you pull open, and a design studio for our team
 
 - **Pull to open.** Four new designs feel like stationery in the hand. Guests unzip *Olive Zip*'s linen pouch by its blush tag and *Noir Zip*'s black-tie clutch by its tag, untie *Satin Bow*'s ribbon, and open *Velvet Seal* from under its wax seal. Each comes in four colourways and has a film that opens the same way.

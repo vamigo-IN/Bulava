@@ -21,8 +21,8 @@ function forCards(definition: TemplateDefinition): TemplateDefinition {
   return { ...definition, website: { ...definition.website!, pages: [{ ...first, sections: first.sections.slice(0, 1) }] }, scenes: undefined, artworks: undefined };
 }
 
-export default async function CardEditorPage({ params, searchParams }: { params: Promise<{ key: string }>; searchParams: Promise<{ event?: string }> }) {
-  const [{ key }, { event }] = await Promise.all([params, searchParams]);
+export default async function CardEditorPage({ params, searchParams }: { params: Promise<{ key: string }>; searchParams: Promise<{ event?: string; card?: string }> }) {
+  const [{ key }, { event, card }] = await Promise.all([params, searchParams]);
   const [tpl, eventTypes, site] = await Promise.all([
     getTemplate(key),
     serverApi<Array<{ key: string; name: string }>>('/meta/event-types', { revalidate: 300 }).then((e) => e ?? []),
@@ -34,6 +34,8 @@ export default async function CardEditorPage({ params, searchParams }: { params:
       template={{ key: tpl.key, name: tpl.name, category: tpl.category, definition: forCards(tpl.definition), eventTypes: tpl.eventTypes, tags: tpl.tags }}
       occasions={eventTypes.map((e) => ({ key: e.key, name: e.name.split(' / ')[0]! }))}
       initialEvent={typeof event === 'string' ? event : undefined}
+      // A card saved in the account (My cards, a preview on the desk), opened by its id; the token never travels in the address.
+      cardId={typeof card === 'string' && /^[0-9a-f-]{36}$/.test(card) ? card : undefined}
       siteName={site.site.name}
     />
   );

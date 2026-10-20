@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BadgePercent, Check, Gift, LockKeyhole, Minus, Plus, ShieldCheck, X } from 'lucide-react';
+import { ArrowLeft, BadgePercent, Check, Gift, LockKeyhole, Minus, Plus, ShieldCheck, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -9,6 +9,7 @@ import { ApiError, apiPost } from '@/lib/api';
 import { paymentStatusPath, runCheckout, type CheckoutSession } from '@/lib/checkout';
 import { errorMessage, useT } from '@/lib/i18n';
 import { addOnLine, planFeatureLines } from '@/lib/plan-features';
+import { lookApi, LOOK_TOKEN } from '@/lib/previews';
 import { moreKeys, useAccountPlan, useMe } from '@/lib/queries';
 import { track } from '@/lib/track';
 import { OfferPrice } from '@/components/ui/offer-price';
@@ -87,6 +88,10 @@ function Checkout() {
   // From an event's plans page: the event a chosen template goes on once paid (and the way back).
   const eventParam = params.get('event');
   const eventId = eventParam && UUID.test(eventParam) ? eventParam : null;
+  // From a preview page (ADR-076): the order carries its link, and paying moves the designs made for this customer into the account.
+  const lookParam = params.get('look');
+  const look = lookParam && LOOK_TOKEN.test(lookParam) ? lookParam : undefined;
+  const offeredCoupon = look ? (params.get('coupon') ?? '').trim().toUpperCase() : '';
   const me = useMe();
   const account = useAccountPlan(Boolean(me.data));
 
@@ -111,17 +116,28 @@ function Checkout() {
   useEffect(() => {
     if (!planKey || !me.data) return;
     setQuote(null);
-    apiPost<Quote>('/orders/quote', { planKey, quantity, offerToken, ...(eventId ? { eventId } : {}) })
+    apiPost<Quote>('/orders/quote', { planKey, quantity, offerToken, look, ...(eventId ? { eventId } : {}) })
       .then((q) => {
         setBase(q);
         setBaseError(null);
       })
       .catch((err: unknown) => setBaseError(err instanceof Error ? err : new Error(String(err))));
-  }, [planKey, quantity, offerToken, eventId, me.data]);
+  }, [planKey, quantity, offerToken, look, eventId, me.data]);
+
+  // The preview's offer may come with a coupon: applied once, like one typed in.
+  const couponTried = useRef(false);
+  useEffect(() => {
+    if (!base || !offeredCoupon || couponTried.current || base.included) return;
+    couponTried.current = true;
+    setCoupon(offeredCoupon);
+    apiPost<Quote>('/orders/quote', { planKey: base.plan.key, quantity, look, couponCode: offeredCoupon })
+      .then(setQuote)
+      .catch(() => undefined);
+  }, [base, offeredCoupon, quantity, look]);
 
   const plan = base?.plan ?? null;
   const shown = quote ?? base;
-  const firstPlan = Boolean(plan && plan.kind === 'PLAN' && !offerToken && account.data && !account.data.plan);
+  const firstPlan = Boolean(plan && plan.kind === 'PLAN' && !offerToken && !look && account.data && !account.data.plan);
 
   /** The first-plan offer, once a session, for a host about to leave this checkout without a plan. */
   const tryOffer = useCallback(
@@ -159,10 +175,10 @@ function Checkout() {
 
   if (me.isPending || (planKey && !base && !baseError)) return <Spinner label={t('common.loading')} />;
 
-  const back = eventId ? `/dashboard/events/${eventId}/unlock${template ? `?template=${encodeURIComponent(template)}` : ''}` : plan?.kind === 'ADDON' ? '/dashboard/plan' : '/pricing';
+  const back = look ? `/look/${look}` : eventId ? `/dashboard/events/${eventId}/unlock${template ? `?template=${encodeURIComponent(template)}` : ''}` : plan?.kind === 'ADDON' ? '/dashboard/plan' : '/pricing';
 
   if (!planKey || !plan || !shown) {
-    const unavailable = baseError instanceof ApiError && (baseError.code === 'ADDON_NOT_OFFERED' || baseError.code === 'ADDON_NEEDS_PLAN');
+    const unavailable = baseError instanceof ApiError && (baseError.code === 'ADDON_NOT_OFFERED' || baseError.code === 'ADDON_NEEDS_PLAN' || baseError.code === 'PREVIEW_ENDED' || baseError.code === 'PREVIEW_OWNED');
     return (
       <div className="clay mx-auto max-w-xl rounded-3xl p-6 text-center sm:p-8">
         <h1 className="font-display text-3xl">{unavailable ? t('checkout.unavailable.title') : t('checkout.noPlan.title')}</h1>
@@ -191,7 +207,7 @@ function Checkout() {
     setApplying(true);
     setCouponError(null);
     try {
-      setQuote(await apiPost<Quote>('/orders/quote', { planKey: plan.key, quantity, offerToken, couponCode: code, ...(eventId ? { eventId } : {}) }));
+      setQuote(await apiPost<Quote>('/orders/quote', { planKey: plan.key, quantity, offerToken, look, couponCode: code, ...(eventId ? { eventId } : {}) }));
       track('coupon_applied', { plan: plan.key });
     } catch (err) {
       setCouponError(errorMessage(t, err));
@@ -219,7 +235,7 @@ function Checkout() {
       const order =
         open?.key === orderKey
           ? await apiPost<CheckoutSession>(`/orders/${open.orderId}/checkout`)
-          : await apiPost<CheckoutSession>('/orders', { planKey: plan.key, quantity, offerToken, couponCode: applied ?? undefined, acceptTerms: true, ...(eventId ? { eventId } : {}) });
+          : await apiPost<CheckoutSession>('/orders', { planKey: plan.key, quantity, offerToken, look, couponCode: applied ?? undefined, acceptTerms: true, ...(eventId ? { eventId } : {}) });
       // A 100% coupon is paid already; everything else goes through Razorpay first.
       const outcome = order.status === 'PAID' ? 'paid' : await runCheckout(order, { unavailable: t('upgrade.unavailable') });
       if (outcome === 'dismissed') {
@@ -253,9 +269,18 @@ function Checkout() {
         className="group flex w-fit items-center gap-1.5 text-sm text-stone-600 transition-colors hover:text-ink"
       >
         <ArrowLeft aria-hidden className="size-4 transition-transform duration-300 group-hover:-translate-x-0.5" />
-        {t('checkout.changePlan')}
+        {look ? t('checkout.look.back') : t('checkout.changePlan')}
       </Link>
       <h1 className="mt-3 font-display text-4xl leading-tight tracking-tight sm:text-5xl">{t('checkout.title')}</h1>
+      {look ? (
+        <p className="mt-3 flex max-w-2xl items-start gap-2.5 rounded-2xl bg-gold-100/70 px-4 py-3 text-sm leading-relaxed text-ink ring-1 ring-gold-200">
+          <Sparkles aria-hidden className="mt-0.5 size-4 shrink-0 text-gold-700" />
+          <span>
+            <span className="font-semibold">{t('checkout.look.badge')}: </span>
+            {t('checkout.look.body')}
+          </span>
+        </p>
+      ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         {/* What is bought. */}
@@ -373,7 +398,42 @@ function Checkout() {
             </div>
           )}
 
-          {included ? (
+          {included && look ? (
+            // The account's plan covers the preview's offer: the designs move in without paying again.
+            <div className="mt-5 border-t border-gold-100 pt-4">
+              <p role="status" className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <Check aria-hidden className="size-4" strokeWidth={3} />
+                {t('checkout.includedPlan')}
+              </p>
+              {message ? (
+                <div className="mt-4">
+                  <Alert>{message}</Alert>
+                </div>
+              ) : null}
+              <Button
+                size="lg"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-full"
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  setMessage(null);
+                  lookApi
+                    .own(look)
+                    .then((result) => {
+                      if ('owned' in result) router.push(result.eventId ? `/dashboard/events/${result.eventId}` : '/dashboard/cards');
+                      else setBusy(false);
+                    })
+                    .catch((err: unknown) => {
+                      setMessage(errorMessage(t, err));
+                      setBusy(false);
+                    });
+                }}
+              >
+                <Sparkles aria-hidden className="size-4.5" />
+                {busy ? t('common.loading') : t('checkout.look.claim')}
+              </Button>
+            </div>
+          ) : included ? (
             // The account has this plan (or a bigger one) or this add-on already: nothing to pay for.
             <div className="mt-5 border-t border-gold-100 pt-4">
               <p role="status" className="flex items-center gap-2 text-sm font-medium text-emerald-800">

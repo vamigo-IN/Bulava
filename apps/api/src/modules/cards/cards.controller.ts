@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, HttpCode, Param, Post, Put, Res } from '@nestjs/common';
+import { Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
@@ -253,17 +253,47 @@ export class PublicCardsController {
   }
 }
 
-/** A watermark-free card through a signed-in customer's plan (as many designs as it includes, ADR-071). */
+/**
+ * Signed in: a watermark-free card through the customer's plan (as many designs
+ * as it includes, ADR-071), and the cards saved in their account (ADR-077).
+ */
 @ApiTags('cards')
 @Controller('cards')
 export class CardsController {
-  constructor(private readonly downloads: CardDownloadsService) {}
+  constructor(
+    private readonly downloads: CardDownloadsService,
+    private readonly cards: CardsService,
+  ) {}
 
   @Post('session/plan-download')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   planDownload(@Headers(CARD_SESSION_HEADER) token: string | undefined, @CurrentUser() user: AuthUser) {
     return this.downloads.plan(sessionToken(token), user);
+  }
+
+  /** My cards: the account's saved cards, newest first, with what became of each. */
+  @Get('mine')
+  mine(@CurrentUser() user: AuthUser) {
+    return this.cards.mine(user.id);
+  }
+
+  @Get('mine/:id/history')
+  history(@CurrentUser() user: AuthUser, @Param('id', ParseIdPipe) id: string) {
+    return this.cards.history(user.id, id);
+  }
+
+  /** The card's token for the editor, on any device (it stays in the browser, never in a URL). */
+  @Post('mine/:id/open')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  open(@CurrentUser() user: AuthUser, @Param('id', ParseIdPipe) id: string) {
+    return this.cards.openMine(user.id, id);
+  }
+
+  @Delete('mine/:id')
+  remove(@CurrentUser() user: AuthUser, @Param('id', ParseIdPipe) id: string) {
+    return this.cards.removeMine(user.id, id);
   }
 }
 

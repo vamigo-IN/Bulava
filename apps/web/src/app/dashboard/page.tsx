@@ -37,6 +37,7 @@ import { daysUntil, DesignCover, EventCard } from '@/components/dashboard/event-
 import { LoadError } from '@/components/dashboard/load-error';
 import { notificationView, relativeTime } from '@/components/dashboard/notification-text';
 import { useSetupSteps } from '@/components/events/use-setup-steps';
+import { AskPreviewCard, DeskGlance, MyPreviewsSection } from '@/components/previews/home-sections';
 import { Spinner } from '@/components/ui/primitives';
 
 const GOLD_CTA =
@@ -111,6 +112,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Previews a designer made for this account (ADR-076). */}
+      <MyPreviewsSection />
+
       {list.length ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-8">
@@ -139,13 +143,18 @@ export default function HomePage() {
           </div>
 
           <div className="space-y-6">
+            <DeskGlance />
             <AtAGlance events={list} />
             <Activity />
             {focus ? <Shortcuts event={focus} /> : null}
+            <AskPreviewCard />
           </div>
         </div>
       ) : (
-        <FirstSteps />
+        <>
+          <DeskGlance />
+          <FirstSteps />
+        </>
       )}
     </div>
   );
@@ -413,6 +422,8 @@ function FirstSteps() {
           <ArrowRight aria-hidden className="size-4" />
         </Link>
       </section>
+
+      <AskPreviewCard wide />
 
       <section aria-labelledby="how-title" className="clay rounded-[2rem] p-6 sm:p-8">
         <h2 id="how-title" className="font-display text-3xl tracking-tight">

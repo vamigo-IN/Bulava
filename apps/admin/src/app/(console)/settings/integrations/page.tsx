@@ -308,6 +308,22 @@ function WhatsAppForm({ view, origins }: { view: SettingGroupView; origins: Sett
           value={templates.paymentPending}
           onChange={(v) => set('templates', { ...templates, paymentPending: v })}
         />
+        <TextField
+          label={t('int.whatsapp.previewRequestedTemplate')}
+          placeholder="preview_requested"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.previewRequested}
+          onChange={(v) => set('templates', { ...templates, previewRequested: v })}
+        />
+        <TextField
+          label={t('int.whatsapp.previewReadyTemplate')}
+          placeholder="preview_ready"
+          spellCheck={false}
+          className="[&_input]:font-mono"
+          value={templates.previewReady}
+          onChange={(v) => set('templates', { ...templates, previewReady: v })}
+        />
       </div>
       <p className="text-xs text-stone-500">{t('int.whatsapp.hostTemplatesHint')}</p>
       <div className="grid gap-4 sm:grid-cols-3">

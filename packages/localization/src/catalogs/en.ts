@@ -6,6 +6,7 @@
 import { enCards } from './en-cards';
 import { enDashboard } from './en-dashboard';
 import { enMarketing } from './en-marketing';
+import { enPreviews } from './en-previews';
 
 const core = {
   // common
@@ -586,7 +587,7 @@ const core = {
   'error.ALBUM_SHARED_RECENTLY': 'The album went to your guests less than 12 hours ago.',
 } as const;
 
-export const en = { ...core, ...enMarketing, ...enDashboard, ...enCards } as const;
+export const en = { ...core, ...enMarketing, ...enDashboard, ...enCards, ...enPreviews } as const;
 
 export type MessageKey = keyof typeof en;
 export type Catalog = Partial<Record<MessageKey, string>>;

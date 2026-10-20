@@ -3,7 +3,7 @@
  * the strict, nonce-based Content-Security-Policy (src/middleware.ts), render
  * per request, and never load third-party analytics.
  */
-const PRIVATE_PREFIXES = ['/dashboard', '/login', '/signup', '/invite', '/p', '/checkin', '/wall', '/e', '/preview', '/team', '/cards/editor', '/cards/order', '/cards/render', '/design/website', '/design/video'];
+const PRIVATE_PREFIXES = ['/dashboard', '/login', '/signup', '/invite', '/p', '/checkin', '/wall', '/e', '/preview', '/team', '/cards/editor', '/cards/order', '/cards/render', '/design/website', '/design/video', '/look'];
 
 export function isPrivatePath(pathname: string): boolean {
   return PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -14,7 +14,7 @@ export function isPrivatePath(pathname: string): boolean {
  * pre-rendered with the marketing CSP, but third-party trackers never load
  * there: some read form fields (Meta Pixel's automatic matching, session replays).
  */
-const FORM_PATHS = ['/contact', '/cards/recover'];
+const FORM_PATHS = ['/contact', '/cards/recover', '/get-preview'];
 
 /** Private pages and public forms: no trackers or custom code. */
 export function isTrackerFreePath(pathname: string): boolean {

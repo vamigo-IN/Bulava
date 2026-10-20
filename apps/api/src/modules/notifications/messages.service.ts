@@ -9,15 +9,19 @@ import { NotificationsService, type NotificationType } from './notifications.ser
 export type GuestMessageType = 'EVENT_UPDATE' | 'REGISTRATION_CONFIRMED' | 'GALLERY_SHARED';
 /** Messages to the person who bought something: never charged to an event's WhatsApp allowance. */
 export type BuyerMessageType = 'PLAN_PURCHASED' | 'PAYMENT_FAILED' | 'PAYMENT_PENDING';
+/** Messages to someone who asked for a preview (ADR-076): their own number and email, outside any allowance. */
+export type PreviewMessageType = 'PREVIEW_REQUESTED' | 'PREVIEW_READY';
 
 /** The approved WhatsApp template each message goes out with. */
-const TEMPLATE_KIND: Record<GuestMessageType | BuyerMessageType, WhatsAppTemplateKind> = {
+const TEMPLATE_KIND: Record<GuestMessageType | BuyerMessageType | PreviewMessageType, WhatsAppTemplateKind> = {
   EVENT_UPDATE: 'eventUpdate',
   REGISTRATION_CONFIRMED: 'registrationConfirmed',
   GALLERY_SHARED: 'galleryShared',
   PLAN_PURCHASED: 'planPurchased',
   PAYMENT_FAILED: 'paymentFailed',
   PAYMENT_PENDING: 'paymentPending',
+  PREVIEW_REQUESTED: 'previewRequested',
+  PREVIEW_READY: 'previewReady',
 };
 
 export interface GuestMessageResult {
@@ -48,7 +52,7 @@ export class MessagesService {
   ) {}
 
   /** Whether this kind of guest message can go on WhatsApp at all now (its template set, WhatsApp connected). */
-  async whatsappAvailable(type: GuestMessageType | BuyerMessageType): Promise<boolean> {
+  async whatsappAvailable(type: GuestMessageType | BuyerMessageType | PreviewMessageType): Promise<boolean> {
     return (await this.settings.messaging()).whatsapp[TEMPLATE_KIND[type]];
   }
 
@@ -107,6 +111,26 @@ export class MessagesService {
     const type: NotificationType = input.type;
     if (email) await this.notifications.notify({ type, channel: 'EMAIL', userId: input.userId, payload: input.payload });
     if (whatsapp) await this.notifications.notify({ type, channel: 'WHATSAPP', userId: input.userId, payload: input.payload });
+    return { email, whatsapp };
+  }
+
+  /**
+   * A message to someone who asked for a preview: email when they gave one,
+   * WhatsApp to their number while the kind's template is set and the number
+   * reaches WhatsApp (they agreed to be contacted about it when asking). The
+   * rows carry only the request's id: the worker reads the number, the email
+   * and the link from the request when it sends, so a delayed message says
+   * what is ready by then.
+   */
+  async toPreviewCustomer(input: { requestId: string; type: PreviewMessageType; phone: string; email: string | null; delayMs?: number }): Promise<{ email: boolean; whatsapp: boolean }> {
+    const whatsapp = (await this.whatsappAvailable(input.type)) && (await whatsappReachable(this.prisma, input.phone));
+    const email = !!input.email;
+    const payload = { previewRequestId: input.requestId };
+    const rows = [...(email ? ['EMAIL' as const] : []), ...(whatsapp ? ['WHATSAPP' as const] : [])];
+    for (const channel of rows) {
+      const row = await this.prisma.notification.create({ data: { type: input.type, channel, payload, status: 'QUEUED' } });
+      await this.notifications.enqueue(row.id, input.delayMs ?? 0);
+    }
     return { email, whatsapp };
   }
 }

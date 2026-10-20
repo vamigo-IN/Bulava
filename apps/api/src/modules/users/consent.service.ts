@@ -29,6 +29,14 @@ export class ConsentService {
     });
   }
 
+  /**
+   * A preview request (ADR-076): the requester's tick for the Terms, the Privacy Policy and being contacted about it
+   * (`versions` of those policies), or staff confirming a customer from outside agreed (`staff-confirmed`).
+   */
+  async recordPreviewContact(tx: Tx, previewRequestId: string, consent: { version: string; source: string; userId?: string | null }): Promise<void> {
+    await tx.consent.create({ data: { previewRequestId, userId: consent.userId ?? null, kind: 'preview_contact', granted: true, version: consent.version, source: consent.source } });
+  }
+
   /** Updates on WhatsApp: an optional consent of its own, given or withdrawn, never bundled with the Terms. */
   async recordWhatsAppUpdates(tx: Tx, userId: string, granted: boolean, source: 'signup' | 'quick_start' | 'account'): Promise<void> {
     await tx.consent.create({ data: { userId, kind: 'whatsapp_updates', granted, version: 'whatsapp_updates@1', source } });

@@ -269,3 +269,68 @@ export function guestReplyEmail(input: { site: string; guestName: string; eventT
     text: [intro, '', said, '', note, input.optedOut ? input.dashboardUrl : input.replyUrl].join('\n'),
   };
 }
+
+// ───────────────────────────── Preview desk (ADR-076) ─────────────────────────────
+
+const para = (text: string, last = false) => `<p style="line-height:1.5;margin:0${last ? '' : ' 0 12px'}">${escapeHtml(text)}</p>`;
+
+/** To someone who asked for a preview: we have it, and a designer will send the link. */
+export function previewRequestedEmail(input: { site: string; name: string; reference: string }) {
+  const greeting = `Hello ${input.name},`;
+  const intro = `Thank you for asking ${input.site} for a preview. Our designer is on it: we will send your preview link here and on WhatsApp, usually within a day.`;
+  const ref = `Your request is ${input.reference}. Quote it if you write to us.`;
+  return {
+    subject: `We have your preview request (${input.reference})`,
+    html: layout(input.site, 'We have your preview request', para(greeting) + para(intro) + para(ref, true), undefined, `You received this because you asked ${input.site} for a preview.`),
+    text: [greeting, '', intro, '', ref].join('\n'),
+  };
+}
+
+/** Previews are on the customer's page: the link to see them, and how to own them. */
+export function previewReadyEmail(input: { site: string; name: string; made: string; title: string; url: string }) {
+  const greeting = `Hello ${input.name},`;
+  const intro = `${input.made.charAt(0).toUpperCase()}${input.made.slice(1)} for ${input.title} ${input.made.includes(' and ') ? 'are' : 'is'} ready to see.`;
+  const next = 'Open your preview page to see it on your phone, ask for changes, or make it yours: paying once moves the design into your account, ready to publish and share.';
+  return {
+    subject: `Your preview is ready: ${input.title}`,
+    html: layout(input.site, 'Your preview is ready', para(greeting) + para(intro) + para(next, true), { label: 'See my preview', url: input.url }, `You received this because you asked ${input.site} for a preview. Please keep this link to yourself.`),
+    text: [greeting, '', intro, '', next, '', input.url].join('\n'),
+  };
+}
+
+/** To a preview provider: work for them (from the open queue or given by an admin), changes asked for, a customer's WhatsApp reply. */
+export function previewWorkEmail(input: { site: string; name: string; kind: 'assigned' | 'changes' | 'reply'; title: string; reference: string; message?: string; url: string }) {
+  const greeting = `Hello ${input.name},`;
+  const intro = {
+    assigned: `A preview request was given to you: ${input.title} (${input.reference}).`,
+    changes: `The customer for ${input.title} (${input.reference}) asked for changes:`,
+    reply: `The customer for ${input.title} (${input.reference}) answered on WhatsApp:`,
+  }[input.kind];
+  const quote = input.message
+    ? `<blockquote style="margin:0;padding:12px 16px;border-left:3px solid #b8892b;background:#fbf7ef;line-height:1.5;white-space:pre-line">${escapeHtml(input.message)}</blockquote>`
+    : '';
+  return {
+    subject: { assigned: `New preview for you: ${input.title}`, changes: `Changes asked for: ${input.title}`, reply: `A message about ${input.title}` }[input.kind],
+    html: layout(
+      input.site,
+      { assigned: 'A preview for you to make', changes: 'Changes asked for', reply: 'A message from your customer' }[input.kind],
+      para(greeting) + para(intro, !quote) + quote,
+      { label: 'Open on the preview desk', url: input.url },
+      `You received this because you make previews on ${input.site}.`,
+    ),
+    text: [greeting, '', intro, ...(input.message ? ['', input.message] : []), '', input.url].join('\n'),
+  };
+}
+
+/** To a new preview provider: their account, and where the work is. */
+export function previewWelcomeEmail(input: { site: string; name: string; url: string }) {
+  const greeting = `Hello ${input.name},`;
+  const intro = `You can now make previews for ${input.site}'s customers. Sign in with this email address (we send you a code), then open the preview desk from your dashboard.`;
+  const next = 'There you take requests from the queue or work on the ones given to you, design the invitation website, card or film, and share each preview: the customer gets the link on WhatsApp.';
+  const safety = 'The desk shows customers’ numbers, so it asks for two-step sign-in: the first time, set up an authenticator app under Account, then Security.';
+  return {
+    subject: `Welcome to the ${input.site} preview desk`,
+    html: layout(input.site, 'Welcome to the preview desk', para(greeting) + para(intro) + para(next) + para(safety, true), { label: 'Open the preview desk', url: input.url }, `You received this because an admin of ${input.site} added you as a preview provider.`),
+    text: [greeting, '', intro, '', next, '', safety, '', input.url].join('\n'),
+  };
+}

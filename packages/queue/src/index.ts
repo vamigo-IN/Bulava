@@ -38,7 +38,7 @@ export interface JobPayloads {
    */
   whatsapp: {
     to: string;
-    template: 'invitation' | 'reminder' | 'registrationConfirmed' | 'eventUpdate' | 'galleryShared' | 'planPurchased' | 'paymentFailed' | 'paymentPending' | 'otp';
+    template: 'invitation' | 'reminder' | 'registrationConfirmed' | 'eventUpdate' | 'galleryShared' | 'planPurchased' | 'paymentFailed' | 'paymentPending' | 'previewRequested' | 'previewReady' | 'otp';
     params: string[];
     copyCode?: string;
   };

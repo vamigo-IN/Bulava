@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, CalendarHeart, CheckCircle2, ChevronDown, House, IdCard, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserRound } from 'lucide-react';
+import { Bell, CalendarHeart, CheckCircle2, ChevronDown, GalleryVerticalEnd, House, IdCard, Inbox, LayoutGrid, LogOut, ReceiptIndianRupee, ShieldCheck, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -124,7 +124,7 @@ function Notifications() {
   );
 }
 
-function AccountMenu({ name, onLogout }: { name?: string; onLogout: () => void }) {
+function AccountMenu({ name, desk, onLogout }: { name?: string; desk: boolean; onLogout: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -161,6 +161,17 @@ function AccountMenu({ name, onLogout }: { name?: string; onLogout: () => void }
             <Link role="menuitem" href="/cards" onClick={() => setOpen(false)} className={cn(item, 'sm:hidden')}>
               <IdCard aria-hidden className="size-4 text-gold-600" />
               {t('nav.cards')}
+            </Link>
+            {desk ? (
+              <Link role="menuitem" href="/dashboard/desk" onClick={() => setOpen(false)} className={cn(item, 'sm:hidden')}>
+                <Inbox aria-hidden className="size-4 text-gold-600" />
+                {t('dash.nav.desk')}
+              </Link>
+            ) : null}
+            {/* The cards saved in the account (ADR-077). */}
+            <Link role="menuitem" href="/dashboard/cards" onClick={() => setOpen(false)} className={item}>
+              <GalleryVerticalEnd aria-hidden className="size-4 text-gold-600" />
+              {t('dash.nav.myCards')}
             </Link>
             <Link role="menuitem" href="/dashboard/account" onClick={() => setOpen(false)} className={item}>
               <UserRound aria-hidden className="size-4 text-gold-600" />
@@ -204,12 +215,15 @@ function Shell({ children }: { children: ReactNode }) {
     router.replace('/login');
   };
 
+  // Preview providers (and staff who manage previews) work on the preview desk (ADR-076).
+  const desk = Boolean(me.data?.platformPermissions?.includes('preview.work'));
   const nav = [
     { href: '/dashboard', label: t('dash.nav.home'), active: pathname === '/dashboard' },
     { href: '/dashboard/events', label: t('dash.nav.events'), active: pathname.startsWith('/dashboard/events') },
+    ...(desk ? [{ href: '/dashboard/desk', label: t('dash.nav.desk'), active: pathname.startsWith('/dashboard/desk') }] : []),
     { href: '/templates', label: t('nav.templates'), active: false },
-    // Digital cards: designed and downloaded without an event (included in plans that remove the watermark).
-    { href: '/cards', label: t('nav.cards'), active: false },
+    // Digital cards: designed and downloaded without an event (included in plans that remove the watermark); the account's own are under My cards.
+    { href: '/cards', label: t('nav.cards'), active: pathname.startsWith('/dashboard/cards') },
   ];
 
   return (
@@ -234,7 +248,7 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-1">
             <Notifications />
-            <AccountMenu name={me.data?.name} onLogout={logout} />
+            <AccountMenu name={me.data?.name} desk={desk} onLogout={logout} />
           </div>
         </div>
       </header>

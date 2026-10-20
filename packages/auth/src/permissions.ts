@@ -48,6 +48,10 @@ export const PLATFORM_PERMISSIONS = [
   'cards.view',
   /** Digital cards: resend a card's email, render it again, export the leads who agreed to offers. */
   'cards.manage',
+  /** The preview desk (ADR-076): take customers' preview requests, make their previews and share them. */
+  'preview.work',
+  /** Every preview request: enter customers from outside, assign the work, set the offer; add and remove preview providers. */
+  'preview.manage',
   'payment.refund',
   /** Super Admin only: complimentary plan upgrades. */
   'plan.grant',
@@ -69,10 +73,10 @@ export type EventRole =
   | 'MEDIA_MANAGER'
   | 'PHOTOGRAPHER';
 
-export type PlatformRole = 'USER' | 'SUPPORT' | 'CONTENT_MANAGER' | 'FINANCE_MANAGER' | 'PLATFORM_ADMIN' | 'SUPER_ADMIN';
+export type PlatformRole = 'USER' | 'SUPPORT' | 'CONTENT_MANAGER' | 'FINANCE_MANAGER' | 'PLATFORM_ADMIN' | 'SUPER_ADMIN' | 'PREVIEW_PROVIDER';
 
 /** Staff roles the Super Admin can assign (SUPER_ADMIN only changes hands by transfer). */
-export const ASSIGNABLE_PLATFORM_ROLES = ['USER', 'SUPPORT', 'CONTENT_MANAGER', 'FINANCE_MANAGER', 'PLATFORM_ADMIN'] as const;
+export const ASSIGNABLE_PLATFORM_ROLES = ['USER', 'SUPPORT', 'CONTENT_MANAGER', 'FINANCE_MANAGER', 'PLATFORM_ADMIN', 'PREVIEW_PROVIDER'] as const;
 
 /** Only the Super Admin holds these. */
 const SUPER_ONLY: readonly PlatformPermission[] = ['plan.grant', 'settings.manage', 'staff.manage'];
@@ -125,6 +129,8 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, readonly PlatformPe
   FINANCE_MANAGER: ['admin.read', 'billing.read', 'payment.refund', 'pricing.manage', 'cards.view'],
   PLATFORM_ADMIN: PLATFORM_PERMISSIONS.filter((p) => !SUPER_ONLY.includes(p)),
   SUPER_ADMIN: PLATFORM_PERMISSIONS,
+  // Works on the preview desk in the dashboard only: no console (ADR-076).
+  PREVIEW_PROVIDER: ['preview.work'],
 };
 
 export function eventRoleHasPermission(role: EventRole, permission: EventPermission): boolean {
