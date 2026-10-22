@@ -4,6 +4,7 @@ import { loadFont as cinzel } from '@remotion/google-fonts/Cinzel';
 import { loadFont as cormorant } from '@remotion/google-fonts/CormorantGaramond';
 import { loadFont as greatVibes } from '@remotion/google-fonts/GreatVibes';
 import { loadFont as italiana } from '@remotion/google-fonts/Italiana';
+import { loadFont as lora } from '@remotion/google-fonts/Lora';
 import { loadFont as marcellus } from '@remotion/google-fonts/Marcellus';
 import { loadFont as montserrat } from '@remotion/google-fonts/Montserrat';
 import { loadFont as notoSans } from '@remotion/google-fonts/NotoSans';
@@ -54,4 +55,6 @@ export function loadTemplateFonts(): void {
   load(() => yatra('normal', { weights: ['400'], subsets: ['devanagari', 'latin'] }));
   load(() => baloo('normal', { weights: ['400', '600', '700', '800'], subsets: ['devanagari', 'latin'] }));
   load(() => pacifico('normal', { weights: ['400'], subsets: ['latin'] }));
+  load(() => lora('normal', { weights: ['400', '500', '600', '700'], subsets: ['latin'] }));
+  load(() => lora('italic', { weights: ['400', '500'], subsets: ['latin'] }));
 }

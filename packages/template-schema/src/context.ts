@@ -197,6 +197,13 @@ const SAMPLE_MENUS: Record<Faith, string> = {
   christian: 'Welcome | Fresh lime soda · Iced tea\nStarters | Prawn rissoles · Chicken cutlets · Vegetable croquettes\nMains | Appam & stew · Mutton roast · Ghee rice · Fish moilee\nDessert | Caramel custard · Bebinca',
 };
 
+/** A destination wedding's practical lines (the stay, travel and gift slots), for designs tagged `destination`. */
+const DESTINATION_LINES = {
+  accommodation: 'Rooms are held for you at the palace hotel from 13 to 15 December; mention our names when you book.',
+  travel: 'The airport is 25 minutes away. Cars will meet every flight on the 13th.',
+  gifts: 'Your blessings are the only gift we wish for.',
+} as const;
+
 /**
  * Sample context for Template Studio previews, catalog previews and automated
  * template tests. `seed` (the template key) and `faith` (else read from `tags`)
@@ -258,8 +265,12 @@ export function sampleRenderContext(overrides: SampleOverrides = {}): RenderCont
     guestName: long ? LONG_GUESTS[people.tradition] : people.guest,
     gallery: overrides.noPhotos ? [] : shots.gallery.map(photo),
     photos: overrides.noPhotos ? [] : [photo(shots.cover), photo(shots.story)],
-    photoSlots: overrides.noPhotos ? {} : { cover: photo(shots.cover), partnerOne: photo(shots.partnerOne), partnerTwo: photo(shots.partnerTwo), story: photo(shots.story), closing: photo(shots.closing) },
+    photoSlots: overrides.noPhotos
+      ? {}
+      : { cover: photo(shots.cover), partnerOne: photo(shots.partnerOne), partnerTwo: photo(shots.partnerTwo), story: photo(shots.story), closing: photo(shots.closing), venue: photo(shots.venue) },
     custom: {
+      // Destination designs show where to stay, how to travel and the gift note.
+      ...(overrides.tags?.includes('destination') ? DESTINATION_LINES : {}),
       tagline: preset.tagline,
       story: 'It started with a chance meeting and a cup of chai. Years later, we are ready to begin our forever.',
       about: preset.description,

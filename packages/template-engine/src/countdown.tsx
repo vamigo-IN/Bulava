@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 
 interface Labels {
   days: string;
@@ -55,7 +55,23 @@ function FlipDigit({ value }: { value: string }) {
  * Variants: boxes, flip (flip-clock leaves), rings (each number in a double ring), inline
  * (one line: "42 days · 8 hours · 30 minutes").
  */
-export function CountdownClock({ target, labels, static: isStatic, variant = 'boxes' }: { target: string; labels: Labels; static?: boolean; variant?: 'boxes' | 'flip' | 'rings' | 'inline' }) {
+export function CountdownClock({
+  target,
+  labels,
+  static: isStatic,
+  variant = 'boxes',
+  ornament,
+  caps = true,
+}: {
+  target: string;
+  labels: Labels;
+  static?: boolean;
+  variant?: 'boxes' | 'flip' | 'rings' | 'inline' | 'ornate';
+  /** ornate: the drawn separator between the units and the flourish at each end (the left one; the right mirrors it). */
+  ornament?: { separator: ReactNode; end: ReactNode };
+  /** Spaced capitals for the units' names (Latin script only). */
+  caps?: boolean;
+}) {
   const t = new Date(target).getTime();
   // Static (thumbnail) mode shows fixed illustrative numbers so server and client render identically.
   const [now, setNow] = useState<ReturnType<typeof remaining> | null>(isStatic ? { days: 42, hours: 8, minutes: 30, seconds: 15, done: false } : null);
@@ -73,6 +89,45 @@ export function CountdownClock({ target, labels, static: isStatic, variant = 'bo
     ['minutes', now?.minutes ?? null],
     ['seconds', now?.seconds ?? null],
   ];
+
+  if (variant === 'ornate') {
+    // One row: large lining figures in the band's gold, the units' names under them, a drawn separator between
+    // each, and on wide pages a flourish at each end pointing in.
+    return (
+      <div className="flex items-start justify-center" role="timer" aria-live="off" data-live="">
+        {ornament ? (
+          <span aria-hidden="true" className="mt-[22px] hidden w-[120px] shrink-0 @min-[1100px]:mr-6 @min-[1100px]:block">
+            {ornament.end}
+          </span>
+        ) : null}
+        {cells.map(([key, n], i) => (
+          <Fragment key={key}>
+            {i && ornament ? (
+              <span aria-hidden="true" className="mt-1 flex w-[26px] shrink-0 justify-center text-[var(--t-orn)] @min-[640px]:mt-2 @min-[640px]:w-[68px]">
+                {ornament.separator}
+              </span>
+            ) : null}
+            <div className="min-w-0 flex-1 text-center @min-[640px]:w-[160px] @min-[640px]:flex-none">
+              <span className="sr-only">
+                {n === null ? '–' : n} {labels[key]}
+              </span>
+              <div aria-hidden="true" className="text-[36px] leading-none font-medium text-[var(--t-accent-ink)] [font-family:var(--t-heading)] [font-variant-numeric:lining-nums_tabular-nums] @min-[640px]:text-[60px]">
+                {n === null ? '––' : String(n).padStart(2, '0')}
+              </div>
+              <div aria-hidden="true" className={`mt-3 text-[var(--t-text)] ${caps ? 'text-[10.5px] tracking-[0.14em] uppercase @min-[640px]:text-[13px] @min-[640px]:tracking-[0.2em]' : 'text-[13px] @min-[640px]:text-[15px]'}`}>
+                {labels[key]}
+              </div>
+            </div>
+          </Fragment>
+        ))}
+        {ornament ? (
+          <span aria-hidden="true" className="mt-[22px] hidden w-[120px] shrink-0 -scale-x-100 @min-[1100px]:ml-6 @min-[1100px]:block">
+            {ornament.end}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
 
   if (variant === 'flip') {
     return (

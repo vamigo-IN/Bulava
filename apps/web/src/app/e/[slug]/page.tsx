@@ -24,6 +24,8 @@ interface PublicEventView {
   /** Kinds of section the page leaves out (no replies, no gallery). */
   without?: Array<'rsvp' | 'gallery' | 'photoShare'>;
   registration: PublicRegistrationInfo | null;
+  /** The event's public page, for the invitation's share links (public, published events only). */
+  shareUrl?: string | null;
 }
 
 /**
@@ -108,7 +110,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
         mode="live"
         introKey={`e-${data.event.slug}`}
         without={data.without}
-        slots={{ watermark: data.watermark, veil: data.veil ?? undefined, rsvp: registration, rsvpHeading: registration ? tr('register.title') : undefined }}
+        slots={{ watermark: data.watermark, veil: data.veil ?? undefined, rsvp: registration, rsvpHeading: registration ? tr('register.title') : undefined, shareUrl: data.shareUrl ?? undefined }}
       />
       {registration && !hasRsvpSection && data.rsvp !== false ? (
         // Templates without an RSVP section still get the form, after the invitation.

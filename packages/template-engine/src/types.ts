@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
-import type { Artwork, EffectName, Fonts, IntroName, LookName, RenderContext, SectionInstance, ThemeColors, ThemeDress } from '@bulava/template-schema';
+import type { Artwork, EffectName, Faith, Fonts, IntroName, LookName, RenderContext, SectionInstance, ThemeColors, ThemeDress } from '@bulava/template-schema';
 import type { OrnamentName } from './ornaments';
 
 /** Interactive pieces the host app injects into template slots. */
@@ -19,6 +19,11 @@ export interface RenderSlots {
   veil?: string;
   /** Heading for the RSVP section when the host app puts something else there (e.g. registration). */
   rsvpHeading?: string;
+  /**
+   * The event's public address, for the closing's share links (WhatsApp, Facebook). Set only for a published
+   * event that anyone may open, with the guest origin (custom domains); never a personal invitation link.
+   */
+  shareUrl?: string;
 }
 
 export type RenderMode = 'live' | 'preview' | 'thumbnail';
@@ -35,6 +40,8 @@ export interface SectionProps {
   ornament: OrnamentName;
   /** Pieces of the suite the theme swaps for others (theme.dress). */
   dress?: ThemeDress;
+  /** The template's tradition (theme.faith): sections that show its emblem (the blessings' centre) read it. */
+  faith?: Faith;
   pattern: string;
   /** Effective theme colours (after customization), for pattern images. */
   colors: ThemeColors;
@@ -51,6 +58,13 @@ export interface SectionProps {
   fonts: Fonts;
   /** Id of the page's RSVP section, which canvas RSVP buttons scroll to. */
   rsvpSectionId?: string;
+  /** Id of the section drawn after this one (a hero's button leads to it). */
+  nextSectionId?: string;
+  /**
+   * Drawings the page defines once and sections place with <use> (decor/sharedArt: roses and peacocks that
+   * recur down a page), by artKey(). Only the page's own render passes them.
+   */
+  artRefs?: Readonly<Record<string, string>>;
   /** Draws one of the template's own sections behind a host's redrawn one (canvas section layers, ADR-065). */
   drawSection?: (sectionId: string, index: number) => ReactNode;
   /**

@@ -45,8 +45,8 @@ const PALETTE_KEYS = ['primary', 'secondary', 'accent', 'background', 'surface',
 const hx = (c: string) => (/^#[0-9a-f]{6}/i.test(c) ? c.slice(0, 7) : '#9a8a78');
 
 /** A palette key or a colour, resolved against the piece's (hazed) palette. */
-function tintOf(colors: ThemeColors, tint: string | undefined, fallback: keyof ThemeColors): string {
-  if (tint && (PALETTE_KEYS as readonly string[]).includes(tint)) return hx(colors[tint as keyof ThemeColors]);
+function tintOf(colors: ThemeColors, tint: string | undefined, fallback: (typeof PALETTE_KEYS)[number]): string {
+  if (tint && (PALETTE_KEYS as readonly string[]).includes(tint)) return hx(colors[tint as (typeof PALETTE_KEYS)[number]]);
   return tint && /^#[0-9a-f]{6}$/i.test(tint) ? tint : hx(colors[fallback]);
 }
 

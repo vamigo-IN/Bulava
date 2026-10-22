@@ -34,6 +34,18 @@ export function formatEventDate(value: Date | string, options: FormatOptions): s
   }).format(toDate(value));
 }
 
+/**
+ * A span of days in the event's time zone and language, e.g. "14–15 December 2026", "30 November – 2 December
+ * 2026": the shared month and year said once. One day (or no end) gives that day alone.
+ */
+export function formatEventDateRange(start: Date | string, end: Date | string | null | undefined, options: FormatOptions): string {
+  const fmt = new Intl.DateTimeFormat(localeFor(options), { day: 'numeric', month: 'long', year: 'numeric', timeZone: options.timeZone });
+  const from = toDate(start);
+  const to = end ? toDate(end) : null;
+  if (!to || to.getTime() <= from.getTime() || fmt.format(from) === fmt.format(to)) return fmt.format(from);
+  return typeof fmt.formatRange === 'function' ? fmt.formatRange(from, to) : `${fmt.format(from)} – ${fmt.format(to)}`;
+}
+
 /** e.g. "15 Dec", "15 दिस॰": the day and month alone, for timelines and other tight spaces. */
 export function formatEventDateShort(value: Date | string, options: FormatOptions): string {
   return new Intl.DateTimeFormat(localeFor(options), {

@@ -5,6 +5,7 @@ import {
   FONT_FAMILIES,
   INTROS,
   isStageIntro,
+  LOOKS,
   ORNAMENTS,
   PATTERNS,
   SUITE_CORNERS,
@@ -16,6 +17,7 @@ import {
   templateStage,
   THEME_MOTIONS,
   type FontRef,
+  type LookName,
   type ThemeColors,
   type ThemeDress,
   type ThemeMotion,
@@ -24,7 +26,13 @@ import { t } from '@/lib/i18n';
 import { Card, CardTitle, Field, Input, Select } from '../ui';
 import { EditError, type EditorProps } from './common';
 
-const COLOR_KEYS: Array<keyof ThemeColors> = ['primary', 'secondary', 'accent', 'background', 'surface', 'text', 'muted'];
+const COLOR_KEYS: Array<Exclude<keyof ThemeColors, 'deep'>> = ['primary', 'secondary', 'accent', 'background', 'surface', 'text', 'muted'];
+
+/** The primary taken a third of the way to black: the deep band when a palette sets none (the engine's deepOf). */
+function derivedDeep(primary: string): string {
+  const n = Number.parseInt(primary.slice(1), 16);
+  return `#${[16, 8, 0].map((s) => Math.round(((n >> s) & 255) * 0.66).toString(16).padStart(2, '0')).join('')}`;
+}
 /** Families that include Devanagari glyphs themselves. */
 const DEVANAGARI_CAPABLE = new Set<string>(['Noto Sans Devanagari', 'Noto Serif Devanagari', 'Tiro Devanagari Hindi', 'Poppins']);
 const DEVANAGARI_FALLBACKS = ['Noto Sans Devanagari', 'Noto Serif Devanagari', 'Tiro Devanagari Hindi'] as const;
@@ -69,6 +77,25 @@ export function ThemeTab({ definition, edit }: EditorProps) {
           {COLOR_KEYS.map((key) => (
             <div key={key} className="flex-1" style={{ background: theme.colors[key] }} />
           ))}
+          {theme.colors.deep ? <div className="flex-1" style={{ background: theme.colors.deep }} /> : null}
+        </div>
+        {/* The deep band's own colour (optional): shown and kept when the palette has one. */}
+        <div className="mt-4 border-t border-stone-100 pt-4">
+          <p className="mb-2 text-xs text-stone-500">{t('theme.color.deepHint')}</p>
+          {theme.colors.deep ? (
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-56 flex-1">
+                <ColorInput key={`deep-${theme.colors.deep}`} label={t('theme.color.deep')} value={theme.colors.deep} onCommit={(hex) => run((d) => void (d.theme.colors.deep = hex))} />
+              </div>
+              <button type="button" className="min-h-10 text-sm text-stone-600 underline underline-offset-2" onClick={() => run((d) => void delete d.theme.colors.deep)}>
+                {t('theme.color.deepRemove')}
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="min-h-10 text-sm font-medium text-brand-700 underline underline-offset-2" onClick={() => run((d) => void (d.theme.colors.deep = derivedDeep(d.theme.colors.primary)))}>
+              {t('theme.color.deepAdd')}
+            </button>
+          )}
         </div>
       </Card>
 
@@ -95,6 +122,17 @@ export function ThemeTab({ definition, edit }: EditorProps) {
                 {(p) => (
                   <Select {...p} value={theme.pattern} onChange={(e) => run((d) => void (d.theme.pattern = e.target.value as (typeof PATTERNS)[number]))}>
                     {PATTERNS.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+              <Field label={t('theme.look')}>
+                {(p) => (
+                  <Select {...p} value={theme.look} onChange={(e) => run((d) => void (d.theme.look = e.target.value as LookName))}>
+                    {LOOKS.map((o) => (
                       <option key={o} value={o}>
                         {o}
                       </option>

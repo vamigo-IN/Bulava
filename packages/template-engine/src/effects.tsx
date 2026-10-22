@@ -8,6 +8,8 @@ import type { EffectName, ThemeColors } from '@bulava/template-schema';
  * rising gold dust, fireflies, confetti, sky lanterns or snow. One canvas,
  * a modest particle count, device-pixel ratio capped for older phones, paused
  * while the tab is hidden, and nothing at all for reduced-motion users.
+ * Particles pass behind words a section marks `data-effect-shelter` (a
+ * hero's names and button), fading out at their edges.
  * The canvas ignores pointer events and is hidden from assistive technology.
  */
 
@@ -81,16 +83,43 @@ export function Effects({ effect, colors, contained = false }: { effect: EffectN
     };
     const particles = Array.from({ length: Math.round(count) }, () => spawn(true));
 
-    const draw = (p: Particle, t: number) => {
+    // Words that particles pass behind (`data-effect-shelter`, e.g. a hero's names and button): read every few
+    // frames, in the canvas's own coordinates; a particle fades out within FEATHER px of one and is gone inside it.
+    const FEATHER = 28;
+    let shelters: Array<{ left: number; top: number; right: number; bottom: number }> = [];
+    const readShelters = () => {
+      // Pages without sheltered words (most) never measure the layout from here.
+      const nodes = document.querySelectorAll<HTMLElement>('[data-effect-shelter]');
+      if (!nodes.length) {
+        shelters = [];
+        return;
+      }
+      const box = el.getBoundingClientRect();
+      shelters = Array.from(nodes)
+        .map((node) => node.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.bottom > box.top && r.top < box.bottom)
+        .map((r) => ({ left: r.left - box.left, top: r.top - box.top, right: r.right - box.left, bottom: r.bottom - box.top }));
+    };
+    const clearOf = (x: number, y: number) => {
+      let k = 1;
+      for (const r of shelters) {
+        const out = Math.max(r.left - x, x - r.right, r.top - y, y - r.bottom);
+        if (out < FEATHER) k = Math.min(k, Math.max(0, out) / FEATHER);
+      }
+      return k;
+    };
+
+    const draw = (p: Particle, t: number, k: number) => {
       ctx.save();
       ctx.translate(p.x, p.y);
+      ctx.globalAlpha = k;
       switch (effect) {
         case 'petals':
         case 'marigold': {
           ctx.rotate(p.rot);
           ctx.scale(1, 0.55 + 0.45 * Math.sin(t * 0.002 + p.phase));
           ctx.fillStyle = p.color;
-          ctx.globalAlpha = 0.85;
+          ctx.globalAlpha = 0.85 * k;
           ctx.beginPath();
           ctx.ellipse(0, 0, p.size, p.size * (effect === 'petals' ? 0.62 : 0.45), 0, 0, Math.PI * 2);
           ctx.fill();
@@ -104,7 +133,7 @@ export function Effects({ effect, colors, contained = false }: { effect: EffectN
           break;
         }
         case 'lanterns': {
-          ctx.globalAlpha = 0.8;
+          ctx.globalAlpha = 0.8 * k;
           const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size * 2.4);
           glow.addColorStop(0, 'rgba(255,200,110,0.55)');
           glow.addColorStop(1, 'rgba(255,160,60,0)');
@@ -121,7 +150,7 @@ export function Effects({ effect, colors, contained = false }: { effect: EffectN
         }
         default: {
           const twinkle = effect === 'fireflies' || effect === 'goldDust' ? 0.35 + 0.65 * Math.abs(Math.sin(t * 0.0025 + p.phase)) : 0.9;
-          ctx.globalAlpha = twinkle;
+          ctx.globalAlpha = twinkle * k;
           if (effect !== 'snow') {
             ctx.shadowColor = p.color;
             ctx.shadowBlur = p.size * 4;
@@ -136,10 +165,12 @@ export function Effects({ effect, colors, contained = false }: { effect: EffectN
     };
 
     let frame = 0;
+    let frames = 0;
     let last = performance.now();
     const tick = (now: number) => {
       const dt = Math.min(48, now - last) / 16.7;
       last = now;
+      if (frames++ % 6 === 0) readShelters();
       ctx.clearRect(0, 0, w, h);
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i]!;
@@ -149,7 +180,8 @@ export function Effects({ effect, colors, contained = false }: { effect: EffectN
         p.rot += p.vr * dt;
         const out = rising ? p.y < -40 : p.y > h + 40;
         if (out || p.x < -60 || p.x > w + 60) particles[i] = spawn(false);
-        draw(p, now);
+        const k = shelters.length ? clearOf(p.x, p.y) : 1;
+        if (k > 0) draw(p, now, k);
       }
       frame = requestAnimationFrame(tick);
     };

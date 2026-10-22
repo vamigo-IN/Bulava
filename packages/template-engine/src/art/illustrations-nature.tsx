@@ -246,7 +246,20 @@ function PeacockEye({ seg, scale, c, metal }: { seg: Segment; scale: number; c: 
  * scaled saddle, a blue body, a barred wing with chestnut flights, the white
  * face markings and a fanned crest. The tint colours the train.
  */
-export function RoyalPeacock({ color, colors, foil, className, style }: IllustrationProps) {
+export function RoyalPeacock(props: IllustrationProps) {
+  return <Peacock {...props} branch />;
+}
+
+/**
+ * The same peacock standing on a ledge (a plinth, a parapet, a ghat's step) instead of a branch: its feet on
+ * the line y 231 of its 320 × 400 frame with a soft shadow under them, its train draping down over the ledge's
+ * face to the right. Place it with its feet on the stone.
+ */
+export function StandingPeacock(props: IllustrationProps) {
+  return <Peacock {...props} branch={false} />;
+}
+
+function Peacock({ color, colors, foil, className, style, branch }: IllustrationProps & { branch: boolean }) {
   const id = useSafeId();
   const c = hex(color);
   const metal = `url(#${id}m)`;
@@ -278,17 +291,24 @@ export function RoyalPeacock({ color, colors, foil, className, style }: Illustra
           <path d={saddle} />
         </clipPath>
       </defs>
-      {/* The branch. */}
-      <path d="M14 232 C80 220 170 224 252 238" fill="none" stroke="#6d4c2f" strokeWidth="7" strokeLinecap="round" />
-      <path d="M60 226 C52 216 50 208 54 200" fill="none" stroke="#6d4c2f" strokeWidth="3" strokeLinecap="round" />
-      {[
-        [34, 229, -30],
-        [54, 202, -70],
-        [76, 224, 20],
-        [226, 233, -15],
-      ].map(([x, y, a]) => (
-        <path key={x} d="M0 0 C6 -7 18 -8 26 0 C18 8 6 7 0 0Z" fill={NATURE.leaf} transform={`translate(${x} ${y}) rotate(${a})`} />
-      ))}
+      {branch ? (
+        <>
+          {/* The branch. */}
+          <path d="M14 232 C80 220 170 224 252 238" fill="none" stroke="#6d4c2f" strokeWidth="7" strokeLinecap="round" />
+          <path d="M60 226 C52 216 50 208 54 200" fill="none" stroke="#6d4c2f" strokeWidth="3" strokeLinecap="round" />
+          {[
+            [34, 229, -30],
+            [54, 202, -70],
+            [76, 224, 20],
+            [226, 233, -15],
+          ].map(([x, y, a]) => (
+            <path key={x} d="M0 0 C6 -7 18 -8 26 0 C18 8 6 7 0 0Z" fill={NATURE.leaf} transform={`translate(${x} ${y}) rotate(${a})`} />
+          ))}
+        </>
+      ) : (
+        // Its shadow on the ledge, under the feet and the train's root.
+        <ellipse cx="160" cy="232" rx="58" ry="5" fill="#000000" opacity="0.16" />
+      )}
       {/* The train, tier by tier: each tier's eyes lie over the vanes behind them. */}
       {tiers.map((tier, t) => (
         <g key={t}>
@@ -347,7 +367,7 @@ export function RoyalPeacock({ color, colors, foil, className, style }: Illustra
 // ─────────────────────────── Flowers ───────────────────────────
 
 /** A garden rose seen from above: outer petals, a cupped centre and a spiral. */
-function Rose({ x, y, r, base, id }: { x: number; y: number; r: number; base: string; id: string }) {
+export function Rose({ x, y, r, base, id }: { x: number; y: number; r: number; base: string; id: string }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       <defs>
@@ -370,7 +390,7 @@ function Rose({ x, y, r, base, id }: { x: number; y: number; r: number; base: st
 }
 
 /** A five-petal filler blossom. */
-function Blossom({ x, y, r, fill, centre }: { x: number; y: number; r: number; fill: string; centre: string }) {
+export function Blossom({ x, y, r, fill, centre }: { x: number; y: number; r: number; fill: string; centre: string }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       {ring(5, (i, a) => (
@@ -383,7 +403,7 @@ function Blossom({ x, y, r, fill, centre }: { x: number; y: number; r: number; f
 
 const LEAF = 'M0 0 C14 -16 44 -18 66 0 C44 18 14 16 0 0Z';
 
-function Leaf({ x, y, angle, scale, fill, vein }: { x: number; y: number; angle: number; scale: number; fill: string; vein: string }) {
+export function Leaf({ x, y, angle, scale, fill, vein }: { x: number; y: number; angle: number; scale: number; fill: string; vein: string }) {
   return (
     <g transform={`translate(${x} ${y}) rotate(${angle}) scale(${scale})`}>
       <path d={LEAF} fill={fill} />

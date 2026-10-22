@@ -134,6 +134,46 @@ export function onCubic([p0, c1, c2, p3]: Segment, t: number) {
  */
 export const frameAt = ({ x, y, tx, ty }: { x: number; y: number; tx: number; ty: number }) => `matrix(${r2(-ty)} ${r2(tx)} ${r2(-tx)} ${r2(-ty)} ${r2(x)} ${r2(y)})`;
 
+/**
+ * A Rajput cusped (multifoil) arch head, as path commands from (x, base) to (x + w, base): three lobes up
+ * each side, the cusps between them pointing inward, then an ogee rising to a pointed apex at (x + w/2,
+ * base - h). Drawn on a 300 × 100 grid and scaled, so every frame, card and arcade shares one profile.
+ * `move` starts the path with M (else it continues one).
+ */
+export function cuspedHead(x: number, base: number, w: number, h: number, move = true): string {
+  const sx = w / 300;
+  const sy = h / 100;
+  const at = (u: number, v: number) => `${r2(x + u * sx)} ${r2(base - h + v * sy)}`;
+  // A lobe from a to b bulging outward (up and away from the opening) by `bulge` grid units.
+  const lobe = (a: Pt, b: Pt, bulge: number) => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const k = (bulge * 4) / 3;
+    const nx = (dy / len) * k;
+    const ny = (-dx / len) * k;
+    return ` C${at(a[0] + dx / 3 + nx, a[1] + dy / 3 + ny)} ${at(a[0] + (2 * dx) / 3 + nx, a[1] + (2 * dy) / 3 + ny)} ${at(b[0], b[1])}`;
+  };
+  const left: Pt[] = [
+    [0, 100],
+    [24, 85],
+    [52, 69],
+    [88, 50],
+  ];
+  const right: Pt[] = left.map(([u, v]) => [300 - u, v] as const).reverse();
+  return [
+    move ? `M${at(0, 100)}` : `L${at(0, 100)}`,
+    lobe(left[0]!, left[1]!, 5),
+    lobe(left[1]!, left[2]!, 6.5),
+    lobe(left[2]!, left[3]!, 8),
+    ` C${at(89, 30)} ${at(138, 20)} ${at(150, 0)}`,
+    ` C${at(162, 20)} ${at(211, 30)} ${at(212, 50)}`,
+    lobe(right[0]!, right[1]!, 8),
+    lobe(right[1]!, right[2]!, 6.5),
+    lobe(right[2]!, right[3]!, 5),
+  ].join('');
+}
+
 /** Natural colours that stay put whatever the palette (leaves, flames, petals of real flowers). */
 export const NATURE = {
   leaf: '#3f7a46',

@@ -1,6 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import type { IllustrationName, LookName, OrnamentNameValue, ThemeColors, ThemeDress } from '@bulava/template-schema';
 import { Illustration, JHAROKHA_OPENING } from '../art/illustrations';
+import { cuspedHead, Metal, taper, type Segment } from '../art/kit';
 import { PRABHAVALI_OPENING } from '../art/illustrations-regional';
 import { Cloud, Kalash, LotusBloom, MarigoldStrand, r2, Toran } from '../art/motifs';
 import { Mandala, Ornament } from '../ornaments';
@@ -55,6 +56,106 @@ const art = (name: IllustrationName, d: Dress, w: number, h: number, style?: CSS
 
 const Rule = ({ className }: { className?: string }) => <span className={`block h-px bg-current opacity-60 ${className ?? 'w-14 @min-[640px]:w-20'}`} />;
 
+/** The fleuron's C-scrolls (left; the right mirrors it), on its 44 × 24 grid. */
+const SCROLL: readonly Segment[] = [
+  [[18.6, 15.9], [14.6, 17.8], [9.4, 17], [8, 13.9]],
+  [[8, 13.9], [7, 11.2], [9.8, 9.6], [11.3, 11.7]],
+];
+const FLEURON_SCROLLS = [SCROLL, SCROLL.map((seg) => seg.map(([x, y]) => [44 - x, y] as const) as unknown as Segment)].map((segs) => taper(segs, [1.7, 1.1, 0.5], 12)).join(' ');
+
+/**
+ * The fleuron: a lotus bud between two leaves and two C-scrolls, stamped in foil of the band's metal (gold on
+ * paper, the light accent on dark bands). 44 × 24 units; the heirloom's divider and its small ornament.
+ */
+export function Fleuron({ d, className, style }: { d: Dress; className?: string; style?: CSSProperties }) {
+  const id = `fl${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  return (
+    <svg viewBox="0 0 44 24" className={className} style={{ display: 'block', ...style }} aria-hidden="true">
+      <defs>
+        <Metal id={id} base={metalOf(d)} foil x2={44} y2={24} />
+      </defs>
+      <g fill={`url(#${id})`}>
+        <path d="M22 2.6 C24.9 6.4 25.8 10 22 14.8 C18.2 10 19.1 6.4 22 2.6Z" />
+        <path d="M20.8 14.2 C17 14.4 14.3 12 14.5 8.6 C17.4 9.9 19.6 11.7 20.8 14.2Z M23.2 14.2 C27 14.4 29.7 12 29.5 8.6 C26.6 9.9 24.4 11.7 23.2 14.2Z" />
+        <path d={FLEURON_SCROLLS} />
+        <circle cx="22" cy="18.2" r="1.3" />
+        <circle cx="4.2" cy="14.2" r="0.9" />
+        <circle cx="39.8" cy="14.2" r="0.9" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * The crest: a small lotus crown (three petals rising from two curling leaves on a band, a bead above and a drop
+ * below) in the band's metal, 44 × 32 units; it crowns the heirloom invitation's words.
+ */
+export function Crest({ d, className, style }: { d: Dress; className?: string; style?: CSSProperties }) {
+  const id = `cr${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  return (
+    <svg viewBox="0 0 44 32" className={className} style={{ display: 'block', ...style }} aria-hidden="true">
+      <defs>
+        <Metal id={id} base={metalOf(d)} foil x2={44} y2={32} />
+      </defs>
+      <g fill={`url(#${id})`}>
+        <path d="M22 5 C25.6 10 26.1 15 22 21 C17.9 15 18.4 10 22 5Z" />
+        <path d="M20.6 20.4 C15.6 20 12.6 16 13.6 11.4 C17.1 13.4 19.6 16.4 20.6 20.4Z M23.4 20.4 C28.4 20 31.4 16 30.4 11.4 C26.9 13.4 24.4 16.4 23.4 20.4Z" />
+        <path d="M19.6 22 C13 23.6 7.4 21 5.8 16.4 C10.9 16.9 16 18.5 19.6 22Z M24.4 22 C31 23.6 36.6 21 38.2 16.4 C33.1 16.9 28 18.5 24.4 22Z" />
+        <rect x="14" y="22.4" width="16" height="2.3" rx="1.15" />
+        <circle cx="22" cy="2.6" r="1.4" />
+        <circle cx="4" cy="15.6" r="0.9" />
+        <circle cx="40" cy="15.6" r="0.9" />
+        <path d="M22 25.6 L23.7 28.3 L22 31 L20.3 28.3Z" />
+      </g>
+    </svg>
+  );
+}
+
+/** The ornate countdown's ends: a fine line thickening into a fleur that points inward (the left end; mirror it for the right). */
+const END_LINE = taper([[[2, 12], [34, 12], [70, 12], [96, 12]]], [0.3, 1.6], 16);
+
+export function EndFlourish({ d }: { d: Dress }) {
+  const id = `ef${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  return (
+    <svg viewBox="0 0 120 24" className="block h-auto w-full" aria-hidden="true">
+      <defs>
+        <Metal id={id} base={metalOf(d)} foil x2={120} y2={24} />
+      </defs>
+      <g fill={`url(#${id})`}>
+        <path d={END_LINE} />
+        <path d="M96 12 C102 7.6 108.6 8.4 113.4 12 C108.6 15.6 102 16.4 96 12Z" />
+        <path d="M99 10.8 C100.4 6.4 104.2 3.8 107.4 4.8 C104.6 6 102.4 8.2 101.4 11Z M99 13.2 C100.4 17.6 104.2 20.2 107.4 19.2 C104.6 18 102.4 15.8 101.4 13Z" />
+        <circle cx="116.6" cy="12" r="1.5" />
+      </g>
+    </svg>
+  );
+}
+
+/** The ornate countdown's separator: a hairline 46 tall with a small diamond at its middle. */
+export function UnitSeparator() {
+  return (
+    <svg viewBox="0 0 10 46" className="block h-[26px] w-2.5 @min-[640px]:h-[46px]" aria-hidden="true">
+      <path d="M5 0 V18.4 M5 27.6 V46" stroke="currentColor" strokeWidth="1" opacity="0.7" vectorEffect="non-scaling-stroke" />
+      <path d="M5 18.6 L8.2 23 L5 27.4 L1.8 23Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/**
+ * The fleuron between two hairlines that fade in from their outer ends: under headings (168 wide on
+ * desktop, 140 on phones), under the hero's names (`compact`, 124) and in the closing (`wide`, 300 and 200).
+ */
+export function FleuronRule({ d, size = 'md', className }: { d: Dress; size?: 'compact' | 'md' | 'wide'; className?: string }) {
+  const line = size === 'wide' ? 'w-[86px] @min-[640px]:w-[136px]' : size === 'compact' ? 'w-11' : 'w-[52px] @min-[640px]:w-16';
+  return (
+    <div aria-hidden="true" className={cx('flex items-center justify-center text-[var(--t-orn)]', className)}>
+      <span className={cx('block h-px opacity-75', line)} style={{ background: 'linear-gradient(to right, transparent, currentColor)' }} />
+      <Fleuron d={d} className={size === 'compact' ? 'mx-1.5 h-[13px] w-6' : 'mx-1.5 h-[13px] w-6 @min-[640px]:h-[15px] @min-[640px]:w-7'} />
+      <span className={cx('block h-px opacity-75', line)} style={{ background: 'linear-gradient(to left, transparent, currentColor)' }} />
+    </div>
+  );
+}
+
 export function SuiteDivider({ d, className }: { d: Dress; className?: string }) {
   const { suite } = d;
   const wrap = (children: ReactNode) => (
@@ -63,6 +164,8 @@ export function SuiteDivider({ d, className }: { d: Dress; className?: string })
     </div>
   );
   switch (suite.divider) {
+    case 'fleuron':
+      return <FleuronRule d={d} className={className} />;
     case 'flourish':
       return (
         <div aria-hidden="true" className={`mx-auto w-44 @min-[640px]:w-56 ${className ?? ''}`}>
@@ -503,7 +606,29 @@ export const FRAME_ASPECT: Record<FrameShape, string> = {
   double: '3 / 4',
   cloud: '1 / 1',
   rounded: '4 / 5',
+  cusped: '4 / 5',
 };
+
+/**
+ * The cusped (Rajput multifoil) arch's head on a 300 × 104 grid (art/kit cuspedHead: three lobes up each
+ * side, an ogee to a pointed apex), drawn at its own proportions over a body of any height: the head is
+ * 104/300 of the frame's width tall (34.667cqw in a frame that is its own inline-size container).
+ */
+const CUSP_LINE = cuspedHead(0, 104, 300, 100);
+const CUSP_FILL = `${CUSP_LINE} V110 H0Z`;
+const CUSP_HEAD = '34.667cqw';
+const CUSP_BODY_TOP = '34.4cqw';
+const CUSP_MASK = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 104' preserveAspectRatio='none'><path d='${CUSP_FILL}'/></svg>`)}")`;
+
+/** The cusped head as a drawn line (with its pearl finial), across the top of a cusped frame or card. */
+function CuspLine({ stroke, width, fill }: { stroke: string; width: number; fill?: string }) {
+  return (
+    <svg viewBox="0 0 300 104" preserveAspectRatio="none" aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 block w-full overflow-visible" style={{ height: CUSP_HEAD }}>
+      {fill ? <path d={CUSP_FILL} fill={fill} /> : null}
+      <path d={CUSP_LINE} fill="none" stroke={stroke} strokeWidth={width} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
 
 const SCALLOP_MASK = (() => {
   const pts: string[] = [];
@@ -554,6 +679,18 @@ function openingStyle(shape: FrameShape): CSSProperties {
       };
     case 'double':
       return { borderRadius: 2 };
+    case 'cusped':
+      // The head at its own proportions over a body of any height (the frame is an inline-size container).
+      return {
+        WebkitMaskImage: `${CUSP_MASK}, linear-gradient(#000, #000)`,
+        maskImage: `${CUSP_MASK}, linear-gradient(#000, #000)`,
+        WebkitMaskSize: `100% ${CUSP_HEAD}, 100% calc(100% - ${CUSP_BODY_TOP})`,
+        maskSize: `100% ${CUSP_HEAD}, 100% calc(100% - ${CUSP_BODY_TOP})`,
+        WebkitMaskPosition: 'top, bottom',
+        maskPosition: 'top, bottom',
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+      };
     default:
       return { borderRadius: 'calc(var(--t-radius) * 1.2)' };
   }
@@ -618,6 +755,13 @@ function Outline({ shape }: { shape: FrameShape }) {
       );
     case 'ticket':
       return null;
+    case 'cusped':
+      return (
+        <div className="pointer-events-none absolute inset-0 opacity-80" aria-hidden="true">
+          <CuspLine stroke="currentColor" width={1.25} />
+          <div className="absolute -inset-x-[0.6px] bottom-0 border-x-[1.25px] border-b-[1.25px] border-current" style={{ top: CUSP_BODY_TOP }} />
+        </div>
+      );
     default:
       return svg(<rect x="0" y="0" width="100" height="100" rx="8" {...common} strokeWidth="1.4" />, '-3%');
   }
@@ -628,9 +772,31 @@ function Outline({ shape }: { shape: FrameShape }) {
  * jharokha window, a temple prabhavali, a mihrab, a lancet, an arch, an oval,
  * a scalloped round, a ticket… The frame keeps its proportions.
  */
-export function PhotoFrame({ d, shape, src, alt, fallback, className, tilt }: { d: Dress; shape?: FrameShape; src?: string; alt: string; fallback?: ReactNode; className?: string; tilt?: boolean }) {
+export function PhotoFrame({
+  d,
+  shape,
+  src,
+  alt,
+  fallback,
+  className,
+  tilt,
+  aspect,
+  focus,
+}: {
+  d: Dress;
+  shape?: FrameShape;
+  src?: string;
+  alt: string;
+  fallback?: ReactNode;
+  className?: string;
+  tilt?: boolean;
+  /** Width / height in place of the frame's own; false when className sets it. */
+  aspect?: string | false;
+  /** Where the photo is held when the frame crops it (CSS object-position), e.g. "50% 30%" to keep a portrait's faces. */
+  focus?: string;
+}) {
   const frame = shape ?? d.suite.frame;
-  const inner = src ? <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center">{fallback}</div>;
+  const inner = src ? <img src={src} alt={alt} className="h-full w-full object-cover" style={focus ? { objectPosition: focus } : undefined} loading="lazy" /> : <div className="flex h-full w-full items-center justify-center">{fallback}</div>;
   if (frame === 'jharokha' || frame === 'niche') {
     const o = frame === 'jharokha' ? JHAROKHA_OPENING : PRABHAVALI_OPENING;
     return (
@@ -653,8 +819,8 @@ export function PhotoFrame({ d, shape, src, alt, fallback, className, tilt }: { 
     );
   }
   return (
-    <div className={cx('relative', tilt && 'bulava-tilt', className)} style={{ aspectRatio: FRAME_ASPECT[frame] }}>
-      <div className="absolute inset-0 overflow-hidden shadow-[0_18px_34px_-22px_rgba(0,0,0,0.55)]" style={{ ...PHOTO_GROUND, ...openingStyle(frame) }}>
+    <div className={cx('relative', tilt && 'bulava-tilt', className)} style={{ ...(aspect === false ? {} : { aspectRatio: aspect ?? FRAME_ASPECT[frame] }), ...(frame === 'cusped' ? { containerType: 'inline-size' } : {}) }}>
+      <div className={cx('absolute inset-0 overflow-hidden', frame !== 'cusped' && 'shadow-[0_18px_34px_-22px_rgba(0,0,0,0.55)]')} style={{ ...PHOTO_GROUND, ...openingStyle(frame) }}>
         {inner}
       </div>
       <div className="pointer-events-none absolute inset-0 text-[var(--t-orn)]">
@@ -674,10 +840,27 @@ const CUT = 'polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16
  * (deco), a double rule, a ticket with notches, a soft pill (oval, circle,
  * cloud)… `fill` is the card's own colour (the look's card by default).
  */
-export function ShapedCard({ d, shape, className, children, fill = 'var(--t-card)' }: { d: Dress; shape?: FrameShape; className?: string; children: ReactNode; fill?: string }) {
+export function ShapedCard({ d, shape, className, children, fill = 'var(--t-card)', full = false }: { d: Dress; shape?: FrameShape; className?: string; children: ReactNode; fill?: string; /** Fill the cell's height (cards in a row of equal height; the words a column). */ full?: boolean }) {
   const frame = shape ?? d.suite.frame;
   const pad = className ?? 'px-6 py-8';
   switch (frame) {
+    case 'cusped': {
+      // The head drawn at its own proportions over a body that grows with the words; a double gold hairline round
+      // both: the card's edge, and a finer line 6 px inside it (its own inline-size container keeps the head's shape).
+      const line = 'color-mix(in srgb, var(--t-orn) 55%, transparent)';
+      const inner = 'color-mix(in srgb, var(--t-orn) 38%, transparent)';
+      return (
+        <div className={cx('relative drop-shadow-[0_18px_20px_rgba(73,53,44,0.12)]', full && 'h-full w-full')} style={{ containerType: 'inline-size' }}>
+          <CuspLine stroke={line} width={1} fill={fill} />
+          <div aria-hidden="true" className="absolute -inset-x-[0.5px] bottom-0 rounded-b-[var(--t-radius)] border-x border-b" style={{ top: CUSP_BODY_TOP, background: fill, borderColor: line }} />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-1.5 top-1.5 bottom-1.5" style={{ containerType: 'inline-size' }}>
+            <CuspLine stroke={inner} width={0.8} />
+            <div className="absolute inset-x-0 bottom-0 rounded-b-[calc(var(--t-radius)-4px)] border-x-[0.8px] border-b-[0.8px]" style={{ top: CUSP_BODY_TOP, borderColor: inner }} />
+          </div>
+          <div className={cx('relative', full && 'flex h-full flex-col', pad)}>{children}</div>
+        </div>
+      );
+    }
     case 'jharokha':
     case 'niche':
     case 'arch':

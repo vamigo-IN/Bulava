@@ -121,7 +121,8 @@ const EVENT_TYPE_WORDS: Array<[RegExp, string]> = [
   [/wedding|shaadi|vivah|haldi|mehendi|mehndi|sangeet|reception|nikah|anand|marriage/, 'WEDDING'],
 ];
 
-function eventTypeFor(category: string): string {
+/** The event type a category or name speaks of (Wedding when none). */
+export function eventTypeFor(category: string): string {
   const c = category.toLowerCase();
   return EVENT_TYPE_WORDS.find(([re]) => re.test(c))?.[1] ?? 'WEDDING';
 }

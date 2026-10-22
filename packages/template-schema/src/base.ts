@@ -124,12 +124,12 @@ export type OrnamentNameValue = (typeof ORNAMENTS)[number];
  *  corner  – mirrored pieces in a band's corners
  *  divider – the rule under every heading
  */
-export const SUITE_FRAMES = ['jharokha', 'niche', 'mihrab', 'lancet', 'arch', 'oval', 'circle', 'scallop', 'ticket', 'deco', 'double', 'cloud', 'rounded'] as const;
+export const SUITE_FRAMES = ['jharokha', 'niche', 'mihrab', 'lancet', 'arch', 'oval', 'circle', 'scallop', 'ticket', 'deco', 'double', 'cloud', 'rounded', 'cusped'] as const;
 export const SUITE_EDGES = ['none', 'toran', 'marigoldSwag', 'floralGarland', 'bunting', 'fairyLights', 'templeBorder', 'zariBand', 'laalPaar', 'phulkari', 'arches', 'lancets', 'deco', 'bandhani', 'scallop'] as const;
 export const SUITE_SEALS = ['emblem', 'medallion', 'kolam', 'arabesque', 'rangoliBloom', 'marigoldWreath', 'botanicalWreath', 'alpana', 'mandala', 'crest', 'sunburst', 'moon', 'sticker', 'phulkari', 'jaali', 'roseWindow'] as const;
 export const SUITE_SKYLINES = ['none', 'domes', 'diyaRow', 'lamps', 'peacocks', 'roses', 'balloons', 'clouds', 'lotuses', 'elephants', 'kalash', 'lanterns', 'sunburst', 'phulkari', 'doves', 'moonrise'] as const;
 export const SUITE_CORNERS = ['none', 'filigreeCorner', 'paisleyOrnate', 'roseCluster', 'peacockFeather', 'decoCorner'] as const;
-export const SUITE_DIVIDERS = ['glyph', 'flourish', 'triple', 'rule', 'laurel', 'lotus'] as const;
+export const SUITE_DIVIDERS = ['glyph', 'flourish', 'triple', 'rule', 'laurel', 'lotus', 'fleuron'] as const;
 export type SuiteFrame = (typeof SUITE_FRAMES)[number];
 export type SuiteEdge = (typeof SUITE_EDGES)[number];
 export type SuiteSeal = (typeof SUITE_SEALS)[number];
@@ -164,5 +164,6 @@ export const FONT_FAMILIES = [
   'Yatra One',
   'Baloo 2',
   'Pacifico',
+  'Lora',
 ] as const;
 export type FontFamily = (typeof FONT_FAMILIES)[number];

@@ -1,12 +1,16 @@
 import type { ReactNode } from 'react';
+import { getLanguage } from '@bulava/localization';
 import { Diya, Toran } from '../art/motifs';
+import { CarouselGallery } from '../carousel';
 import { CountdownClock } from '../countdown';
 import { DepthGallery } from '../depth-gallery';
 import { PhotoStack } from '../interactive';
 import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
-import { EDGE_HEIGHT, Hangings, PhotoFrame, Seal, ShapedCard, Skyline, SuiteEdge, SWAG_EDGES, type Band, type Dress } from './dress';
-import { BAND_CLASS, BAND_FILL, cardClass, cx, dressFor, initials, SectionShell, shell } from './shared';
+import { EDGE_HEIGHT, EndFlourish, Fleuron, Hangings, PhotoFrame, Seal, ShapedCard, Skyline, SuiteEdge, SWAG_EDGES, UnitSeparator, type Band, type Dress } from './dress';
+import { RsvpAutoOpen } from './rsvp-open';
+import { BAND_CLASS, BAND_FILL, cardClass, cx, dressFor, HEIRLOOM_PILL, initials, PillArrow, SectionShell, shell } from './shared';
+import { VistaFooter } from './vista';
 
 /** The month around a date as weeks of days (null before the first), in the event's time zone. */
 function monthOf(iso: string, timeZone: string) {
@@ -86,6 +90,21 @@ export function Countdown(p: SectionProps) {
     minutes: p.t('template.countdown.minutes'),
     seconds: p.t('template.countdown.seconds'),
   };
+  if (variant === 'ornate') {
+    // One row on the band: gold figures, the units' names, drawn separators and a flourish at each end.
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={p.value('heading') ?? p.t('template.countdown.bigDay')} wide>
+        <CountdownClock
+          target={target}
+          static={p.mode === 'thumbnail'}
+          variant="ornate"
+          labels={labels}
+          ornament={{ separator: <UnitSeparator />, end: <EndFlourish d={d} /> }}
+          caps={getLanguage(p.language).script === 'Latn'}
+        />
+      </SectionShell>
+    );
+  }
   return (
     <SectionShell {...shell(p)} dress={d} heading={titled ? (p.value('heading') ?? p.t('template.countdown.title')) : undefined} eyebrow={titled ? undefined : (p.value('eyebrow') ?? p.t('template.countdown.title'))}>
       {variant === 'calendar' ? (
@@ -161,6 +180,49 @@ export function Gallery(p: SectionProps) {
       </div>
     );
   };
+
+  if (variant === 'carousel') {
+    const all = images.slice(0, 24);
+    const eyebrow = p.value('eyebrow') ?? p.t('template.gallery.eyebrow');
+    const title = p.value('heading') ?? p.t('template.gallery.captured');
+    const row =
+      p.mode === 'thumbnail' ? (
+        <div className="flex gap-3.5 overflow-hidden px-6 pt-2 pb-6">
+          {all.slice(0, 4).map((img, i) => (
+            <span key={img.url + i} className="block h-[220px] shrink-0 overflow-hidden rounded-[6px] shadow-[0_12px_28px_-18px_rgba(0,0,0,0.45)]" style={{ aspectRatio: img.width && img.height ? `${img.width} / ${img.height}` : '4 / 5' }}>
+              <img src={img.thumbUrl} alt="" className="h-full w-full object-cover" />
+            </span>
+          ))}
+        </div>
+      ) : (
+        <CarouselGallery
+          photos={all.map((img, i) => ({ url: img.url, thumbUrl: img.thumbUrl, width: img.width, height: img.height, label: p.t('template.gallery.open', { number: i + 1, total: all.length }) }))}
+          labels={{ previous: p.t('template.gallery.previous'), next: p.t('template.gallery.next'), goTo: all.map((_, i) => p.t('template.carousel.goTo', { number: i + 1 })) }}
+          label={title}
+        />
+      );
+    return (
+      <SectionShell {...common} heading={title} eyebrow={eyebrow} wide>
+        {/* The row runs to the band's edges, its first photo on the content column. */}
+        <div style={{ marginInline: 'calc((100% - 100cqw) / 2)' }}>{row}</div>
+        {all.length > 6 && p.mode !== 'thumbnail' ? (
+          <details className="bulava-more-list mt-6 text-center">
+            <summary className={cx(HEIRLOOM_PILL, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>
+              {p.t('template.gallery.viewAll')}
+              <PillArrow />
+            </summary>
+            <div className="mt-8 grid grid-cols-2 gap-3 @min-[900px]:grid-cols-3 @min-[900px]:gap-4">
+              {all.map((img, i) => (
+                <a key={img.url + i} href={img.url} target="_blank" rel="noopener noreferrer" aria-label={label(i)} className="block aspect-square overflow-hidden rounded-[6px]">
+                  <img src={img.thumbUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                </a>
+              ))}
+            </div>
+          </details>
+        ) : null}
+      </SectionShell>
+    );
+  }
 
   if (depth) {
     const ring = shown.slice(0, 12);
@@ -262,6 +324,32 @@ export function Rsvp(p: SectionProps) {
   const paper: Dress = { ...d, band: 'plain' };
   const content = p.slots.rsvp ?? <ReplyPlaceholder d={paper} options={[p.t('rsvp.attending'), p.t('rsvp.maybe'), p.t('rsvp.declined')]} />;
   const heading = p.slots.rsvpHeading ?? p.value('heading') ?? p.t('rsvp.title');
+  if (p.instance.variant === 'invite') {
+    // A letter's close: the guest greeted by name, a line, and the reply card that opens where it is.
+    const greeting = p.slots.rsvpHeading ?? (p.ctx.guest && p.mode !== 'thumbnail' ? p.t('invitation.dear', { guestName: p.ctx.guest.name }) : p.t('template.rsvp.dearAll'));
+    const detailsId = `${p.instance.id}-reply`;
+    return (
+      <SectionShell {...shell(p)} dress={d}>
+        <div className="mx-auto max-w-[560px] text-center">
+          <h2 className="text-[24px] leading-[1.25] font-semibold text-balance text-[var(--t-text)] [font-family:var(--t-heading)] @min-[640px]:text-[28px]">{greeting}</h2>
+          <p className="mx-auto mt-3 max-w-[520px] text-[15.5px] leading-[1.75] text-[var(--t-text)] @min-[640px]:text-[16.5px]">{p.t('template.rsvp.presence')}</p>
+          <details id={detailsId} className="bulava-reply mt-7">
+            <summary className={cx(HEIRLOOM_PILL, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden @min-[640px]:min-w-[330px]')}>
+              {p.t('template.rsvp.confirm')}
+              <PillArrow />
+            </summary>
+            <div className="bulava-reply-card mx-auto max-w-[520px] text-left" style={{ backgroundColor: 'transparent' }}>
+              <ShapedCard d={paper} shape="cusped" fill="var(--rc-bg)" className="px-5 pt-[30cqw] pb-8 @min-[640px]:px-10">
+                <Fleuron d={paper} className="absolute top-[17cqw] left-1/2 h-[15px] w-7 -translate-x-1/2" />
+                {content}
+              </ShapedCard>
+            </div>
+          </details>
+          {p.mode === 'live' ? <RsvpAutoOpen sectionId={p.instance.id} detailsId={detailsId} /> : null}
+        </div>
+      </SectionShell>
+    );
+  }
   if (p.instance.variant === 'card') {
     return (
       <SectionShell {...shell(p)} dress={d} heading={heading}>
@@ -302,6 +390,7 @@ export function PhotoShare(p: SectionProps) {
  * blessing (strands hanging either side, the closing line large between them, the names).
  */
 export function Footer(p: SectionProps) {
+  if (p.instance.variant === 'vista') return <VistaFooter {...p} />;
   const hashtag = p.value('hashtag');
   const closing = p.value('closing') ?? p.t('template.footer.thanks');
   const photo = p.ctx.photoSlots?.closing?.url;

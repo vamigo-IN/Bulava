@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { IllustrationName } from '@bulava/template-schema';
 import type { IllustrationProps } from './kit';
 import { BalloonBunch, Bunting, Cake, DiyaRow, FairyLights, GiftBox, House, MoonCloud, Rings } from './illustrations-festive';
-import { BananaLeaf, Doves, Elephant, FloralGarland, JasmineStrand, MehendiHand, RoseCluster, RoyalPeacock } from './illustrations-nature';
+import { BananaLeaf, Doves, Elephant, FloralGarland, JasmineStrand, MehendiHand, RoseCluster, RoyalPeacock, StandingPeacock } from './illustrations-nature';
 import { Arabesque, Domes, FiligreeCorner, Flourish, Jharokha, Kolam, Medallion, OrnateFrame, PaisleyOrnate, RangoliBloom, TempleBells } from './illustrations-ornate';
 import { CoupleBengali, CoupleChristian, CoupleElder, CoupleHindu, CoupleNikah, CoupleSikh, CoupleSouth, CoupleVarmala } from './illustrations-people';
 import { BabyCradle, BrideBust, GroomBust, KidBoy, KidGirl, MomToBe } from './illustrations-family';
@@ -12,6 +12,7 @@ import { Alpana, Ghungroo, Kuthuvilakku, LaalPaar, MarigoldSwag, MarigoldWreath,
 import { CrescentStar, Cross, Ganesha, Khanda } from './illustrations-faith';
 import { Fanoos, GirihRosette, GoldenTemple, JaaliArch, LancetWindow, Lilies, PhulkariBagh, WeddingBells } from './illustrations-sacred';
 import { SatinBow, SatinRibbon, ScallopTag, WaxSeal, Zipper, ZipperPull } from './illustrations-atelier';
+import { ChhatriArt, FloralStrand, FlowerBed, MandapCanopy, PalaceArcade, PalaceFacadeArt, PalacePillar } from './illustrations-palace';
 import {
   BananaPlantArt,
   CandelabraArt,
@@ -39,6 +40,7 @@ export { foilCss, metalStops } from './kit';
 const COMPONENTS: Record<IllustrationName, (props: IllustrationProps) => ReactNode> = {
   elephant: Elephant,
   royalPeacock: RoyalPeacock,
+  standingPeacock: StandingPeacock,
   jharokha: Jharokha,
   ornateFrame: OrnateFrame,
   filigreeCorner: FiligreeCorner,
@@ -137,15 +139,23 @@ const COMPONENTS: Record<IllustrationName, (props: IllustrationProps) => ReactNo
   ferrisWheel: FerrisWheelArt,
   hotAirBalloon: HotAirBalloonArt,
   lampTower: LampTowerArt,
+  palaceArcade: PalaceArcade,
+  palacePillar: PalacePillar,
+  chhatri: ChhatriArt,
+  palaceFacade: PalaceFacadeArt,
+  mandapCanopy: MandapCanopy,
+  flowerBed: FlowerBed,
+  floralStrand: FloralStrand,
 };
 
 /** Drawn to the layer's own size (frames, garlands, strings); the others keep their proportions inside it. */
-export const FRAME_SIZED: ReadonlySet<IllustrationName> = new Set<IllustrationName>(['ornateFrame', 'floralGarland', 'jasmineStrand', 'bunting', 'fairyLights', 'hairlineFrame', 'goldVine', 'sparkles', 'zariBand', 'mihrab', 'phulkari', 'marigoldSwag', 'decoFrame', 'laalPaar', 'ghungroo', 'zipper', 'satinRibbon']);
+export const FRAME_SIZED: ReadonlySet<IllustrationName> = new Set<IllustrationName>(['ornateFrame', 'floralGarland', 'jasmineStrand', 'bunting', 'fairyLights', 'hairlineFrame', 'goldVine', 'sparkles', 'zariBand', 'mihrab', 'phulkari', 'marigoldSwag', 'decoFrame', 'laalPaar', 'ghungroo', 'zipper', 'satinRibbon', 'palaceArcade', 'flowerBed', 'floralStrand']);
 
 /** Width ÷ height of each illustration as drawn (new layers in the editor start at it). */
 export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
   elephant: 350 / 280,
   royalPeacock: 320 / 400,
+  standingPeacock: 320 / 400,
   jharokha: 300 / 440,
   ornateFrame: 0.75,
   filigreeCorner: 1,
@@ -245,6 +255,14 @@ export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
   ferrisWheel: 1,
   hotAirBalloon: 180 / 250,
   lampTower: 150 / 470,
+  // The Royal Heirloom's palace (illustrations-palace.tsx); the arcade, the flower bed and the strand are drawn to their frames.
+  palaceArcade: 1.6,
+  palacePillar: 90 / 500,
+  chhatri: 312 / 400,
+  palaceFacade: 360 / 400,
+  mandapCanopy: 345 / 300,
+  flowerBed: 6,
+  floralStrand: 0.3,
 };
 
 export { JAALI_ARCH_OPENING, LANCET_OPENING } from './illustrations-sacred';

@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, ChevronDown, PenTool, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { SECTION_VARIANTS } from '@bulava/template-engine';
-import { BINDINGS, heroStage, isStageIntro, SECTION_KEYS, SectionInstanceSchema, STAGE_META, STAGE_NAMES, templateStage, type SectionKey } from '@bulava/template-schema';
+import { BINDINGS, heroStage, isStageIntro, SECTION_BANDS, SECTION_KEYS, SectionInstanceSchema, STAGE_META, STAGE_NAMES, templateStage, type SectionBand, type SectionKey } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
 import { emptyCanvas } from '../canvas-editor/presets';
 import { Badge, Button, Card, Input, Label, Select } from '../ui';
@@ -25,6 +25,17 @@ export function SectionsTab({ definition, edit, onOpenCanvas }: EditorProps & { 
 
   return (
     <div className="space-y-5">
+      {definition.website ? (
+        <label className="flex items-center gap-2 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            className="size-4 accent-brand-700"
+            checked={definition.website.nav === 'bar'}
+            onChange={(e) => run((d) => void (d.website!.nav = e.target.checked ? 'bar' : 'none'))}
+          />
+          {t('sections.nav')}
+        </label>
+      ) : null}
       {pages.map((page, pageIndex) => {
         const taken = new Set(page.sections.map((s) => s.id));
         return (
@@ -160,6 +171,48 @@ export function SectionsTab({ definition, edit, onOpenCanvas }: EditorProps & { 
                               const check = SectionInstanceSchema.safeParse({ ...section, props: parsed });
                               if (!check.success) return firstIssue(check.error);
                               return edit((d) => void (d.website!.pages[pageIndex]!.sections[i]!.props = check.data.props));
+                            }}
+                          />
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <Label htmlFor={`band-${section.id}`}>{t('sections.band')}</Label>
+                            <Select
+                              id={`band-${section.id}`}
+                              value={section.band ?? ''}
+                              onChange={(e) =>
+                                run((d) => {
+                                  const s = d.website!.pages[pageIndex]!.sections[i]!;
+                                  if (e.target.value) s.band = e.target.value as SectionBand;
+                                  else delete s.band;
+                                })
+                              }
+                            >
+                              <option value="">{t('sections.band.auto')}</option>
+                              {SECTION_BANDS.map((b) => (
+                                <option key={b} value={b}>
+                                  {b}
+                                </option>
+                              ))}
+                            </Select>
+                          </div>
+                        </div>
+                        <div>
+                          <Label>{t('sections.decor')}</Label>
+                          <p className="mb-2 text-xs text-stone-500">{t('sections.decorHint')}</p>
+                          <JsonField
+                            key={JSON.stringify(section.decor ?? [])}
+                            label={t('sections.decor')}
+                            value={section.decor ?? []}
+                            rows={Math.min(14, 3 + (section.decor?.length ?? 0) * 2)}
+                            onCommit={(parsed) => {
+                              const check = SectionInstanceSchema.safeParse({ ...section, decor: parsed });
+                              if (!check.success) return firstIssue(check.error);
+                              return edit((d) => {
+                                const s = d.website!.pages[pageIndex]!.sections[i]!;
+                                if (check.data.decor?.length) s.decor = check.data.decor;
+                                else delete s.decor;
+                              });
                             }}
                           />
                         </div>

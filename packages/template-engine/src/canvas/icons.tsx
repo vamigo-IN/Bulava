@@ -26,7 +26,26 @@ const PATHS: Record<IconName, string> = {
   bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21a2 2 0 0 0 4 0',
   diya: 'M3 13h18c0 3.3-4 6-9 6s-9-2.7-9-6zM12 11c-2-2-2-4 0-6 2 2 2 4 0 6zM8 19l-1 2M16 19l1 2',
   navigation: 'M3 11l19-9-9 19-2-8z',
+  plane: 'M20.5 3.5c-1-1-2.6-.6-3.6.4L13.6 7.2 5.2 5.4 3.6 7l6.9 3.8-3.3 3.3-2.8-.4-1.2 1.2 3.4 1.8 1.8 3.4 1.2-1.2-.4-2.8 3.3-3.3 3.8 6.9 1.6-1.6-1.8-8.4 3.3-3.3c1-1 1.4-2.6.4-3.6z',
+  cloche: 'M3 19h18M5 17a7 7 0 0 1 14 0zM12 10V8.5M10.5 8h3',
+  map: 'M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15',
 };
+
+/** Share glyphs for the closing's share row (engine-internal: never placed on a canvas). */
+const SOCIAL_PATHS = {
+  whatsapp: 'M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.6zM9 8.4c0 3.6 2.9 6.6 6.6 6.6l1.1-1.6-2.2-1-1 1c-1.4-.6-2.4-1.6-3-3l1-1-1-2.2z',
+  instagram: 'M7.5 3h9A4.5 4.5 0 0 1 21 7.5v9a4.5 4.5 0 0 1-4.5 4.5h-9A4.5 4.5 0 0 1 3 16.5v-9A4.5 4.5 0 0 1 7.5 3zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM17.2 6.8h.01',
+  facebook: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 7.5H14a2.5 2.5 0 0 0-2.5 2.5v11M8.8 12.8h5.6',
+} as const;
+export type SocialGlyph = keyof typeof SOCIAL_PATHS;
+
+export function SocialIcon({ name, style, weight = 1.5 }: { name: SocialGlyph; style?: CSSProperties; weight?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: 'block', ...style }}>
+      <path d={SOCIAL_PATHS[name]} />
+    </svg>
+  );
+}
 
 export function Icon({ name, style, weight = 1.75 }: { name: IconName; style?: CSSProperties; weight?: number }) {
   return (

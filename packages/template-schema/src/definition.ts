@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, SCENE_NAMES, STAGE_NAMES, STAGE_SHOTS, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, ValueSchema } from './base';
-import { ArtboardSchema, CanvasSectionSchema } from './canvas';
-import { FAITHS } from './faith';
+import { ArtboardSchema, CanvasSectionSchema, SectionDecorSchema } from './canvas';
+import { EMBLEM_NAMES, FAITHS } from './faith';
 
 export { ConditionSchema, DARK_SCENE_NAMES, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, SCENE_NAMES, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, VALUE_FORMATS, ValueSchema, type OrnamentNameValue, type SceneNameValue } from './base';
 export { DARK_STAGE_NAMES, STAGE_META, STAGE_NAMES, STAGE_SHOTS, type StageMeta, type StageNameValue, type StageShot } from './base';
@@ -27,6 +27,12 @@ export const ThemeColorsSchema = z.object({
   surface: hex,
   text: hex,
   muted: hex,
+  /**
+   * The deep band's own colour (an emerald, a midnight), for designs whose dark bands are not a shade of the
+   * primary (`band: 'deep'`). Presets carry it; a host's own colours leave it as the preset set it. Unset: the
+   * primary taken a third of the way to black.
+   */
+  deep: hex.optional(),
 });
 export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
 
@@ -41,14 +47,16 @@ export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
  *  garden      – pastel florals, soft washes, rounded cards
  *  celebration – bright bands, confetti edges, playful type
  *  modern      – editorial: large type, rules and numbers
+ *  heirloom    – printed on ivory paper: gold capitals over italic serif headings, framed deep bands, each
+ *                section's band and corner art chosen by the template (The Royal Heirloom)
  */
-export const LOOKS = ['classic', 'heritage', 'noir', 'royal', 'garden', 'celebration', 'modern'] as const;
+export const LOOKS = ['classic', 'heritage', 'noir', 'royal', 'garden', 'celebration', 'modern', 'heirloom'] as const;
 export type LookName = (typeof LOOKS)[number];
 /** Camera moves through a video backdrop; near layers move more than far ones. */
 export const CAMERA_MOVES = ['still', 'push', 'pull', 'panLeft', 'panRight', 'rise', 'descend'] as const;
 export type CameraMove = (typeof CAMERA_MOVES)[number];
 /** Named places a customer can put their own photos. */
-export const PHOTO_SLOTS = ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing'] as const;
+export const PHOTO_SLOTS = ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing', 'venue'] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 /** Opening animations played before a website invitation is revealed. */
 export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch', 'zipper', 'ribbon', 'arrival', 'doorway', 'silk', 'unfold'] as const;
@@ -165,11 +173,26 @@ export const SECTION_KEYS = [
   'photoShare',
   'menu',
   'quote',
+  /** The invitation's own words: "We cordially invite you to" the event's title and description. */
+  'invitation',
+  /** Stay, travel, gifts and the menu in one strip of columns. */
+  'essentials',
   'footer',
   /** A free-form artboard designed in the Canvas editor (see canvas.ts). */
   'canvas',
 ] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
+
+/**
+ * The band a section is printed on, when the template chooses it (else the look
+ * decides by the section's place): the page's paper, the surface, the primary or
+ * accent colour, or the deep band (`colors.deep`).
+ */
+export const SECTION_BANDS = ['plain', 'surface', 'primary', 'accent', 'deep'] as const;
+export type SectionBand = (typeof SECTION_BANDS)[number];
+
+/** The page menu: none, or a bar with the monogram, links to the sections shown and "Save the date". */
+export const WEBSITE_NAVS = ['none', 'bar'] as const;
 
 export const SectionInstanceSchema = z
   .object({
@@ -178,14 +201,23 @@ export const SectionInstanceSchema = z
     variant: z.string().regex(/^[a-z][a-zA-Z0-9-]*$/).max(40).default('default'),
     props: z.record(z.string(), ValueSchema).default({}),
     visibleWhen: ConditionSchema.optional(),
+    /** The band the section is printed on (else the look's choice). */
+    band: z.enum(SECTION_BANDS).optional(),
+    /** Art in the section's corners and sides, behind its words (canvas.ts SectionDecorSchema). */
+    decor: z.lazy(() => z.array(SectionDecorSchema).max(8)).optional(),
     /** The artboards of a "canvas" section (and nothing else). */
     canvas: z.lazy(() => CanvasSectionSchema).optional(),
   })
   .superRefine((s, ctx) => {
     if (s.section === 'canvas' && !s.canvas) ctx.addIssue({ code: 'custom', path: ['canvas'], message: 'A canvas section needs its artboards' });
     if (s.section !== 'canvas' && s.canvas) ctx.addIssue({ code: 'custom', path: ['canvas'], message: 'Only canvas sections carry artboards' });
+    s.decor?.forEach((piece, i) => {
+      // The faith emblem is never decoration: it crowns the invitation, upright and whole (docs/templates.md#faith).
+      if (EMBLEM_NAMES.has(piece.art)) ctx.addIssue({ code: 'custom', path: ['decor', i, 'art'], message: 'A faith emblem is never section decor' });
+    });
   });
 export type SectionInstance = z.infer<typeof SectionInstanceSchema>;
+export type SectionInstanceInput = z.input<typeof SectionInstanceSchema>;
 
 export const WebsitePageSchema = z.object({
   id,
@@ -377,6 +409,8 @@ export const TemplateDefinitionSchema = z
       .object({
         /** Opening animation before the invitation is revealed. */
         intro: z.enum(INTROS).default('none'),
+        /** The page menu (WEBSITE_NAVS): a bar of links to the sections shown, over the hero and then stuck to the top. */
+        nav: z.enum(WEBSITE_NAVS).default('none'),
         pages: z.array(WebsitePageSchema).min(1).max(10),
       })
       .optional(),

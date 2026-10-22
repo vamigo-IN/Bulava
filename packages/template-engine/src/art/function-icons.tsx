@@ -1,4 +1,6 @@
-import type { ReactElement } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
+import type { IllustrationName, ThemeColors } from '@bulava/template-schema';
+import { Illustration, ILLUSTRATION_ASPECT } from './illustrations';
 
 /**
  * A small motif for each kind of function, chosen from the function's name
@@ -153,5 +155,58 @@ export function FunctionMotif({ name, className }: { name: string; className?: s
     <svg viewBox="0 0 48 48" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {(cache ??= paths())[motifFor(name)]}
     </svg>
+  );
+}
+
+/**
+ * The illustration each kind of function shows on a card (the heirloom's arch cards): a haldi bowl, henna
+ * hands, a dhol, the mandap, the palace… Never a faith emblem.
+ */
+export const FUNCTION_ART: Readonly<Record<Motif, IllustrationName>> = {
+  haldi: 'haldiBowl',
+  mehendi: 'mehendiHand',
+  sangeet: 'dhol',
+  music: 'dhol',
+  baraat: 'elephant',
+  wedding: 'mandapCanopy',
+  reception: 'palaceFacade',
+  meal: 'palaceFacade',
+  engagement: 'rings',
+  puja: 'sacredFire',
+  cocktail: 'champagne',
+  nikah: 'fanoos',
+  church: 'weddingBells',
+  birthday: 'cake',
+  sparkle: 'medallion',
+};
+
+/** Each art's main colour on a card: brass and gold in the palette's metal, cloth in its primary, sandstone in its accent. */
+const ART_TINT: Partial<Record<IllustrationName, keyof ThemeColors>> = { dhol: 'primary', elephant: 'primary', mandapCanopy: 'primary', palaceFacade: 'accent', cake: 'accent' };
+
+/** A function's illustration, `height` tall at its own proportions (henna hands drawn as a pair). */
+export function FunctionArt({ name, colors, className, style }: { name: string; colors: ThemeColors; className?: string; style?: CSSProperties }) {
+  const art = FUNCTION_ART[motifFor(name)];
+  const color = art === 'mehendiHand' ? '#9c4a1e' : (colors[ART_TINT[art] ?? 'secondary'] ?? colors.secondary);
+  const aspect = ILLUSTRATION_ASPECT[art];
+  if (art === 'mehendiHand') {
+    // Two hands, the left one mirrored, each turned 8 degrees outward and overlapping by a fifth.
+    const hand = (side: -1 | 1) => (
+      <span style={{ display: 'block', height: '100%', aspectRatio: `${aspect}`, transform: `scaleX(${side}) rotate(${side * -8}deg)`, marginInline: side < 0 ? `0 -${Math.round(aspect * 10)}%` : undefined }}>
+        <Illustration name="mehendiHand" color={color} colors={colors} foil w={240} h={340} style={{ display: 'block', width: '100%', height: '100%' }} />
+      </span>
+    );
+    return (
+      <span aria-hidden="true" className={className} style={{ display: 'flex', justifyContent: 'center', ...style }}>
+        {hand(-1)}
+        {hand(1)}
+      </span>
+    );
+  }
+  return (
+    <span aria-hidden="true" className={className} style={{ display: 'flex', justifyContent: 'center', ...style }}>
+      <span style={{ display: 'block', height: '100%', aspectRatio: `${aspect}` }}>
+        <Illustration name={art} color={color} colors={colors} foil w={Math.round(200 * aspect)} h={200} style={{ display: 'block', width: '100%', height: '100%' }} />
+      </span>
+    </span>
   );
 }

@@ -76,7 +76,7 @@ export const SAMPLE_PHOTOS = {
 
 export type SamplePhotoName = keyof typeof SAMPLE_PHOTOS;
 
-/** The photos of one sample invitation: its named spots, its gallery (four) and its photos[n] (two). */
+/** The photos of one sample invitation: its named spots, its gallery (four or more) and its photos[n] (two). */
 export interface SamplePhotoSet {
   cover: SamplePhotoName;
   /** The first partner's portrait (the bride's, for a wedding), and the second's. */
@@ -84,7 +84,9 @@ export interface SamplePhotoSet {
   partnerTwo: SamplePhotoName;
   story: SamplePhotoName;
   closing: SamplePhotoName;
-  gallery: readonly [SamplePhotoName, SamplePhotoName, SamplePhotoName, SamplePhotoName];
+  /** The venue (photo.venue): a place, never a portrait. */
+  venue: SamplePhotoName;
+  gallery: readonly [SamplePhotoName, SamplePhotoName, SamplePhotoName, SamplePhotoName, ...SamplePhotoName[]];
 }
 
 const set = (cover: SamplePhotoName, story: SamplePhotoName, closing: SamplePhotoName, gallery: SamplePhotoSet['gallery'], partners: [SamplePhotoName, SamplePhotoName] = [cover, story]): SamplePhotoSet => ({
@@ -93,6 +95,7 @@ const set = (cover: SamplePhotoName, story: SamplePhotoName, closing: SamplePhot
   partnerTwo: partners[1],
   story,
   closing,
+  venue: 'venue-gate',
   gallery,
 });
 
@@ -108,6 +111,17 @@ const WEDDINGS: Record<Faith, SamplePhotoSet> = {
   muslim: set('muslim-couple', 'mehendi', 'mosque', ['lantern', 'domes', 'walima', 'mehendi-red'], ['muslim-bride', 'muslim-groom']),
   sikh: set('sikh-couple', 'marigold-hand', 'darbar', ['darbar-night', 'phulkari', 'darbar-gold', 'garlands'], ['sikh-bride', 'sikh-groom']),
   christian: set('christian-couple', 'christian-hands', 'church', ['christian-rings', 'ring-exchange', 'bouquet-bride', 'church-nave'], ['christian-bride', 'christian-groom']),
+};
+
+/**
+ * A royal Hindu wedding in a palace (tag `palace`): the bride's portrait for the story, the venue lit for the
+ * evening, and a fuller gallery led by the couple, so a carousel of five across has photos to move through.
+ */
+const PALACE_WEDDING: SamplePhotoSet = {
+  ...WEDDINGS.hindu,
+  story: 'hindu-bride',
+  venue: 'fairy-lights',
+  gallery: ['hindu-couple', 'chooda', 'garlands', 'hindu-ritual', 'mehendi', 'diyas', 'hindu-groom', 'mehendi-red'],
 };
 
 /** Prayers and family rites (a puja, a Quran Khwani, a path, a thanksgiving Mass), by tradition. */
@@ -136,14 +150,15 @@ const GATHERING = set('fairy-lights', 'bouquet', 'venue-gate', ['candles', 'ball
 /**
  * The photos for a sample invitation: by its occasion and the tradition of its
  * sample family (the template's faith, or for designs that suit every family
- * the one its key chose), with festival tags choosing that festival's.
+ * the one its key chose), with festival tags choosing that festival's and
+ * the `palace` tag a royal Hindu wedding's.
  */
 export function samplePhotoSet(typeKey: string, tradition: Faith, tags: readonly string[] = []): SamplePhotoSet {
   switch (typeKey) {
     case 'WEDDING':
     case 'ENGAGEMENT':
     case 'ANNIVERSARY':
-      return WEDDINGS[tradition];
+      return tradition === 'hindu' && tags.includes('palace') ? PALACE_WEDDING : WEDDINGS[tradition];
     case 'BIRTHDAY':
       return BIRTHDAY;
     case 'BABY_SHOWER':

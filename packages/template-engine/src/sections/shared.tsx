@@ -1,10 +1,13 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { getLanguage } from '@bulava/localization';
-import type { LookName, ThemeColors, ThemeDress } from '@bulava/template-schema';
+import type { LookName, SectionDecor, ThemeColors, ThemeDress } from '@bulava/template-schema';
 import { Marigold, Toran } from '../art/motifs';
 import { Divider, FloralCorner, patternStyle, type OrnamentName } from '../ornaments';
 import { StarField } from '../ornaments-signature';
-import type { SectionProps } from '../types';
+import { textureStyle } from '../canvas/colors';
+import { deepOf } from '../theme';
+import type { RenderMode, SectionProps } from '../types';
+import { decorOf } from './decor';
 import { dressOf, EDGE_HEIGHT, onDark, SuiteCorners, SuiteDivider, SuiteEdge, SWAG_EDGES, type Band, type Dress } from './dress';
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
@@ -14,7 +17,7 @@ export function cx(...parts: Array<string | false | null | undefined>): string {
 export type { Band, Dress };
 
 /** Looks whose sections follow a dark hero onto the dark stock (heritage and celebration keep their colour bands; noir pages are dark already). */
-const DARK_STOCK_LOOKS = new Set<LookName>(['royal', 'classic', 'garden', 'modern']);
+const DARK_STOCK_LOOKS = new Set<LookName>(['royal', 'classic', 'garden', 'modern', 'heirloom']);
 
 /**
  * Which band a section sits on. Looks alternate bands by position, so a page
@@ -35,6 +38,9 @@ export function bandFor(look: LookName, index: number, tone: 'plain' | 'surface'
       return index % 2 ? 'plain' : 'surface';
     case 'noir':
       return 'plain';
+    // Paper by default; the template chooses each section's band (`band`), dark bands are the deep colour.
+    case 'heirloom':
+      return tone === 'surface' ? 'surface' : tone === 'inverse' ? 'deep' : 'plain';
     default:
       return tone === 'surface' ? 'surface' : tone === 'inverse' ? 'primary' : 'plain';
   }
@@ -59,7 +65,21 @@ export const BAND_FILL: Record<Band, string> = {
 
 /** Common shell props from a section's props. */
 export function shell(p: SectionProps) {
-  return { id: p.instance.id, ornament: p.ornament, look: p.look, index: p.index, colors: p.colors, dark: p.heroTone === 'dark', pattern: p.pattern, themeDress: p.dress };
+  return {
+    id: p.instance.id,
+    ornament: p.ornament,
+    look: p.look,
+    index: p.index,
+    colors: p.colors,
+    dark: p.heroTone === 'dark',
+    pattern: p.pattern,
+    themeDress: p.dress,
+    ...(p.instance.band ? { band: p.instance.band } : {}),
+    ...(p.instance.decor?.length ? { decor: p.instance.decor } : {}),
+    mode: p.mode,
+    script: getLanguage(p.language).script,
+    ...(p.artRefs ? { artRefs: p.artRefs } : {}),
+  };
 }
 
 /**
@@ -69,13 +89,13 @@ export function shell(p: SectionProps) {
  * the shell and to every piece.
  */
 export function dressFor(p: SectionProps, tone: 'plain' | 'surface' | 'inverse' = 'plain', band?: Band): Dress {
-  return dressOf(p.ornament, p.look, p.colors, band ?? bandFor(p.look, p.index, tone, p.heroTone === 'dark'), p.dress);
+  return dressOf(p.ornament, p.look, p.colors, band ?? p.instance.band ?? bandFor(p.look, p.index, tone, p.heroTone === 'dark'), p.dress);
 }
 
 /** Heading faces loaded with a true italic (the others would be slanted by the browser). */
-const TRUE_ITALIC = new Set<string>(['Cormorant Garamond']);
+const TRUE_ITALIC = new Set<string>(['Cormorant Garamond', 'Lora']);
 /** Heading faces that read well in a paragraph (the rest are display faces: Cinzel's capitals, Yeseva, Rozha…). */
-const BOOK_FACES = new Set<string>(['Cormorant Garamond', 'Playfair Display', 'Marcellus', 'Noto Serif']);
+const BOOK_FACES = new Set<string>(['Cormorant Garamond', 'Playfair Display', 'Marcellus', 'Noto Serif', 'Lora']);
 
 /**
  * The faces printed lines take: `name` for short lines (the parents' names, a
@@ -159,7 +179,8 @@ function Filigree({ className, style }: { className?: string; style?: CSSPropert
 }
 
 /** The section's heading in the look's type, with the suite's rule (or the look's own) beneath it. */
-export function Heading({ d, heading, eyebrow, look, index, align = 'center' }: { d: Dress; heading: string; eyebrow?: string; look: LookName; index: number; align?: 'center' | 'left' }) {
+export function Heading({ d, heading, eyebrow, look, index, align = 'center', script }: { d: Dress; heading: string; eyebrow?: string; look: LookName; index: number; align?: 'center' | 'left'; script?: string }) {
+  if (look === 'heirloom') return <HeirloomHeading d={d} heading={heading} eyebrow={eyebrow} align={align} script={script} />;
   const modernNumber = look === 'modern' ? String(index).padStart(2, '0') : null;
   const left = look === 'modern' || align === 'left';
   return (
@@ -181,6 +202,37 @@ export function Heading({ d, heading, eyebrow, look, index, align = 'center' }: 
         {heading}
       </h2>
       <div className={cx('mt-4', left && 'flex')}>{d.suite.name === 'none' ? <LookDivider look={look} ornament="none" /> : <SuiteDivider d={d} className={left ? 'justify-start' : undefined} />}</div>
+    </div>
+  );
+}
+
+/**
+ * The heirloom's small capitals: spaced Lora capitals in Latin script; scripts without capitals (Devanagari…)
+ * lose their joins when spaced, so they are set a little larger and unspaced.
+ */
+export function heirloomCaps(script: string | undefined, latin: string, other = 'text-[0.95rem]'): string {
+  return !script || script === 'Latn' ? `uppercase ${latin}` : other;
+}
+
+/**
+ * The heirloom's heading stack: gold capitals, an italic serif heading and the fleuron on paper; on the
+ * dark bands the heading itself is set as a line of gold capitals over the fleuron.
+ */
+export function HeirloomHeading({ d, heading, eyebrow, align = 'center', script, className }: { d: Dress; heading: string; eyebrow?: string; align?: 'center' | 'left'; script?: string; className?: string }) {
+  const left = align === 'left';
+  return (
+    <div className={cx('mb-8 @min-[640px]:mb-10', left ? 'text-left' : 'text-center', className)}>
+      {onDark(d) ? (
+        <h2 className={cx('leading-[1.4] font-semibold text-[var(--t-heading-ink)]', heirloomCaps(script, 'text-[12.5px] tracking-[0.24em] @min-[640px]:text-[15px]'))}>{heading}</h2>
+      ) : (
+        <>
+          {eyebrow ? <p className={cx('leading-[1.4] font-semibold text-[var(--t-secondary-ink)]', heirloomCaps(script, 'text-[11.5px] tracking-[0.24em] @min-[640px]:text-[13px]'))}>{eyebrow}</p> : null}
+          <h2 className={cx('text-[28px] leading-[1.15] font-medium italic text-balance text-[var(--t-heading-ink)] [font-family:var(--t-heading)] @min-[640px]:text-[36px]', eyebrow && 'mt-3.5')}>{heading}</h2>
+        </>
+      )}
+      <div className={cx('mt-3.5', left && 'flex')}>
+        <SuiteDivider d={d} className={left ? 'justify-start' : undefined} />
+      </div>
     </div>
   );
 }
@@ -213,6 +265,12 @@ export function SectionShell({
   dress: given,
   themeDress,
   bare = false,
+  decor,
+  mode,
+  script,
+  join,
+  bleed,
+  artRefs,
 }: {
   id: string;
   heading?: string;
@@ -238,9 +296,27 @@ export function SectionShell({
   themeDress?: ThemeDress;
   /** No corners or border (sections that frame themselves). */
   bare?: boolean;
+  /** Art in the section's corners and sides (instance.decor). */
+  decor?: readonly SectionDecor[];
+  mode?: RenderMode;
+  /** The page's script (getLanguage().script): capitals are spaced in Latin only. */
+  script?: string;
+  /** 'above': the section continues the band above it (no top padding, no frame). */
+  join?: 'above';
+  /** The section lays out its own edges (a photo to the page's edge): no padding or column (heirloom). */
+  bleed?: boolean;
+  /** The page's shared drawings (SectionProps.artRefs). */
+  artRefs?: Readonly<Record<string, string>>;
 }) {
   const dress = given ?? dressOf(ornament, look, colors, bandOverride ?? bandFor(look, index, tone, dark), themeDress);
   const band = dress.band;
+  if (look === 'heirloom') {
+    return (
+      <HeirloomShell id={id} dress={dress} heading={heading} eyebrow={eyebrow} className={className} wide={wide} decor={decor} mode={mode} script={script} join={join} bleed={bleed} artRefs={artRefs}>
+        {children}
+      </HeirloomShell>
+    );
+  }
   const suite = dress.suite;
   const suited = suite.name !== 'none';
   const darkBand = onDark(dress);
@@ -323,9 +399,92 @@ export function SectionShell({
   );
 }
 
+/**
+ * The heirloom's band: printed paper (grain on the dark bands), generous margins, an inset hairline frame
+ * with filigree corners round the dark bands, and the section's decor behind the words.
+ */
+function HeirloomShell({
+  id,
+  dress,
+  heading,
+  eyebrow,
+  className,
+  wide,
+  decor,
+  mode,
+  script,
+  join,
+  bleed,
+  artRefs,
+  children,
+}: {
+  id: string;
+  dress: Dress;
+  heading?: string;
+  eyebrow?: string;
+  className?: string;
+  wide?: boolean;
+  decor?: readonly SectionDecor[];
+  mode?: RenderMode;
+  script?: string;
+  join?: 'above';
+  bleed?: boolean;
+  artRefs?: Readonly<Record<string, string>>;
+  children: ReactNode;
+}) {
+  const band = dress.band;
+  const dark = onDark(dress);
+  const colors = dress.colors;
+  const paper = band === 'deep' ? deepOf(colors) : band === 'primary' ? colors.primary : band === 'surface' ? colors.surface : band === 'accent' ? colors.accent : colors.background;
+  const texture = textureStyle(dark ? 'grain' : 'paper', dark ? 0.45 : 0.5, [paper]);
+  const pad = dark ? 'py-[30px] @min-[640px]:py-[34px]' : 'py-[44px] @min-[640px]:py-[56px]';
+  const art = decorOf(decor, colors, mode, artRefs);
+  // Narrower pages: room along the band's top and foot for the pieces standing there (they start at its edge).
+  const room = (px: number) => (px > 24 ? <div aria-hidden="true" className="@min-[1100px]:hidden" style={{ height: px - 24 }} /> : null);
+  return (
+    <section id={id} className={cx('bulava-reveal relative overflow-hidden', !bleed && 'px-6 @min-[1100px]:px-10', !bleed && pad, join === 'above' && 'pt-0 @min-[640px]:pt-0', BAND_CLASS[band], className)} style={{ ['--t-band' as string]: BAND_FILL[band] }}>
+      <div className="pointer-events-none absolute inset-0" style={texture} aria-hidden="true" />
+      {dark && join !== 'above' ? (
+        <div className="pointer-events-none absolute inset-2.5 border border-[var(--t-line)]" aria-hidden="true">
+          <Filigree className="absolute -top-px -left-px w-[26px] text-[var(--t-orn)]" />
+          <Filigree className="absolute -top-px -right-px w-[26px] -scale-x-100 text-[var(--t-orn)]" />
+          <Filigree className="absolute -bottom-px -left-px w-[26px] -scale-y-100 text-[var(--t-orn)]" />
+          <Filigree className="absolute -right-px -bottom-px w-[26px] -scale-100 text-[var(--t-orn)]" />
+        </div>
+      ) : null}
+      {art.layer}
+      {room(art.top)}
+      {bleed ? (
+        children
+      ) : (
+        <div className={cx('relative mx-auto', wide ? 'max-w-[1240px]' : 'max-w-3xl')}>
+          {heading ? <HeirloomHeading d={dress} heading={heading} eyebrow={eyebrow} script={script} /> : null}
+          {children}
+        </div>
+      )}
+      {room(art.bottom)}
+    </section>
+  );
+}
+
+/** A heirloom pill: the button and the disclosures' summaries (a 14 px arrow after the words). */
+export const HEIRLOOM_PILL =
+  'bulava-caps inline-flex min-h-11 items-center justify-center gap-2.5 rounded-full bg-[var(--t-button)] bg-[linear-gradient(to_bottom,rgb(255_255_255/0.06),rgb(255_255_255/0))] px-[30px] text-[12px] leading-none font-semibold tracking-[0.16em] uppercase text-[var(--t-on-button)] shadow-[0_10px_22px_-14px_rgba(112,37,43,0.65)] transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-[0_14px_26px_-14px_rgba(112,37,43,0.75)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--t-accent)] @min-[640px]:min-h-[46px] @min-[640px]:text-[12.5px]';
+
+/** The pill's arrow (or a chevron). */
+export function PillArrow({ chevron = false }: { chevron?: boolean }) {
+  return (
+    <svg viewBox="0 0 14 14" aria-hidden="true" className="size-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      {chevron ? <path d="M5 2.5 9.5 7 5 11.5" /> : <path d="M2 7h10M8 3l4 4-4 4" />}
+    </svg>
+  );
+}
+
 /** Card surface in the look's style (glass on bands and noir, paper elsewhere). */
 export function cardClass(look: LookName): string {
   switch (look) {
+    case 'heirloom':
+      return 'rounded-[var(--t-radius)] border border-[color-mix(in_srgb,var(--t-orn)_55%,transparent)] bg-[var(--t-card-alt)] shadow-[0_22px_44px_-34px_rgba(73,53,44,0.5)]';
     case 'noir':
       return 'rounded-[calc(var(--t-radius)*1.2)] border border-[var(--t-line)] bg-[var(--t-card)] shadow-[0_20px_50px_-30px_rgba(0,0,0,0.8)] backdrop-blur-md';
     case 'garden':

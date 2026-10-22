@@ -5,6 +5,7 @@ import {
   Cormorant_Garamond,
   Great_Vibes,
   Italiana,
+  Lora,
   Marcellus,
   Montserrat,
   Noto_Sans,
@@ -53,6 +54,7 @@ const rozha = Rozha_One({ subsets: ['latin', 'devanagari'], weight: '400', varia
 const yatra = Yatra_One({ subsets: ['latin', 'devanagari'], weight: '400', variable: '--font-yatra', display: 'swap', preload: false });
 const baloo = Baloo_2({ subsets: ['latin', 'devanagari'], variable: '--font-baloo', display: 'swap', preload: false });
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font-pacifico', display: 'swap', preload: false });
+const lora = Lora({ subsets: ['latin', 'latin-ext'], weight: ['400', '500', '600', '700'], style: ['normal', 'italic'], variable: '--font-lora', display: 'swap', preload: false });
 
 export const fontVariables = [
   notoSans,
@@ -76,6 +78,7 @@ export const fontVariables = [
   yatra,
   baloo,
   pacifico,
+  lora,
 ]
   .map((f) => f.variable)
   .join(' ');

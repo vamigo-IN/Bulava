@@ -294,8 +294,55 @@ export const ILLUSTRATIONS = [
   'ferrisWheel',
   'hotAirBalloon',
   'lampTower',
+  // A Rajput palace (illustrations-palace.tsx, The Royal Heirloom): carved sandstone, a pavilion, a palace front, the mandap, flowers.
+  'palaceArcade',
+  'palacePillar',
+  'chhatri',
+  'palaceFacade',
+  'mandapCanopy',
+  'flowerBed',
+  'floralStrand',
+  'standingPeacock',
 ] as const;
 export type IllustrationName = (typeof ILLUSTRATIONS)[number];
+
+/** Where a piece of section decor stands: a corner, or a side at mid-height. */
+export const DECOR_PLACES = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'left', 'right'] as const;
+export type DecorPlace = (typeof DECOR_PLACES)[number];
+
+/**
+ * A piece of art in a section's corner or side (`SectionInstance.decor`), behind its words: roses in a
+ * corner, lanterns hanging from the top, a pavilion at the foot. Sizes are px on a 1440-wide page and
+ * scale down with it; under 1100 px a piece moves into a strip above or below the words at `size × phone`,
+ * or hides (0). Never an emblem (the faith emblem crowns the invitation, never decorates it).
+ */
+export const SectionDecorSchema = z
+  .object({
+    art: z.enum(ILLUSTRATIONS),
+    at: z.enum(DECOR_PLACES),
+    /** Height in px on a 1440-wide page. */
+    size: z.number().int().min(24).max(560),
+    /** Width ÷ height, for art drawn to its frame (strands, beds); else the art's own proportions. */
+    aspect: z.number().min(0.05).max(8).optional(),
+    /** Px in from the side edge (negative bleeds off the page). */
+    x: z.number().int().min(-240).max(640).default(0),
+    /** Px in from the top or bottom edge. */
+    y: z.number().int().min(-240).max(640).default(0),
+    flip: z.enum(['none', 'x', 'y', 'xy']).default('none'),
+    /** The art's main colour (its metal, stone or leaves): a palette name or #hex. */
+    tint: ColorRefSchema.default('secondary'),
+    foil: z.boolean().default(false),
+    /** A warm halo behind it (lanterns on a dark band). */
+    glow: z.boolean().default(false),
+    opacity: z.number().min(0.2).max(1).default(1),
+    /** Sways gently from its top (strands, lanterns) on live pages. */
+    sway: z.boolean().default(false),
+    /** Under 1100 px: drawn in a strip at size × phone; 0 hides it. */
+    phone: z.number().min(0).max(1).default(0),
+  })
+  .strict();
+export type SectionDecor = z.infer<typeof SectionDecorSchema>;
+export type SectionDecorInput = z.input<typeof SectionDecorSchema>;
 
 /** Decorations the engine draws itself (no assets to license). */
 export const ORNAMENT_LAYERS = [
@@ -349,7 +396,7 @@ export const SceneLayerSchema = z.object({
 });
 
 /** Small line icons for detail rows and buttons (drawn by the engine). */
-export const ICONS = ['calendar', 'clock', 'pin', 'heart', 'rings', 'music', 'camera', 'gift', 'phone', 'mail', 'sparkle', 'star', 'car', 'bed', 'dinner', 'flower', 'bell', 'diya', 'navigation'] as const;
+export const ICONS = ['calendar', 'clock', 'pin', 'heart', 'rings', 'music', 'camera', 'gift', 'phone', 'mail', 'sparkle', 'star', 'car', 'bed', 'dinner', 'flower', 'bell', 'diya', 'navigation', 'plane', 'cloche', 'map'] as const;
 export type IconName = (typeof ICONS)[number];
 
 export const IconLayerSchema = z.object({

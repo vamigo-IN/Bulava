@@ -54,6 +54,7 @@ const FONT_WEIGHTS: Partial<Record<FontFamily, number[]>> = {
   Cinzel: [400, 500, 600, 700],
   Montserrat: [300, 400, 500, 600, 700],
   'Baloo 2': [400, 500, 600, 700, 800],
+  Lora: [400, 500, 600, 700],
 };
 
 const WEIGHT_NAMES = {

@@ -8,6 +8,7 @@ import { artworkArt, DARK_SCENES, SceneHero, sceneArt, type SceneName } from '..
 import { coverMonogram } from '../covers';
 import { StageHero } from '../stage/hero';
 import type { SectionProps } from '../types';
+import { BalconyHero } from './balcony';
 import { cx, initials, Names } from './shared';
 
 /**
@@ -71,6 +72,7 @@ const SCENE_TYPE: Partial<Record<string, 'script' | 'caps' | 'italic'>> = {
  *  celestial – night sky, crescent moon and twinkling stars (always dark)
  *  lantern  – hanging paper lanterns over a night sky (always dark)
  *  peacock  – crossed peacock feathers (Krishna-inspired)
+ *  balcony  – the photo seen from a palace balcony: carved arches, jasmine strands, lanterns, the words on paper (sections/balcony.tsx)
  * Illustrated scenes with layered 3D parallax (art/scenes.tsx):
  *  gopuram, palace, toran, arches, lotus, mandap, noir, floral, balloons, backwaters, sarovar, vrindavan
  *  artwork – one of the template's painted artworks (prop `artwork`: its key; `nameStyle`: script, caps or italic)
@@ -95,6 +97,8 @@ export function Hero(p: SectionProps) {
   const pattern = patternStyle(p.pattern, dark ? p.colors.accent : p.colors.secondary);
   const surface: CSSProperties = dark ? { ...pattern, backgroundColor: p.colors.primary, color: 'var(--t-on-primary)' } : pattern;
   const ornamentColor = dark ? 'text-[var(--t-accent)]' : 'text-[var(--t-secondary)]';
+
+  if (p.instance.variant === 'balcony') return <BalconyHero p={p} title={title} emblem={emblemName} />;
 
   if (p.instance.variant === 'stage') {
     const name = stageOf(v('stage'));

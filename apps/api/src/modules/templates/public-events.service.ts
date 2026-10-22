@@ -5,6 +5,7 @@ import { APP_CONFIG, type AppConfig } from '../../config/env';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AppError } from '../../common/errors/app-error';
 import { AudienceService } from '../audience/audience.service';
+import { EventLinksService } from '../domains/event-links.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { openRegistrationByDefault } from '../registrations/registration-defaults';
 import { summarizeForPublic } from '../registrations/registration-public';
@@ -40,6 +41,7 @@ export class PublicEventsService {
     private readonly renderContext: RenderContextService,
     private readonly entitlements: EntitlementsService,
     private readonly media: MediaService,
+    private readonly links: EventLinksService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -139,6 +141,10 @@ export class PublicEventsService {
     ]);
     if (!template) throw new AppError('SERVICE_UNAVAILABLE', 'No template is available.');
     const show = EntitlementsService.invitation(features, event);
+    // The invitation's share links (a closing's WhatsApp and Facebook): the event's own public page, only for a
+    // published event anyone may open, on its own domain when one is live; never a personal or secret link.
+    const origin = policy.mode === 'PUBLIC' && event.status === 'ACTIVE' ? await this.links.guestOrigin(event.id) : null;
+    const shareUrl = origin ? (origin === this.links.mainOrigin ? `${origin}/e/${event.slug}` : `${origin}/`) : null;
 
     return {
       event: {
@@ -173,6 +179,8 @@ export class PublicEventsService {
       /** Kinds of section the page leaves out (no replies, no gallery). */
       without: show.without,
       registration: summarizeForPublic(registrationSettings, confirmedRegistrations, event.status === 'ACTIVE'),
+      /** The event's public page for share links (public, published events only). */
+      shareUrl,
     };
   }
 

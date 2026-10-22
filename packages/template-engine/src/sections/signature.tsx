@@ -11,14 +11,7 @@ export function Menu(p: SectionProps) {
   const text = p.value('text');
   if (!text) return null;
   const d = dressFor(p);
-  const rows = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [course, ...rest] = line.split('|');
-      return rest.length ? { course: course!.trim(), dishes: rest.join('|').trim() } : { course: null, dishes: line };
-    });
+  const rows = menuRows(text);
   const list = (
     <ul className="space-y-6">
       {rows.map((row, i) => (
@@ -45,11 +38,37 @@ export function Menu(p: SectionProps) {
   );
 }
 
-/** quote: a verse, shloka or line from the couple, set large under the suite's seal. Hidden when empty. */
+/** A menu's lines: "Course | dishes", or a plain line of dishes. */
+export function menuRows(text: string | undefined): Array<{ course: string | null; dishes: string }> {
+  return (text ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [course, ...rest] = line.split('|');
+      return rest.length ? { course: course!.trim(), dishes: rest.join('|').trim() } : { course: null, dishes: line };
+    });
+}
+
+/**
+ * quote: a verse, shloka or line from the couple, set large under the suite's seal. Hidden when empty.
+ * Variant verse: one centred line in the heading face's italic, in the gold ink ("verse — its author"), that
+ * continues the band above it (the blessings' last line).
+ */
 export function Quote(p: SectionProps) {
   const text = p.value('text');
   if (!text) return null;
   const by = p.value('by');
+  if (p.instance.variant === 'verse') {
+    return (
+      <SectionShell {...shell(p)} dress={dressFor(p)} join="above">
+        <p className="mx-auto max-w-[820px] text-center text-[24px] leading-[1.35] font-medium italic text-balance text-[var(--t-secondary-ink)] [font-family:var(--t-heading)] @min-[640px]:text-[30px]">
+          {text}
+          {by ? <span className="whitespace-nowrap"> — {by}</span> : null}
+        </p>
+      </SectionShell>
+    );
+  }
   const d = dressFor(p, 'inverse');
   const suited = d.suite.name !== 'none';
   return (

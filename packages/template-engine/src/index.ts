@@ -18,7 +18,7 @@ export {
   type SceneName,
 } from './art/scenes';
 export { Toran, MarigoldStrand, Marigold, Diya, Kalash, Bell, LotusBloom, Balloon, Gopuram, Dome, Chhatri, PeacockPlume, Bansuri, KadambaTree, Moon, rand, r2 } from './art/motifs';
-export { FunctionMotif, motifFor } from './art/function-icons';
+export { FunctionArt, FUNCTION_ART, FunctionMotif, motifFor } from './art/function-icons';
 export { initials } from './sections/shared';
 export { Effects } from './effects';
 export { Mandala, Paisley, FloralCorner, GeometricStar, Confetti, ArchFrame, TempleBorder, Ornament, Divider, PeacockPair } from './ornaments';
@@ -50,6 +50,7 @@ export {
   type HandleName,
 } from './canvas/editing';
 export { Illustration, ILLUSTRATION_ASPECT, FRAME_SIZED, JHAROKHA_OPENING } from './art/illustrations';
+export { LakePalaceVignette } from './art/vignettes';
 /**
  * Signature 3D stages (ADR-078): the set registry, the camera, the hero, stills and what films and openings build on
  * (films import the openings' choreography and the covers' hinges from here, never from src/stage/*). Marketing and
@@ -157,17 +158,19 @@ export const SECTION_VARIANTS: Readonly<Record<string, readonly string[]>> = {
     'vrindavan',
     'artwork',
     'stage',
+    'balcony',
   ],
   couple: ['default', 'stacked', 'portraits', 'duet', 'monogram', 'flip', 'profile'],
-  family: ['default', 'blessings'],
-  parents: ['default', 'blessings'],
-  story: ['default', 'letter', 'curtain', 'polaroid'],
-  eventTimeline: ['cards', 'timeline', 'frames', 'tiles', 'tickets', 'diya'],
-  gallery: ['default', 'frames', 'stack', 'mosaic', 'polaroid', 'depth'],
-  countdown: ['default', 'flip', 'rings', 'calendar'],
-  venue: ['default', 'illustrated', 'postcard'],
-  rsvp: ['default', 'card'],
-  footer: ['default', 'seal', 'skyline', 'blessing'],
+  family: ['default', 'blessings', 'houses'],
+  parents: ['default', 'blessings', 'houses'],
+  story: ['default', 'letter', 'curtain', 'polaroid', 'arch'],
+  eventTimeline: ['cards', 'timeline', 'frames', 'tiles', 'tickets', 'diya', 'arches'],
+  gallery: ['default', 'frames', 'stack', 'mosaic', 'polaroid', 'depth', 'carousel'],
+  countdown: ['default', 'flip', 'rings', 'calendar', 'ornate'],
+  venue: ['default', 'illustrated', 'postcard', 'photo'],
+  rsvp: ['default', 'card', 'invite'],
+  quote: ['default', 'verse'],
+  footer: ['default', 'seal', 'skyline', 'blessing', 'vista'],
 };
 
 /** The section suites (sections/suites.ts): each ornament's own pieces, for the Studio and the docs. */

@@ -52,6 +52,7 @@ export const BINDINGS: Record<string, { type: BindingType; description: string }
   'photo.partnerTwo': { type: 'image', description: 'Photo of the second partner' },
   'photo.story': { type: 'image', description: 'Photo beside the story' },
   'photo.closing': { type: 'image', description: 'Photo in the closing section' },
+  'photo.venue': { type: 'image', description: 'Photo of the venue' },
   'announcements': { type: 'list', description: 'Published announcements for the viewer' },
   // The first functions the viewer may see, by position: a card's timeline (Mehendi · Sangeet · Wedding).
   ...Object.fromEntries(
@@ -67,7 +68,7 @@ export const BINDINGS: Record<string, { type: BindingType; description: string }
 
 /** custom.<key> bindings are validated against capabilities.textSlots. */
 export function isKnownBinding(path: string, textSlotKeys: readonly string[] = []): boolean {
-  if (path in BINDINGS) return true;
+  if (Object.prototype.hasOwnProperty.call(BINDINGS, path)) return true;
   const custom = /^custom\.([a-zA-Z0-9]+)$/.exec(path);
   return custom !== null && textSlotKeys.includes(custom[1]!);
 }
@@ -75,7 +76,10 @@ export function isKnownBinding(path: string, textSlotKeys: readonly string[] = [
 /** Resolve a dotted path (supports [n] indexes) against the context. */
 export function resolveBinding(path: string, ctx: RenderContext): unknown {
   const slot = /^photo\.(\w+)$/.exec(path);
-  if (slot) return ctx.photoSlots?.[slot[1] as keyof NonNullable<RenderContext['photoSlots']>]?.url;
+  if (slot) {
+    const slots = ctx.photoSlots;
+    return slots && Object.prototype.hasOwnProperty.call(slots, slot[1]!) ? slots[slot[1] as keyof typeof slots]?.url : undefined;
+  }
   const normalized = path
     .replace('function.date', 'function.startsAt')
     .replace('function.time', 'function.startsAt')
@@ -84,9 +88,12 @@ export function resolveBinding(path: string, ctx: RenderContext): unknown {
     const m = /^(\w+)\[(\d+)\]$/.exec(p);
     return m ? [m[1]!, Number(m[2])] : [p];
   });
+  // Own properties only: a path (or a declared text slot) named `constructor`, `toString` or `__proto__`
+  // reads nothing rather than an Object prototype's function.
   let current: unknown = ctx;
   for (const part of parts) {
     if (current === null || current === undefined) return undefined;
+    if (!Object.prototype.hasOwnProperty.call(current, part)) return undefined;
     current = (current as Record<string | number, unknown>)[part];
   }
   if (path === 'photos[0]' || path === 'photos[1]' || path === 'photos[2]') {

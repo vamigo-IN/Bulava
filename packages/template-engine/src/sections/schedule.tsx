@@ -1,13 +1,27 @@
-import { formatEventDateWithWeekday, formatEventTime } from '@bulava/localization';
-import type { FunctionContext } from '@bulava/template-schema';
-import { FunctionMotif } from '../art/function-icons';
+import type { ReactNode } from 'react';
+import { formatEventDateShort, formatEventDateWithWeekday, formatEventTime, getLanguage } from '@bulava/localization';
+import type { FunctionContext, IconName } from '@bulava/template-schema';
+import { FunctionArt, FunctionMotif } from '../art/function-icons';
 import { Diya } from '../art/motifs';
+import { LakePalaceVignette } from '../art/vignettes';
 import { Icon } from '../canvas/icons';
 import { FlipCard } from '../interactive';
 import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
-import { Seal, ShapedCard, Skyline, type Dress } from './dress';
-import { cardClass, cx, dressFor, SectionShell, shell } from './shared';
+import { FleuronRule, Seal, ShapedCard, Skyline, type Dress } from './dress';
+import { cardClass, cx, dressFor, heirloomCaps, HEIRLOOM_PILL, PillArrow, SectionShell, shell } from './shared';
+
+/** A detail row: a line icon, then the words. */
+function Row({ icon, children, className, size = 'size-[15px]' }: { icon: IconName; children: ReactNode; className?: string; size?: string }) {
+  return (
+    <p className={cx('flex items-start gap-1.5 @min-[220px]:gap-2.5', className)}>
+      <span className={cx('mt-[0.2em] block shrink-0 text-[var(--t-primary-ink)]', size)}>
+        <Icon name={icon} weight={1.5} />
+      </span>
+      <span className="min-w-0">{children}</span>
+    </p>
+  );
+}
 
 function dateParts(iso: string, language: string, timeZone: string) {
   const d = new Date(iso);
@@ -63,6 +77,123 @@ export function EventTimeline(p: SectionProps) {
   const suited = p.ornament !== 'none';
   const tone = p.instance.variant === 'timeline' || p.instance.variant === 'diya' ? 'plain' : 'surface';
   const d = dressFor(p, tone);
+
+  if (p.instance.variant === 'arches') {
+    // Cards under cusped arches, each with its function's illustration in the arch's head, all of one height
+    // with the note at the foot: four in a row on wide pages, two on phones. A card answers to its own width
+    // (it is its own container): under 220 px it is compact (the day, the time, the venue's name). "View full schedule" opens the whole itinerary below them: every function's day, its hours,
+    // its venue with directions and its note in full (a fifth function onward is listed only there).
+    const script = getLanguage(p.language).script;
+    const card = (fn: FunctionContext) => {
+      const href = linkless ? null : mapHref(fn);
+      const venue = fn.venue ? [fn.venue.name, fn.venue.city].filter(Boolean).join(', ') : null;
+      const place = (text: string) =>
+        href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-[var(--t-line)] underline-offset-4 hover:text-[var(--t-primary-ink)]">
+            {text}
+          </a>
+        ) : (
+          text
+        );
+      return (
+        <li key={fn.id} className="flex min-w-0">
+          <ShapedCard d={d} shape="cusped" fill="var(--t-card-alt)" full className="w-full px-3 pt-[15cqw] pb-5 text-center @min-[220px]:px-[22px] @min-[220px]:pb-[26px]">
+            <FunctionArt name={fn.name} colors={p.colors} className="h-[70px] @min-[220px]:h-[132px]" />
+            <h3 className="mt-3 line-clamp-2 text-[19px] leading-[1.2] font-semibold text-balance text-[var(--t-primary-ink)] [font-family:var(--t-heading)] @min-[220px]:mt-4 @min-[220px]:text-[24px]">{fn.name}</h3>
+            {status(fn)}
+            <div className="mx-auto mt-2.5 inline-flex max-w-full flex-col gap-1 text-left text-[12.5px] leading-[1.45] text-[var(--t-text)] @min-[220px]:mt-4 @min-[220px]:gap-2 @min-[220px]:text-[14.5px] @min-[220px]:leading-[1.5]">
+              {fn.startsAt ? (
+                <Row icon="calendar" size="size-[13px] @min-[220px]:size-[15px]">
+                  <span className="@min-[220px]:hidden">{formatEventDateShort(fn.startsAt, fmt)}</span>
+                  <span className="hidden @min-[220px]:inline">{formatEventDateWithWeekday(fn.startsAt, fmt)}</span>
+                </Row>
+              ) : null}
+              {fn.startsAt ? (
+                <Row icon="clock" size="size-[13px] @min-[220px]:size-[15px]">
+                  {formatEventTime(fn.startsAt, fmt)}
+                </Row>
+              ) : null}
+              {venue && fn.venue ? (
+                <Row icon="pin" size="size-[13px] @min-[220px]:size-[15px]" className="@min-[220px]:mt-1.5">
+                  <span className="line-clamp-2 @min-[220px]:hidden">{place(fn.venue.name)}</span>
+                  <span className="hidden @min-[220px]:inline">{place(venue)}</span>
+                </Row>
+              ) : null}
+            </div>
+            {fn.description ? <p className="mt-auto hidden pt-3 text-[13.5px] leading-[1.5] text-[var(--t-muted-ink)] italic @min-[220px]:line-clamp-2">{fn.description}</p> : null}
+          </ShapedCard>
+        </li>
+      );
+    };
+    const first = fns.slice(0, 4);
+    const grid = (
+      <ul className={cx('mx-auto grid grid-cols-2 gap-x-3 gap-y-5 @min-[640px]:gap-7', first.length >= 4 ? '@min-[1100px]:grid-cols-4' : first.length === 3 ? '@min-[1100px]:max-w-[970px] @min-[1100px]:grid-cols-3' : first.length === 1 ? 'max-w-[340px] grid-cols-1' : '@min-[1100px]:max-w-[650px]')}>
+        {first.map(card)}
+      </ul>
+    );
+    // The whole itinerary: a ruled list, the day and hours at the left, the function, its venue and its note beside.
+    const itinerary = (
+      <ol className="mx-auto mt-8 max-w-[780px] divide-y divide-[var(--t-line)] border-y border-[var(--t-line)] text-left">
+        {fns.map((fn) => {
+          const href = mapHref(fn);
+          const where = fn.venue ? [fn.venue.name, fn.venue.address, fn.venue.city].filter(Boolean).join(', ') : null;
+          return (
+            <li key={fn.id} className="grid gap-1.5 py-5 @min-[640px]:grid-cols-[260px_1fr] @min-[640px]:gap-8">
+              <div>
+                {fn.startsAt ? <p className={cx('text-[12.5px] leading-[1.5] font-semibold text-[var(--t-secondary-ink)]', heirloomCaps(script, 'tracking-[0.12em]'))}>{formatEventDateWithWeekday(fn.startsAt, fmt)}</p> : null}
+                {fn.startsAt ? (
+                  <p className="mt-0.5 text-[15px] text-[var(--t-text)]">
+                    {formatEventTime(fn.startsAt, fmt)}
+                    {fn.endsAt ? ` – ${formatEventTime(fn.endsAt, fmt)}` : null}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <h3 className="text-[22px] leading-[1.2] font-medium italic text-[var(--t-primary-ink)] [font-family:var(--t-heading)]">{fn.name}</h3>
+                {status(fn)}
+                {where ? (
+                  <Row icon="pin" className="mt-1.5 text-[14.5px] leading-[1.55] text-[var(--t-text)]">
+                    {where}
+                    {href ? (
+                      <>
+                        {' · '}
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-[var(--t-line)] underline-offset-4 hover:text-[var(--t-primary-ink)]">
+                          {p.t('template.getDirections')}
+                        </a>
+                      </>
+                    ) : null}
+                  </Row>
+                ) : null}
+                {fn.description ? <p className="mt-1.5 text-[14.5px] leading-[1.6] whitespace-pre-line text-[var(--t-muted-ink)]">{fn.description}</p> : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    );
+    const viewAll = p.t('template.schedule.viewAll');
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={p.value('heading') ?? p.t('template.schedule.celebrate')} eyebrow={p.value('eyebrow') ?? p.t('template.schedule.eyebrow')} wide>
+        {grid}
+        {linkless ? (
+          <div className="mt-9 text-center">
+            <span className={HEIRLOOM_PILL}>
+              {viewAll}
+              <PillArrow />
+            </span>
+          </div>
+        ) : (
+          <details className="bulava-more-list mt-9 text-center">
+            <summary className={cx(HEIRLOOM_PILL, 'cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>
+              {viewAll}
+              <PillArrow />
+            </summary>
+            {itinerary}
+          </details>
+        )}
+      </SectionShell>
+    );
+  }
 
   if (p.instance.variant === 'timeline' || p.instance.variant === 'diya') {
     const diya = p.instance.variant === 'diya';
@@ -259,6 +390,63 @@ export function Venue(p: SectionProps) {
     ) : null;
   const heading = p.value('heading') ?? p.t('template.venue.title');
   const d = dressFor(p);
+
+  if (p.instance.variant === 'photo') {
+    // The venue's own photograph (photo.venue, never a portrait) across the left half, the words beside it.
+    const image = p.value('image');
+    const script = getLanguage(p.language).script;
+    const directions = q ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}` : venue.mapUrl;
+    const still = p.mode === 'thumbnail';
+    const viewMap = p.t('template.venue.viewMap');
+    const mapRow = venue.embedUrl && !still ? (
+      <details className="group">
+        <summary className="cursor-pointer list-none underline decoration-[var(--t-line)] underline-offset-4 [&::-webkit-details-marker]:hidden">{viewMap}</summary>
+        <iframe src={venue.embedUrl} title={p.t('template.venue.map', { venue: venue.name })} loading="lazy" referrerPolicy="origin" allowFullScreen className="mt-4 aspect-[4/3] w-full max-w-[420px] rounded-[6px] border-0 bg-[var(--t-surface)]" />
+      </details>
+    ) : still ? (
+      <span>{viewMap}</span>
+    ) : (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-[var(--t-line)] underline-offset-4 hover:text-[var(--t-primary-ink)]">
+        {viewMap}
+      </a>
+    );
+    return (
+      <SectionShell {...shell(p)} dress={d} bleed>
+        <div className="grid @min-[900px]:min-h-[412px] @min-[900px]:grid-cols-[53.5fr_46.5fr]">
+          <div className="relative aspect-[4/3] overflow-hidden @min-[900px]:aspect-auto">
+            {image ? <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" /> : <LakePalaceVignette colors={p.colors} className="absolute inset-0 h-full w-full" />}
+          </div>
+          <div className="relative px-6 pt-9 pb-12 text-center @min-[900px]:self-center @min-[900px]:py-16 @min-[900px]:pr-10 @min-[900px]:pl-[110px] @min-[900px]:text-left">
+            <p className={cx('leading-[1.4] font-semibold text-[var(--t-secondary-ink)]', heirloomCaps(script, 'text-[11.5px] tracking-[0.24em] @min-[640px]:text-[13px]'))}>{p.value('eyebrow') ?? p.t('template.venue.eyebrow')}</p>
+            <div className="mt-2.5 flex justify-center @min-[900px]:justify-start">
+              <FleuronRule d={d} className="@min-[900px]:-ml-1.5" />
+            </div>
+            <p className="mt-4 text-[32px] leading-[1.1] font-medium italic break-words text-balance text-[var(--t-primary-ink)] [font-family:var(--t-heading)] @min-[640px]:text-[40px]">{venue.name}</p>
+            <div className="mt-6 inline-flex flex-col gap-3.5 text-left text-[15px] leading-[1.5] text-[var(--t-text)] @min-[640px]:text-[16px]">
+              {venue.address ? <Row icon="pin" size="size-[18px]">{venue.address}</Row> : null}
+              {venue.city ? <Row icon="navigation" size="size-[18px]">{venue.city}</Row> : null}
+              <Row icon="map" size="size-[18px]">
+                {mapRow}
+              </Row>
+            </div>
+            <div className="mt-8">
+              {still || !directions ? (
+                <span className={HEIRLOOM_PILL}>
+                  {p.t('template.getDirections')}
+                  <PillArrow chevron />
+                </span>
+              ) : (
+                <a href={directions} target="_blank" rel="noopener noreferrer" className={HEIRLOOM_PILL}>
+                  {p.t('template.getDirections')}
+                  <PillArrow chevron />
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </SectionShell>
+    );
+  }
 
   if (p.instance.variant === 'illustrated') {
     return (

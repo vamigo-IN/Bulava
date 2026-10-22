@@ -28,6 +28,7 @@ export const FONT_CSS_VARS: Record<string, string> = {
   'Yatra One': '--font-yatra',
   'Baloo 2': '--font-baloo',
   Pacifico: '--font-pacifico',
+  Lora: '--font-lora',
 };
 
 const family = (name: string) => `var(${FONT_CSS_VARS[name] ?? '--font-none'}, '${name}')`;
@@ -164,9 +165,9 @@ export function themeStyle(theme: Theme, colors: ThemeColors, fonts: Fonts): CSS
   };
 }
 
-/** The deep band of a dark-stock design: the primary colour taken a third of the way to black. */
+/** The deep band: the palette's own deep colour (an emerald, a midnight), else the primary taken a third of the way to black. */
 export function deepOf(colors: ThemeColors): string {
-  return mix(colors.primary, '#000000', 0.34);
+  return colors.deep ?? mix(colors.primary, '#000000', 0.34);
 }
 
 /** The lightest of some colours (relative luminance). */

@@ -105,6 +105,16 @@ export const FONT_PAIRINGS: readonly FontPairing[] = [
       script: { family: 'Pacifico', scripts: ['Latn'], fallbacks: { Deva: 'Baloo 2' } },
     },
   },
+  {
+    // A printed heirloom: Cormorant's italics for headings, Lora's book face for reading, Great Vibes for a verse.
+    key: 'heirloom',
+    label: 'Heirloom',
+    fonts: {
+      heading: { family: 'Cormorant Garamond', scripts: ['Latn'], fallbacks: deva.serif },
+      body: { family: 'Lora', scripts: ['Latn'], fallbacks: deva.serif },
+      script: { family: 'Great Vibes', scripts: ['Latn'], fallbacks: deva.script },
+    },
+  },
 ];
 
 export function fontPairing(key: string | undefined): FontPairing | undefined {

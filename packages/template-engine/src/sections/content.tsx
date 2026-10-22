@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react';
+import { getLanguage } from '@bulava/localization';
+import { FAITH_EMBLEMS } from '@bulava/template-schema';
+import { ILLUSTRATION_ASPECT, Illustration } from '../art/illustrations';
+import { emblemMetal } from '../art/illustrations-faith';
 import { Icon } from '../canvas/icons';
 import { Glyph } from '../ornaments-suite';
 import { Curtain, FlipCard } from '../interactive';
 import type { SectionProps } from '../types';
-import { PhotoFrame, RoundPortrait, Seal, type Dress } from './dress';
-import { cardClass, cx, dressFor, faces, initials, labelClass, Paragraphs, SectionShell, shell } from './shared';
+import { ArtOrRef } from './decor';
+import { FleuronRule, PhotoFrame, RoundPortrait, Seal, type Dress } from './dress';
+import { cardClass, cx, dressFor, faces, heirloomCaps, HEIRLOOM_PILL, initials, labelClass, Paragraphs, PillArrow, SectionShell, shell } from './shared';
 
 interface Person {
   name: string;
@@ -274,11 +279,12 @@ export function Family(p: SectionProps) {
   const one = p.value('partnerOneParents');
   const two = p.value('partnerTwoParents');
   const couple = p.ctx.couple;
-  const families = p.instance.variant === 'blessings' && couple && (one || two);
+  const families = (p.instance.variant === 'blessings' || p.instance.variant === 'houses') && couple && (one || two);
   if (!text && !families) return null;
   const heading = p.value('heading') ?? p.t('template.family.title');
   const d = dressFor(p);
   const face = faces(p);
+  if (p.instance.variant === 'houses') return <Houses p={p} d={d} one={one} two={two} text={text} />;
   if (families) {
     const col = (who: string, line?: string) =>
       line ? (
@@ -312,6 +318,80 @@ export function Family(p: SectionProps) {
   );
 }
 
+/** A family's parents as two lines: the first in the reading face's semibold, the second after a script ampersand, quieter. */
+function HouseParents({ line }: { line: string }) {
+  const at = line.search(/\s+&\s+/);
+  const first = at < 0 ? line : line.slice(0, at);
+  const second = at < 0 ? null : line.slice(at).replace(/^\s+&\s+/, '');
+  return (
+    <p className="mt-2.5 text-balance">
+      <span className="block text-[16px] leading-[1.5] font-semibold text-[var(--t-text)]">{first}</span>
+      {second ? (
+        <span className="mt-0.5 block text-[15px] leading-[1.5] text-[var(--t-muted-ink)]">
+          <span aria-hidden="true" className="mr-[0.3em] text-[1.15em] text-[var(--t-secondary-ink)] [font-family:var(--t-script)]">
+            &amp;
+          </span>
+          <span className="sr-only">and </span>
+          {second}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
+/**
+ * family / parents "houses" (The Royal Heirloom): "With blessings from" over the two families side by side,
+ * each its house's name and its parents, the template's faith emblem between them (the suite's seal for a
+ * design of no one faith), then the blessings. An empty family is left out, its name too.
+ */
+function Houses({ p, d, one, two, text }: { p: SectionProps; d: Dress; one?: string; two?: string; text?: string }) {
+  const couple = p.ctx.couple;
+  const script = getLanguage(p.language).script;
+  const emblem = p.faith ? FAITH_EMBLEMS[p.faith] : null;
+  const aspect = emblem ? (ILLUSTRATION_ASPECT[emblem] ?? 1) : 1;
+  const house = (name: string, line?: string) =>
+    line ? (
+      <div className="flex min-w-0 flex-col items-center text-center">
+        <h3 className="text-[24px] leading-[1.2] break-words text-[var(--t-text)] [font-family:var(--t-heading)] @min-[640px]:text-[26px]">{p.t('template.family.house', { name })}</h3>
+        <HouseParents line={line} />
+      </div>
+    ) : null;
+  const centre = emblem ? (
+    <span data-emblem={emblem} aria-hidden="true" className="mx-auto block h-16 @min-[900px]:h-24" style={{ aspectRatio: `${aspect}` }}>
+      <Illustration name={emblem} color={emblemMetal(p.colors, false)} colors={p.colors} foil w={Math.round(96 * aspect)} h={96} style={{ display: 'block', width: '100%', height: '100%' }} />
+    </span>
+  ) : (
+    <Seal d={d} className="mx-auto w-16 @min-[900px]:w-24" quiet />
+  );
+  const families = couple && (one || two);
+  return (
+    <SectionShell {...shell(p)} dress={d} wide>
+      <p className={cx('mb-9 text-center leading-[1.4] font-semibold text-[var(--t-primary-ink)]', heirloomCaps(script, 'text-[12.5px] tracking-[0.24em] @min-[640px]:text-[13px]'))}>{p.value('eyebrow') ?? p.t('template.family.blessingsFrom')}</p>
+      {families ? (
+        <div className={cx('mx-auto grid max-w-[900px] items-center gap-7', one && two ? '@min-[900px]:grid-cols-[1fr_auto_1fr] @min-[900px]:gap-14' : 'max-w-md')}>
+          {house(couple.partnerOne, one)}
+          {centre}
+          {house(couple.partnerTwo, two)}
+        </div>
+      ) : null}
+      {text ? (
+        // The elders' blessings: each line (each family's grandparents) its own balanced block.
+        <div className="mx-auto mt-9 max-w-[600px] space-y-3 text-center text-[15.5px] leading-[1.65] text-[var(--t-muted-ink)] @min-[640px]:text-base">
+          {text.split(/\n{2,}/).map((para, i) => (
+            <p key={i}>
+              {para.split('\n').map((line, j) => (
+                <span key={j} className="block text-balance">
+                  {line}
+                </span>
+              ))}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </SectionShell>
+  );
+}
+
 /**
  * story: narrative text with an optional photo (photo.story, else the second chosen photo).
  * Variants: default (the photo in the suite's frame beside the text), curtain (the photo
@@ -324,6 +404,7 @@ export function Story(p: SectionProps) {
   const photo = p.value('image');
   const heading = p.value('heading') ?? p.t('template.story.title');
   const d = dressFor(p);
+  if (p.instance.variant === 'arch') return <StoryArch p={p} d={d} text={text} photo={photo} />;
 
   if (photo && p.instance.variant === 'curtain') {
     return (
@@ -385,6 +466,83 @@ export function Story(p: SectionProps) {
   );
 }
 
+/**
+ * story "arch" (The Royal Heirloom): the words in the left column (gold capitals, the fleuron, "A Journey
+ * of Love" in italic serif, the story), the photograph under a cusped Rajput arch on the right with flowers
+ * along its foot. A long story (over 280 characters or two paragraphs) shows its first lines and opens in
+ * place; a short one shows whole, with no button. Without a photo, the couple's monogram fills the arch.
+ */
+function StoryArch({ p, d, text, photo }: { p: SectionProps; d: Dress; text: string; photo?: string }) {
+  const script = getLanguage(p.language).script;
+  const eyebrow = p.value('eyebrow') ?? p.t('template.story.title');
+  const heading = p.value('heading') ?? p.t('template.story.journey');
+  const long = text.length > 280 || text.split(/\n{2,}/).length > 2;
+  const couple = p.ctx.couple;
+  const monogram = couple ? `${Array.from(couple.partnerOne.trim())[0] ?? ''}${Array.from(couple.partnerTwo.trim())[0] ?? ''}` : initials(p.ctx.honoree?.name ?? p.ctx.event.title);
+  const paragraphs = (
+    <div className="space-y-4 text-[15.5px] leading-[1.75] text-[var(--t-text)] @min-[640px]:text-[16.5px]">
+      {text.split(/\n{2,}/).map((para, i) => (
+        <p key={i} className="whitespace-pre-line">
+          {para}
+        </p>
+      ))}
+    </div>
+  );
+  return (
+    <SectionShell {...shell(p)} dress={d} wide>
+      <div className="grid items-center gap-12 @min-[900px]:grid-cols-[52fr_48fr] @min-[900px]:gap-6">
+        <div className="mx-auto w-full max-w-[560px] text-center">
+          <p className={cx('leading-[1.4] font-semibold text-[var(--t-secondary-ink)]', heirloomCaps(script, 'text-[11.5px] tracking-[0.24em] @min-[640px]:text-[13px]'))}>{eyebrow}</p>
+          <FleuronRule d={d} className="mt-2.5" />
+          <h2 className="mt-4 text-[32px] leading-[1.1] font-medium italic text-balance text-[var(--t-primary-ink)] [font-family:var(--t-heading)] @min-[640px]:text-[44px]">{heading}</h2>
+          {long && p.mode !== 'thumbnail' ? (
+            <div className="bulava-more mt-7">
+              <div className="bulava-clamp-story">{paragraphs}</div>
+              <details>
+                <summary className={cx(HEIRLOOM_PILL, 'mt-8 cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>
+                  {p.value('more') ?? p.t('template.story.readMore')}
+                  <PillArrow />
+                </summary>
+              </details>
+            </div>
+          ) : (
+            <div className={cx('mt-7', long && 'line-clamp-5')}>{paragraphs}</div>
+          )}
+        </div>
+        <div className="relative mx-auto mb-4 w-full max-w-[360px] @min-[900px]:mr-0 @min-[900px]:mb-0 @min-[900px]:max-w-[520px]">
+          <PhotoFrame
+            d={d}
+            shape="cusped"
+            src={photo}
+            alt=""
+            aspect={false}
+            focus="50% 28%"
+            className="aspect-[1.04] @min-[900px]:aspect-[520/440]"
+            fallback={
+              // The couple's monogram in the arch's body (below the head), over a fleuron.
+              <span className="absolute inset-0 flex flex-col items-center justify-center pt-[24%]" style={{ background: 'radial-gradient(circle at 50% 60%, var(--t-surface), var(--t-bg))' }}>
+                <span className="text-[72px] leading-none text-[var(--t-orn)] [font-family:var(--t-script)] @min-[900px]:text-[96px]">{monogram}</span>
+                <FleuronRule d={d} size="compact" className="mt-3" />
+              </span>
+            }
+          />
+          {/* Roses gathered at the arch's foot: a full cluster at the left corner, a smaller one at the right. */}
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-6 -left-[11%] aspect-[320/270] w-[42%]">
+            <div className="h-full w-full -scale-y-100">
+              <ArtOrRef art="roseCluster" tint="#7c8f6a" colors={p.colors} foil={false} w={320} h={270} refs={p.artRefs} />
+            </div>
+          </div>
+          <div aria-hidden="true" className="pointer-events-none absolute -right-[7%] -bottom-4 aspect-[320/270] w-[26%]">
+            <div className="h-full w-full -scale-100">
+              <ArtOrRef art="roseCluster" tint="#7c8f6a" colors={p.colors} foil={false} w={320} h={270} refs={p.artRefs} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </SectionShell>
+  );
+}
+
 const INFO_ICONS: Record<string, 'bed' | 'car' | 'gift'> = { '🏨': 'bed', '🚗': 'car', '🎁': 'gift' };
 
 /** accommodation / travel / giftRegistry: heading + custom text in a card under the suite's seal; hidden when empty. */
@@ -420,6 +578,22 @@ export function Announcements(p: SectionProps) {
   const items = p.ctx.announcements ?? [];
   if (!items.length) return null;
   const d = dressFor(p);
+  if (p.look === 'heirloom') {
+    // Printed on the band itself: a centred column of notices, the suite's glyph between them.
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={p.value('heading') ?? p.t('template.announcements.eyebrow')}>
+        <ul className="mx-auto max-w-[680px] text-center">
+          {items.map((a, i) => (
+            <li key={i}>
+              {i > 0 ? <Glyph name={d.suite.glyph} className="mx-auto my-5 size-[18px] text-[var(--t-orn)]" /> : null}
+              <p className="text-[22px] leading-[1.25] font-semibold text-[var(--t-text)] [font-family:var(--t-heading)] @min-[640px]:text-[24px]">{a.title}</p>
+              <p className="mt-1.5 text-[15px] leading-[1.7] whitespace-pre-line text-[var(--t-muted-ink)] @min-[640px]:text-[15.5px]">{a.body}</p>
+            </li>
+          ))}
+        </ul>
+      </SectionShell>
+    );
+  }
   return (
     <SectionShell {...shell(p)} dress={d} heading={p.value('heading') ?? p.t('template.announcements.title')}>
       <ul className="space-y-3">

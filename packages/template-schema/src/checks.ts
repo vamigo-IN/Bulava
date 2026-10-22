@@ -41,7 +41,7 @@ export function templateCheckCases(definition: TemplateDefinition): TemplateChec
   return cases;
 }
 
-const OPTIONAL_PROP = /^(tagline|image|invocation|subtitle|place|hashtag|closing|text|partnerOneParents|partnerTwoParents|heading|eyebrow)$/;
+const OPTIONAL_PROP = /^(tagline|image|invocation|subtitle|place|hashtag|closing|text|partnerOneParents|partnerTwoParents|heading|eyebrow|dateEnd|stay|travel|gifts|menu)$/;
 
 /** Resolve every prop/element across the test matrix. Pure; used by Template Studio before publishing. */
 export function runTemplateChecks(definition: TemplateDefinition): TemplateCheckResult[] {

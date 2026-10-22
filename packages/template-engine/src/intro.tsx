@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { IntroName, StageIntro, ThemeColors } from '@bulava/template-schema';
+import { cuspedHead } from './art/kit';
 import { easeInOut, RibbonCover, ZipperCover, type CoverProps } from './covers';
 import { Crescent, GateLeaf, Lantern, StarField } from './ornaments-signature';
 import { StageOpening, type StageOpeningPlan } from './stage/opening';
@@ -83,9 +84,12 @@ export function IntroOverlay({
   coverMonogram,
   rootId,
   stage,
+  frame,
   children,
 }: {
   variant: IntroVariant;
+  /** The theme's frame (`theme.dress.frame`): the doors of a `cusped` suite are palace doors (a cusped inlay, brass studs, lotus bosses). */
+  frame?: string;
   monogram: string;
   labels: IntroLabels;
   /** Shown under the scratch card (usually the date). */
@@ -193,14 +197,16 @@ export function IntroOverlay({
   const opening = state === 'opening';
   const fadeDelay = Math.max(0, DURATION[shown] - 700);
   const pulled = PULLED.has(shown) && !!colors;
+  // Doors and curtains cover the whole screen and open onto the invitation itself: no backdrop behind them.
+  const seeThrough = pulled || shown === 'doors' || shown === 'curtain';
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${pulled ? '' : 'bg-[var(--t-bg)]'}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${seeThrough ? '' : 'bg-[var(--t-bg)]'}`}
       style={{ opacity: opening ? 0 : 1, transitionDelay: opening ? `${fadeDelay}ms` : '0ms' }}
     >
       {shown === 'envelope' ? <Envelope opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
-      {shown === 'curtain' || shown === 'doors' ? <Panels variant={shown} opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
+      {shown === 'curtain' || shown === 'doors' ? <Panels variant={shown} palace={shown === 'doors' && frame === 'cusped'} opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
       {shown === 'gates' ? <Gates opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
       {shown === 'seal' ? <Seal opening={opening} monogram={monogram} label={labels.seal} onOpen={open} /> : null}
       {shown === 'lanterns' ? <Lanterns opening={opening} monogram={monogram} label={labels.lanterns} onOpen={open} /> : null}
@@ -250,7 +256,7 @@ function Envelope({ opening, monogram, label, onOpen }: PartProps) {
   );
 }
 
-function Panels({ variant, opening, monogram, label, onOpen }: PartProps & { variant: 'curtain' | 'doors' }) {
+function Panels({ variant, palace = false, opening, monogram, label, onOpen }: PartProps & { variant: 'curtain' | 'doors'; palace?: boolean }) {
   return (
     <button type="button" onClick={onOpen} className="absolute inset-0 flex" aria-label={label}>
       {[0, 1].map((side) => (
@@ -267,17 +273,87 @@ function Panels({ variant, opening, monogram, label, onOpen }: PartProps & { var
             backgroundImage:
               variant === 'curtain'
                 ? 'repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0 6px, rgba(255,255,255,0.05) 6px 24px)'
-                : 'linear-gradient(90deg, rgba(0,0,0,0.15), transparent 30%, transparent 70%, rgba(0,0,0,0.15))',
+                : 'radial-gradient(120% 55% at 50% 0%, rgba(255,255,255,0.07), transparent 62%), linear-gradient(90deg, rgba(0,0,0,0.15), transparent 30%, transparent 70%, rgba(0,0,0,0.15))',
           }}
         >
-          {variant === 'doors' ? <div className="absolute inset-6 rounded-t-full border-2 border-[var(--t-secondary)]/70" /> : null}
+          {palace ? <PalaceDoorLeaf side={side} /> : variant === 'doors' ? <div className="absolute inset-6 rounded-t-full border-2 border-[var(--t-secondary)]/70" /> : null}
         </div>
       ))}
       <span className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center transition-opacity duration-300" style={{ opacity: opening ? 0 : 1 }}>
         <Medallion monogram={monogram} />
-        <span className="mt-6 bulava-breathe text-sm tracking-[0.3em] uppercase text-[var(--t-on-primary)]">{label}</span>
+        {variant === 'doors' ? (
+          // On a small pill of the doors' own colour, so the seam and the panels' lines never run through the words.
+          <span className="mt-5 bulava-breathe rounded-full bg-[var(--t-primary)] px-5 py-2 text-xs font-semibold tracking-[0.3em] uppercase text-[var(--t-on-primary)] shadow-[0_8px_18px_-10px_rgba(0,0,0,0.6)] ring-1 ring-[color-mix(in_srgb,var(--t-secondary)_70%,transparent)]">{label}</span>
+        ) : (
+          <span className="mt-6 bulava-breathe text-sm tracking-[0.3em] uppercase text-[var(--t-on-primary)]">{label}</span>
+        )}
       </span>
     </button>
+  );
+}
+
+/** A row of brass studs along one edge of a door leaf, as a CSS pattern (any leaf size keeps their spacing). */
+function studs(axis: 'x' | 'y'): CSSProperties {
+  const head = 'radial-gradient(circle at 50% 50%, var(--t-secondary) 0 2.6px, color-mix(in srgb, var(--t-secondary) 50%, #000) 2.9px 3.5px, transparent 3.9px)';
+  const glint = 'radial-gradient(circle at 44% 40%, rgba(255, 248, 226, 0.9) 0 0.9px, transparent 1.5px)';
+  return {
+    backgroundImage: `${glint}, ${head}`,
+    backgroundSize: axis === 'x' ? '22px 100%' : '100% 22px',
+    backgroundRepeat: axis === 'x' ? 'repeat-x' : 'repeat-y',
+    backgroundPosition: 'center',
+  };
+}
+
+/** The cusped head of a door's inlay on a 300 × 120 grid: the outer line ends at x 0 and 300, the inner (8 in) at 9 and 291. */
+const DOOR_HEAD_OUTER = cuspedHead(0, 120, 300, 116);
+const DOOR_HEAD_INNER = cuspedHead(9, 120, 282, 106);
+
+/**
+ * One leaf of the palace doors (a `cusped` suite's opening): brass studs round its edges, a cusped arch inlaid
+ * in a double gold hairline on darker lacquer, and a gilt lotus boss with its ring at the middle. The head keeps
+ * its proportions on any leaf (the inlay is its own inline-size container), so phones and desktops match.
+ */
+function PalaceDoorLeaf({ side }: { side: number }) {
+  const gold = { stroke: 'var(--t-secondary)' };
+  const line = 'color-mix(in srgb, var(--t-secondary) 70%, transparent)';
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <span className="absolute top-3 right-3 left-3 h-2.5" style={studs('x')} />
+      <span className="absolute right-3 bottom-3 left-3 h-2.5" style={studs('x')} />
+      <span className="absolute top-8 bottom-8 left-3 w-2.5" style={studs('y')} />
+      <span className="absolute top-8 right-3 bottom-8 w-2.5" style={studs('y')} />
+      {/* The meeting stile: a shadowed seam with a gold edge. */}
+      <span className={`absolute inset-y-0 w-[3px] ${side === 0 ? 'right-0' : 'left-0'}`} style={{ background: `linear-gradient(${side === 0 ? '90deg' : '270deg'}, rgba(0,0,0,0.3), ${line})` }} />
+      <span className="absolute top-[11%] right-[15%] bottom-[7%] left-[15%]" style={{ containerType: 'inline-size' }}>
+        <svg viewBox="0 0 300 120" preserveAspectRatio="none" className="absolute inset-x-0 top-0 block h-[40cqw] w-full overflow-visible">
+          <path d={`${DOOR_HEAD_OUTER} V120 H0Z`} fill="rgba(0,0,0,0.14)" />
+          <path d={DOOR_HEAD_OUTER} fill="none" style={gold} strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
+          <path d={DOOR_HEAD_INNER} fill="none" style={gold} strokeOpacity="0.7" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <span className="absolute inset-x-0 top-[40cqw] bottom-0 border-x-[1.4px] border-b-[1.4px] bg-black/[0.14]" style={{ borderColor: 'var(--t-secondary)' }} />
+        <span className="absolute top-[40cqw] right-[3cqw] bottom-[3cqw] left-[3cqw] border-x border-b" style={{ borderColor: line }} />
+        <span className="absolute top-1/2 left-1/2 block w-[30cqw] max-w-[88px] -translate-x-1/2 -translate-y-1/2">
+          <LotusBoss />
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** A gilt lotus boss with a ring hanging from it (a door's pull), in the palette's gold. */
+function LotusBoss() {
+  const petals: ReactNode[] = [];
+  for (let i = 0; i < 8; i++) petals.push(<ellipse key={i} cx="0" cy="-5.2" rx="2.5" ry="5" transform={`rotate(${i * 45})`} />);
+  return (
+    <svg viewBox="-12 -12 24 34" className="block h-auto w-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)]">
+      <circle r="11" fill="none" style={{ stroke: 'var(--t-secondary)' }} strokeWidth="0.8" />
+      <g style={{ fill: 'var(--t-secondary)', stroke: 'color-mix(in srgb, var(--t-secondary) 55%, #000)' }} strokeWidth="0.35">
+        {petals}
+      </g>
+      <circle r="3.2" style={{ fill: 'var(--t-accent)', stroke: 'color-mix(in srgb, var(--t-secondary) 55%, #000)' }} strokeWidth="0.4" />
+      <circle cy="11.4" r="1.4" style={{ fill: 'var(--t-secondary)' }} />
+      <circle cy="16.6" r="4.6" fill="none" style={{ stroke: 'var(--t-secondary)' }} strokeWidth="1.5" />
+    </svg>
   );
 }
 

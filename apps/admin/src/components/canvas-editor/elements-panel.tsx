@@ -46,6 +46,17 @@ const KEYWORDS: Record<string, string> = {
   ferrisWheel: 'stage 3d ferris wheel giant wheel mela fair carnival lights ride',
   hotAirBalloon: 'stage 3d hot air balloon sky baby shower travel adventure',
   lampTower: 'stage 3d lamp tower deepastambha deepmala diya stambh temple diwali aarti flame',
+  palaceArcade: 'palace rajput arches arcade balcony jharokha sandstone carved royal heirloom frame',
+  palacePillar: 'palace rajput pillar column sandstone carved royal heirloom',
+  chhatri: 'palace rajput pavilion dome cenotaph rajasthan royal heirloom',
+  palaceFacade: 'palace rajput facade fort haveli jharokha domes rajasthan royal heirloom reception',
+  mandapCanopy: 'mandap wedding canopy pheras havan marigold hindu',
+  flowerBed: 'flowers peony rose jasmine bed border garden foot',
+  floralStrand: 'flowers vine bougainvillea strand hanging lantern chain',
+  standingPeacock: 'peacock bird standing plinth ledge parapet royal rajasthan',
+  plane: 'travel flight airport arrival',
+  cloche: 'menu food dinner dome serving',
+  map: 'map directions location venue',
 };
 
 /** "royalPeacock" → "royal peacock". */

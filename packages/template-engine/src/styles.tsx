@@ -98,6 +98,37 @@ const STYLES = `
   .bulava-template.reveal-ready .bulava-canvas:not(.is-visible) .bulava-cv-in { opacity: 1; }
   .bulava-canvas.is-visible .bulava-cv-in { animation: none; }
 }
+/* The heirloom look (The Royal Heirloom): headings clear of the page menu, disclosures that open in place,
+   clamped text, the hero's photo feathered into the paper and its words coming in as the opening lifts. */
+.bulava-look-heirloom [id] { scroll-margin-top: 72px; }
+/* Spaced capitals are for Latin script: Devanagari and the other Indic scripts have no capitals and lose their joins when spaced. */
+.bulava-template:not([data-script="Latn"]) .bulava-caps { letter-spacing: normal !important; text-transform: none !important; }
+.bulava-more > details[open] > summary, .bulava-more-list[open] > summary, .bulava-reply[open] > summary { display: none; }
+.bulava-clamp-4, .bulava-clamp-story { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.bulava-clamp-story { -webkit-line-clamp: 5; }
+@container (min-width: 900px) {
+  .bulava-clamp-story { -webkit-line-clamp: 3; }
+  .bulava-heirloom-photo { -webkit-mask-image: linear-gradient(to right, #000 76%, transparent); mask-image: linear-gradient(to right, #000 76%, transparent); }
+}
+.bulava-more:has(> details[open]) .bulava-clamp-4, .bulava-more:has(> details[open]) .bulava-clamp-story { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.bulava-ess-wrap:has(.bulava-ess-toggle[open]) .bulava-ess-menu { display: block; }
+@supports not selector(:has(*)) {
+  .bulava-ess-menu { display: block; }
+  .bulava-ess-toggle, .bulava-more > details { display: none; }
+  .bulava-clamp-4, .bulava-clamp-story { display: block; -webkit-line-clamp: unset; overflow: visible; }
+}
+@keyframes bulava-rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.bulava-heirloom-words[data-enter="wait"] > * { opacity: 0; }
+.bulava-heirloom-words[data-enter="play"] > * { animation: bulava-rise-in 0.8s ease-out both; }
+.bulava-heirloom-words[data-enter="play"] > :nth-child(2) { animation-delay: 0.09s; }
+.bulava-heirloom-words[data-enter="play"] > :nth-child(3) { animation-delay: 0.18s; }
+.bulava-heirloom-words[data-enter="play"] > :nth-child(4) { animation-delay: 0.27s; }
+.bulava-heirloom-words[data-enter="play"] > :nth-child(5) { animation-delay: 0.36s; }
+.bulava-heirloom-words[data-enter="play"] > :nth-child(6) { animation-delay: 0.45s; }
+.bulava-heirloom-words[data-enter="play"] > :nth-child(7) { animation-delay: 0.54s; }
+@media (prefers-reduced-motion: reduce) {
+  .bulava-heirloom-words[data-enter] > * { opacity: 1; animation: none; }
+}
 `;
 
 /**

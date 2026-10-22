@@ -1,5 +1,5 @@
 import { Fragment, type ComponentType, type ReactNode } from 'react';
-import { createTranslator, formatEventDateWithWeekday, getLanguage } from '@bulava/localization';
+import { createTranslator, formatEventDateWithWeekday, getLanguage, type Translator } from '@bulava/localization';
 import {
   canRedraw,
   effectiveColors,
@@ -34,6 +34,12 @@ import { StageRig } from './stage/rig';
 import { stageSet } from './stage/sets';
 import type { OrnamentName } from './ornaments';
 import { Couple, Family, Story, InfoBlock, Announcements } from './sections/content';
+import { Essentials } from './sections/essentials';
+import { Invitation } from './sections/invitation';
+import { calendarUrl } from './canvas/links';
+import { PageNav, type PageNavLink } from './nav';
+import { SharedArt, sharedArtOf } from './sections/decor';
+import { VISTA_PEACOCK } from './sections/vista';
 import { Hero } from './sections/hero';
 import { Countdown, Footer, Gallery, PhotoShare, Rsvp } from './sections/misc';
 import { EventTimeline, Venue } from './sections/schedule';
@@ -65,9 +71,64 @@ const REGISTRY: Record<SectionKey, ComponentType<SectionProps>> = {
   photoShare: PhotoShare,
   menu: Menu,
   quote: Quote,
+  invitation: Invitation,
+  essentials: Essentials,
   footer: Footer,
   canvas: CanvasSection,
 };
+
+/**
+ * The page menu's links (website.nav "bar"): one per kind of section the page shows and draws (the same
+ * tests as each section's own: a story with words, functions, a venue, photos, the stay strip's travel and
+ * gifts columns, the reply section where it shows), in page order, Home first.
+ */
+function navLinksOf(sections: SectionInstance[], props: (instance: SectionInstance, index: number) => SectionProps, rootId: string, t: Translator): PageNavLink[] {
+  const links: PageNavLink[] = [];
+  const seen = new Set<string>();
+  const add = (kind: string, href: string, label: string) => {
+    if (seen.has(kind)) return;
+    seen.add(kind);
+    links.push({ href, label });
+  };
+  sections.forEach((instance, index) => {
+    const p = props(instance, index);
+    const at = `#${instance.id}`;
+    switch (instance.section) {
+      case 'hero':
+        if (index === 0) add('home', `#${rootId}`, t('template.nav.home'));
+        break;
+      case 'story':
+        if (p.value('text')) add('story', at, t('template.nav.story'));
+        break;
+      case 'eventTimeline':
+        if (p.ctx.functions.length) add('functions', at, t('template.nav.functions'));
+        break;
+      case 'venue':
+      case 'map':
+        if (p.ctx.venue) add('venue', at, t('template.nav.venue'));
+        break;
+      case 'gallery':
+        if (p.ctx.gallery.images.length || p.ctx.photos.length) add('gallery', at, t('template.nav.gallery'));
+        break;
+      case 'essentials':
+        if (p.value('travel')) add('travel', `${at}-travel`, t('template.nav.travel'));
+        if (p.value('gifts')) add('gifts', `${at}-gifts`, t('template.nav.gifts'));
+        break;
+      case 'travel':
+        if (p.value('text')) add('travel', at, t('template.nav.travel'));
+        break;
+      case 'giftRegistry':
+        if (p.value('text')) add('gifts', at, t('template.nav.gifts'));
+        break;
+      case 'rsvp':
+        if (p.mode !== 'live' || p.slots.rsvp) add('rsvp', at, t('template.nav.rsvp'));
+        break;
+      default:
+        break;
+    }
+  });
+  return links;
+}
 
 function isVisible(instance: SectionInstance, ctx: RenderContext): boolean {
   const cond = instance.visibleWhen;
@@ -140,6 +201,7 @@ function pageOf({ definition: template, context, customization, language: langua
     timeZone,
     ornament,
     ...(definition.theme.dress ? { dress: definition.theme.dress } : {}),
+    ...(definition.theme.faith ? { faith: definition.theme.faith } : {}),
     pattern: definition.theme.pattern,
     colors,
     heroTone: definition.theme.heroTone ?? 'light',
@@ -150,6 +212,7 @@ function pageOf({ definition: template, context, customization, language: langua
     artworks: definition.artworks,
     fonts,
     rsvpSectionId,
+    nextSectionId: sections[index + 1]?.id,
     motion,
     drawSection,
   });
@@ -218,12 +281,16 @@ export function TemplateRenderer({ definition: template, context, customization,
   const stage = openingStage(shown[0], template);
   const stagePlan = mode === 'live' && stage && isStageIntro(intro) ? stageOpeningPlan(stage, intro, colors, sealMonogram) : null;
   const stageMotion = definition.theme.motion === 'stage';
+  // Drawings that recur down the page (roses, peacocks) are defined once and placed with <use>.
+  const shared = sharedArtOf(shown, colors, shown.some((s) => s.section === 'footer' && s.variant === 'vista') ? [VISTA_PEACOCK] : []);
+  const artRefs: Record<string, string> = Object.fromEntries([...shared.keys()].map((key, i) => [key, `${rootId}-art${i}`]));
 
   return (
     <div
       id={rootId}
       lang={language}
       dir={getLanguage(language).direction}
+      data-script={getLanguage(language).script}
       className={`bulava-template bulava-look-${look}${stageMotion ? ' bulava-motion-stage' : ''} relative min-h-full antialiased`}
       style={themeStyle(definition.theme, colors, fonts)}
     >
@@ -256,6 +323,7 @@ export function TemplateRenderer({ definition: template, context, customization,
           coverMonogram={sealMonogram}
           rootId={rootId}
           stage={stagePlan}
+          frame={definition.theme.dress?.frame}
         />
       ) : null}
       {/* The camera rig runs on any stage the page shows (a stage hero further down, too). */}
@@ -264,11 +332,25 @@ export function TemplateRenderer({ definition: template, context, customization,
         <MusicPlayer url={ctx.music.url} title={ctx.music.title} vinyl={look === 'noir'} labels={{ play: t('template.music.play'), pause: t('template.music.pause') }} />
       ) : null}
       {slots.veil ? <WatermarkVeil text={slots.veil} /> : null}
+      <SharedArt art={shared} ids={artRefs} colors={colors} />
       {/* The sections answer to the page's width (container queries), not the window's: a phone-wide frame shows the phone's layout. */}
       <div style={{ containerType: 'inline-size' }}>
+        {definition.website?.nav === 'bar' ? (
+          <PageNav
+            links={navLinksOf(shown, sectionProps, rootId, t)}
+            monogram={ctx.couple ? [ctx.couple.partnerOne.trim().charAt(0).toUpperCase(), ctx.couple.partnerTwo.trim().charAt(0).toUpperCase()] : monogram}
+            save={(() => {
+              const href = calendarUrl(ctx);
+              return href ? { href, label: t('template.saveTheDate') } : null;
+            })()}
+            labels={{ nav: t('template.nav.label'), open: t('template.nav.open'), close: t('template.nav.close') }}
+            heroId={shown[0]?.id}
+            interactive={mode === 'live'}
+          />
+        ) : null}
         {shown.map((instance, index) => {
           const Component = REGISTRY[instance.section];
-          const node = <Component key={instance.id} {...sectionProps(instance, index)} />;
+          const node = <Component key={instance.id} {...sectionProps(instance, index)} artRefs={artRefs} />;
           return wrapSection ? <Fragment key={instance.id}>{wrapSection(instance, node, index)}</Fragment> : node;
         })}
       </div>

@@ -32,6 +32,7 @@ export function illustrationTint(name: IllustrationName): ColorRef {
   const tints: Partial<Record<IllustrationName, ColorRef>> = {
     elephant: 'accent',
     royalPeacock: 'accent',
+    standingPeacock: 'accent',
     mehendiHand: '#8a3a17',
     bananaLeaf: '#3d7f3e',
     roseCluster: '#6b8f6e',
@@ -67,6 +68,13 @@ export function illustrationTint(name: IllustrationName): ColorRef {
     fountain: 'muted',
     bananaPlant: '#3f7a46',
     stall: 'accent',
+    palaceArcade: 'accent',
+    palacePillar: 'accent',
+    chhatri: 'surface',
+    palaceFacade: 'surface',
+    mandapCanopy: 'primary',
+    flowerBed: '#7c8f6a',
+    floralStrand: '#7c8f6a',
   };
   return tints[name] ?? 'secondary';
 }
@@ -74,9 +82,9 @@ export function illustrationTint(name: IllustrationName): ColorRef {
 /** Drawn to the whole board, a little inside its edges. */
 const FULL_FRAMES = new Set<IllustrationName>(['ornateFrame', 'hairlineFrame', 'decoFrame', 'mihrab']);
 /** Tall, narrow strands. */
-const STRANDS = new Set<IllustrationName>(['goldVine', 'ghungroo']);
+const STRANDS = new Set<IllustrationName>(['goldVine', 'ghungroo', 'floralStrand']);
 /** Tall stage props (pillars, posts, stands): they start taller, so their detail reads. */
-const TALL_PROPS = new Set<IllustrationName>(['carvedPillar', 'lampPost', 'candelabra', 'bananaPlant', 'lampTower']);
+const TALL_PROPS = new Set<IllustrationName>(['carvedPillar', 'lampPost', 'candelabra', 'bananaPlant', 'lampTower', 'palacePillar']);
 
 /** An illustration's starting frame: at its own proportions, or across the board for garlands, strings and frames. */
 function illustrationFrame(name: IllustrationName, board: Pick<Artboard, 'width' | 'height'>, u: (n: number) => number) {

@@ -5,7 +5,7 @@ import { Copy, FileJson, Film, Globe, Heart, IdCard, Plus, RotateCcw, Star, Tras
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type FormEvent } from 'react';
-import { ImportCardForm } from '@/components/import-card';
+import { ImportDesignForm } from '@/components/import-design';
 import { RequirePermission, useInvalidate } from '@/components/shell';
 import { Alert, Badge, Button, EmptyState, ErrorNotice, Field, Input, Modal, PageHeader, Select, Spinner, statusTone, Table, Td, Th } from '@/components/ui';
 import { apiDelete, apiGet, apiPost, errorMessage } from '@/lib/api';
@@ -197,7 +197,7 @@ function TemplateList() {
       ) : null}
 
       <Modal open={importing} onClose={() => setImporting(false)} title={t('templates.import.title')} wide>
-        {importing ? <ImportCardForm onDone={() => setImporting(false)} /> : null}
+        {importing ? <ImportDesignForm onDone={() => setImporting(false)} /> : null}
       </Modal>
       <Modal open={creating} onClose={() => setCreating(false)} title={t('templates.createTitle')}>
         <CreateTemplateForm templates={templates.data ?? []} onDone={() => setCreating(false)} />
