@@ -1,5 +1,6 @@
-import { DARK_SCENE_NAMES, type CameraMove, type EffectName, type SceneNameValue, type TemplateDefinitionInput, type ThemeColors, type Value } from '@bulava/template-schema';
-import { fontsFor, INVOCATION, palette, TITLE, type CatalogEntry, type CatalogMeta, type FontPreset } from './builder';
+import { DARK_SCENE_NAMES, STAGE_META, type CameraMove, type EffectName, type SceneNameValue, type StageNameValue, type StageShot, type TemplateDefinitionInput, type ThemeColors, type Value } from '@bulava/template-schema';
+import { fontsFor, INVOCATION, layoutEyebrow, palette, TITLE, type CatalogEntry, type CatalogMeta, type FontPreset } from './builder';
+import type { StageFilmParts, StageTemplateSpec, StageWebsiteSpec } from './stages/types';
 
 type Recipe = 'royal' | 'modern' | 'festive' | 'photo' | 'film' | 'premium';
 type Ornament = 'mandala' | 'paisley' | 'floral' | 'geometric' | 'confetti' | 'lotus' | 'peacock' | 'stars' | 'laurel';
@@ -751,3 +752,198 @@ const SPECS: VideoSpec[] = [
 ];
 
 export const VIDEO_TEMPLATES: CatalogEntry[] = SPECS.map((spec, i) => video(spec, 100 + i));
+
+// ─────────────────────────── Signature 3D films (ADR-078) ───────────────────────────
+
+/** Stage films run at 24 fps: a film look, and a fifth fewer frames to render (final.md §8.3.4). */
+export const STAGE_FILM_FPS = 24;
+
+/** Text inks over a stage: light type on dark stages, the palette's deep colours on light ones (STAGE_META.dark). */
+function stageInks(stage: StageNameValue) {
+  return STAGE_META[stage].dark
+    ? { head: 'accent', body: 'background', soft: 'accent', shadow: 'glow' as const, softShadow: 'soft' as const, card: 'primary' }
+    : { head: 'primary', body: 'text', soft: 'secondary', shadow: undefined, softShadow: undefined, card: 'surface' };
+}
+
+/**
+ * A stage film's scenes (final.md §5.4): the premium recipe filmed inside the
+ * website's own 3D stage. Every scene's backdrop is the stage with a shot of
+ * its own; the opening plays the website's opening (`reveal`) and settles on
+ * the set; the names turn up in 3D (`flipUp`, foiled, no shadow); the stage's
+ * particles are drawn at depth by the backdrop; the words start below the
+ * stage's crown band (STAGE_META.filmTextDrop) and stay in the top ~64%.
+ */
+export function stageFilmScenes(website: StageWebsiteSpec, parts: StageFilmParts) {
+  const { stage, invocation } = website;
+  const eyebrow = website.eyebrow ? t(website.eyebrow) : layoutEyebrow(website.layout);
+  const dy = STAGE_META[stage].filmTextDrop;
+  const ink = stageInks(stage);
+  const script = parts.nameStyle === 'script';
+  const eventTitle = website.heroTitle === 'event';
+  const backdrop = (shot: StageShot, part?: keyof NonNullable<StageFilmParts['intensity']>, veil = 0) => ({ stage, shot, intensity: (part && parts.intensity?.[part]) ?? 1, veil });
+  const drop = (elements: FilmElement[]): FilmElement[] => (dy ? elements.map((el) => ({ ...el, frame: { ...el.frame, y: el.frame.y + dy } })) : elements);
+  // Names turn up in 3D with a foil sheen: never a shadow under them (final.md §5.4).
+  const nameStyle = (size: number): Style =>
+    script ? { font: 'script', fontSize: size, color: ink.head, lineHeight: 1.05 } : { font: 'heading', fontSize: Math.round(size * 0.7), letterSpacing: 9, color: ink.head, lineHeight: 1.1 };
+  const rule = (id: string, y: number, width: number, delaySec: number): FilmElement => ({
+    id,
+    kind: 'shape',
+    frame: { x: (W - width) / 2, y, w: width, h: 3 },
+    style: { fill: ink.soft, opacity: 0.9, radius: 2 },
+    animation: { in: { type: 'fade', durationSec: 1.2, delaySec } },
+  });
+  const title: Value = eventTitle
+    ? b('event.title', script ? undefined : 'upper')
+    : script
+      ? TITLE
+      : { ...TITLE, fallback: { binding: 'honoree.name', format: 'upper', fallback: { binding: 'event.title', format: 'upper' } } };
+  const closingTitle: Value = eventTitle ? b('event.title') : TITLE;
+
+  // Opening: the website's own opening plays over the stage, then the blessing and the eyebrow as the camera settles.
+  const opening = {
+    id: 'opening',
+    durationSec: 6.5,
+    reveal: website.intro,
+    backdrop: backdrop('settle'),
+    particles: parts.particles.opening,
+    elements: drop([
+      ...(invocation ? [text('invocation', 320, 90, lit(invocation), { font: 'body', fontSize: 46, color: ink.soft, shadow: ink.shadow }, { type: 'fade', delaySec: 0.3, durationSec: 1.4 })] : []),
+      text('eyebrow', 440, 130, eyebrow, { font: 'heading', fontSize: parts.people === 'couple' ? 64 : 54, letterSpacing: parts.people === 'couple' ? 8 : 5, color: ink.body, shadow: ink.shadow }, { type: 'tracking', delaySec: 0.9, durationSec: 2 }),
+      rule('rule', 600, 260, 1.8),
+    ]),
+  };
+
+  const joiner = parts.joiner === 'and' ? lit('&') : t('template.weds');
+  const names = {
+    id: 'names',
+    durationSec: 6.5,
+    backdrop: backdrop(parts.shots.names, 'names'),
+    particles: parts.particles.names,
+    elements: drop(
+      parts.people === 'couple'
+        ? [
+            text('families', 160, 70, t('template.film.families'), { font: 'body', fontSize: 36, letterSpacing: 3, color: ink.body, opacity: 0.9, shadow: ink.softShadow }, { type: 'fade', delaySec: 0.2 }),
+            text('partner-one', 250, 200, script ? PARTNER_ONE : { ...PARTNER_ONE, format: 'upper' }, nameStyle(156), { type: 'flipUp', delaySec: 0.5, durationSec: 1.6 }),
+            text('weds', 452, 110, joiner, parts.joiner === 'and' ? { font: 'script', fontSize: 110, color: ink.soft, shadow: ink.shadow } : { font: 'heading', fontSize: 54, color: ink.soft, shadow: ink.shadow }, { type: 'fade', delaySec: 1.4, durationSec: 1.1 }),
+            text('partner-two', 566, 200, script ? b('couple.partnerTwo') : b('couple.partnerTwo', 'upper'), nameStyle(156), { type: 'flipUp', delaySec: 1.9, durationSec: 1.6 }),
+            rule('rule', 790, 220, 2.7),
+            text('date', 812, 76, b('event.startDate', 'date'), { font: 'heading', fontSize: 54, color: ink.body, shadow: ink.softShadow }, { type: 'fadeUp', delaySec: 2.9 }),
+            text('city', 890, 62, b('venue.city', 'upper'), { font: 'body', fontSize: 34, letterSpacing: 12, color: ink.soft, shadow: ink.softShadow }, { type: 'tracking', delaySec: 3.3, durationSec: 1.6 }),
+          ]
+        : [
+            text('eyebrow-2', 180, 80, eyebrow, { font: 'body', fontSize: 38, letterSpacing: 8, color: ink.body, shadow: ink.softShadow }, { type: 'tracking', delaySec: 0.2, durationSec: 1.4 }),
+            text('title', 280, 380, title, nameStyle(170), { type: 'flipUp', delaySec: 0.6, durationSec: 1.8 }),
+            rule('rule', 690, 220, 1.8),
+            text('date', 712, 80, b('event.startDate', 'dateWithWeekday'), { font: 'heading', fontSize: 54, color: ink.body, shadow: ink.softShadow }, { type: 'fadeUp', delaySec: 2 }),
+            text('city', 796, 60, b('venue.city', 'upper'), { font: 'body', fontSize: 34, letterSpacing: 12, color: ink.soft, shadow: ink.softShadow }, { type: 'tracking', delaySec: 2.4, durationSec: 1.6 }),
+          ],
+    ),
+  };
+
+  const scenes: unknown[] = [opening, names];
+
+  // The couple's photo in a gold arch or ring, the suite's ornament blooming behind it.
+  if (parts.people === 'couple' && parts.shots.couple) {
+    const portrait = parts.portrait ?? 'arch';
+    const photoFrame = portrait === 'circle' ? { x: 300, y: 230, w: 480, h: 480 } : { x: 300, y: 190, w: 480, h: 620 };
+    scenes.push({
+      id: 'couple',
+      durationSec: 5,
+      backdrop: backdrop(parts.shots.couple, 'couple', 0.35),
+      particles: parts.particles.names,
+      elements: drop([
+        ornament('halo', website.ornament, 160, 140, 760, ink.soft, 0.32, 'bloom'),
+        {
+          id: 'portrait',
+          kind: 'photo',
+          frame: photoFrame,
+          content: { binding: 'photo.cover', fallback: b('photos[0]') },
+          style: { opacity: 1, radius: 24, mask: portrait, border: 'accent' },
+          animation: { in: { type: 'zoomIn', durationSec: 1.4, delaySec: 0.3 } },
+        },
+        text('couple-names', portrait === 'circle' ? 760 : 850, 130, TITLE, { font: script ? 'script' : 'heading', fontSize: script ? 100 : 66, letterSpacing: script ? 0 : 5, color: ink.head, shadow: ink.shadow }, { type: 'fadeUp', delaySec: 1 }),
+      ]),
+    });
+  }
+
+  // One glass card per function, as the camera moves along the set (each repeat a station further).
+  scenes.push({
+    id: 'function',
+    durationSec: 4.5,
+    repeatPerFunction: true,
+    backdrop: backdrop(parts.shots.functions, 'functions', 0.3),
+    elements: drop([
+      { id: 'fn-card', kind: 'shape', frame: { x: 100, y: 190, w: 880, h: 800 }, style: { fill: ink.card, opacity: 0.6, radius: 48 }, animation: { in: { type: 'fade', durationSec: 0.8 } } },
+      rule('fn-rule-top', 236, 200, 0.2),
+      ornament('fn-motif', parts.motif, 450, 270, 180, ink.soft, 0.9, 'bloom'),
+      text('fn-name', 460, 150, b('function.name'), { font: script ? 'script' : 'heading', fontSize: script ? 120 : 96, color: ink.head, shadow: ink.shadow }, { type: 'reveal', delaySec: 0.3, durationSec: 1 }),
+      text('fn-date', 626, 74, b('function.date', 'dateWithWeekday'), { font: 'body', fontSize: 44, color: ink.body }, { type: 'fadeUp', delaySec: 0.7 }),
+      text('fn-time', 702, 64, b('function.time', 'time'), { font: 'body', fontSize: 40, letterSpacing: 4, color: ink.soft }, { type: 'tracking', delaySec: 0.9, durationSec: 1.2 }),
+      text('fn-venue', 780, 130, b('function.venue.name'), { font: 'heading', fontSize: 52, color: ink.body }, { type: 'fadeUp', delaySec: 1.1 }),
+      rule('fn-rule-bottom', 940, 200, 1.3),
+    ]),
+  });
+
+  // Closing: an invitation to join as the camera leaves the set.
+  scenes.push({
+    id: 'closing',
+    durationSec: 5.5,
+    backdrop: backdrop(parts.shots.closing, 'closing'),
+    particles: parts.particles.closing,
+    elements: drop([
+      text('join', 230, 220, t('template.joinUs'), { font: 'script', fontSize: 132, color: ink.head }, { type: 'shine', delaySec: 0.3, durationSec: 2 }),
+      text('thanks', 470, 170, t('template.footer.thanks'), { font: 'heading', fontSize: 52, color: ink.body, shadow: ink.softShadow }, { type: 'fadeUp', delaySec: 1 }),
+      rule('rule', 666, 220, 1.4),
+      text('closing-title', 690, 90, closingTitle, { font: 'heading', fontSize: 44, letterSpacing: 6, color: ink.soft, shadow: ink.softShadow }, { type: 'tracking', delaySec: 1.6, durationSec: 1.6 }),
+      ornament('closing-motif', parts.motif, 470, 820, 140, ink.soft, 0.85, 'bloom', 2),
+    ]),
+  });
+  return scenes;
+}
+
+/**
+ * A stage website's film (final.md §5.2, §5.4): `<key>-film`, "<Name> Film",
+ * made from the website's own meta, palette, presets, type, suite, eyebrow,
+ * invocation and track, filmed in its stage at 24 fps.
+ */
+export function stageFilm(spec: StageTemplateSpec, sortOrder: number): CatalogEntry {
+  const { website: w, film } = spec;
+  const photos = film.people === 'couple' && !!film.shots.couple;
+  const key = `${w.key}-film`;
+  const definition: TemplateDefinitionInput = {
+    schemaVersion: 1,
+    templateKey: key,
+    type: 'VIDEO',
+    name: `${w.name} Film`,
+    description: film.description,
+    eventTypes: w.eventTypes,
+    languages: w.languages ?? ['en', 'hi', 'hi-Latn'],
+    theme: { colors: w.colors, radius: 20, ornament: w.ornament, pattern: 'none' },
+    fonts: fontsFor(w.fonts),
+    capabilities: {
+      editable: { colors: true, fonts: true, music: true, background: false, layout: true, photos, text: false, animation: false },
+      colorPresets: w.presets ?? [],
+      textSlots: [],
+      maxPhotos: photos ? 1 : 0,
+      photoSlots: photos ? ['cover'] : [],
+    },
+    music: { allowCustomerChoice: true, defaultTrack: w.defaultTrack },
+    canvas: { width: W, height: H, fps: STAGE_FILM_FPS },
+    scenes: stageFilmScenes(w, film) as never,
+  };
+  return {
+    meta: {
+      key,
+      name: `${w.name} Film`,
+      description: film.description,
+      category: w.category,
+      style: w.style,
+      tier: 'SIGNATURE',
+      badge: w.badge ?? 'NEW',
+      tags: [...w.tags, 'video', 'illustrated'],
+      eventTypes: w.eventTypes,
+      sortOrder,
+    },
+    definition,
+  };
+}

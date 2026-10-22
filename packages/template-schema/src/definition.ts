@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, SCENE_NAMES, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, ValueSchema } from './base';
+import { ConditionSchema, EFFECTS, FONT_FAMILIES, hex, id, ORNAMENTS, PATTERNS, SCENE_NAMES, STAGE_NAMES, STAGE_SHOTS, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, ValueSchema } from './base';
 import { ArtboardSchema, CanvasSectionSchema } from './canvas';
 import { FAITHS } from './faith';
 
 export { ConditionSchema, DARK_SCENE_NAMES, EFFECTS, FONT_FAMILIES, ORNAMENTS, PATTERNS, SCENE_NAMES, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, VALUE_FORMATS, ValueSchema, type OrnamentNameValue, type SceneNameValue } from './base';
+export { DARK_STAGE_NAMES, STAGE_META, STAGE_NAMES, STAGE_SHOTS, type StageMeta, type StageNameValue, type StageShot } from './base';
 export type { SuiteCorner, SuiteDivider, SuiteEdge, SuiteFrame, SuiteSeal, SuiteSkyline } from './base';
 export type { Condition, EffectName, FontFamily, Value } from './base';
 
@@ -50,8 +51,15 @@ export type CameraMove = (typeof CAMERA_MOVES)[number];
 export const PHOTO_SLOTS = ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing'] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 /** Opening animations played before a website invitation is revealed. */
-export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch', 'zipper', 'ribbon'] as const;
+export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch', 'zipper', 'ribbon', 'arrival', 'doorway', 'silk', 'unfold'] as const;
 export type IntroName = (typeof INTROS)[number];
+/** Openings that move through a stage hero (ADR-078): only a template whose first section is a stage hero takes them. */
+export const STAGE_INTROS = ['arrival', 'doorway', 'silk', 'unfold'] as const;
+export type StageIntro = (typeof STAGE_INTROS)[number];
+export const isStageIntro = (n: string | undefined): n is StageIntro => !!n && (STAGE_INTROS as readonly string[]).includes(n);
+/** Motion below the hero: 'stage' turns on 3D section entrances, pointer tilt and the depth gallery (ADR-078). */
+export const THEME_MOTIONS = ['stage'] as const;
+export type ThemeMotion = (typeof THEME_MOTIONS)[number];
 
 /** A suite's pieces a theme swaps (base.ts SUITE_*): no defaults, so an omitted piece stays the suite's own. */
 export const ThemeDressSchema = z
@@ -89,6 +97,8 @@ export const ThemeSchema = z.object({
    * that suit every family.
    */
   faith: z.enum(FAITHS).optional(),
+  /** Motion below the hero: 'stage' turns on 3D entrances, pointer tilt and the depth gallery. Unset: today's motion. */
+  motion: z.enum(THEME_MOTIONS).optional(),
 });
 export type Theme = z.infer<typeof ThemeSchema>;
 
@@ -187,9 +197,10 @@ export const WebsitePageSchema = z.object({
 /**
  * Element entrances in videos. blurIn: out of focus into focus; tracking: wide
  * letter spacing settling in; reveal: wiped up from a baseline; bloom: an
- * ornament turning and opening; shine: a gold light sweeping across.
+ * ornament turning and opening; shine: a gold light sweeping across; flipUp:
+ * a line turns up from rotateX(-80°) with a foil sheen; coin: turns about Y.
  */
-export const ANIMATIONS = ['none', 'fade', 'fadeUp', 'fadeDown', 'zoomIn', 'zoomOut', 'slideLeft', 'slideRight', 'typewriter', 'float', 'blurIn', 'tracking', 'reveal', 'bloom', 'shine'] as const;
+export const ANIMATIONS = ['none', 'fade', 'fadeUp', 'fadeDown', 'zoomIn', 'zoomOut', 'slideLeft', 'slideRight', 'typewriter', 'float', 'blurIn', 'tracking', 'reveal', 'bloom', 'shine', 'flipUp', 'coin'] as const;
 
 export const AnimationSchema = z.object({
   type: z.enum(ANIMATIONS),
@@ -286,8 +297,11 @@ export const SceneCanvasSchema = z.object({
 });
 export type SceneCanvas = z.infer<typeof SceneCanvasSchema>;
 
-/** How a film's scene can open, like its invitation's website (ADR-074): a zipper pulled open, a satin ribbon untied. */
-export const SCENE_REVEALS = ['none', 'zipper', 'ribbon'] as const;
+/**
+ * How a film's scene can open, like its invitation's website (ADR-074): a zipper pulled open, a satin ribbon untied,
+ * or one of the stage openings (ADR-078; only over a stage backdrop).
+ */
+export const SCENE_REVEALS = ['none', 'zipper', 'ribbon', ...STAGE_INTROS] as const;
 export type SceneReveal = (typeof SCENE_REVEALS)[number];
 
 export const SceneSchema = z.object({
@@ -297,7 +311,7 @@ export const SceneSchema = z.object({
   transition: z.enum(['none', 'fade', 'slide', 'wipe']).default('fade'),
   /** Repeat this scene once per authorized function, binding `function.*`. */
   repeatPerFunction: z.boolean().default(false),
-  /** A drawn scene or a painted artwork behind the elements, filmed with a camera move. */
+  /** A drawn scene, a painted artwork or a 3D stage behind the elements, filmed with a camera move. */
   backdrop: z
     .object({
       scene: z.enum(SCENE_NAMES).optional(),
@@ -308,8 +322,12 @@ export const SceneSchema = z.object({
       intensity: z.number().min(0).max(3).default(1),
       /** Darkens the artwork behind text (0 = none). */
       veil: z.number().min(0).max(0.8).default(0),
+      /** A Signature 3D stage the camera moves through (ADR-078). */
+      stage: z.enum(STAGE_NAMES).optional(),
+      /** Stages: the camera's shot. Unset: `camera` is mapped to the nearest shot (cameraMoveToShot). */
+      shot: z.enum(STAGE_SHOTS).optional(),
     })
-    .refine((b) => Boolean(b.scene) !== Boolean(b.artwork), { message: 'Choose either a drawn scene or a painted artwork' })
+    .refine((b) => [b.scene, b.artwork, b.stage].filter(Boolean).length === 1, { message: 'Choose one: a drawn scene, a painted artwork or a stage' })
     .optional(),
   /** Particles drifting over the scene (petals, gold dust…), drawn deterministically per frame. */
   particles: z.enum(EFFECTS).default('none'),
@@ -343,7 +361,18 @@ export const TemplateDefinitionSchema = z
     assets: z.array(AssetRefSchema).default([]),
     /** Painted scenes built from licensed image assets (each layer's asset is listed in `assets`). */
     artworks: z.record(artworkKey, ArtworkSchema).optional(),
-    music: z.object({ defaultMusicId: z.uuid().optional(), allowCustomerChoice: z.boolean().default(false) }).optional(),
+    music: z
+      .object({
+        defaultMusicId: z.uuid().optional(),
+        /** One of Bulava's own tracks by its slug (storage key `music/<slug>.m4a`), the default when no `defaultMusicId` is set. */
+        defaultTrack: z
+          .string()
+          .max(60)
+          .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+          .optional(),
+        allowCustomerChoice: z.boolean().default(false),
+      })
+      .optional(),
     website: z
       .object({
         /** Opening animation before the invitation is revealed. */

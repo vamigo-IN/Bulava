@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { continueRender, delayRender, Easing, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
-import type { CameraMove, EffectName, RenderContext, Scene, SceneNameValue, TemplateDefinition, ThemeColors } from '@bulava/template-schema';
+import type { CameraMove, EffectName, RenderContext, Scene, SceneNameValue, SceneReveal, TemplateDefinition, ThemeColors } from '@bulava/template-schema';
 import { backdropArt, backdropImageUrls, mix, rand } from '@bulava/template-engine';
+import { StageBackdrop } from './stage-backdrop';
 
 /**
  * Illustrated scene behind a video scene, filmed with a camera move.
@@ -124,6 +125,57 @@ export function SceneBackdrop({
       ) : null}
     </div>
   );
+}
+
+/** What a stage backdrop needs beyond a drawn scene's (final.md §3.3). */
+export interface StageBackdropExtras {
+  /** The scene's reveal: a stage opening plays inside the stage. */
+  reveal: SceneReveal;
+  /** The repeat of a per-function scene: its station along the set. */
+  station: number;
+  /** The scene's particles, drawn at depth in the stage (the 2D Particles are skipped). */
+  particles: EffectName;
+  /** coverMonogram(couple, initials): printed on the set's and the cover's seals. */
+  monogram: string;
+  /** The film's script face, for the cover's monogram. */
+  script: string;
+  /** A rand() salt for the scene's particles. */
+  seed: string;
+}
+
+/**
+ * A scene's backdrop: a Signature 3D stage when `backdrop.stage` is set
+ * (StageBackdrop, ADR-078), else the drawn scene or painted artwork.
+ */
+export function BackdropView({
+  backdrop,
+  stage,
+  ...scene
+}: {
+  backdrop: Backdrop;
+  definition: Pick<TemplateDefinition, 'artworks'>;
+  ctx: Pick<RenderContext, 'assets'>;
+  colors: ThemeColors;
+  frames: number;
+  monogram?: string;
+  photo?: string;
+  stage: StageBackdropExtras;
+}) {
+  if (backdrop.stage) {
+    return (
+      <StageBackdrop
+        stage={backdrop.stage}
+        shot={backdrop.shot}
+        camera={backdrop.camera}
+        intensity={backdrop.intensity}
+        veil={backdrop.veil}
+        colors={scene.colors}
+        frames={scene.frames}
+        {...stage}
+      />
+    );
+  }
+  return <SceneBackdrop backdrop={backdrop} {...scene} />;
 }
 
 const MARIGOLD = ['#ffb300', '#ff8f00', '#f57c00', '#ffd54f'];

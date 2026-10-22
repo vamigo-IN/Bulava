@@ -4,10 +4,12 @@ import { Lock, MousePointer2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { backdropArt, backdropTitleTop } from '@bulava/template-engine';
+// One module only (as template-card.tsx does): the stage still and its set, not the whole stage runtime.
+import { StageStill } from '@bulava/template-engine/src/stage/still';
 import type { MessageKey } from '@bulava/localization';
-import type { Customization } from '@bulava/template-schema';
+import { STAGE_META, type Customization, type StageNameValue, type ThemeColors } from '@bulava/template-schema';
 import { api, apiGet, apiPost } from '@/lib/api';
 import { errorMessage, useT } from '@/lib/i18n';
 import { useApprovedPhotos, useCatalog, useDesign, useEvent, useInvalidateEvent, useVideos } from '@/lib/queries';
@@ -21,11 +23,34 @@ import { ScenePoster } from '@/components/design/scene-poster';
 import { FilmPosterView } from '@/components/marketing/live-template';
 import { readFilmDraft, writeFilmDraft } from '@/lib/design-drafts';
 import { isCanvasFilm } from '@/lib/films';
+import { posterPreview } from '@/lib/template-previews';
 import { Alert, Badge, Button, Card, EmptyState, Spinner } from '@/components/ui/primitives';
 
 const Preview = dynamic(() => import('@/components/events/video-preview').then((m) => m.VideoPreview), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
 
 const TIER_RANK = { FREE: 0, PREMIUM: 1, SIGNATURE: 2 } as const;
+
+/** A Signature 3D film's poster: its stage at rest, filling the tile's width, the title where the stage's words start. */
+function StagePoster({ stage, colors, ratio, children }: { stage: StageNameValue; colors: ThemeColors; ratio: number; children?: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry?.contentRect.width ?? 0)));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={box} className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: ratio, background: colors.primary }}>
+      {width ? (
+        <StageStill name={stage} colors={colors} width={width} height={Math.round(width / ratio)}>
+          {children}
+        </StageStill>
+      ) : null}
+    </div>
+  );
+}
 
 export default function VideoPage() {
   return (
@@ -50,7 +75,8 @@ function VideoEditor() {
   const [selected, setSelected] = useState<TemplateSummaryLite | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [musicId, setMusicId] = useState<string | null>(null);
+  // Unset: the template's own music; null: the host chose none; an id: their pick (sent only when set).
+  const [musicId, setMusicId] = useState<string | null | undefined>(undefined);
   // Colours, fonts and the cover photo for this render; the photo carries over between templates.
   const [custom, setCustom] = useState<Customization>({});
   const [tab, setTab] = useState<'style' | 'photos'>('style');
@@ -101,7 +127,7 @@ function VideoEditor() {
     setError(null);
     try {
       const customization = prune(custom, tpl.definition);
-      await apiPost(`/events/${eventId}/videos`, { templateKey: tpl.key, customization, ...(musicId && tpl.outputs.includes('VIDEO') ? { musicId } : {}) });
+      await apiPost(`/events/${eventId}/videos`, { templateKey: tpl.key, customization, ...(musicId !== undefined && tpl.outputs.includes('VIDEO') && tpl.definition?.capabilities.editable.music ? { musicId } : {}) });
       await invalidate();
     } catch (err) {
       setError(errorMessage(t, err));
@@ -128,7 +154,9 @@ function VideoEditor() {
             const locked = TIER_RANK[tpl.tier] > maxTier;
             const backdrop = tpl.definition?.scenes?.find((sc) => sc.backdrop)?.backdrop;
             const colors = tpl.definition?.theme.colors;
-            const art = tpl.definition && backdrop && colors ? backdropArt(tpl.definition, backdrop, colors, { width: 1200 }) : null;
+            const stage = backdrop?.stage;
+            const poster = stage ? posterPreview(tpl.key) : null;
+            const art = tpl.definition && backdrop && colors && !stage ? backdropArt(tpl.definition, backdrop, colors, { width: 1200 }) : null;
             return (
               <li key={tpl.key}>
                 <button
@@ -145,6 +173,26 @@ function VideoEditor() {
                       </div>
                       <p className="mt-2 truncate font-display text-lg leading-tight">{tpl.name}</p>
                     </>
+                  ) : stage && colors && poster ? (
+                    // Signature 3D films show their pre-rendered poster (a live set per tile is a whole 3D stage, rebuilt on every edit).
+                    <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: 9 / 14, background: colors.primary }}>
+                      <img src={poster} alt={tpl.name} loading="lazy" decoding="async" className="block size-full object-cover" />
+                    </div>
+                  ) : stage && colors ? (
+                    // Until its poster is made: the stage at rest.
+                    <StagePoster stage={stage} colors={colors} ratio={9 / 14}>
+                      <span
+                        className="absolute inset-x-0 px-4 text-center font-display text-xl leading-tight"
+                        style={{
+                          top: `${STAGE_META[stage].textTop * 100}%`,
+                          color: STAGE_META[stage].dark ? colors.accent : colors.primary,
+                          textShadow: STAGE_META[stage].dark ? '0 1px 14px rgba(0,0,0,0.45)' : '0 1px 12px rgba(255,255,255,0.7)',
+                        }}
+                      >
+                        {tpl.outputs.includes('VIDEO') ? '▶ ' : ''}
+                        {tpl.name}
+                      </span>
+                    </StagePoster>
                   ) : art && backdrop && colors && tpl.definition ? (
                     // Films show their drawn or painted scene.
                     <ScenePoster art={art} ratio={9 / 14}>
@@ -236,7 +284,7 @@ function VideoEditor() {
                 </div>
               </div>
             ) : null}
-            {choice.outputs.includes('VIDEO') && choice.definition.capabilities.editable.music ? <MusicPicker value={musicId} onChange={setMusicId} /> : null}
+            {choice.outputs.includes('VIDEO') && choice.definition.capabilities.editable.music ? <MusicPicker value={musicId} onChange={setMusicId} templateTrack={Boolean(choice.definition.music?.defaultTrack || choice.definition.music?.defaultMusicId)} /> : null}
             {TIER_RANK[choice.tier] > maxTier ? (
               <Link href={`/dashboard/events/${eventId}/unlock`} className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-gold-600 font-semibold text-white hover:bg-gold-700">
                 <Lock aria-hidden className="size-4" />

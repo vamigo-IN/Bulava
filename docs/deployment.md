@@ -91,7 +91,7 @@ Docker writes its own firewall rules, so ports published on `0.0.0.0` are reacha
    curl -s -o /dev/null -w '%{http_code}\n' -H "Host: bulava.in" http://127.0.0.1:18090/healthz   # 200
    ```
 
-   The `migrate` job applies migrations, seeds reference data and the template catalog (the same templates as a local seed), creates the platform admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`, and uploads Bulava's original music track to R2 and approves it in the music library (`SEED_ORIGINAL_MUSIC`, from `packages/database/seed-assets`). Every step is idempotent, so the job runs on every deploy.
+   The `migrate` job applies migrations, seeds reference data and the template catalog (the same templates as a local seed), creates the platform admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`, and uploads Bulava's original music tracks (`ORIGINAL_TRACKS` in `packages/database/src/music-seed.ts`, the files in `packages/database/seed-assets/music`) to R2 and approves them in the music library (`SEED_ORIGINAL_MUSIC`; a track already in storage or in the library is skipped, so a new track in a release is added by its first deploy). Every step is idempotent, so the job runs on every deploy.
 7. **Host Nginx site.** Render Bulava's site from `.env.production`, review it, install it and test the whole Nginx configuration before reloading:
 
    ```bash

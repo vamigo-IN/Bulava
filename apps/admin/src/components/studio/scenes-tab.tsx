@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, ChevronDown, Palette, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { CAMERA_MOVES, EFFECTS, ElementSchema, SCENE_NAMES, type Scene } from '@bulava/template-schema';
+import { CAMERA_MOVES, EFFECTS, ElementSchema, isStageIntro, SCENE_NAMES, STAGE_META, STAGE_NAMES, STAGE_SHOTS, type Scene, type StageNameValue, type StageShot } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
 import { addPage } from '../canvas-editor/pages';
 import { Badge, Button, Card, CardTitle, Checkbox, Field, Input, Label, Select } from '../ui';
@@ -11,6 +11,10 @@ import { EditError, firstIssue, JsonField, type EditorProps } from './common';
 const BACKGROUNDS = ['background', 'surface', 'primary', 'secondary', 'accent', 'gradient'] as const;
 const TRANSITIONS = ['none', 'fade', 'slide', 'wipe'] as const;
 const ElementsSchema = ElementSchema.array().max(40);
+
+/** The backdrop select's value: `artwork:<key>`, `stage:<name>` (Signature 3D, ADR-078), a drawn scene's name, or '' for none. */
+const backdropValue = (scene: Scene): string =>
+  scene.backdrop?.artwork ? `artwork:${scene.backdrop.artwork}` : scene.backdrop?.stage ? `stage:${scene.backdrop.stage}` : (scene.backdrop?.scene ?? '');
 
 /** The scenes of a film or an image card: their timing and look here, their boards in the Design Studio. */
 export function ScenesTab({ definition, edit, onOpenDesign }: EditorProps & { onOpenDesign: (sceneId: string) => void }) {
@@ -144,20 +148,24 @@ export function ScenesTab({ definition, edit, onOpenDesign }: EditorProps & { on
                         {(p) => (
                           <Select
                             {...p}
-                            value={scene.backdrop?.artwork ? `artwork:${scene.backdrop.artwork}` : (scene.backdrop?.scene ?? '')}
+                            value={backdropValue(scene)}
                             onChange={(e) =>
                               run((d) => {
                                 const target = d.scenes![i]!;
                                 const value = e.target.value;
+                                // Only a stage takes the 3D openings; leaving the stages leaves its opening too.
+                                if (!value.startsWith('stage:') && isStageIntro(target.reveal)) target.reveal = 'none';
                                 if (!value) {
                                   delete target.backdrop;
                                   return;
                                 }
-                                // A backdrop is either a drawn scene or one of the template's painted artworks.
-                                const { scene: _scene, artwork: _artwork, ...rest } = target.backdrop ?? { camera: 'push' as const, intensity: 1, veil: 0 };
+                                // A backdrop is a drawn scene, one of the template's painted artworks or a 3D stage (its shot goes with it).
+                                const { scene: _scene, artwork: _artwork, stage: _stage, shot, ...rest } = target.backdrop ?? { camera: 'push' as const, intensity: 1, veil: 0 };
                                 target.backdrop = value.startsWith('artwork:')
                                   ? { ...rest, artwork: value.slice('artwork:'.length) }
-                                  : { ...rest, scene: value as NonNullable<NonNullable<Scene['backdrop']>['scene']> };
+                                  : value.startsWith('stage:')
+                                    ? { ...rest, stage: value.slice('stage:'.length) as StageNameValue, ...(shot ? { shot } : {}) }
+                                    : { ...rest, scene: value as NonNullable<NonNullable<Scene['backdrop']>['scene']> };
                               })
                             }
                           >
@@ -171,6 +179,13 @@ export function ScenesTab({ definition, edit, onOpenDesign }: EditorProps & { on
                                 ))}
                               </optgroup>
                             ) : null}
+                            <optgroup label={t('scenes.backdrop.stages')}>
+                              {STAGE_NAMES.map((name) => (
+                                <option key={name} value={`stage:${name}`}>
+                                  {name} · {STAGE_META[name].architecture}
+                                </option>
+                              ))}
+                            </optgroup>
                             <optgroup label={t('scenes.backdrop.drawn')}>
                               {SCENE_NAMES.map((name) => (
                                 <option key={name} value={name}>
@@ -208,6 +223,31 @@ export function ScenesTab({ definition, edit, onOpenDesign }: EditorProps & { on
                           </Select>
                         )}
                       </Field>
+                      {scene.backdrop?.stage ? (
+                        <Field label={t('scenes.shot')}>
+                          {(p) => (
+                            <Select
+                              {...p}
+                              value={scene.backdrop?.shot ?? ''}
+                              onChange={(e) =>
+                                run((d) => {
+                                  const backdrop = d.scenes![i]!.backdrop!;
+                                  // Unset: the camera move is mapped to the nearest shot (cameraMoveToShot).
+                                  if (e.target.value) backdrop.shot = e.target.value as StageShot;
+                                  else delete backdrop.shot;
+                                })
+                              }
+                            >
+                              <option value="">{t('scenes.shot.auto')}</option>
+                              {STAGE_SHOTS.map((m) => (
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
+                              ))}
+                            </Select>
+                          )}
+                        </Field>
+                      ) : null}
                     </div>
                     {!isCard ? (
                       <Checkbox

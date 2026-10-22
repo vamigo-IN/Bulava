@@ -1,14 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import type { IntroName, ThemeColors } from '@bulava/template-schema';
+import type { IntroName, StageIntro, ThemeColors } from '@bulava/template-schema';
 import { easeInOut, RibbonCover, ZipperCover, type CoverProps } from './covers';
 import { Crescent, GateLeaf, Lantern, StarField } from './ornaments-signature';
+import { StageOpening, type StageOpeningPlan } from './stage/opening';
+import { INTRO_DONE_EVENT, isStageOpening } from './stage/openings';
 
 export type IntroVariant = Exclude<IntroName, 'none'>;
+export type { StageOpeningPlan } from './stage/opening';
 
 /** Fired when the guest opens the invitation (a user gesture), e.g. to start music. */
 export const INTRO_OPEN_EVENT = 'bulava:intro-open';
+
+/** Fired when an opening has finished and the invitation is open (a stage opening: on the hero's rest pose). */
+export { INTRO_DONE_EVENT };
+
+/**
+ * A stage opening with no stage to play on (the hero redrawn on the canvas without it): its 2D twin,
+ * the same idea drawn flat (final.md §3.2).
+ */
+const STAGE_TWIN: Readonly<Record<StageIntro, IntroVariant>> = { arrival: 'gates', doorway: 'doors', silk: 'curtain', unfold: 'envelope' };
 
 /** How long each opening plays before the overlay is removed (ms). */
 const DURATION: Record<IntroVariant, number> = {
@@ -24,6 +36,11 @@ const DURATION: Record<IntroVariant, number> = {
   // The cover has already moved off when these open: the overlay only fades.
   zipper: 500,
   ribbon: 500,
+  // Stage openings (Signature 3D): played on the hero itself by StageOpening (stage/openings.ts OPENING_MS).
+  arrival: 2800,
+  doorway: 2400,
+  silk: 2000,
+  unfold: 2400,
 };
 
 /** Openings the guest pulls (ADR-074): the invitation shows through them as they open. */
@@ -45,6 +62,11 @@ export interface IntroLabels {
   zipper?: string;
   /** "Pull the ribbon to open". */
   ribbon?: string;
+  /** Stage openings (Signature 3D): "Tap to enter", "Tap to open the doors", "Lift the silk to enter", "Tap to unfold your invitation". */
+  arrival?: string;
+  doorway?: string;
+  silk?: string;
+  unfold?: string;
 }
 
 /**
@@ -59,6 +81,8 @@ export function IntroOverlay({
   storageKey,
   colors,
   coverMonogram,
+  rootId,
+  stage,
   children,
 }: {
   variant: IntroVariant;
@@ -71,17 +95,33 @@ export function IntroOverlay({
   colors?: ThemeColors;
   /** The monogram the pulled openings print ("R & A"); the medallions' `monogram` otherwise. */
   coverMonogram?: string;
+  /** The page's root element id: a stage opening finds its hero under it. */
+  rootId?: string;
+  /** A stage opening's plan (renderer.tsx); without it, or without a stage hero on the page, it plays its 2D twin. */
+  stage?: StageOpeningPlan | null;
   children?: ReactNode;
 }) {
   const [state, setState] = useState<'closed' | 'opening' | 'gone'>('closed');
+  const [twin, setTwin] = useState(false);
   const announced = useRef(false);
+  const doneSent = useRef(false);
+  const stageKind = isStageOpening(variant) ? variant : null;
+  const onStage = !!(stageKind && stage && rootId && !twin);
+  // What is drawn: the variant itself, or a stage opening's 2D twin when it has no stage to play on.
+  const shown: IntroVariant = stageKind && !onStage ? STAGE_TWIN[stageKind] : variant;
+  const openLabel = stageKind ? (labels[stageKind] ?? labels.open) : labels.open;
 
+  // Whether it plays is decided once, after hydration: a stage opening touches the hero only after this says so.
+  const [checked, setChecked] = useState(false);
   useEffect(() => {
+    let skip = false;
     try {
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || sessionStorage.getItem(storageKey)) setState('gone');
+      skip = window.matchMedia('(prefers-reduced-motion: reduce)').matches || !!sessionStorage.getItem(storageKey);
     } catch {
       /* storage unavailable: still show the intro */
     }
+    if (skip) setState('gone');
+    else setChecked(true);
   }, [storageKey]);
 
   useEffect(() => {
@@ -106,31 +146,71 @@ export function IntroOverlay({
       /* ignore */
     }
     announce();
-    setTimeout(() => setState('gone'), DURATION[variant]);
-  }, [announce, storageKey, variant]);
+    setTimeout(() => {
+      setState('gone');
+      if (doneSent.current) return;
+      doneSent.current = true;
+      window.dispatchEvent(new CustomEvent(INTRO_DONE_EVENT, { detail: { opening: shown } }));
+    }, DURATION[shown]);
+  }, [announce, storageKey, shown]);
+
+  /** A stage opening has landed on the hero's rest pose (it fired bulava:intro-done itself). */
+  const opened = useCallback(() => {
+    try {
+      sessionStorage.setItem(storageKey, '1');
+    } catch {
+      /* ignore */
+    }
+    setState('gone');
+  }, [storageKey]);
+  const toTwin = useCallback(() => setTwin(true), []);
 
   if (state === 'gone') return null;
+
+  if (onStage && stageKind && stage && rootId) {
+    // The overlay draws no stage: it drives the hero's own (stage/opening.tsx). Reduced motion hides it by CSS from first paint.
+    return (
+      <div data-stage-opening="" className="fixed inset-0 z-50 overflow-hidden">
+        <StageOpening
+          variant={stageKind}
+          rootId={rootId}
+          active={checked}
+          plan={stage}
+          label={openLabel}
+          medallion={<Medallion monogram={monogram} />}
+          onGesture={announce}
+          onOpen={opened}
+          onFallback={toTwin}
+        />
+        <style href="bulava-stage-opening" precedence="bulava">
+          {'@media (prefers-reduced-motion: reduce) { [data-stage-opening] { display: none !important; } }'}
+        </style>
+        {children}
+      </div>
+    );
+  }
+
   const opening = state === 'opening';
-  const fadeDelay = Math.max(0, DURATION[variant] - 700);
-  const pulled = PULLED.has(variant) && !!colors;
+  const fadeDelay = Math.max(0, DURATION[shown] - 700);
+  const pulled = PULLED.has(shown) && !!colors;
 
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden transition-opacity duration-700 ${pulled ? '' : 'bg-[var(--t-bg)]'}`}
       style={{ opacity: opening ? 0 : 1, transitionDelay: opening ? `${fadeDelay}ms` : '0ms' }}
     >
-      {variant === 'envelope' ? <Envelope opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
-      {variant === 'curtain' || variant === 'doors' ? <Panels variant={variant} opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
-      {variant === 'gates' ? <Gates opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
-      {variant === 'seal' ? <Seal opening={opening} monogram={monogram} label={labels.seal} onOpen={open} /> : null}
-      {variant === 'lanterns' ? <Lanterns opening={opening} monogram={monogram} label={labels.lanterns} onOpen={open} /> : null}
-      {variant === 'petals' ? <Petals opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
-      {variant === 'celestial' ? <Celestial opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
-      {variant === 'scratch' ? <Scratch opening={opening} monogram={monogram} labels={labels} revealText={revealText} onOpen={open} /> : null}
-      {pulled && variant === 'zipper' ? <Pulled cover={ZipperCover} colors={colors} monogram={coverMonogram ?? monogram} label={labels.zipper ?? labels.open} hintAt={0.2} onGesture={announce} onOpen={open} /> : null}
-      {pulled && variant === 'ribbon' ? <Pulled cover={RibbonCover} colors={colors} monogram={coverMonogram ?? monogram} label={labels.ribbon ?? labels.open} hintAt={0.13} onGesture={announce} onOpen={open} /> : null}
+      {shown === 'envelope' ? <Envelope opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
+      {shown === 'curtain' || shown === 'doors' ? <Panels variant={shown} opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
+      {shown === 'gates' ? <Gates opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
+      {shown === 'seal' ? <Seal opening={opening} monogram={monogram} label={labels.seal} onOpen={open} /> : null}
+      {shown === 'lanterns' ? <Lanterns opening={opening} monogram={monogram} label={labels.lanterns} onOpen={open} /> : null}
+      {shown === 'petals' ? <Petals opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
+      {shown === 'celestial' ? <Celestial opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
+      {shown === 'scratch' ? <Scratch opening={opening} monogram={monogram} labels={labels} revealText={revealText} onOpen={open} /> : null}
+      {pulled && shown === 'zipper' ? <Pulled cover={ZipperCover} colors={colors} monogram={coverMonogram ?? monogram} label={labels.zipper ?? labels.open} hintAt={0.2} onGesture={announce} onOpen={open} /> : null}
+      {pulled && shown === 'ribbon' ? <Pulled cover={RibbonCover} colors={colors} monogram={coverMonogram ?? monogram} label={labels.ribbon ?? labels.open} hintAt={0.13} onGesture={announce} onOpen={open} /> : null}
       {/* Without a palette (an older caller) a pulled opening falls back to the envelope. */}
-      {PULLED.has(variant) && !colors ? <Envelope opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
+      {PULLED.has(shown) && !colors ? <Envelope opening={opening} monogram={monogram} label={labels.open} onOpen={open} /> : null}
       {children}
     </div>
   );

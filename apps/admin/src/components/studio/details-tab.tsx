@@ -164,7 +164,7 @@ function ListingForm({ template, eventTypes, onEventTypes }: { template: AdminTe
             {(p) => <Input {...p} value={form.tags} onChange={(e) => set('tags', e.target.value)} />}
           </Field>
           <Field label={t('details.sortOrder')}>
-            {(p) => <Input {...p} type="number" min={0} max={100000} value={form.sortOrder} onChange={(e) => set('sortOrder', Number(e.target.value) || 0)} />}
+            {(p) => <Input {...p} type="number" min={-1000} max={100000} value={form.sortOrder} onChange={(e) => set('sortOrder', Number(e.target.value) || 0)} />}
           </Field>
         </div>
         <Checkbox label={t('details.featured')} checked={form.featured} onChange={(e) => set('featured', e.target.checked)} />

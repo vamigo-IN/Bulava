@@ -36,7 +36,7 @@ export interface AdminShowcase {
   siteOrigin: string;
 }
 
-const fits = (section: ShowcaseSection, t: TemplateSummary) => fitsShowcase(section, { outputs: t.outputs, heroSection: t.preview.heroSection });
+const fits = (section: ShowcaseSection, t: TemplateSummary) => fitsShowcase(section, { outputs: t.outputs, heroSection: t.preview.heroSection, heroVariant: t.preview.heroVariant });
 
 /**
  * Which templates the home page shows, section by section, and the first cards

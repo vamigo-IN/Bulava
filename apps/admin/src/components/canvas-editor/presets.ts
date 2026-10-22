@@ -63,6 +63,10 @@ export function illustrationTint(name: IllustrationName): ColorRef {
     scallopTag: 'accent',
     satinRibbon: 'accent',
     satinBow: 'accent',
+    carvedPillar: 'muted',
+    fountain: 'muted',
+    bananaPlant: '#3f7a46',
+    stall: 'accent',
   };
   return tints[name] ?? 'secondary';
 }
@@ -71,6 +75,8 @@ export function illustrationTint(name: IllustrationName): ColorRef {
 const FULL_FRAMES = new Set<IllustrationName>(['ornateFrame', 'hairlineFrame', 'decoFrame', 'mihrab']);
 /** Tall, narrow strands. */
 const STRANDS = new Set<IllustrationName>(['goldVine', 'ghungroo']);
+/** Tall stage props (pillars, posts, stands): they start taller, so their detail reads. */
+const TALL_PROPS = new Set<IllustrationName>(['carvedPillar', 'lampPost', 'candelabra', 'bananaPlant', 'lampTower']);
 
 /** An illustration's starting frame: at its own proportions, or across the board for garlands, strings and frames. */
 function illustrationFrame(name: IllustrationName, board: Pick<Artboard, 'width' | 'height'>, u: (n: number) => number) {
@@ -81,6 +87,7 @@ function illustrationFrame(name: IllustrationName, board: Pick<Artboard, 'width'
   if (name === 'satinRibbon') return { x: 0, y: Math.round(board.height / 2 - u(22)), w: board.width, h: u(44) };
   if (STRANDS.has(name)) return centred(board, Math.max(u(18), Math.round(u(480) * ILLUSTRATION_ASPECT[name])), u(480));
   if (FRAME_SIZED.has(name)) return { x: 0, y: 0, w: board.width, h: u(110) };
+  if (TALL_PROPS.has(name)) return centred(board, Math.round(u(380) * ILLUSTRATION_ASPECT[name]), u(380));
   const aspect = ILLUSTRATION_ASPECT[name];
   const w = aspect >= 1 ? u(240) : Math.round(u(260) * aspect);
   return centred(board, w, Math.round(w / aspect));

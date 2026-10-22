@@ -2,6 +2,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Baby,
+  Box,
   Building2,
   CalendarHeart,
   Cake,
@@ -46,6 +47,7 @@ import { HeroStage } from '@/components/marketing/hero-stage';
 import { PricingCards } from '@/components/marketing/pricing-cards';
 import { SceneCoverflow, type CoverflowItem } from '@/components/marketing/scene-coverflow';
 import { SectionHeading, SiteFooter, SiteHeader } from '@/components/marketing/site-chrome';
+import { StageCarousel, type StageItem } from '@/components/marketing/stage-carousel';
 import { SiteStructuredData } from '@/components/marketing/structured-data';
 import { TemplateCard, TemplatePhone } from '@/components/marketing/template-card';
 import { TemplateExplorer, type ExplorerItem } from '@/components/marketing/template-explorer';
@@ -54,7 +56,7 @@ import { MagneticButton } from '@/lib/motion/magnetic-button';
 import { formatInr, getGalleryTemplates, getPlans, getShowcase, getStats, getTemplate, getTemplateDefinitions, getTestimonials, tierPrice, type Plan, type TemplateSummary } from '@/lib/server-api';
 import { getSiteConfig } from '@/lib/site-config';
 import { onePerLook } from '@/lib/template-looks';
-import { fullPreview } from '@/lib/template-previews';
+import { cardPreview, fullPreview } from '@/lib/template-previews';
 import { cn } from '@/lib/utils';
 import { Parallax, Reveal, StepsProgress } from './home-animations';
 
@@ -251,6 +253,14 @@ export default async function HomePage() {
     blurb: w.description ?? '',
     node: <TemplatePhone template={w} width={250} height={470} sections={1} />,
   }));
+  // Signature 3D stage templates (tagged 'stage'), featured first; each shows its pre-rendered
+  // preview, or its palette as a doorway until the preview script has made one. Picks come from them only.
+  const stageWebsites = websites.filter((w) => w.tags.includes('stage')).sort((a, b) => Number(b.featured) - Number(a.featured));
+  const stages: StageItem[] = withPicks(showcase.stages, stageWebsites, stageWebsites, 12).map((w) => {
+    const c = w.preview?.colors ?? null;
+    return { key: w.key, name: w.name, blurb: w.description ?? '', image: cardPreview(w.key), colors: c ? { primary: c.primary, accent: c.accent, background: c.background } : null };
+  });
+  const stageCount = onePerLook(stageWebsites, (w) => w.preview?.look).length;
   // What the spotlight design does, from the design itself: a fixed "opens like a sealed envelope"
   // beside a design that opens behind curtains told visitors two different things.
   const spotlightIntro = spotlightDefinition?.website?.intro;
@@ -390,9 +400,50 @@ export default async function HomePage() {
           )}
         </div>
 
+        {/* Signature 3D: walk-in invitations, on a soft band with a stage floor drawn in perspective */}
+        {stages.length ? (
+          <section
+            data-header-tone="light"
+            aria-labelledby="stages-title"
+            className="relative isolate overflow-hidden border-y border-gold-200/50 bg-[linear-gradient(180deg,rgba(239,226,210,0.55),rgba(246,238,229,0))] pt-24 pb-28"
+          >
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+              <div className="absolute -top-56 left-1/2 h-[720px] w-[1100px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(233,200,127,0.34),transparent)]" />
+              <div
+                className="absolute inset-x-[-30%] bottom-0 h-[420px] opacity-60"
+                style={{
+                  backgroundImage: 'linear-gradient(90deg, rgba(183,140,64,0.22) 1px, transparent 1px), linear-gradient(0deg, rgba(183,140,64,0.22) 1px, transparent 1px)',
+                  backgroundSize: '72px 72px',
+                  transform: 'perspective(640px) rotateX(62deg)',
+                  transformOrigin: '50% 100%',
+                  maskImage: 'linear-gradient(to top, black, transparent 85%)',
+                  WebkitMaskImage: 'linear-gradient(to top, black, transparent 85%)',
+                }}
+              />
+            </div>
+            <Reveal className="px-4">
+              <SectionHeading id="stages-title" eyebrow={t('home.stages.eyebrow')} title={t('home.stages.title')} subtitle={t('home.stages.subtitle')} />
+            </Reveal>
+            <Reveal variant="scale" className="mt-12">
+              <StageCarousel
+                items={stages}
+                labels={{ list: t('home.stages.title'), badge: t('tag.stage'), demo: t('home.scenes.demo'), previous: t('home.scenes.previous'), next: t('home.scenes.next') }}
+              />
+            </Reveal>
+            <div className="mt-10 text-center">
+              <Link href="/templates?tag=stage" className={SECONDARY_CTA}>
+                <span className="icon-3d size-9 rounded-xl">
+                  <Box aria-hidden className="size-4" />
+                </span>
+                {t('home.grid.more', { count: stageCount })}
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
         {/* ───── Act two: occasions, the collection, a spotlight ───── */}
         <div data-header-tone="light" className="relative">
-          <section className="mx-auto max-w-7xl px-4 pt-8 pb-24 sm:px-6" aria-labelledby="categories-title">
+          <section className={cn('mx-auto max-w-7xl px-4 pb-24 sm:px-6', stages.length ? 'pt-24' : 'pt-8')} aria-labelledby="categories-title">
             <Reveal>
               <SectionHeading id="categories-title" eyebrow={t('home.categories.eyebrow')} title={t('home.categories.title')} />
             </Reveal>

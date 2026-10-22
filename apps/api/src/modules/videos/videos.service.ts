@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Prisma, TemplateType } from '@bulava/database';
 import { ObjectStorage } from '@bulava/storage';
 import { validateCustomization, validateTemplateDefinition } from '@bulava/template-schema';
@@ -12,10 +12,12 @@ import type { EventAccessContext } from '../../common/request-context';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { findDefaultTrack, isPlayableTrack } from '../templates/default-track';
 
 export const CreateVideoSchema = z.object({
   templateKey: z.string().trim().min(1).max(80),
   customization: z.unknown().optional(),
+  /** Unset: the template's own music; null: no music; an id: the host's pick. */
   musicId: z.uuid().nullable().optional(),
 });
 export type CreateVideoInput = z.infer<typeof CreateVideoSchema>;
@@ -25,6 +27,7 @@ export interface VideoJobInput {
   templateKey: string;
   output: 'VIDEO' | 'DIGITAL_CARD';
   customization: unknown;
+  /** Resolved when requested (the host's pick, else the template's own track), so retries render the same film. */
   musicId: string | null;
   hd: boolean;
   watermark: boolean;
@@ -32,6 +35,8 @@ export interface VideoJobInput {
 
 @Injectable()
 export class VideosService {
+  private readonly logger = new Logger(VideosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly queues: QueueService,
@@ -66,9 +71,12 @@ export class VideosService {
     const features = await this.entitlements.forEvent(event.id);
     EntitlementsService.assertTemplateTier(features, template.tier);
     // Music comes with the plan (ADR-062); on unless a plan says otherwise.
-    if (input.musicId && !(features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true)) {
+    const musicOn = features.get(FEATURE_KEYS.MUSIC)?.enabled ?? true;
+    if (input.musicId && !musicOn) {
       throw new AppError('PLAN_UPGRADE_REQUIRED', 'Music comes with a bigger plan.', { feature: FEATURE_KEYS.MUSIC });
     }
+    // Unset: nothing chosen, so the template's own track plays (when the plan has music); null: the host chose none; an id: their pick.
+    const musicId = input.musicId !== undefined ? input.musicId : musicOn && output === 'VIDEO' ? await this.templateTrackId(template.key, parsed.definition) : null;
     const used = await this.prisma.videoJob.count({ where: { eventId: event.id, status: { in: ['QUEUED', 'PROCESSING', 'COMPLETED'] } } });
     EntitlementsService.assertWithinLimit(features, FEATURE_KEYS.VIDEO_RENDERS_MAX, used);
 
@@ -76,7 +84,7 @@ export class VideosService {
       templateKey: template.key,
       output,
       customization: custom.value,
-      musicId: input.musicId ?? null,
+      musicId,
       hd: EntitlementsService.enabled(features, FEATURE_KEYS.VIDEO_HD),
       watermark: EntitlementsService.enabled(features, FEATURE_KEYS.WATERMARK),
     };
@@ -97,12 +105,13 @@ export class VideosService {
 
   private async assertLicensedMusic(musicId: string) {
     const music = await this.prisma.music.findUnique({ where: { id: musicId }, include: { license: true } });
-    const ok =
-      music?.status === 'APPROVED' &&
-      music.license.commercialUse &&
-      music.license.onDemandUse &&
-      (!music.license.expiresAt || music.license.expiresAt > new Date());
-    if (!ok) throw new AppError('CUSTOMIZATION_INVALID', 'This music is not licensed for video invitations.');
+    if (!isPlayableTrack(music)) throw new AppError('CUSTOMIZATION_INVALID', 'This music is not licensed for video invitations.');
+  }
+
+  /** The template's own track for a film (final.md §7.2): a missing or unlicensed default is logged and the film is silent, never an error. */
+  private async templateTrackId(templateKey: string, definition: Parameters<typeof findDefaultTrack>[1]): Promise<string | null> {
+    const track = await findDefaultTrack(this.prisma, definition, (message) => this.logger.warn(`${templateKey}: ${message}`));
+    return track?.id ?? null;
   }
 
   async list(access: EventAccessContext) {

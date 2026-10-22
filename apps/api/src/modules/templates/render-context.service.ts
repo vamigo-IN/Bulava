@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   buildRenderContext,
   validateTemplateDefinition,
@@ -17,6 +17,7 @@ import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { STORAGE } from '../../infrastructure/storage/storage.module';
 import { SETTINGS_STORE } from '../settings/settings.service';
 import { APP_CONFIG, type AppConfig } from '../../config/env';
+import { findDefaultTrack, isPlayableTrack, type GatedTrack } from './default-track';
 
 type FunctionWithVenue = Prisma.EventFunctionGetPayload<{ include: { venue: true } }>;
 
@@ -40,6 +41,8 @@ function mapQuery(venue: { latitude: Prisma.Decimal | null; longitude: Prisma.De
 const FALLBACK_TEMPLATE_KEY = 'classic-ivory';
 /** Signed music links outlive a long visit but not a forwarded page. */
 const MUSIC_URL_TTL_SECONDS = 6 * 3600;
+/** How long a template's own track is remembered: guest pages ask on every view, and a missing one is logged once in this time. */
+const TEMPLATE_TRACK_TTL_MS = 60_000;
 
 /**
  * Builds the RenderContext a template binds to. Callers pass only functions
@@ -47,6 +50,10 @@ const MUSIC_URL_TTL_SECONDS = 6 * 3600;
  */
 @Injectable()
 export class RenderContextService {
+  private readonly logger = new Logger(RenderContextService.name);
+  /** The templates' own tracks by their music settings, looked up at most once per TEMPLATE_TRACK_TTL_MS. */
+  private readonly templateTracks = new Map<string, { at: number; track: Promise<GatedTrack | null> }>();
+
   constructor(
     private readonly prisma: PrismaService,
     @Inject(STORAGE) private readonly storage: ObjectStorage,
@@ -61,17 +68,39 @@ export class RenderContextService {
 
   /**
    * Website background music: the host's choice (validated against the template's
-   * capabilities when saved) or the template default. Only approved tracks with a
-   * current commercial, on-demand licence ever play.
+   * capabilities when saved), the template's default by id, or else one of Bulava's
+   * own tracks the template names by slug (`music.defaultTrack`, seeded as
+   * `music/<slug>.m4a`). A host who switched the music off (`musicId: null`) hears
+   * nothing: only an unset choice falls back to the template's. Only approved tracks
+   * with a current commercial, on-demand licence ever play. The template's own track
+   * is found by `findDefaultTrack`, the resolver films share (`VideosService.create`),
+   * and remembered for a minute (`templateTrack`); the gates run again on every view.
    */
   async resolveMusic(template: ResolvedTemplate | null): Promise<RenderContext['music']> {
     if (!template) return null;
-    const musicId = template.customization?.musicId ?? template.definition.music?.defaultMusicId;
-    if (!musicId) return null;
-    const track = await this.prisma.music.findUnique({ where: { id: musicId }, include: { license: true } });
-    if (!track || track.status !== 'APPROVED' || !track.license.commercialUse || !track.license.onDemandUse) return null;
-    if (track.license.expiresAt && track.license.expiresAt <= new Date()) return null;
+    const chosen = template.customization?.musicId;
+    if (chosen === null) return null;
+    const track = chosen
+      ? await this.prisma.music.findUnique({ where: { id: chosen }, include: { license: true } })
+      : await this.templateTrack(template.definition);
+    if (!isPlayableTrack(track)) return null;
     return { url: await this.storage.presignDownload(track.storageKey, { expiresInSeconds: MUSIC_URL_TTL_SECONDS }), title: track.title };
+  }
+
+  /**
+   * The template's own track for guest pages, previews and public events, which ask on every view: looked up (and a
+   * missing or unlicensed one logged) at most once a minute per music setting, not once per request.
+   */
+  private templateTrack(definition: TemplateDefinition): Promise<GatedTrack | null> {
+    const music = definition.music;
+    if (!music?.defaultMusicId && !music?.defaultTrack) return Promise.resolve(null);
+    const key = `${music.defaultMusicId ?? ''}|${music.defaultTrack ?? ''}`;
+    const now = Date.now();
+    const known = this.templateTracks.get(key);
+    if (known && now - known.at < TEMPLATE_TRACK_TTL_MS) return known.track;
+    const track = findDefaultTrack(this.prisma, definition, (m) => this.logger.warn(m));
+    this.templateTracks.set(key, { at: now, track });
+    return track;
   }
 
   toFunctionContext(fn: FunctionWithVenue): FunctionContext {

@@ -5,7 +5,9 @@ import type { MessageKey, Translator } from '@bulava/localization';
 // of the template engine (openings, music, RSVP forms) with every page that shows a card.
 import { backdropArt, backdropTitleTop, SceneStill } from '@bulava/template-engine/src/art/scenes';
 import { Ornament } from '@bulava/template-engine/src/ornaments';
+import { StageStill } from '@bulava/template-engine/src/stage/still';
 import { TemplateStyles } from '@bulava/template-engine/src/styles';
+import { STAGE_META } from '@bulava/template-schema';
 import type { TemplateSummary } from '@/lib/server-api';
 import { isCanvasFilm } from '@/lib/films';
 import { cardPreview, POSTER_HEIGHT, POSTER_WIDTH, posterPreview } from '@/lib/template-previews';
@@ -93,7 +95,14 @@ function posterScene(template: TemplateSummary) {
   return art && definition && backdrop && colors ? { art, definition, backdrop, colors } : null;
 }
 
-export const hasPosterScene = (template: TemplateSummary) => posterScene(template) !== null;
+/** The 3D stage a Signature film opens in (ADR-078), when its first backdrop is a stage. */
+function posterStage(template: TemplateSummary) {
+  const colors = template.definition?.theme.colors;
+  const stage = template.definition?.scenes?.find((s) => s.backdrop)?.backdrop?.stage;
+  return stage && colors ? { stage, colors } : null;
+}
+
+export const hasPosterScene = (template: TemplateSummary) => posterStage(template) !== null || posterScene(template) !== null;
 
 /** A film drawn from a canvas invitation (ADR-058): its poster is its opening board. */
 export const hasCanvasFilm = (template: TemplateSummary) => isCanvasFilm(template.definition);
@@ -106,6 +115,23 @@ const posterLabel = (template: TemplateSummary) => (template.outputs.includes('V
  * /preview-frame photographs from this component.
  */
 export function PosterScene({ template, width, height }: { template: TemplateSummary; width: number; height: number }) {
+  const stage = posterStage(template);
+  if (stage) {
+    // The stage at its rest pose, every style inline (no keyframes): the title sits where the hero's words start.
+    const meta = STAGE_META[stage.stage];
+    const c = stage.colors;
+    return (
+      <StageStill name={stage.stage} colors={c} width={width} height={height}>
+        <div
+          className="absolute inset-x-0 flex flex-col items-center gap-2 px-7 text-center"
+          style={{ color: meta.dark ? c.accent : c.primary, top: `${Math.round(meta.textTop * 1000) / 10}%`, textShadow: meta.dark ? '0 1px 14px rgba(0,0,0,0.45)' : '0 1px 12px rgba(255,255,255,0.7)' }}
+        >
+          <span className="text-[10px] font-semibold tracking-[0.35em] uppercase">{posterLabel(template)}</span>
+          <span className="font-display text-2xl leading-tight">{template.name}</span>
+        </div>
+      </StageStill>
+    );
+  }
   const scene = posterScene(template);
   if (!scene) return null;
   const { art, definition, backdrop, colors: c } = scene;
@@ -138,7 +164,7 @@ function VideoPoster({ template, width, height, priority }: { template: Template
       </div>
     );
   }
-  if (posterScene(template)) {
+  if (hasPosterScene(template)) {
     return (
       <div className={PHONE_FRAME} style={{ width: width + 14, height: height + 14 }}>
         <PosterScene template={template} width={width} height={height} />

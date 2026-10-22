@@ -43,6 +43,8 @@ const ENTRANCE: Record<string, Layer['animation']['entrance']> = {
   reveal: 'fadeUp',
   bloom: 'pop',
   shine: 'fade',
+  flipUp: 'fadeUp',
+  coin: 'pop',
 };
 
 /** Film ornaments under their canvas names. */
@@ -76,7 +78,7 @@ function layerOf(el: Element): LayerInput | null {
         letterSpacing: Math.max(-0.1, Math.min(0.6, round((s.letterSpacing / Math.max(1, s.fontSize)) * 100) / 100)),
         shadow: s.shadow ?? 'none',
         // The film's sweep of light across gold names becomes gold foil.
-        foil: anim?.type === 'shine',
+        foil: anim?.type === 'shine' || anim?.type === 'flipUp',
       },
     };
   }

@@ -1,4 +1,5 @@
-import { fontPairing, type EffectName, type Fonts, type IntroName, type LookName, type ORNAMENTS, type PhotoSlot, type TemplateDefinitionInput, type ThemeColors, type ThemeDress, type Value } from '@bulava/template-schema';
+import { fontPairing, type EffectName, type Fonts, type IntroName, type LookName, type ORNAMENTS, type PhotoSlot, type StageNameValue, type TemplateDefinitionInput, type ThemeColors, type ThemeDress, type ThemeMotion, type Value } from '@bulava/template-schema';
+import type { StageWebsiteSpec } from './stages/types';
 
 /**
  * Helpers to author catalog templates compactly. Output is plain
@@ -148,7 +149,9 @@ type HeroVariant =
   | 'balloons'
   | 'backwaters'
   | 'sarovar'
-  | 'vrindavan';
+  | 'vrindavan'
+  // A Signature 3D stage (template-engine/src/stage, ADR-078): the set is `WebsiteSpec.stage`
+  | 'stage';
 type TimelineVariant = 'cards' | 'timeline' | 'frames' | 'tiles' | 'tickets' | 'diya';
 
 /** Layout choices for the sections that have several (template-engine SECTION_VARIANTS). */
@@ -156,7 +159,7 @@ interface Variants {
   hero: HeroVariant;
   timeline: TimelineVariant;
   couple: 'default' | 'stacked' | 'arch' | 'portraits' | 'duet' | 'monogram' | 'flip' | 'profile';
-  gallery: 'default' | 'frames' | 'stack' | 'mosaic' | 'polaroid';
+  gallery: 'default' | 'frames' | 'stack' | 'mosaic' | 'polaroid' | 'depth';
   story: 'default' | 'letter' | 'curtain' | 'polaroid';
   countdown: 'default' | 'flip' | 'rings' | 'calendar';
   venue: 'default' | 'illustrated' | 'postcard';
@@ -488,6 +491,16 @@ export interface WebsiteSpec extends Omit<CatalogMeta, 'sortOrder'> {
   intro?: IntroName;
   /** Guests hear a licensed track chosen by the host (Signature collection). */
   music?: boolean;
+  /** With `music`: one of Bulava's own tracks by its slug (music.defaultTrack), the website's and its film's. */
+  defaultTrack?: string;
+  /** Hero `stage` only: the set the guest walks into (props.stage). */
+  stage?: StageNameValue;
+  /** Translation key replacing the layout's eyebrow above the names ('template.engagementOf', …). */
+  eyebrow?: string;
+  /** The hero's title: the names (TITLE, default) or the event's own title. */
+  heroTitle?: 'names' | 'event';
+  /** Motion below the hero (theme.motion): 'stage' for 3D entrances, pointer tilt and the depth gallery. */
+  motion?: ThemeMotion;
   heroTone?: 'light' | 'dark';
   invocation?: string;
   radius?: number;
@@ -508,6 +521,31 @@ function photoSlotsFor(layout: Layout, hero: HeroVariant): PhotoSlot[] {
   if (sections.some((sec) => sec.section === 'story' && sec.props && 'image' in sec.props)) slots.push('story');
   slots.push('closing');
   return slots;
+}
+
+/** The words above a layout's names (its hero eyebrow), before a spec's own `eyebrow` and the faith's wording. */
+export function layoutEyebrow(layout: Layout): Value {
+  return LAYOUTS[layout].eyebrow;
+}
+
+/** The layout's sections with the spec's hero choices applied: the stage, an eyebrow of its own, the event's title. */
+function sectionsFor(spec: WebsiteSpec, variants: Variants): SectionSpec[] {
+  const sections = LAYOUTS[spec.layout].sections(variants, spec.invocation);
+  if (spec.hero === 'stage' && !spec.stage) throw new Error(`${spec.key}: a stage hero needs its stage`);
+  if (!spec.stage && !spec.eyebrow && spec.heroTitle !== 'event') return sections;
+  return sections.map((sec) =>
+    sec.section === 'hero'
+      ? {
+          ...sec,
+          props: {
+            ...sec.props,
+            ...(spec.eyebrow ? { eyebrow: t(spec.eyebrow) } : {}),
+            ...(spec.heroTitle === 'event' ? { title: b('event.title') } : {}),
+            ...(spec.hero === 'stage' && spec.stage ? { stage: lit(spec.stage) } : {}),
+          },
+        }
+      : sec,
+  );
 }
 
 export function website(spec: WebsiteSpec, sortOrder: number): CatalogEntry {
@@ -543,6 +581,7 @@ export function website(spec: WebsiteSpec, sortOrder: number): CatalogEntry {
         heroTone: spec.heroTone ?? 'light',
         look: spec.look ?? 'classic',
         effect: spec.effect ?? 'none',
+        ...(spec.motion ? { motion: spec.motion } : {}),
       },
       fonts: fontsFor(spec.fonts),
       capabilities: {
@@ -553,13 +592,14 @@ export function website(spec: WebsiteSpec, sortOrder: number): CatalogEntry {
         maxPhotos: spec.maxPhotos ?? 6,
         photoSlots: photoSlotsFor(spec.layout, spec.hero),
       },
-      ...(spec.music ? { music: { allowCustomerChoice: true } } : {}),
+      ...(spec.music ? { music: { allowCustomerChoice: true, ...(spec.defaultTrack ? { defaultTrack: spec.defaultTrack } : {}) } } : {}),
       website: {
         intro: spec.intro ?? 'none',
         pages: [
           {
             id: 'home',
-            sections: layout.sections(
+            sections: sectionsFor(
+              spec,
               {
                 hero: spec.hero,
                 timeline: spec.timeline,
@@ -572,11 +612,19 @@ export function website(spec: WebsiteSpec, sortOrder: number): CatalogEntry {
                 footer: spec.footer ?? 'default',
                 family: spec.family ?? (spec.layout === 'wedding-lite' ? 'blessings' : 'default'),
               },
-              spec.invocation,
             ) as never,
           },
         ],
       },
     },
   };
+}
+
+/**
+ * A Signature 3D website (ADR-078, final.md §5.2): the template's stage as its
+ * hero, its stage opening, its own track (the host may choose another), the
+ * 3D motion below the hero, and always the Signature tier.
+ */
+export function stageWebsite(spec: StageWebsiteSpec, sortOrder: number): CatalogEntry {
+  return website({ ...spec, tier: 'SIGNATURE', badge: spec.badge ?? 'NEW', hero: 'stage', pattern: 'none', music: true, motion: 'stage' }, sortOrder);
 }

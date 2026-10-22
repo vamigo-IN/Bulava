@@ -10,6 +10,7 @@ import {
   EFFECTS,
   ICONS,
   IMAGE_MASKS,
+  isStageIntro,
   LAYER_ENTRANCES,
   LAYER_MOTIONS,
   ORNAMENT_LAYERS,
@@ -80,7 +81,13 @@ function SceneSettings({ scene, onScene }: { scene: Scene; onScene: (mutate: (sc
     <Group title={t('design.scene.settings')}>
       <NumberField label={t('scenes.duration')} value={scene.durationSec} min={0.5} max={60} step={0.5} suffix="s" onChange={(n) => onScene((s) => void (s.durationSec = Math.round(n * 2) / 2))} />
       <SelectField label={t('design.scene.transition')} value={scene.transition} onChange={(v) => onScene((s) => void (s.transition = v))} options={TRANSITIONS} />
-      <SelectField label={t('design.scene.reveal')} value={scene.reveal} onChange={(v) => onScene((s) => void (s.reveal = v))} options={SCENE_REVEALS.map((r) => ({ value: r, label: t(`design.scene.reveal.${r}`) }))} />
+      <SelectField
+        label={t('design.scene.reveal')}
+        value={scene.reveal}
+        onChange={(v) => onScene((s) => void (s.reveal = v))}
+        // The 3D openings move through a stage (ADR-078): only a scene over a stage backdrop takes one.
+        options={SCENE_REVEALS.filter((r) => !isStageIntro(r) || scene.backdrop?.stage || r === scene.reveal).map((r) => ({ value: r, label: t(`design.scene.reveal.${r}`) }))}
+      />
       <SelectField label={t('design.scene.particles')} value={scene.particles} onChange={(v) => onScene((s) => void (s.particles = v))} options={EFFECTS} />
       {scene.canvas ? (
         <>

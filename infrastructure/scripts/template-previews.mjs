@@ -16,7 +16,9 @@
  *
  * Run it after adding or changing a template, then rebuild the web app; a template
  * without an image is still shown, drawn live. Uses Remotion's downloaded Chrome
- * Headless Shell unless CHROME_PATH is set.
+ * Headless Shell unless CHROME_PATH is set, compositing on SwiftShader as browsers with
+ * a GPU do: Chrome's software compositor (--disable-gpu) leaves tiles of the Signature 3D
+ * stages' large planes undrawn at phone width (docs/testing.md#signature-3d-stages).
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -64,9 +66,23 @@ const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, 'utf8'
 for (const kind of ['card', 'full', 'poster']) if (!ONLY || !manifest[kind]) manifest[kind] = {};
 mkdirSync(OUT, { recursive: true });
 
-const browser = await puppeteer.launch({ executablePath: findChrome(), headless: true, args: ['--no-sandbox', '--disable-gpu', '--hide-scrollbars'] });
-const page = await browser.newPage();
-await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+const LAUNCH = { executablePath: findChrome(), headless: true, args: ['--no-sandbox', '--hide-scrollbars', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] };
+/** SwiftShader's GPU process can hang a long session: a fresh browser every this many pages. */
+const RELAUNCH_EVERY = 40;
+let browser = await puppeteer.launch(LAUNCH);
+let page = await openPage();
+let pages = 0;
+async function openPage() {
+  const tab = await browser.newPage();
+  await tab.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  return tab;
+}
+async function freshBrowser() {
+  if (++pages % RELAUNCH_EVERY) return;
+  await browser.close().catch(() => undefined);
+  browser = await puppeteer.launch(LAUNCH);
+  page = await openPage();
+}
 const hash = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, 10);
 
 /**
@@ -74,6 +90,7 @@ const hash = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, 10
  * it covers, or null for a 404 (a film or card without a scene).
  */
 async function shoot(key, view, size, maxHeight = size.height) {
+  await freshBrowser();
   await page.setViewport({ width: size.width, height: maxHeight, deviceScaleFactor: size.imageWidth / size.width });
   const res = await page.goto(`${BASE}/preview-frame/${key}?view=${view}`, { waitUntil: 'networkidle0', timeout: 120_000 });
   if (res?.status() === 404 && view === 'poster') return null;

@@ -1,4 +1,4 @@
-import { DARK_SCENE_NAMES, type SceneNameValue, type Value } from './base';
+import { DARK_SCENE_NAMES, STAGE_META, STAGE_NAMES, type SceneNameValue, type StageNameValue, type Value } from './base';
 import { ArtboardSchema, CANVAS_SCENES, ORNAMENT_LAYERS, type Artboard, type ArtboardInput, type LayerInput, type OrnamentLayerName } from './canvas';
 import { ADDED_SECTION_WIDTH } from './canvas-custom';
 import type { SectionInstance, TemplateDefinition } from './definition';
@@ -111,18 +111,23 @@ function heroBoard(def: Def, s: SectionInstance): Artboard {
   const scene = (CANVAS_SCENES as readonly string[]).includes(variant) ? (variant as SceneNameValue) : null;
   const artworkKey = variant === 'artwork' ? prop(s, 'artwork') : undefined;
   const artwork = artworkKey && 'literal' in artworkKey ? def.artworks?.[String(artworkKey.literal)] : undefined;
+  // A Signature 3D stage (ADR-078): the words are laid out as on its hero; the set itself stays the template's
+  // own section behind a redraw (section-snapshot), so the board's background is plain.
+  const stageRef = variant === 'stage' ? prop(s, 'stage') : undefined;
+  const stageName = stageRef && 'literal' in stageRef && (STAGE_NAMES as readonly string[]).includes(String(stageRef.literal)) ? (String(stageRef.literal) as StageNameValue) : null;
+  const stage = stageName ? STAGE_META[stageName] : null;
   const inverse = variant === 'photo';
-  const dark = scene ? DARK_SCENE_NAMES.includes(scene) : artwork ? artwork.dark : variant === 'celestial' || variant === 'lantern' || (def.theme.heroTone === 'dark' && !inverse);
+  const dark = stage ? stage.dark : scene ? DARK_SCENE_NAMES.includes(scene) : artwork ? artwork.dark : variant === 'celestial' || variant === 'lantern' || (def.theme.heroTone === 'dark' && !inverse);
   // A phone's screen, as the website's hero fills it: the words in the sky, the art below them.
-  const H = scene ? 844 : inverse ? 720 : 700;
+  const H = scene || stage ? 844 : inverse ? 720 : 700;
 
   const ink = inverse ? '#ffffff' : dark ? 'background' : 'text';
   const accent = inverse ? '#ffffff' : dark ? 'accent' : 'secondary';
   const namesColor = inverse ? '#ffffff' : dark ? 'accent' : 'primary';
-  const shadow = scene || inverse ? 'soft' : 'none';
+  const shadow = scene || stage || inverse ? 'soft' : 'none';
   const styleProp = prop(s, 'nameStyle');
   const chosen = styleProp && 'literal' in styleProp ? String(styleProp.literal) : '';
-  const nameStyle: NameStyle = scene ? (SCENE_NAME_STYLE[scene] ?? 'script') : variant === 'minimal' ? 'heading' : chosen === 'caps' || chosen === 'italic' ? chosen : 'script';
+  const nameStyle: NameStyle = stage ? stage.names : scene ? (SCENE_NAME_STYLE[scene] ?? 'script') : variant === 'minimal' ? 'heading' : chosen === 'caps' || chosen === 'italic' ? chosen : 'script';
 
   const lines: Line[] = [];
   const add = (key: string, line: (content: Value) => Line) => {
@@ -138,9 +143,10 @@ function heroBoard(def: Def, s: SectionInstance): Artboard {
   add('tagline', (v) => ({ h: 36, gap: 12, layer: (y) => text('tagline', { y, h: 36 }, v, { font: 'script', size: 24, color: accent, shadow }) }));
 
   const tall = stackHeight(lines);
-  // Scenes: the words start below a toran or drape and end before the art (the top ~55%).
-  const top = scene
-    ? Math.max(40, Math.min(Math.round(H * (SCENE_TEXT_TOP[scene] ?? 0.12)), Math.round(H * 0.56) - tall))
+  // Scenes and stages: the words start below a toran, drape or crown band (STAGE_META.textTop) and end before the art (the top ~55%).
+  const skyTop = stage ? stage.textTop : scene ? (SCENE_TEXT_TOP[scene] ?? 0.12) : null;
+  const top = skyTop !== null
+    ? Math.max(40, Math.min(Math.round(H * skyTop), Math.round(H * 0.56) - tall))
     : inverse
       ? H - 64 - tall
       : variant === 'split'
@@ -162,7 +168,9 @@ function heroBoard(def: Def, s: SectionInstance): Artboard {
   const art: LayerInput[] = [];
   const ornament = (id: string, name: OrnamentLayerName, frame: { x: number; y: number; w: number; h: number; rotate?: number }, extra: Record<string, unknown> = {}): LayerInput => ({ id, kind: 'ornament', ornament: name, color: orn, frame, ...extra });
 
-  if (scene) {
+  if (stage) {
+    background = plain;
+  } else if (scene) {
     background = plain;
     art.push({ id: 'scene', kind: 'scene', scene: scene as (typeof CANVAS_SCENES)[number], sky: true, frame: { x: 0, y: 0, w: W, h: H } });
   } else {

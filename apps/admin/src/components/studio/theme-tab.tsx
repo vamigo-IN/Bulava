@@ -1,7 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { FONT_FAMILIES, INTROS, ORNAMENTS, PATTERNS, SUITE_CORNERS, SUITE_DIVIDERS, SUITE_EDGES, SUITE_FRAMES, SUITE_SEALS, SUITE_SKYLINES, type FontRef, type ThemeColors, type ThemeDress } from '@bulava/template-schema';
+import {
+  FONT_FAMILIES,
+  INTROS,
+  isStageIntro,
+  ORNAMENTS,
+  PATTERNS,
+  SUITE_CORNERS,
+  SUITE_DIVIDERS,
+  SUITE_EDGES,
+  SUITE_FRAMES,
+  SUITE_SEALS,
+  SUITE_SKYLINES,
+  templateStage,
+  THEME_MOTIONS,
+  type FontRef,
+  type ThemeColors,
+  type ThemeDress,
+  type ThemeMotion,
+} from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
 import { Card, CardTitle, Field, Input, Select } from '../ui';
 import { EditError, type EditorProps } from './common';
@@ -130,9 +148,31 @@ export function ThemeTab({ definition, edit }: EditorProps) {
                       })
                     }
                   >
-                    {INTROS.map((o) => (
+                    {/* The 3D openings move through a stage hero (ADR-078): offered when the first section is one. */}
+                    {INTROS.filter((o) => !isStageIntro(o) || templateStage(definition) || o === definition.website?.intro).map((o) => (
                       <option key={o} value={o}>
                         {o}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+              <Field label={t('theme.motion')}>
+                {(p) => (
+                  <Select
+                    {...p}
+                    value={theme.motion ?? ''}
+                    onChange={(e) =>
+                      run((d) => {
+                        if (e.target.value) d.theme.motion = e.target.value as ThemeMotion;
+                        else delete d.theme.motion;
+                      })
+                    }
+                  >
+                    <option value="">{t('theme.motion.none')}</option>
+                    {THEME_MOTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {t(`theme.motion.${o}`)}
                       </option>
                     ))}
                   </Select>

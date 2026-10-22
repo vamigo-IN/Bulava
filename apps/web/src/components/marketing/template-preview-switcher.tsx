@@ -1,12 +1,15 @@
 'use client';
 
-import { Monitor, Play, Smartphone } from 'lucide-react';
+import { Monitor, Play, Smartphone, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { IntroOverlay, TemplateRenderer, themeStyle } from '@bulava/template-engine';
+import { INTRO_DONE_EVENT, IntroOverlay, TemplateRenderer, themeStyle } from '@bulava/template-engine';
 import { createTranslator, formatEventDateWithWeekday } from '@bulava/localization';
-import { templateSampleContext, type TemplateDefinition } from '@bulava/template-schema';
+import { isStageIntro, templateSampleContext, type TemplateDefinition } from '@bulava/template-schema';
 import { cn } from '@/lib/utils';
+
+/** How long the names hold after a stage opening lands before the replay closes. */
+const STAGE_HOLD_MS = 1900;
 
 /** A segmented control: a pressed-in track with the chosen segment raised as a 3D button. */
 const SEGMENTS = 'clay-inset inline-flex gap-1 rounded-full p-1.5';
@@ -94,8 +97,76 @@ export function TemplatePreviewSwitcher({
       <p className="mt-4 max-w-md text-center text-sm text-stone-500">{labels.note}</p>
       {opening !== null && intro !== 'none' ? (
         // A full-screen replay of the opening, as a guest sees it on their phone.
-        <PreviewOpening key={opening} definition={definition} intro={intro} language={language} ctx={ctx} tr={tr} />
+        isStageIntro(intro) ? (
+          <StagePreviewOpening key={opening} definition={definition} language={language} ctx={ctx} play={opening} closeLabel={tr('common.close')} onClose={() => setOpening(null)} />
+        ) : (
+          <PreviewOpening key={opening} definition={definition} intro={intro} language={language} ctx={ctx} tr={tr} />
+        )
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A stage opening replayed (final.md §3.2): the page's first section drawn live, so the real overlay drives the
+ * real hero (its cover, camera and build-in), then the replay closes once the names have landed. Escape or the
+ * close button leave at any time.
+ */
+function StagePreviewOpening({
+  definition,
+  language,
+  ctx,
+  play,
+  closeLabel,
+  onClose,
+}: {
+  definition: TemplateDefinition;
+  language: string;
+  ctx: ReturnType<typeof templateSampleContext>;
+  play: number;
+  closeLabel: string;
+  onClose: () => void;
+}) {
+  const [leaving, setLeaving] = useState(false);
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  useEffect(() => {
+    let hold = 0;
+    const done = () => {
+      window.clearTimeout(hold);
+      hold = window.setTimeout(() => setLeaving(true), STAGE_HOLD_MS);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close.current();
+    };
+    window.addEventListener(INTRO_DONE_EVENT, done);
+    window.addEventListener('keydown', key);
+    // Reduced motion: the opening never plays (nor says it is done), so the hero at rest is shown for the hold and the replay closes.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) done();
+    return () => {
+      window.clearTimeout(hold);
+      window.removeEventListener(INTRO_DONE_EVENT, done);
+      window.removeEventListener('keydown', key);
+    };
+  }, []);
+  useEffect(() => {
+    if (!leaving) return;
+    const out = window.setTimeout(() => close.current(), 450);
+    return () => window.clearTimeout(out);
+  }, [leaving]);
+
+  return (
+    <div className="fixed inset-0 z-[60] overflow-hidden bg-black transition-opacity duration-[450ms]" style={{ opacity: leaving ? 0 : 1 }}>
+      <TemplateRenderer definition={definition} context={ctx} mode="live" language={language} maxSections={1} introKey={`preview-${definition.templateKey}-${play}`} />
+      <button
+        type="button"
+        onClick={() => close.current()}
+        aria-label={closeLabel}
+        className="absolute top-4 right-4 z-[70] inline-flex size-11 items-center justify-center rounded-full bg-black/45 text-white ring-1 ring-white/30 transition-colors hover:bg-black/65 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+      >
+        <X aria-hidden className="size-5" />
+      </button>
     </div>
   );
 }

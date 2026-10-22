@@ -7,11 +7,11 @@ import { z } from 'zod';
  * always has. Picks that are no longer published, or no longer fit their
  * section, are skipped on the site and flagged in the console.
  */
-export const SHOWCASE_SECTIONS = ['hero', 'heroBack', 'scenes', 'collection', 'spotlight', 'videos', 'cards'] as const;
+export const SHOWCASE_SECTIONS = ['hero', 'heroBack', 'scenes', 'stages', 'collection', 'spotlight', 'videos', 'cards'] as const;
 export type ShowcaseSection = (typeof SHOWCASE_SECTIONS)[number];
 
-/** What a template must be to appear in a section: an invitation website, a film, or a card (a canvas opening). */
-export type ShowcaseFit = 'website' | 'video' | 'card';
+/** What a template must be to appear in a section: an invitation website, one opening on a Signature 3D stage hero, a film, or a card (a canvas opening). */
+export type ShowcaseFit = 'website' | 'stage' | 'video' | 'card';
 
 export const SHOWCASE_RULES: Record<ShowcaseSection, { max: number; fit: ShowcaseFit }> = {
   /** The phone playing live in the hero. */
@@ -20,6 +20,8 @@ export const SHOWCASE_RULES: Record<ShowcaseSection, { max: number; fit: Showcas
   heroBack: { max: 2, fit: 'website' },
   /** The illustrated scenes carousel. */
   scenes: { max: 12, fit: 'website' },
+  /** The Signature 3D walk-in invitations (stage heroes), after the scenes. */
+  stages: { max: 12, fit: 'stage' },
   /** The collection grid: picks come first, the rest of the catalog follows (the grid filters). */
   collection: { max: 24, fit: 'website' },
   /** The large feature below the collection. */
@@ -30,11 +32,12 @@ export const SHOWCASE_RULES: Record<ShowcaseSection, { max: number; fit: Showcas
   cards: { max: 24, fit: 'card' },
 };
 
-/** Whether a published template (its outputs and the opening section's kind) fits a section. */
-export function fitsShowcase(section: ShowcaseSection, template: { outputs: readonly string[]; heroSection?: string | null }): boolean {
+/** Whether a published template (its outputs and the opening section's kind and variant) fits a section. */
+export function fitsShowcase(section: ShowcaseSection, template: { outputs: readonly string[]; heroSection?: string | null; heroVariant?: string | null }): boolean {
   const fit = SHOWCASE_RULES[section].fit;
   if (fit === 'video') return template.outputs.includes('VIDEO');
   if (fit === 'card') return template.heroSection === 'canvas';
+  if (fit === 'stage') return template.outputs.includes('WEBSITE') && template.heroSection === 'hero' && template.heroVariant === 'stage';
   return template.outputs.includes('WEBSITE');
 }
 

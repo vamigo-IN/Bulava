@@ -508,7 +508,7 @@ export interface Testimonial {
 }
 
 /** A home page section whose templates staff choose (Home page screen). */
-export type ShowcaseSectionKey = 'hero' | 'heroBack' | 'scenes' | 'collection' | 'spotlight' | 'videos' | 'cards';
+export type ShowcaseSectionKey = 'hero' | 'heroBack' | 'scenes' | 'stages' | 'collection' | 'spotlight' | 'videos' | 'cards';
 
 export interface ShowcaseCandidate {
   key: string;
@@ -523,7 +523,7 @@ export interface ShowcaseCandidate {
 }
 
 export interface AdminShowcase {
-  sections: Array<{ section: ShowcaseSectionKey; max: number; fit: 'website' | 'video' | 'card'; templateKeys: string[]; updatedAt: string | null }>;
+  sections: Array<{ section: ShowcaseSectionKey; max: number; fit: 'website' | 'stage' | 'video' | 'card'; templateKeys: string[]; updatedAt: string | null }>;
   /** Every published template. */
   templates: ShowcaseCandidate[];
   siteOrigin: string;

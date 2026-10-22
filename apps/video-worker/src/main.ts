@@ -9,6 +9,7 @@ import { createPrismaClient } from '@bulava/database';
 import { connectionFromUrl, createWorker, QueueName } from '@bulava/queue';
 import { ObjectStorage } from '@bulava/storage';
 import { DEFAULT_BUNDLE_DIR } from './bundle';
+import { glSetup, REMOTION_CHECKED } from './gl';
 import { renderVideoJob } from './render';
 
 /**
@@ -29,6 +30,12 @@ async function main(): Promise<void> {
   const storage = ObjectStorage.fromEnv();
   const jobConcurrency = Number(process.env.VIDEO_WORKER_CONCURRENCY ?? 1);
   const renderThreads = Number(process.env.VIDEO_RENDER_THREADS ?? 2);
+
+  // Once, at start: which GL backend films render with (gl.ts), and a warning when Remotion has moved past the
+  // release whose renderer was read for the CPU-raster switch.
+  const gl = glSetup();
+  log.info(gl, 'Chromium GL setup for films');
+  if (!gl.checked) log.warn({ remotion: gl.remotion, checked: REMOTION_CHECKED }, 'Remotion is not the release gl.ts was checked against: re-read what __RESERVED_IS_INSIDE_REMOTION_LAMBDA does before trusting stage films');
 
   log.info('Preparing headless browser');
   await ensureBrowser();

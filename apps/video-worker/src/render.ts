@@ -14,9 +14,13 @@ import {
   type RenderContext,
   type TemplateDefinition,
 } from '@bulava/template-schema';
+// Chromium's GL setup for films (stage films on SwiftShader, rasterised on the CPU): see gl.ts, which also sets the
+// Remotion switch for the CPU raster on import, before any browser opens.
+import { filmChromium } from './gl';
 
 /** Must match COMPOSITION_ID / TemplateVideoProps in @bulava/video-engine (bundled separately by Remotion). */
 const COMPOSITION_ID = 'TemplateVideo';
+
 interface TemplateVideoProps extends Record<string, unknown> {
   definition: TemplateDefinition;
   context: RenderContext;
@@ -24,6 +28,7 @@ interface TemplateVideoProps extends Record<string, unknown> {
   language: string;
   watermark: boolean;
   musicUrl: string | null;
+  frameScale?: number;
 }
 
 export interface RenderDeps {
@@ -122,7 +127,19 @@ export async function renderVideoJob(deps: RenderDeps, videoJobId: string, attem
       assets[a.id] = await sign(a.renditions.length ? StorageKeys.templateAssetRendition(a.id, Math.max(...a.renditions)) : a.storageKey);
     }
     if (artwork.length < artworkIds.length) log.warn({ videoJobId, missing: artworkIds.length - artwork.length }, 'Some painted layers are not approved or licensed; rendering without them');
-    const music = input.musicId ? await prisma.music.findUnique({ where: { id: input.musicId } }) : null;
+    // Music passes the same gates as when the film was requested (isPlayableTrack in the API), checked again now:
+    // a retry, or a job that waited in the queue, never plays a track whose licence has lapsed since.
+    const music = input.musicId
+      ? await prisma.music.findFirst({
+          where: {
+            id: input.musicId,
+            status: 'APPROVED',
+            license: { commercialUse: true, onDemandUse: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          },
+          select: { storageKey: true },
+        })
+      : null;
+    if (input.musicId && !music) log.warn({ videoJobId, musicId: input.musicId }, 'The music is not approved or licensed for on-demand use; rendering without it');
     const starts = functions.map((f) => f.startsAt).filter((d): d is Date => !!d).sort((a, b) => a.getTime() - b.getTime());
 
     const context = buildRenderContext({
@@ -153,16 +170,21 @@ export async function renderVideoJob(deps: RenderDeps, videoJobId: string, attem
       faith: definition.theme.faith ?? null,
     });
 
+    const chromiumOptions = filmChromium(definition);
+    // The standard size is half the frame. A stage film draws it natively (frameScale, at scale 1): SwiftShader takes
+    // about 1.8 times as long per frame shrinking the full frame at a device scale of 0.5 (measured on one core).
+    const native = !input.hd && chromiumOptions.gl === 'swangle';
     const inputProps: TemplateVideoProps = {
       definition,
       context,
       customization: input.customization,
       language: job.event.language,
       watermark: input.watermark,
-      musicUrl: music && music.status === 'APPROVED' ? await sign(music.storageKey) : null,
+      musicUrl: music ? await sign(music.storageKey) : null,
+      ...(native ? { frameScale: 0.5 } : {}),
     };
-    const composition = await selectComposition({ serveUrl: deps.serveUrl, id: COMPOSITION_ID, inputProps });
-    const scale = input.hd ? 1 : 0.5;
+    const composition = await selectComposition({ serveUrl: deps.serveUrl, id: COMPOSITION_ID, inputProps, chromiumOptions });
+    const scale = input.hd || native ? 1 : 0.5;
 
     // Cancellation: poll the job row while rendering.
     const { cancelSignal, cancel } = makeCancelSignal();
@@ -181,7 +203,7 @@ export async function renderVideoJob(deps: RenderDeps, videoJobId: string, attem
         outFile = path.join(workdir, 'card.png');
         key = StorageKeys.generatedVideo(job.eventId, job.id).replace(/\.mp4$/, '.png');
         contentType = 'image/png';
-        await renderStill({ composition, serveUrl: deps.serveUrl, output: outFile, inputProps, scale, frame: 0 });
+        await renderStill({ composition, serveUrl: deps.serveUrl, output: outFile, inputProps, scale, frame: 0, chromiumOptions });
       } else {
         outFile = path.join(workdir, 'video.mp4');
         key = StorageKeys.generatedVideo(job.eventId, job.id);
@@ -189,6 +211,7 @@ export async function renderVideoJob(deps: RenderDeps, videoJobId: string, attem
         await renderMedia({
           composition,
           serveUrl: deps.serveUrl,
+          chromiumOptions,
           codec: 'h264',
           audioCodec: 'aac',
           crf: 20,

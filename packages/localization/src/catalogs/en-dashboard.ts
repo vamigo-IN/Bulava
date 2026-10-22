@@ -281,6 +281,7 @@ export const enDashboard = {
   'video.watermark': 'Includes Bulava mark (Free plan)',
   'video.music': 'Music',
   'video.music.none': 'No music',
+  'video.music.template': 'The template’s own music',
 
   'photos.title': 'Photo album',
   'photos.subtitle': 'One album for the whole event: one QR code and link for uploads, one gallery for guests and one live wall. Every function has its own folder.',

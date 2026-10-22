@@ -195,25 +195,26 @@ export function Bunting({ colors, w, h, className, style }: IllustrationProps) {
   );
 }
 
-/** A wrapped gift: polka-dot paper in the primary, a metal ribbon and bow. */
+/**
+ * A wrapped gift: polka-dot paper in the primary, a metal ribbon and bow. Drawn without a clip path (the Signature 3D
+ * stages allow none): every dot lies wholly on the paper or off it, so the dots off it are simply not drawn.
+ */
 export function GiftBox({ colors, foil, className, style }: IllustrationProps) {
   const id = useSafeId();
   const p = hex(colors.primary);
   const metal = `url(#${id}m)`;
+  const dots = Array.from({ length: 30 }, (_, i) => ({ i, cx: 40 + (i % 6) * 24 + (Math.floor(i / 6) % 2) * 12, cy: 104 + Math.floor(i / 6) * 18 })).filter((d) => d.cx + 4 <= 164);
   return (
     <svg viewBox="0 0 200 200" className={className} style={style} aria-hidden="true">
       <defs>
         <Metal id={`${id}m`} base={colors.secondary} foil={foil ?? true} x2={200} y2={200} />
         <Lit id={`${id}p`} base={p} light={0.2} dark={0.2} />
-        <clipPath id={`${id}c`}>
-          <rect x="36" y="98" width="128" height="86" />
-        </clipPath>
       </defs>
       <ellipse cx="100" cy="186" rx="76" ry="7" fill="#000000" opacity="0.12" />
       <rect x="36" y="98" width="128" height="86" rx="4" fill={`url(#${id}p)`} />
-      <g clipPath={`url(#${id}c)`}>
-        {Array.from({ length: 30 }, (_, i) => (
-          <circle key={i} cx={40 + (i % 6) * 24 + (Math.floor(i / 6) % 2) * 12} cy={104 + Math.floor(i / 6) * 18} r="4" fill={tint(p, 0.5)} />
+      <g>
+        {dots.map((d) => (
+          <circle key={d.i} cx={d.cx} cy={d.cy} r="4" fill={tint(p, 0.5)} />
         ))}
       </g>
       <rect x="28" y="80" width="144" height="24" rx="4" fill={shade(p, 0.1)} />

@@ -5,7 +5,9 @@ import {
   effectiveColors,
   effectiveFonts,
   FILM_FORMAT_SIZE,
+  isStageIntro,
   resolveValue,
+  STAGE_META,
   videoDurationSec,
   withFilmCustomization,
   type Customization,
@@ -15,8 +17,8 @@ import {
   type TemplateDefinition,
   type ThemeColors,
 } from '@bulava/template-schema';
-import { Bell, coverMonogram, Crescent, Diya, easeInOut, fontStack, initials, Kalash, Lantern, MarigoldStrand, Ornament, PeacockFeather, RibbonCover, Toran, ZipperCover } from '@bulava/template-engine';
-import { Particles, SceneBackdrop } from './backdrop';
+import { Bell, coverMonogram, Crescent, Diya, easeInOut, fontStack, initials, Kalash, Lantern, MarigoldStrand, mix, Ornament, PeacockFeather, RibbonCover, STAGE_REVEAL, Toran, ZipperCover } from '@bulava/template-engine';
+import { BackdropView, Particles } from './backdrop';
 import { CanvasScene } from './canvas-scene';
 import { fitFontSize } from './fit';
 
@@ -29,14 +31,25 @@ export interface TemplateVideoProps extends Record<string, unknown> {
   language: string;
   watermark: boolean;
   musicUrl: string | null;
+  /**
+   * The share of its size the film is drawn at (default 1). The worker draws a standard-size Signature 3D film at 0.5,
+   * natively at 540×960, rather than shrinking the full frame at render time: SwiftShader takes about 1.8 times as long
+   * per frame at a device scale of 0.5. Every scene scales to the frame, so the picture is the same.
+   */
+  frameScale?: number;
 }
 
-interface PlannedScene {
+/** The film's drawing scale: `frameScale` when it shrinks the film, else 1. */
+const frameScaleOf = (props: Pick<TemplateVideoProps, 'frameScale'>): number => (props.frameScale && props.frameScale > 0 && props.frameScale < 1 ? props.frameScale : 1);
+
+export interface PlannedScene {
   key: string;
   scene: Scene;
   ctx: RenderContext;
   from: number;
   frames: number;
+  /** Which copy of a per-function scene this is (0 for other scenes): a stage films each one a station further down the set. */
+  repeatIndex: number;
 }
 
 /** Expand per-function scenes and lay scenes out on the timeline. */
@@ -47,7 +60,7 @@ export function planScenes(definition: TemplateDefinition, context: RenderContex
     const copies = scene.repeatPerFunction && context.functions.length ? context.functions.map((fn) => ({ ...context, function: fn, venue: fn.venue ?? context.venue })) : [context];
     copies.forEach((ctx, i) => {
       const frames = Math.max(1, Math.round(scene.durationSec * fps));
-      out.push({ key: `${scene.id}-${i}`, scene, ctx, from, frames });
+      out.push({ key: `${scene.id}-${i}`, scene, ctx, from, frames, repeatIndex: i });
       from += frames;
     });
   }
@@ -64,7 +77,8 @@ export function templateVideoMetadata(props: TemplateVideoProps) {
   const seconds = Math.max(1, videoDurationSec(film, props.context.functions.length));
   const format = props.definition.type === 'VIDEO' ? props.customization?.filmFormat : undefined;
   const size = format && format !== 'story' ? FILM_FORMAT_SIZE[format] : stageOf(props.definition);
-  return { durationInFrames: Math.max(1, Math.round(seconds * fps)), fps, width: size.width, height: size.height };
+  const k = frameScaleOf(props);
+  return { durationInFrames: Math.max(1, Math.round(seconds * fps)), fps, width: Math.round(size.width * k), height: Math.round(size.height * k) };
 }
 
 /**
@@ -89,12 +103,24 @@ function color(value: string | undefined, colors: ThemeColors, fallback: string)
   return (colors as Record<string, string>)[value] ?? fallback;
 }
 
-function useAnimation(el: Element, sceneFrames: number): { style: CSSProperties; progress: number } {
+/** After a `flipUp` line has turned up, its foil sheen crosses it over this long (seconds; the website's type-in is 1.4 s). */
+const FLIP_SHEEN_SEC = 1.2;
+
+/** An element's entrance at the current frame: its style, its progress, and where a foil sheen is (shine, flipUp). */
+interface Entrance {
+  style: CSSProperties;
+  progress: number;
+  /** 0..1 across the letters (shine and flipUp only). */
+  sheen?: number;
+}
+
+/** `offsetSec` delays the entrance (the words of a scene that opens under a cover come in as it opens). */
+function useAnimation(el: Element, sceneFrames: number, offsetSec = 0): Entrance {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const anim = el.animation.in;
   if (!anim || anim.type === 'none') return { style: {}, progress: 1 };
-  const start = anim.delaySec * fps;
+  const start = (anim.delaySec + offsetSec) * fps;
   const end = start + Math.max(1, anim.durationSec * fps);
   const p = interpolate(frame, [start, end], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
   switch (anim.type) {
@@ -129,14 +155,54 @@ function useAnimation(el: Element, sceneFrames: number): { style: CSSProperties;
     case 'bloom':
       return { style: { opacity: p, transform: `rotate(${(1 - p) * -120}deg) scale(${0.5 + 0.5 * p})` }, progress: p };
     case 'shine':
-      return { style: { opacity: interpolate(p, [0, 0.3], [0, 1], { extrapolateRight: 'clamp' }) }, progress: p };
+      return { style: { opacity: interpolate(p, [0, 0.3], [0, 1], { extrapolateRight: 'clamp' }) }, progress: p, sheen: p };
+    case 'flipUp': {
+      // 3D type (final.md §3.1.6): the line turns up from lying toward the viewer, hinged on its foot, as the
+      // website's names do; once it stands, a foil sheen crosses it. No drop shadow (a filter) under it.
+      const sheen = interpolate(frame, [start + (end - start) * 0.55, end + FLIP_SHEEN_SEC * fps], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.inOut(Easing.cubic),
+      });
+      return {
+        style: {
+          opacity: interpolate(p, [0, 0.3], [0, 1], { extrapolateRight: 'clamp' }),
+          transform: p < 1 ? `perspective(800px) rotateX(${-80 * (1 - p)}deg)` : undefined,
+          transformOrigin: '50% 100%',
+        },
+        progress: p,
+        sheen,
+      };
+    }
+    case 'coin':
+      // A medallion turning to face the camera like a coin.
+      return {
+        style: { opacity: interpolate(p, [0, 0.4], [0, 1], { extrapolateRight: 'clamp' }), transform: p < 1 ? `perspective(800px) rotateY(${90 * (1 - p)}deg)` : undefined },
+        progress: p,
+      };
     default:
       return { style: {}, progress: 1 };
   }
 }
 
-function ElementView({ el, ctx, colors, fonts, language, sceneFrames }: { el: Element; ctx: RenderContext; colors: ThemeColors; fonts: TemplateDefinition['fonts']; language: string; sceneFrames: number }) {
-  const { style: animStyle, progress } = useAnimation(el, sceneFrames);
+function ElementView({
+  el,
+  ctx,
+  colors,
+  fonts,
+  language,
+  sceneFrames,
+  offsetSec = 0,
+}: {
+  el: Element;
+  ctx: RenderContext;
+  colors: ThemeColors;
+  fonts: TemplateDefinition['fonts'];
+  language: string;
+  sceneFrames: number;
+  offsetSec?: number;
+}) {
+  const { style: animStyle, progress, sheen = progress } = useAnimation(el, sceneFrames, offsetSec);
   const t = createTranslator(language);
   const value = resolveValue(el.content, ctx, { t, language, timeZone: ctx.event.timezone });
   const box: CSSProperties = {
@@ -172,13 +238,14 @@ function ElementView({ el, ctx, colors, fonts, language, sceneFrames }: { el: El
         : el.style.shadow === 'soft'
           ? `0 ${Math.round(fontSize * 0.04)}px ${Math.round(fontSize * 0.2)}px rgba(0,0,0,0.45)`
           : undefined;
-    // Shine: a band of light sweeps across the letters once they are in.
-    const shining = el.animation.in?.type === 'shine';
+    // Shine: a band of light sweeps across the letters once they are in. flipUp: the same foil, after the line stands.
+    const entrance = el.animation.in?.type;
+    const shining = entrance === 'shine' || entrance === 'flipUp';
     const shine: CSSProperties = shining
       ? {
           backgroundImage: `linear-gradient(105deg, ${ink} 0%, ${ink} 40%, #fff6d6 50%, ${ink} 60%, ${ink} 100%)`,
           backgroundSize: '300% 100%',
-          backgroundPosition: `${100 - progress * 100}% 0`,
+          backgroundPosition: entrance === 'flipUp' ? `${110 - sheen * 120}% 0` : `${100 - sheen * 100}% 0`,
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',
           color: 'transparent',
@@ -195,9 +262,9 @@ function ElementView({ el, ctx, colors, fonts, language, sceneFrames }: { el: El
             justifyContent: el.style.align === 'left' ? 'flex-start' : el.style.align === 'right' ? 'flex-end' : 'center',
             textAlign: el.style.align,
             color: ink,
-            // Clipped-background text cannot carry a text shadow; a drop shadow filter stands in.
+            // Clipped-background text cannot carry a text shadow; a drop shadow filter stands in (never under 3D type).
             textShadow: shining ? undefined : shadow,
-            filter: shining && shadow ? `drop-shadow(0 0 ${Math.round(fontSize * 0.15)}px ${colors.accent}88)` : undefined,
+            filter: entrance === 'shine' && shadow ? `drop-shadow(0 0 ${Math.round(fontSize * 0.15)}px ${colors.accent}88)` : undefined,
             fontFamily,
             fontSize,
             fontWeight: el.style.fontWeight,
@@ -285,18 +352,31 @@ function VideoOrnament({ name }: { name: string }) {
 export const REVEAL_TIMING = { hold: 0.7, pull: 1.9, release: 0.7 } as const;
 /** When the scene's own layers start to come in under a cover: as it opens. */
 export const REVEAL_CONTENT_DELAY = REVEAL_TIMING.hold + REVEAL_TIMING.pull * 0.25;
+/**
+ * A stage opening (`reveal: 'arrival' | 'doorway' | 'silk' | 'unfold'`, ADR-078) holds its cover 0.7 s and opens it
+ * over 2.6 s inside the stage: the scene's words come in at 80% of that run (0.7 + 0.8 × 2.6 = 2.78 s).
+ */
+export const STAGE_REVEAL_CONTENT_DELAY = STAGE_REVEAL.content;
 
 /** A triangle wave in [-1, 1]: the tag's swing, from the frame alone. */
 const swingAt = (t: number) => 1 - 4 * Math.abs(t - Math.floor(t) - 0.5);
 
-function SceneReveal({ reveal, ctx, colors, definition }: { reveal: Exclude<Scene['reveal'], 'none'>; ctx: RenderContext; colors: ThemeColors; definition: TemplateDefinition }) {
+/** The initials or names printed on a cover's seal (the website's own monogram). */
+function monogramOf(ctx: RenderContext): string {
+  const names = ctx.couple ? `${ctx.couple.partnerOne} & ${ctx.couple.partnerTwo}` : (ctx.honoree?.name ?? ctx.event.title);
+  return coverMonogram(ctx.couple, initials(names));
+}
+
+/** The film's script face (its heading face when it has none), for monograms. */
+const scriptOf = (definition: TemplateDefinition) => fontStack(definition.fonts.script ?? definition.fonts.heading, definition.fonts.script ? 'cursive' : 'serif');
+
+function SceneReveal({ reveal, ctx, colors, definition }: { reveal: 'zipper' | 'ribbon'; ctx: RenderContext; colors: ThemeColors; definition: TemplateDefinition }) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const { hold, pull, release } = REVEAL_TIMING;
   const progress = easeInOut(interpolate(frame, [hold * fps, (hold + pull) * fps], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }));
   const gone = interpolate(frame, [(hold + pull) * fps, (hold + pull + release) * fps], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   if (gone >= 1) return null;
-  const names = ctx.couple ? `${ctx.couple.partnerOne} & ${ctx.couple.partnerTwo}` : (ctx.honoree?.name ?? ctx.event.title);
   const Cover = reveal === 'zipper' ? ZipperCover : RibbonCover;
   return (
     <Cover
@@ -305,8 +385,8 @@ function SceneReveal({ reveal, ctx, colors, definition }: { reveal: Exclude<Scen
       width={width}
       height={height}
       colors={colors}
-      monogram={coverMonogram(ctx.couple, initials(names))}
-      script={fontStack(definition.fonts.script ?? definition.fonts.heading, definition.fonts.script ? 'cursive' : 'serif')}
+      monogram={monogramOf(ctx)}
+      script={scriptOf(definition)}
       heading={fontStack(definition.fonts.heading, 'serif')}
       swing={progress > 0 ? 0 : 3 * swingAt(frame / (fps * 3.4))}
     />
@@ -328,6 +408,11 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
   // A board without a background is words and art over the scene (a host's redrawn scene): it goes over the particles, as elements do.
   const overlay = canvas?.board.background.type === 'none';
   const reveal = planned.scene.reveal;
+  // A stage draws its particles at depth and plays a stage opening inside itself (final.md §3.3); its words wait for the opening.
+  // The opening plays under the scene's board: a host's board with its own background hides the stage, so that scene drops
+  // the opening and starts as any other, and over one without, every layer waits for the opening (whole-board ones too).
+  const stage = !!backdrop?.stage;
+  const stageReveal = stage && isStageIntro(reveal) && (!canvas || overlay);
   const board = canvas ? (
     <CanvasScene
       canvas={canvas}
@@ -337,13 +422,14 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
       theme={definition.theme}
       language={language}
       frames={planned.frames}
-      offsetSec={reveal !== 'none' ? REVEAL_CONTENT_DELAY : 0}
+      offsetSec={stageReveal ? STAGE_REVEAL_CONTENT_DELAY : reveal === 'zipper' || reveal === 'ribbon' ? REVEAL_CONTENT_DELAY : 0}
+      coversWait={stageReveal}
     />
   ) : null;
   return (
     <AbsoluteFill style={{ background, opacity }}>
       {backdrop ? (
-        <SceneBackdrop
+        <BackdropView
           backdrop={backdrop}
           definition={definition}
           ctx={planned.ctx}
@@ -351,21 +437,41 @@ function SceneView({ planned, colors, definition, language }: { planned: Planned
           frames={planned.frames}
           monogram={initials(planned.ctx.event.title)}
           photo={planned.ctx.photoSlots?.cover?.url ?? planned.ctx.photos[0]?.url}
+          stage={{ reveal: isStageIntro(reveal) && !stageReveal ? 'none' : reveal, station: planned.repeatIndex, particles: planned.scene.particles, monogram: monogramOf(planned.ctx), script: scriptOf(definition), seed: planned.key }}
         />
       ) : null}
       {overlay ? null : board}
-      <Particles effect={planned.scene.particles} colors={colors} />
+      {stage ? null : <Particles effect={planned.scene.particles} colors={colors} />}
       {overlay ? board : null}
       {planned.scene.elements.length ? (
         <Stage stage={stageOf(definition)}>
           {planned.scene.elements.map((el) => (
-            <ElementView key={el.id} el={el} ctx={planned.ctx} colors={colors} fonts={definition.fonts} language={language} sceneFrames={planned.frames} />
+            <ElementView
+              key={el.id}
+              el={el}
+              ctx={planned.ctx}
+              colors={colors}
+              fonts={definition.fonts}
+              language={language}
+              sceneFrames={planned.frames}
+              offsetSec={stageReveal ? STAGE_REVEAL_CONTENT_DELAY : 0}
+            />
           ))}
         </Stage>
       ) : null}
-      {reveal !== 'none' ? <SceneReveal reveal={reveal} ctx={planned.ctx} colors={colors} definition={definition} /> : null}
+      {reveal === 'zipper' || reveal === 'ribbon' ? <SceneReveal reveal={reveal} ctx={planned.ctx} colors={colors} definition={definition} /> : null}
     </AbsoluteFill>
   );
+}
+
+/**
+ * The colour a film fades through between scenes and from on its first frame. A film on a dark stage fades through
+ * its own night (the ink of the stage's words veil), never through the template's light page colour, which would
+ * flash at every cut.
+ */
+export function filmBaseColor(definition: Pick<TemplateDefinition, 'scenes'>, colors: ThemeColors): string {
+  const stage = definition.scenes?.find((s) => s.backdrop?.stage)?.backdrop?.stage;
+  return stage && STAGE_META[stage].dark ? mix(colors.primary, '#000000', 0.55) : colors.background;
 }
 
 /** Generic renderer for VIDEO and DIGITAL_CARD template definitions. */
@@ -377,8 +483,10 @@ export function TemplateVideo(props: TemplateVideoProps) {
   const definition = { ...withFilmCustomization(props.definition, props.customization), fonts: effectiveFonts(props.definition, props.customization) };
   const ctx: RenderContext = props.customization?.custom ? { ...props.context, custom: { ...props.context.custom, ...props.customization.custom } } : props.context;
   const scenes = planScenes(definition, ctx, fps);
+  // Sizes in px below are the full frame's; a film drawn smaller (frameScale) draws them smaller too.
+  const k = frameScaleOf(props);
   return (
-    <AbsoluteFill style={{ background: colors.background, fontFamily: fontStack(definition.fonts.body, 'sans-serif') }}>
+    <AbsoluteFill style={{ background: filmBaseColor(definition, colors), fontFamily: fontStack(definition.fonts.body, 'sans-serif') }}>
       {scenes.map((s) => (
         <Sequence key={s.key} from={s.from} durationInFrames={s.frames}>
           <SceneView planned={s} colors={colors} definition={definition} language={props.language} />
@@ -392,8 +500,8 @@ export function TemplateVideo(props: TemplateVideoProps) {
       ) : null}
       {props.watermark ? (
         // A dark translucent pill stays legible on light and dark templates alike.
-        <div style={{ position: 'absolute', bottom: 32, width: '100%', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ background: 'rgba(20,16,12,0.55)', color: '#ffffff', fontSize: 26, padding: '8px 22px', borderRadius: 999, letterSpacing: 0.5 }}>
+        <div style={{ position: 'absolute', bottom: 32 * k, width: '100%', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ background: 'rgba(20,16,12,0.55)', color: '#ffffff', fontSize: 26 * k, padding: `${8 * k}px ${22 * k}px`, borderRadius: 999, letterSpacing: 0.5 * k }}>
             {createTranslator(props.language)('template.madeWith')} · bulava.in
           </div>
         </div>

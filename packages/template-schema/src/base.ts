@@ -54,6 +54,51 @@ export type SceneNameValue = (typeof SCENE_NAMES)[number];
 /** Scenes drawn on the primary colour: text over them uses light inks. */
 export const DARK_SCENE_NAMES: readonly SceneNameValue[] = ['palace', 'toran', 'arches', 'noir', 'sarovar', 'vrindavan'];
 
+/** Signature 3D stages (template-engine/src/stage, ADR-078): sets in CSS 3D that a camera moves through. */
+export const STAGE_NAMES = ['sheeshMahal', 'chaarBagh', 'causeway', 'nave', 'courtyard', 'rooftop', 'bigTop', 'ballroom', 'cloudNine', 'aangan', 'ghat', 'mandapam', 'dwaar', 'deepstambh', 'bazaar', 'auditorium', 'quadrangle', 'mela', 'veranda'] as const;
+export type StageNameValue = (typeof STAGE_NAMES)[number];
+export interface StageMeta {
+  /** Light inks over it (the website words, the film's text). */
+  dark: boolean;
+  names: 'script' | 'caps' | 'italic';
+  /** Where the hero's words start, as a fraction of the hero's height (below the crown band). */
+  textTop: number;
+  /** Films: px on the 1080×1920 frame that text drops below the crown band. */
+  filmTextDrop: number;
+  architecture: string;
+  time: 'dawn' | 'morning' | 'day' | 'golden' | 'dusk' | 'blue' | 'night';
+}
+/**
+ * What the catalog, posters and apps know of a stage without importing its art:
+ * its darkness, name style, where the words start, the film's text drop, and
+ * its (architecture, time) pair (unique across stages).
+ */
+export const STAGE_META: Readonly<Record<StageNameValue, StageMeta>> = {
+  sheeshMahal: { dark: true, names: 'script', textTop: 0.22, filmTextDrop: 230, architecture: 'mirror hall', time: 'night' },
+  chaarBagh: { dark: true, names: 'script', textTop: 0.14, filmTextDrop: 80, architecture: 'garden channel', time: 'blue' },
+  causeway: { dark: false, names: 'caps', textTop: 0.1, filmTextDrop: 0, architecture: 'causeway over water', time: 'dawn' },
+  nave: { dark: false, names: 'italic', textTop: 0.14, filmTextDrop: 80, architecture: 'chapel nave', time: 'golden' },
+  courtyard: { dark: false, names: 'script', textTop: 0.1, filmTextDrop: 0, architecture: 'arcaded courtyard', time: 'golden' },
+  rooftop: { dark: true, names: 'script', textTop: 0.16, filmTextDrop: 120, architecture: 'rooftop terrace', time: 'blue' },
+  bigTop: { dark: true, names: 'caps', textTop: 0.16, filmTextDrop: 120, architecture: 'circus tent', time: 'night' },
+  ballroom: { dark: true, names: 'script', textTop: 0.2, filmTextDrop: 190, architecture: 'ballroom', time: 'night' },
+  cloudNine: { dark: false, names: 'script', textTop: 0.17, filmTextDrop: 130, architecture: 'sky of clouds', time: 'dawn' },
+  aangan: { dark: false, names: 'script', textTop: 0.16, filmTextDrop: 120, architecture: 'veranda courtyard', time: 'dawn' },
+  ghat: { dark: false, names: 'caps', textTop: 0.1, filmTextDrop: 0, architecture: 'river ghat', time: 'dawn' },
+  mandapam: { dark: false, names: 'caps', textTop: 0.14, filmTextDrop: 80, architecture: 'pillared hall', time: 'morning' },
+  dwaar: { dark: true, names: 'caps', textTop: 0.12, filmTextDrop: 40, architecture: 'house threshold', time: 'blue' },
+  deepstambh: { dark: true, names: 'caps', textTop: 0.12, filmTextDrop: 40, architecture: 'temple courtyard', time: 'dusk' },
+  bazaar: { dark: true, names: 'script', textTop: 0.16, filmTextDrop: 120, architecture: 'festive lane', time: 'night' },
+  auditorium: { dark: true, names: 'caps', textTop: 0.12, filmTextDrop: 40, architecture: 'auditorium', time: 'night' },
+  quadrangle: { dark: true, names: 'caps', textTop: 0.14, filmTextDrop: 80, architecture: 'colonnaded quad', time: 'dusk' },
+  mela: { dark: true, names: 'caps', textTop: 0.14, filmTextDrop: 80, architecture: 'fair square', time: 'night' },
+  veranda: { dark: false, names: 'script', textTop: 0.1, filmTextDrop: 0, architecture: 'hill veranda', time: 'golden' },
+};
+export const DARK_STAGE_NAMES: readonly StageNameValue[] = STAGE_NAMES.filter((n) => STAGE_META[n].dark);
+/** A stage backdrop's camera (stages only; CAMERA_MOVES stay the scenes'). */
+export const STAGE_SHOTS = ['still', 'settle', 'dollyIn', 'dollyOut', 'truckLeft', 'truckRight', 'craneUp', 'craneDown', 'orbitLeft', 'orbitRight', 'riseOver', 'flyThrough', 'pullAway'] as const;
+export type StageShot = (typeof STAGE_SHOTS)[number];
+
 /**
  * Decorative motifs the engine draws itself (no external assets). A theme's
  * ornament is also its sections' suite (template-engine sections/suites.ts):

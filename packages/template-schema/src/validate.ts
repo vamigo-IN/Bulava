@@ -27,12 +27,16 @@ import {
 import {
   EFFECTS,
   INTROS,
+  isStageIntro,
   PHOTO_SLOTS,
+  STAGE_NAMES,
   TemplateDefinitionSchema,
   type EffectName,
   type Fonts,
   type IntroName,
   type PhotoSlot,
+  type SectionInstance,
+  type StageNameValue,
   type TemplateDefinition,
   type ThemeColors,
   type Value,
@@ -43,6 +47,19 @@ import { canRedraw } from './section-boards';
 export interface ValidationIssue {
   path: string;
   message: string;
+}
+
+/** The stage a hero section shows (ADR-078): its `props.stage` literal when it is a stage hero, else null. */
+export function heroStage(section: Pick<SectionInstance, 'section' | 'variant' | 'props'> | undefined): StageNameValue | null {
+  if (!section || section.section !== 'hero' || section.variant !== 'stage') return null;
+  const ref = section.props.stage;
+  const name = ref && 'literal' in ref ? String(ref.literal) : '';
+  return (STAGE_NAMES as readonly string[]).includes(name) ? (name as StageNameValue) : null;
+}
+
+/** The stage of a template whose first section is a stage hero (the only templates that take stage openings), else null. */
+export function templateStage(definition: Pick<TemplateDefinition, 'website'>): StageNameValue | null {
+  return heroStage(definition.website?.pages[0]?.sections[0]);
 }
 
 export type DefinitionValidation =
@@ -123,6 +140,9 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
         const key = ref && 'literal' in ref ? String(ref.literal) : undefined;
         if (!key || !d.artworks?.[key]) issues.push({ path: `${base}.props.artwork`, message: 'Choose one of this template’s artworks: { "literal": "<key>" }' });
       }
+      if (s.section === 'hero' && s.variant === 'stage' && !heroStage(s)) {
+        issues.push({ path: `${base}.props.stage`, message: 'Choose one of the stages: { "literal": "<name>" }' });
+      }
       if (s.visibleWhen?.exists && !isKnownBinding(s.visibleWhen.exists, slots)) {
         issues.push({ path: `${base}.visibleWhen.exists`, message: `Unknown binding "${s.visibleWhen.exists}"` });
       }
@@ -141,8 +161,15 @@ export function validateTemplateDefinition(input: unknown): DefinitionValidation
     });
   });
 
+  // Stage openings move through a stage hero (ADR-078): the page has to open on one.
+  if (d.website && isStageIntro(d.website.intro) && !templateStage(d)) {
+    issues.push({ path: 'website.intro', message: 'This opening needs a 3D stage: make the first section a stage hero' });
+  }
+
   const sceneIds = new Set<string>();
   d.scenes?.forEach((scene, si) => {
+    if (isStageIntro(scene.reveal) && !scene.backdrop?.stage) issues.push({ path: `scenes.${si}.reveal`, message: 'This opening needs a 3D stage backdrop' });
+    if (scene.backdrop?.shot && !scene.backdrop.stage) issues.push({ path: `scenes.${si}.backdrop.shot`, message: 'Only a stage backdrop takes a shot' });
     if (sceneIds.has(scene.id)) issues.push({ path: `scenes.${si}.id`, message: `Duplicate scene id "${scene.id}"` });
     sceneIds.add(scene.id);
     if (scene.backdrop?.artwork && !d.artworks?.[scene.backdrop.artwork]) {
@@ -323,7 +350,10 @@ function canvasCustomizationIssues(definition: TemplateDefinition, canvas: Canva
   // The drawn sections were checked above (the template's own section is no longer on the merged page).
   const plain = added.map((a) => ({ ...a, mobile: { ...a.mobile, layers: a.mobile.layers.filter((layer) => layer.kind !== 'section') } }));
   const applied = validateTemplateDefinition(withCanvasCustomization(definition, canvas, plain));
-  if (!applied.ok) issues.push(...applied.issues.map((i) => ({ path: `canvas (${i.path})`, message: i.message })));
+  // A stage opening on a template whose stage hero the host redrew still plays: the stand-in keeps the
+  // stage behind its words, and without a stage DOM the opening falls back to its 2D twin (ADR-078).
+  const redrawnStage = (i: { path: string }) => i.path === 'website.intro' && templateStage(definition) !== null;
+  if (!applied.ok) issues.push(...applied.issues.filter((i) => !redrawnStage(i)).map((i) => ({ path: `canvas (${i.path})`, message: i.message })));
   return issues;
 }
 
@@ -389,6 +419,8 @@ export function validateCustomization(definition: TemplateDefinition, input: unk
   }
   if ((c.intro || c.effect) && !e.animation) {
     issues.push({ path: c.intro ? 'intro' : 'effect', message: 'This template does not allow animation changes' });
+  } else if (isStageIntro(c.intro) && !templateStage(definition)) {
+    issues.push({ path: 'intro', message: 'This opening needs a 3D stage' });
   }
   if ((c.canvas && Object.keys(c.canvas).length) || c.addedSections?.length) {
     if (!e.layout) issues.push({ path: c.canvas ? 'canvas' : 'addedSections', message: 'This template does not allow layout changes' });

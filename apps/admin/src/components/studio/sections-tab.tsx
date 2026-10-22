@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, ChevronDown, PenTool, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { SECTION_VARIANTS } from '@bulava/template-engine';
-import { BINDINGS, SECTION_KEYS, SectionInstanceSchema, type SectionKey } from '@bulava/template-schema';
+import { BINDINGS, heroStage, isStageIntro, SECTION_KEYS, SectionInstanceSchema, STAGE_META, STAGE_NAMES, templateStage, type SectionKey } from '@bulava/template-schema';
 import { t } from '@/lib/i18n';
 import { emptyCanvas } from '../canvas-editor/presets';
 import { Badge, Button, Card, Input, Label, Select } from '../ui';
@@ -78,7 +78,19 @@ export function SectionsTab({ definition, edit, onOpenCanvas }: EditorProps & { 
                       <Select
                         aria-label={t('sections.variant')}
                         value={variants.includes(section.variant) ? section.variant : variants[0]}
-                        onChange={(e) => run((d) => void (d.website!.pages[pageIndex]!.sections[i]!.variant = e.target.value))}
+                        onChange={(e) =>
+                          run((d) => {
+                            const s = d.website!.pages[pageIndex]!.sections[i]!;
+                            s.variant = e.target.value;
+                            // A stage hero needs its stage (ADR-078): it starts on the first one, chosen beside the layout.
+                            if (s.section === 'hero' && s.variant === 'stage' && !heroStage(s)) s.props.stage = { literal: STAGE_NAMES[0] };
+                            if (s.section === 'hero' && s.variant !== 'stage') {
+                              delete s.props.stage;
+                              // The 3D openings move through a stage hero: leaving the stage leaves its opening too.
+                              if (isStageIntro(d.website!.intro) && !templateStage(d)) d.website!.intro = 'none';
+                            }
+                          })
+                        }
                         className="min-h-8 w-auto py-0 text-xs"
                         disabled={variants.length < 2}
                       >
@@ -88,6 +100,21 @@ export function SectionsTab({ definition, edit, onOpenCanvas }: EditorProps & { 
                           </option>
                         ))}
                       </Select>
+                      {section.section === 'hero' && section.variant === 'stage' ? (
+                        <Select
+                          aria-label={t('sections.stage')}
+                          value={heroStage(section) ?? ''}
+                          onChange={(e) => run((d) => void (d.website!.pages[pageIndex]!.sections[i]!.props.stage = { literal: e.target.value }))}
+                          className="min-h-8 w-auto py-0 text-xs"
+                        >
+                          {heroStage(section) ? null : <option value="">{t('sections.stage')}</option>}
+                          {STAGE_NAMES.map((name) => (
+                            <option key={name} value={name}>
+                              {name} · {STAGE_META[name].architecture}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : null}
                       <Button size="icon" variant="ghost" aria-label={t('sections.moveUp')} disabled={i === 0} onClick={() => run((d) => move(d.website!.pages[pageIndex]!.sections, i, -1))}>
                         <ArrowUp className="size-4" />
                       </Button>

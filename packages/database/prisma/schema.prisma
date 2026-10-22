@@ -1653,7 +1653,7 @@ model Testimonial {
 /// Templates staff chose for a home page section (and the first cards of the
 /// card gallery), by key and in order. A section without a row chooses its own.
 model ShowcaseSection {
-  /// hero | heroBack | scenes | collection | spotlight | videos | cards (SHOWCASE_SECTIONS in @bulava/validation).
+  /// hero | heroBack | scenes | stages | collection | spotlight | videos | cards (SHOWCASE_SECTIONS in @bulava/validation).
   section      String   @id
   templateKeys String[]
   updatedById  String?  @db.Uuid

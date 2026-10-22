@@ -130,7 +130,7 @@ Approval rules (spec §31–33, §82):
 
 Only approved tracks with a current licence are offered to hosts (`GET /music`) and ever play on invitations or in rendered videos.
 
-For development, `node infrastructure/scripts/demo-music.mjs` synthesizes an original, royalty-free track (a tanpura drone with a pentatonic melody) and registers it through this same admin flow. The same track ships in `packages/database/seed-assets/music`; the production `migrate` job uploads it and adds it to the library, approved, when `SEED_ORIGINAL_MUSIC=true` (it skips a track already in the library under the same title).
+For development, `node infrastructure/scripts/demo-music.mjs` synthesizes an original, royalty-free track (a tanpura drone with a pentatonic melody) and registers it through this same admin flow. Bulava's own collection is composed by `infrastructure/scripts/compose-music.mjs` ([templates.md](templates.md#in-house-music)); it and the demo track ship in `packages/database/seed-assets/music` (`ORIGINAL_TRACKS`), and the production `migrate` job uploads them and adds them to the library, approved, when `SEED_ORIGINAL_MUSIC=true` (it skips a track already in the library under the same storage key or title).
 
 ## Testing
 

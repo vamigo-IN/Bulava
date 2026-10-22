@@ -279,6 +279,21 @@ export const ILLUSTRATIONS = [
   'satinRibbon',
   'satinBow',
   'waxSeal',
+  // Props from the Signature 3D stages (illustrations-stage.tsx, the stage kit's own art).
+  'chandelier',
+  'candelabra',
+  'lampPost',
+  'hangingLantern',
+  'carvedPillar',
+  'fountain',
+  'pottedPalm',
+  'bananaPlant',
+  'sacredFire',
+  'stall',
+  // Set favourites promoted to the kit (stage/kit/favourites.tsx): Mela Chowk's Ferris wheel, Cloud Nine's balloon, Deepstambh's lamp tower.
+  'ferrisWheel',
+  'hotAirBalloon',
+  'lampTower',
 ] as const;
 export type IllustrationName = (typeof ILLUSTRATIONS)[number];
 

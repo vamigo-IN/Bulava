@@ -4,7 +4,7 @@ import { Clapperboard, CopyPlus, Images, Palette, RectangleHorizontal, Rectangle
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 import { createTranslator, type MessageKey } from '@bulava/localization';
-import { backdropArt, CanvasArtboard, SceneStill, themeStyle } from '@bulava/template-engine';
+import { backdropArt, CanvasArtboard, SceneStill, StageStill, themeStyle } from '@bulava/template-engine';
 import {
   ADDED_SCENE_SECONDS,
   ADDED_SCENES_MAX,
@@ -18,6 +18,7 @@ import {
   FILM_FORMATS,
   FILM_MAX_SECONDS,
   sceneBoard,
+  STAGE_META,
   stableStringify,
   videoDurationSec,
   withFilmCustomization,
@@ -67,9 +68,15 @@ const sceneBackground = (scene: Scene, colors: ThemeColors): string =>
 function FilmBoard({ board, scene, definition, colors, fonts, ctx, language, width, height }: { board: Artboard; scene: Scene; definition: TemplateDefinition; colors: ThemeColors; fonts: Fonts; ctx: RenderContext; language: string; width: number; height: number }) {
   const t = useMemo(() => createTranslator(language), [language]);
   const art = useMemo(() => (scene.backdrop ? backdropArt(definition, scene.backdrop, colors, { width: 1200 }) : null), [scene.backdrop, definition, colors]);
+  // A Signature 3D stage (ADR-078): the set at its rest pose, as the film starts it before the camera moves, under the
+  // scene's own veil as the film draws it.
+  const stage = scene.backdrop?.stage;
+  const veil = scene.backdrop?.veil ?? 0;
+  const still = useMemo(() => (stage ? <StageStill name={stage} colors={colors} width={width} height={height} veil={veil} /> : null), [stage, colors, width, height, veil]);
   const omit = useMemo(() => filmOmits(board), [board]);
   return (
     <div style={{ position: 'relative', width: '100%', aspectRatio: `${board.width} / ${board.height}`, overflow: 'hidden', background: art?.background ?? sceneBackground(scene, colors) }}>
+      {still ? <div style={{ position: 'absolute', inset: 0 }}>{still}</div> : null}
       {art ? (
         <div style={{ position: 'absolute', inset: 0 }}>
           <SceneStill art={art} width={width} height={height} />
@@ -88,6 +95,7 @@ const STARTERS: Starter[] = ['words', 'photo', 'date', 'blank'];
 /** Does the scene's look need light words (a dark backdrop or background)? */
 function darkLook(scene: Scene | undefined, definition: TemplateDefinition): boolean {
   if (!scene) return false;
+  if (scene.backdrop?.stage) return STAGE_META[scene.backdrop.stage].dark;
   if (scene.backdrop?.scene) return DARK_SCENE_NAMES.includes(scene.backdrop.scene);
   if (scene.backdrop?.artwork) return Boolean(definition.artworks?.[scene.backdrop.artwork]?.dark);
   return scene.background === 'primary' || scene.background === 'gradient';

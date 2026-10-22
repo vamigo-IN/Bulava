@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Translator } from '@bulava/localization';
-import type { Artwork, Fonts, LookName, RenderContext, SectionInstance, ThemeColors, ThemeDress } from '@bulava/template-schema';
+import type { Artwork, EffectName, Fonts, IntroName, LookName, RenderContext, SectionInstance, ThemeColors, ThemeDress } from '@bulava/template-schema';
 import type { OrnamentName } from './ornaments';
 
 /** Interactive pieces the host app injects into template slots. */
@@ -53,4 +53,9 @@ export interface SectionProps {
   rsvpSectionId?: string;
   /** Draws one of the template's own sections behind a host's redrawn one (canvas section layers, ADR-065). */
   drawSection?: (sectionId: string, index: number) => ReactNode;
+  /**
+   * The page's effective opening and effect (effectiveMotion): a stage hero builds its
+   * opening's cover pieces and draws the effect as particles at depth (ADR-078).
+   */
+  motion?: { intro: IntroName; effect: EffectName };
 }

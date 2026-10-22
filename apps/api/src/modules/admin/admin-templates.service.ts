@@ -61,7 +61,8 @@ export const UpdateTemplateMetaSchema = z.object({
   featured: z.boolean().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   eventTypes: z.array(z.string().max(40)).max(20).optional(),
-  sortOrder: z.number().int().min(0).max(100_000).optional(),
+  /** Below 0 places a template ahead of the catalog's own order (the Signature 3D collection is seeded at -100…-42). */
+  sortOrder: z.number().int().min(-1000).max(100_000).optional(),
 });
 export type UpdateTemplateMetaInput = z.infer<typeof UpdateTemplateMetaSchema>;
 

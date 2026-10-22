@@ -1,10 +1,12 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { EMBLEM_NAMES, type IllustrationName, type ThemeColors } from '@bulava/template-schema';
+import { EMBLEM_NAMES, STAGE_META, STAGE_NAMES, type IllustrationName, type StageNameValue, type ThemeColors } from '@bulava/template-schema';
 import { ArchFrame, Confetti, FloralCorner, Mandala, Ornament, patternStyle, TempleBorder } from '../ornaments';
 import { CrestFrame, Crescent, GothicArch, Lantern, Laurel, PeacockFeather, RoseWindow, SeaWaves, StarField } from '../ornaments-signature';
 import { ILLUSTRATION_ASPECT, Illustration } from '../art/illustrations';
 import { emblemMetal } from '../art/illustrations-faith';
 import { artworkArt, DARK_SCENES, SceneHero, sceneArt, type SceneName } from '../art/scenes';
+import { coverMonogram } from '../covers';
+import { StageHero } from '../stage/hero';
 import type { SectionProps } from '../types';
 import { cx, initials, Names } from './shared';
 
@@ -31,6 +33,11 @@ function HeroEmblem({ name, colors, dark, shadow, className }: { name: Illustrat
 /** The hero's emblem prop, when it names a faith emblem. */
 function emblemOf(value: string | undefined): IllustrationName | undefined {
   return value && EMBLEM_NAMES.has(value) ? (value as IllustrationName) : undefined;
+}
+
+/** The stage a hero's `stage` prop names (a STAGE_NAMES literal), or null: old data falls back to the default variant. */
+function stageOf(value: string | undefined): StageNameValue | null {
+  return value && (STAGE_NAMES as readonly string[]).includes(value) ? (value as StageNameValue) : null;
 }
 
 /** Name styling per scene: grand capitals for heritage scenes, italic serif for noir, script elsewhere. */
@@ -67,6 +74,9 @@ const SCENE_TYPE: Partial<Record<string, 'script' | 'caps' | 'italic'>> = {
  * Illustrated scenes with layered 3D parallax (art/scenes.tsx):
  *  gopuram, palace, toran, arches, lotus, mandap, noir, floral, balloons, backwaters, sarovar, vrindavan
  *  artwork – one of the template's painted artworks (prop `artwork`: its key; `nameStyle`: script, caps or italic)
+ * A Signature 3D stage (stage/hero.tsx, ADR-078):
+ *  stage – a set in CSS 3D the guest looks into (prop `stage`: one of STAGE_NAMES); its darkness,
+ *          name style and where the words start come from STAGE_META
  * Theme heroTone "dark" sets the hero on the primary colour with gold type.
  * Props: invocation, eyebrow, title, subtitle, date, place, tagline, image
  */
@@ -85,6 +95,18 @@ export function Hero(p: SectionProps) {
   const pattern = patternStyle(p.pattern, dark ? p.colors.accent : p.colors.secondary);
   const surface: CSSProperties = dark ? { ...pattern, backgroundColor: p.colors.primary, color: 'var(--t-on-primary)' } : pattern;
   const ornamentColor = dark ? 'text-[var(--t-accent)]' : 'text-[var(--t-secondary)]';
+
+  if (p.instance.variant === 'stage') {
+    const name = stageOf(v('stage'));
+    if (name) {
+      const meta = STAGE_META[name];
+      return (
+        <StageHero name={name} colors={p.colors} mode={p.mode} intro={p.motion?.intro} effect={p.motion?.effect ?? 'none'} monogram={coverMonogram(p.ctx.couple, initials(title))}>
+          <HeroText {...common} dark={meta.dark} names={meta.names} emblem={emblem(meta.dark)} typeLines />
+        </StageHero>
+      );
+    }
+  }
 
   const scene = SCENE_TYPE[p.instance.variant];
   if (scene) {
@@ -337,6 +359,7 @@ function HeroText({
   names: namesStyle = 'script',
   portrait,
   emblem,
+  typeLines,
 }: {
   title: string;
   greeting?: string;
@@ -355,23 +378,51 @@ function HeroText({
   portrait?: string;
   /** The faith emblem, above everything (HeroEmblem). */
   emblem?: ReactNode;
+  /**
+   * Stage heroes: the words a stage opening sets in 3D (final.md §3.1.6). The root is
+   * `[data-stage-words]`, the names turn up line by line (`data-line`, sections/shared.tsx)
+   * and the rest fades in (`data-type-fade`: head before the names, tail after them).
+   */
+  typeLines?: boolean;
 }) {
   const onColor = inverse || dark;
   // Text on a dark hero sits on the primary colour; on a light hero, on the page background.
   const accent = inverse ? 'text-[var(--t-accent)]' : dark ? 'text-[var(--t-accent-on-primary)]' : 'text-[var(--t-secondary-ink)]';
   const names = inverse ? 'text-white' : dark ? 'text-[var(--t-accent-on-primary)]' : 'text-[var(--t-primary-ink)]';
+  const ink = inverse ? '#ffffff' : dark ? 'var(--t-accent-on-primary)' : 'var(--t-primary-ink)';
+  const head = typeLines ? { 'data-type-fade': 'head' } : {};
+  const tail = typeLines ? { 'data-type-fade': 'tail' } : {};
   return (
-    <div className={cx('flex flex-col', align === 'left' ? 'items-center @min-[640px]:items-start' : 'items-center', dark && !inverse && 'text-[var(--t-on-primary)]')}>
-      {emblem ? <div className="mb-4">{emblem}</div> : null}
+    <div className={cx('flex flex-col', align === 'left' ? 'items-center @min-[640px]:items-start' : 'items-center', dark && !inverse && 'text-[var(--t-on-primary)]')} {...(typeLines ? { 'data-stage-words': '' } : {})}>
+      {emblem ? (
+        <div className="mb-4" {...head}>
+          {emblem}
+        </div>
+      ) : null}
       {portrait ? (
-        <div className="mb-5 size-24 overflow-hidden rounded-full border-[3px] border-[var(--t-accent)] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] @min-[640px]:size-28">
+        <div className="mb-5 size-24 overflow-hidden rounded-full border-[3px] border-[var(--t-accent)] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] @min-[640px]:size-28" {...head}>
           <img src={portrait} alt="" className="h-full w-full object-cover" loading="eager" />
         </div>
       ) : null}
-      {invocation ? <p className={cx('mb-4 text-sm', accent)}>{invocation}</p> : null}
-      {greeting ? <p className={cx('mb-3 text-lg italic [font-family:var(--t-heading)]', onColor ? 'opacity-90' : 'text-[var(--t-muted-ink)]')}>{greeting}</p> : null}
-      {eyebrow ? <p className={cx('mb-4 text-[0.7rem] font-semibold tracking-[0.35em] uppercase', accent)}>{eyebrow}</p> : null}
+      <ScrimLines scrim={!!typeLines && !!(invocation || greeting || eyebrow)} align={align} at="head">
+        {invocation ? (
+          <p className={cx('mb-4 text-sm', accent)} {...head}>
+            {invocation}
+          </p>
+        ) : null}
+        {greeting ? (
+          <p className={cx('mb-3 text-lg italic [font-family:var(--t-heading)]', onColor ? 'opacity-90' : 'text-[var(--t-muted-ink)]')} {...head}>
+            {greeting}
+          </p>
+        ) : null}
+        {eyebrow ? (
+          <p className={cx('mb-4 text-[0.7rem] font-semibold tracking-[0.35em] uppercase', accent)} {...head}>
+            {eyebrow}
+          </p>
+        ) : null}
+      </ScrimLines>
       <h1
+        style={typeLines ? ({ ['--ink' as string]: ink } as CSSProperties) : undefined}
         className={cx(
           names,
           namesStyle === 'caps'
@@ -383,14 +434,45 @@ function HeroText({
       >
         <Names text={title} className={align === 'left' ? '@min-[640px]:items-start' : undefined} ampersandClassName={dark ? 'text-[var(--t-on-primary)] normal-case tracking-normal' : 'normal-case tracking-normal'} />
       </h1>
-      {subtitle ? <p className={cx('mt-5 max-w-sm text-base', onColor ? 'opacity-85' : 'text-[var(--t-muted-ink)]')}>{subtitle}</p> : null}
-      {date ? (
-        <p className={cx('mt-6 border-y py-2 text-lg tracking-wide [font-family:var(--t-heading)]', inverse ? 'border-white/40' : dark ? 'border-[var(--t-accent)]/50' : 'border-[var(--t-secondary)]/50')}>
-          {date}
-        </p>
-      ) : null}
-      {place ? <p className={cx('mt-2 text-sm tracking-[0.2em] uppercase', onColor ? 'opacity-80' : 'text-[var(--t-muted-ink)]')}>{place}</p> : null}
-      {tagline ? <p className={cx('mt-5 text-2xl [font-family:var(--t-script)]', accent)}>{tagline}</p> : null}
+      <ScrimLines scrim={!!typeLines && !!(subtitle || date || place || tagline)} align={align} at="tail">
+        {subtitle ? (
+          <p className={cx('mt-5 max-w-sm text-base', onColor ? 'opacity-85' : 'text-[var(--t-muted-ink)]')} {...tail}>
+            {subtitle}
+          </p>
+        ) : null}
+        {date ? (
+          <p className={cx('mt-6 border-y py-2 text-lg tracking-wide [font-family:var(--t-heading)]', inverse ? 'border-white/40' : dark ? 'border-[var(--t-accent)]/50' : 'border-[var(--t-secondary)]/50')} {...tail}>
+            {date}
+          </p>
+        ) : null}
+        {place ? (
+          <p className={cx('mt-2 text-sm tracking-[0.2em] uppercase', onColor ? 'opacity-80' : 'text-[var(--t-muted-ink)]')} {...tail}>
+            {place}
+          </p>
+        ) : null}
+        {tagline ? (
+          <p className={cx('mt-5 text-2xl [font-family:var(--t-script)]', accent)} {...tail}>
+            {tagline}
+          </p>
+        ) : null}
+      </ScrimLines>
+    </div>
+  );
+}
+
+/**
+ * The lines above and below the names. On a stage hero each group stands together over a words scrim
+ * (`.bulava-stage-scrim`, StageStyles, in the colour StageHero gives `--bulava-scrim`): a soft pool sized by those
+ * lines, painted behind them, so the small lines read wherever the block runs over the set's art (the head lines
+ * often sit on a ceiling or a sky the veil barely lightens). The names between them keep the stage behind them.
+ * Elsewhere they are the block's own lines.
+ */
+function ScrimLines({ scrim, align, at, children }: { scrim: boolean; align: 'center' | 'left'; at: 'head' | 'tail'; children: ReactNode }) {
+  if (!scrim) return <>{children}</>;
+  return (
+    <div className={cx('relative flex flex-col', align === 'left' ? 'items-center @min-[640px]:items-start' : 'items-center')}>
+      {children}
+      <div className="bulava-stage-scrim" data-scrim={at} aria-hidden="true" />
     </div>
   );
 }

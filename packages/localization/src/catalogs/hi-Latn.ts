@@ -40,4 +40,8 @@ export const hiLatn: Catalog = {
   'register.redirecting': 'Aapka invitation khul raha hai…',
   'template.intro.zipper': 'Kholne ke liye tag neeche kheenchiye',
   'template.intro.ribbon': 'Kholne ke liye ribbon kheenchiye',
+  'template.intro.arrival': 'Pravesh ke liye tap kijiye',
+  'template.intro.doorway': 'Dwaar kholne ke liye tap kijiye',
+  'template.intro.silk': 'Reshmi parda uthane ke liye upar kheenchiye',
+  'template.intro.unfold': 'Nimantran kholne ke liye tap kijiye',
 };

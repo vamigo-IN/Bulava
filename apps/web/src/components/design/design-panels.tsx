@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { StockSearch, type StockSource } from '@/components/editor/stock-search';
 import { fontStack } from '@bulava/template-engine';
 import type { MessageKey } from '@bulava/localization';
-import { EFFECTS, FONT_PAIRINGS, INTROS, samplePreset, type Customization, type EffectName, type IntroName, type PhotoSlot, type TemplateDefinition, type ThemeColors } from '@bulava/template-schema';
+import { EFFECTS, FONT_PAIRINGS, INTROS, isStageIntro, samplePreset, templateStage, type Customization, type EffectName, type IntroName, type PhotoSlot, type TemplateDefinition, type ThemeColors } from '@bulava/template-schema';
 import { MusicPicker } from '@/components/events/music-picker';
 import { Alert, Input, Textarea } from '@/components/ui/primitives';
 import { useT } from '@/lib/i18n';
@@ -360,12 +360,26 @@ export function WordsPanel({ definition, custom, setCustom }: PanelProps) {
 
 const EFFECT_ICONS: Record<EffectName, string> = { none: '○', petals: '🌸', marigold: '🏵️', goldDust: '✨', fireflies: '🪲', confetti: '🎊', lanterns: '🏮', snow: '❄️' };
 
+/**
+ * The openings a host may choose: the template's own first, then (on a template whose
+ * first section is a 3D stage, ADR-078) the other stage openings, then the rest. Stage
+ * openings move through the stage hero, so other templates never offer them.
+ */
+function openingsFor(definition: TemplateDefinition): IntroName[] {
+  const own = definition.website?.intro ?? 'none';
+  const stage = templateStage(definition) !== null;
+  const offered = INTROS.filter((name) => stage || !isStageIntro(name));
+  const stageFirst = [...offered.filter((name) => isStageIntro(name)), ...offered.filter((name) => !isStageIntro(name))];
+  return [own, ...stageFirst.filter((name) => name !== own)];
+}
+
 /** `musicNote`: said beside the music (a plan without it, on an event). */
 export function MotionPanel({ definition, custom, setCustom, musicNote }: PanelProps & { musicNote?: ReactNode }) {
   const t = useT();
   const caps = definition.capabilities;
   const intro = custom.intro ?? definition.website?.intro ?? 'none';
   const effect = custom.effect ?? definition.theme.effect ?? 'none';
+  const intros = useMemo(() => openingsFor(definition), [definition]);
   return (
     <div className="space-y-8">
       {caps.editable.animation ? (
@@ -374,7 +388,7 @@ export function MotionPanel({ definition, custom, setCustom, musicNote }: PanelP
             <legend className="text-sm font-semibold">{t('design.motion.opening')}</legend>
             <p className="mb-3 text-xs text-stone-500">{t('design.motion.openingNote')}</p>
             <div className="grid grid-cols-2 gap-2">
-              {INTROS.map((name: IntroName) => (
+              {intros.map((name: IntroName) => (
                 <button
                   key={name}
                   type="button"
@@ -410,7 +424,16 @@ export function MotionPanel({ definition, custom, setCustom, musicNote }: PanelP
       {caps.editable.music ? (
         <div className="space-y-3">
           {musicNote}
-          <MusicPicker value={custom.musicId} onChange={(musicId) => setCustom({ ...custom, musicId })} />
+          <MusicPicker
+            value={custom.musicId}
+            templateTrack={Boolean(definition.music?.defaultTrack || definition.music?.defaultMusicId)}
+            onChange={(musicId) => {
+              // Unset (the template's own music) is no key at all; `null` is the host's "No music".
+              const next = { ...custom, musicId };
+              if (musicId === undefined) delete next.musicId;
+              setCustom(next);
+            }}
+          />
         </div>
       ) : null}
     </div>

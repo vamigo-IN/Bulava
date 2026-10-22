@@ -84,6 +84,7 @@ export function CanvasScene({
   language,
   frames,
   offsetSec = 0,
+  coversWait = false,
 }: {
   canvas: SceneCanvas;
   ctx: RenderContext;
@@ -94,6 +95,11 @@ export function CanvasScene({
   frames: number;
   /** Seconds before the first layer comes in (a scene that opens under a cover waits for it to open). */
   offsetSec?: number;
+  /**
+   * Whether the layers that cover the board (there from the start elsewhere) wait for `offsetSec` too: a stage opening
+   * plays under the board, not under a cover drawn over it, so nothing of the board may float over the closed cover.
+   */
+  coversWait?: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -111,7 +117,11 @@ export function CanvasScene({
 
   const layerStyle = (layer: Layer): CSSProperties | undefined => {
     const start = starts.get(layer.id);
-    if (start === undefined) return undefined;
+    if (start === undefined) {
+      if (!coversWait || offsetSec <= 0) return undefined;
+      // A layer that covers the board fades in as the words start.
+      return { opacity: interpolate(frame, [offsetSec * fps, (offsetSec + 0.5) * fps], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) };
+    }
     const from = start * fps;
     const to = from + Math.max(0.4, Math.min(1.6, layer.animation.durationSec || 0.9)) * fps;
     const q = interpolate(frame, [from, to], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });

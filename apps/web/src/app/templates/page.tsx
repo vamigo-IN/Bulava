@@ -21,7 +21,9 @@ export const metadata: Metadata = {
 
 const PAGE_SIZE = 24;
 
-const TRADITIONS = ['signature', 'hindu', 'sikh', 'muslim', 'south-indian', 'christian', 'bengali', 'marathi', 'gujarati', 'punjabi', 'rajasthani', 'destination', 'modern'];
+// 'stage' (Signature 3D, "3D walk-in") is a style like 'signature': the home page's walk-in section links to ?tag=stage,
+// and an option here gives that filter its chip and its place in the sidebar.
+const TRADITIONS = ['signature', 'stage', 'hindu', 'sikh', 'muslim', 'south-indian', 'christian', 'bengali', 'marathi', 'gujarati', 'punjabi', 'rajasthani', 'destination', 'modern'];
 
 export default async function TemplatesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;

@@ -33,6 +33,19 @@ const KEYWORDS: Record<string, string> = {
   crescentStar: 'faith muslim emblem',
   khanda: 'faith sikh emblem',
   cross: 'faith christian emblem',
+  chandelier: 'stage 3d light lamp crystal ballroom palace candles hanging',
+  candelabra: 'stage 3d light lamp candles candle stand brass church',
+  lampPost: 'stage 3d light lamp street lantern post garden',
+  hangingLantern: 'stage 3d light lamp lantern brass hanging moroccan',
+  carvedPillar: 'stage 3d pillar column temple stone granite carved architecture',
+  fountain: 'stage 3d fountain water garden marble courtyard',
+  pottedPalm: 'stage 3d plant palm pot planter leaves brass urn',
+  bananaPlant: 'stage 3d plant banana tree leaves south indian wedding',
+  sacredFire: 'stage 3d fire havan agni hindu wedding pheras flame',
+  stall: 'stage 3d stall shop sweets mithai mela bazaar fair',
+  ferrisWheel: 'stage 3d ferris wheel giant wheel mela fair carnival lights ride',
+  hotAirBalloon: 'stage 3d hot air balloon sky baby shower travel adventure',
+  lampTower: 'stage 3d lamp tower deepastambha deepmala diya stambh temple diwali aarti flame',
 };
 
 /** "royalPeacock" → "royal peacock". */

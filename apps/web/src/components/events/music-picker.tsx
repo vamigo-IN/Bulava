@@ -18,9 +18,24 @@ export interface LicensedTrack {
 
 const duration = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
-/** Choose a licensed track (or none), with in-place previews. */
-export function MusicPicker({ value, onChange }: { value: string | null | undefined; onChange: (musicId: string | null) => void }) {
+/**
+ * Choose a licensed track (or none), with in-place previews. With
+ * `templateTrack` (the template names its own music) the first choice is the
+ * template's own track, `undefined`, kept apart from "No music", `null`;
+ * without it, an unset value reads as no music.
+ */
+export function MusicPicker({
+  value,
+  onChange,
+  templateTrack = false,
+}: {
+  value: string | null | undefined;
+  onChange: (musicId: string | null | undefined) => void;
+  templateTrack?: boolean;
+}) {
   const t = useT();
+  const own = templateTrack && value === undefined;
+  const none = templateTrack ? value === null : !value;
   const tracks = useQuery({ queryKey: ['music'], queryFn: () => apiGet<LicensedTrack[]>('/music'), staleTime: 300_000 });
   const audio = useRef<HTMLAudioElement | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
@@ -42,8 +57,14 @@ export function MusicPicker({ value, onChange }: { value: string | null | undefi
     <fieldset>
       <legend className="mb-1 text-sm font-semibold">{t('video.music')}</legend>
       <div role="radiogroup" className="space-y-1.5">
-        <label className={cn('flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm', !value ? 'border-brand-700 bg-brand-50' : 'border-gold-200')}>
-          <input type="radio" name="music" className="accent-brand-700" checked={!value} onChange={() => onChange(null)} />
+        {templateTrack ? (
+          <label className={cn('flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm', own ? 'border-brand-700 bg-brand-50' : 'border-gold-200')}>
+            <input type="radio" name="music" className="accent-brand-700" checked={own} onChange={() => onChange(undefined)} />
+            {t('video.music.template')}
+          </label>
+        ) : null}
+        <label className={cn('flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm', none ? 'border-brand-700 bg-brand-50' : 'border-gold-200')}>
+          <input type="radio" name="music" className="accent-brand-700" checked={none} onChange={() => onChange(null)} />
           {t('video.music.none')}
         </label>
         {tracks.data?.map((track) => (

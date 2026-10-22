@@ -12,6 +12,21 @@ import { Alpana, Ghungroo, Kuthuvilakku, LaalPaar, MarigoldSwag, MarigoldWreath,
 import { CrescentStar, Cross, Ganesha, Khanda } from './illustrations-faith';
 import { Fanoos, GirihRosette, GoldenTemple, JaaliArch, LancetWindow, Lilies, PhulkariBagh, WeddingBells } from './illustrations-sacred';
 import { SatinBow, SatinRibbon, ScallopTag, WaxSeal, Zipper, ZipperPull } from './illustrations-atelier';
+import {
+  BananaPlantArt,
+  CandelabraArt,
+  CarvedPillarArt,
+  ChandelierArt,
+  FerrisWheelArt,
+  FountainArt,
+  HangingLanternArt,
+  HotAirBalloonArt,
+  LampPostArt,
+  LampTowerArt,
+  PottedPalmArt,
+  SacredFireArt,
+  StallArt,
+} from './illustrations-stage';
 
 export type { IllustrationProps } from './kit';
 export { foilCss, metalStops } from './kit';
@@ -109,6 +124,19 @@ const COMPONENTS: Record<IllustrationName, (props: IllustrationProps) => ReactNo
   satinRibbon: SatinRibbon,
   satinBow: SatinBow,
   waxSeal: WaxSeal,
+  chandelier: ChandelierArt,
+  candelabra: CandelabraArt,
+  lampPost: LampPostArt,
+  hangingLantern: HangingLanternArt,
+  carvedPillar: CarvedPillarArt,
+  fountain: FountainArt,
+  pottedPalm: PottedPalmArt,
+  bananaPlant: BananaPlantArt,
+  sacredFire: SacredFireArt,
+  stall: StallArt,
+  ferrisWheel: FerrisWheelArt,
+  hotAirBalloon: HotAirBalloonArt,
+  lampTower: LampTowerArt,
 };
 
 /** Drawn to the layer's own size (frames, garlands, strings); the others keep their proportions inside it. */
@@ -203,6 +231,20 @@ export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
   satinRibbon: 6,
   satinBow: 300 / 210,
   waxSeal: 1,
+  // The stage kit's default boxes (stage/kit: LIGHTS_BOXES, ARCHITECTURE_BOXES, NATURE_BOXES).
+  chandelier: 260 / 170,
+  candelabra: 60 / 300,
+  lampPost: 40 / 300,
+  hangingLantern: 60 / 160,
+  carvedPillar: 70 / 470,
+  fountain: 260 / 300,
+  pottedPalm: 160 / 330,
+  bananaPlant: 140 / 420,
+  sacredFire: 140 / 150,
+  stall: 200 / 240,
+  ferrisWheel: 1,
+  hotAirBalloon: 180 / 250,
+  lampTower: 150 / 470,
 };
 
 export { JAALI_ARCH_OPENING, LANCET_OPENING } from './illustrations-sacred';

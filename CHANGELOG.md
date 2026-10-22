@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Signature 3D: invitations you walk into, with music of their own
+
+- **Walk into your invitation.** Nineteen new Signature designs are real 3D venues: a palace hall of mirrors at night, a Mughal garden at blue hour, a marble causeway to the golden shrine at dawn, a chapel aisle in golden light, a bougainvillea courtyard, a rooftop terrace, a circus tent, a ballroom, a crescent swing above the clouds, a jasmine courtyard, the Ganga's ghats at sunrise, a granite temple hall, a home's threshold before dawn, a temple courtyard at the evening aarti, a festival lane, an auditorium, a campus lawn at dusk, a fair at night and a hill veranda at golden hour. There is one for every occasion, and a wedding for every faith and one for none. Find them on the home page under *Walk-in invitations*, or with the gallery's *3D walk-in* filter.
+- **Openings that take you in.** Guests walk through the gates, open carved doors, lift a silk curtain or unfold a card, and the camera carries them into the venue as the lights come up and the names turn into place. A tap, Enter or Space opens every one.
+- **A venue that moves.** Lanterns sway, flames flicker, water shimmers and petals fall at depth. The view breathes, steps in as guests scroll and turns gently with the pointer or the phone. Sections below rise into place in 3D, and a new gallery stands your photos on a ring guests turn with a swipe. With reduced motion, everything stays still.
+- **The same venue in the film.** Each design's video invitation is filmed in its own venue, opening the same way, with the camera moving through the set.
+- **Music made for each design.** Eighteen original tracks, composed and made by Bulava: shehnai, santoor, bansuri, temple bells, a processional, a waltz, a music box, dhol, and more. Each Signature 3D design plays its own track on the website and in the film. When making a video, choose *The template's own music*, another track, or *No music*.
+
 ### Previews made for you, and your cards in your account
 
 - **Ask for a free preview.** On the new *Free preview* page, tell us what you'd like (an invitation website, a card, a video invitation), the names, the date, the venue and your functions. A designer makes it with your details and sends you the link on WhatsApp and by email, usually within a day. Template pages and the card gallery offer it too: *Or let our designers make it for you, free*.

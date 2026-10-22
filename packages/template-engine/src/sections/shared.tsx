@@ -343,15 +343,26 @@ export function cardClass(look: LookName): string {
   }
 }
 
-/** Splits "Ananya & Vihaan" so the ampersand can be set in the script face. */
+/**
+ * Splits "Ananya & Vihaan" so the ampersand can be set in the script face. Each line
+ * carries `data-line` (name one, the ampersand, name two, or the single title): stage
+ * heroes turn the names up in 3D by whole lines, never letters, so conjuncts stay whole.
+ */
 export function Names({ text, className, ampersandClassName }: { text: string; className?: string; ampersandClassName?: string }) {
   const parts = text.split(/\s+&\s+/);
-  if (parts.length !== 2) return <span className={className}>{text}</span>;
+  if (parts.length !== 2)
+    return (
+      <span className={className} data-line="">
+        {text}
+      </span>
+    );
   return (
     <span className={cx('flex flex-col items-center', className)}>
-      <span>{parts[0]}</span>
-      <span className={cx('my-1 text-[0.6em] [font-family:var(--t-script)]', ampersandClassName ?? 'text-[var(--t-secondary-ink)]')}>&amp;</span>
-      <span>{parts[1]}</span>
+      <span data-line="">{parts[0]}</span>
+      <span className={cx('my-1 text-[0.6em] [font-family:var(--t-script)]', ampersandClassName ?? 'text-[var(--t-secondary-ink)]')} data-line="">
+        &amp;
+      </span>
+      <span data-line="">{parts[1]}</span>
     </span>
   );
 }

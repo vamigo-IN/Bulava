@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Diya, Toran } from '../art/motifs';
 import { CountdownClock } from '../countdown';
+import { DepthGallery } from '../depth-gallery';
 import { PhotoStack } from '../interactive';
 import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
@@ -106,7 +107,9 @@ export function Countdown(p: SectionProps) {
 /**
  * gallery: approved photos (else the customer's chosen photos), lazy-loaded; hidden when there are none.
  * Variants: masonry (default), stack (3D swipeable cards), mosaic (a pyramid wall), polaroid (scattered
- * prints), frames (a wall of the suite's frames: arches, niches, ovals…).
+ * prints), frames (a wall of the suite's frames: arches, niches, ovals…), depth (Signature 3D: a ring of
+ * photos receding in 3D that turns by swipe, drag, keys or buttons; the mosaic wall in thumbnails, for
+ * fewer than three photos and for reduced motion).
  */
 export function Gallery(p: SectionProps) {
   const images = p.ctx.gallery.images.length ? p.ctx.gallery.images : p.ctx.photos;
@@ -129,8 +132,51 @@ export function Gallery(p: SectionProps) {
   const dims = (img: (typeof shown)[number]) => (img.width && img.height ? { width: img.width, height: img.height } : {});
   const d = dressFor(p);
   const common = { ...shell(p), dress: d, heading };
+  const depth = p.instance.variant === 'depth' && p.mode !== 'thumbnail' && shown.length > 2;
+  const variant = p.instance.variant === 'depth' && !depth ? 'mosaic' : p.instance.variant;
 
-  if (p.instance.variant === 'stack' && p.mode !== 'thumbnail' && shown.length > 1) {
+  // Rows of 1, 3, 5… photos: a pyramid wall like a photo-booth print (the mosaic, and the depth ring's still fallback).
+  const mosaic = (photos: typeof shown) => {
+    const rows: Array<typeof shown> = [];
+    let at = 0;
+    for (let size = 1; at < photos.length; size += 2) {
+      rows.push(photos.slice(at, at + size));
+      at += size;
+    }
+    return (
+      <div className="flex flex-col items-center gap-1.5 @min-[640px]:gap-2">
+        {rows.map((row, r) => (
+          <div key={r} className="flex w-full justify-center gap-1.5 @min-[640px]:gap-2">
+            {row.map((img, k) => {
+              const i = rows.slice(0, r).reduce((n, x) => n + x.length, 0) + k;
+              return wrap(
+                i,
+                img,
+                <img src={img.thumbUrl} alt="" loading="lazy" decoding="async" className="aspect-[4/5] h-full w-full object-cover shadow-md" {...dims(img)} />,
+                r === 0 ? 'w-1/3 @min-[640px]:w-1/4' : 'min-w-0 flex-1 max-w-[33%]',
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  if (depth) {
+    const ring = shown.slice(0, 12);
+    return (
+      <SectionShell {...common} wide>
+        <DepthGallery
+          photos={ring.map((img, i) => ({ url: img.url, thumbUrl: img.thumbUrl, label: p.t('template.gallery.open', { number: i + 1, total: ring.length }), ...dims(img) }))}
+          labels={{ next: p.t('template.gallery.next'), previous: p.t('template.gallery.previous'), hint: p.t('template.gallery.swipe') }}
+          label={heading}
+          fallback={mosaic(shown)}
+        />
+      </SectionShell>
+    );
+  }
+
+  if (variant === 'stack' && p.mode !== 'thumbnail' && shown.length > 1) {
     return (
       <SectionShell {...common}>
         <PhotoStack
@@ -141,7 +187,7 @@ export function Gallery(p: SectionProps) {
     );
   }
 
-  if (p.instance.variant === 'frames') {
+  if (variant === 'frames') {
     return (
       <SectionShell {...common} wide>
         <div className="grid grid-cols-2 gap-x-5 gap-y-8 @min-[640px]:grid-cols-3 @min-[640px]:gap-x-10">
@@ -151,36 +197,15 @@ export function Gallery(p: SectionProps) {
     );
   }
 
-  if (p.instance.variant === 'mosaic') {
-    // Rows of 1, 3, 5… photos: a pyramid wall like a photo-booth print.
-    const rows: Array<typeof shown> = [];
-    let at = 0;
-    for (let size = 1; at < shown.length; size += 2) {
-      rows.push(shown.slice(at, at + size));
-      at += size;
-    }
+  if (variant === 'mosaic') {
     return (
       <SectionShell {...common} wide>
-        <div className="flex flex-col items-center gap-1.5 @min-[640px]:gap-2">
-          {rows.map((row, r) => (
-            <div key={r} className="flex w-full justify-center gap-1.5 @min-[640px]:gap-2">
-              {row.map((img, k) => {
-                const i = rows.slice(0, r).reduce((n, x) => n + x.length, 0) + k;
-                return wrap(
-                  i,
-                  img,
-                  <img src={img.thumbUrl} alt="" loading="lazy" decoding="async" className="aspect-[4/5] h-full w-full object-cover shadow-md" {...dims(img)} />,
-                  r === 0 ? 'w-1/3 @min-[640px]:w-1/4' : 'min-w-0 flex-1 max-w-[33%]',
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        {mosaic(shown)}
       </SectionShell>
     );
   }
 
-  if (p.instance.variant === 'polaroid') {
+  if (variant === 'polaroid') {
     return (
       <SectionShell {...common} wide>
         <div className="grid grid-cols-2 gap-6 @min-[640px]:grid-cols-3 @min-[640px]:gap-10">
