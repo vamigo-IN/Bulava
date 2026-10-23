@@ -274,6 +274,8 @@ const FORMAT_ALIASES: Record<string, ValueFormat> = {
   datewithweekday: 'dateWithWeekday',
   shortdate: 'dateShort',
   dateshort: 'dateShort',
+  numericdate: 'dateNumeric',
+  datenumeric: 'dateNumeric',
   time: 'time',
   datetime: 'dateTime',
   upper: 'upper',
@@ -529,7 +531,7 @@ const HERO_WORDS: Array<[RegExp, string]> = [
   [/floral|flower|garden|botanical/, 'floral'],
   [/minimal|editorial|modern/, 'minimal'],
 ];
-const LOOK_HERO: Record<LookName, string> = { classic: 'classic', heritage: 'toran', noir: 'noir', royal: 'arch', garden: 'floral', celebration: 'festive', modern: 'minimal', heirloom: 'arch' };
+const LOOK_HERO: Record<LookName, string> = { classic: 'classic', heritage: 'toran', noir: 'noir', royal: 'arch', garden: 'floral', celebration: 'festive', modern: 'minimal', heirloom: 'arch', deckle: 'floral' };
 
 const LOOK_WORDS: Array<[RegExp, LookName]> = [
   [/royal|palace|regal|heirloom|maharaj|rajwada|rajasthan|mughal|nawab|durbar/, 'royal'],
@@ -558,7 +560,7 @@ const ORNAMENT_WORDS: Array<[RegExp, OrnamentNameValue]> = [
   [/floral|flower|botanical|rose/, 'floral'],
   [/geometric/, 'geometric'],
 ];
-const LOOK_ORNAMENT: Record<LookName, OrnamentNameValue> = { classic: 'none', heritage: 'marigold', noir: 'deco', royal: 'mandala', garden: 'floral', celebration: 'confetti', modern: 'none', heirloom: 'mandala' };
+const LOOK_ORNAMENT: Record<LookName, OrnamentNameValue> = { classic: 'none', heritage: 'marigold', noir: 'deco', royal: 'mandala', garden: 'floral', celebration: 'confetti', modern: 'none', heirloom: 'mandala', deckle: 'floral' };
 const EFFECT_WORDS: Array<[RegExp, EffectName]> = [
   [/petal/, 'petals'],
   [/marigold/, 'marigold'],

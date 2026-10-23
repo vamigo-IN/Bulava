@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { AA_TEXT, contrastRatio, ensureContrast, type FontRef, type Fonts, type Theme, type ThemeColors } from '@bulava/template-schema';
+import { AA_LARGE, AA_TEXT, contrastRatio, ensureContrast, type FontRef, type Fonts, type Theme, type ThemeColors } from '@bulava/template-schema';
 
 /**
  * Fonts are loaded by the host app (next/font) and exposed as CSS variables.
@@ -29,6 +29,12 @@ export const FONT_CSS_VARS: Record<string, string> = {
   'Baloo 2': '--font-baloo',
   Pacifico: '--font-pacifico',
   Lora: '--font-lora',
+  'Imperial Script': '--font-imperial-script',
+  'Beau Rivage': '--font-beau-rivage',
+  Ovo: '--font-ovo',
+  // The templates' Fraunces has its optical-size and softness axes (the interface's own Fraunces does not).
+  Fraunces: '--font-fraunces-text',
+  Amiri: '--font-amiri',
 };
 
 const family = (name: string) => `var(${FONT_CSS_VARS[name] ?? '--font-none'}, '${name}')`;
@@ -100,6 +106,10 @@ export function themeStyle(theme: Theme, colors: ThemeColors, fonts: Fonts): CSS
     ['--t-muted-ink' as string]: ink(colors.muted),
     // Section headings in looks that colour them (bands swap in their own).
     ['--t-heading-ink' as string]: ink(colors.primary),
+    // Display type only (24 px and up: script headings, large figures): WCAG asks 3:1 of large text, so the
+    // gold and the muted keep their designed colour where a 4.5:1 ink would darken them (bands swap in their own).
+    ['--t-secondary-display' as string]: ensureContrast(colors.secondary, page, AA_LARGE),
+    ['--t-muted-display' as string]: ensureContrast(colors.muted, page, AA_LARGE),
     ['--t-on-primary' as string]: onFill(colors.primary, [colors.background, colors.text, colors.surface]),
     ['--t-accent-on-primary' as string]: ensureContrast(colors.accent, [colors.primary], AA_TEXT),
     ['--t-on-secondary' as string]: onFill(colors.secondary, [colors.background, colors.text, colors.surface]),

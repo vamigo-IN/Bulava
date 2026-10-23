@@ -6,6 +6,8 @@
 
 /** WCAG AA for normal-size text. */
 export const AA_TEXT = 4.5;
+/** WCAG AA for large text: 24 px and up (18.66 px bold), as display headings and script names are set. */
+export const AA_LARGE = 3;
 
 function channels(hex: string): [number, number, number] {
   const h = hex.replace('#', '');

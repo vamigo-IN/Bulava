@@ -1,4 +1,4 @@
-import type { PhotoSlot } from './definition';
+import type { PhotoSlot, TemplateSample } from './definition';
 import { faithFromTags, type Faith } from './faith';
 import { samplePhoto, samplePhotoSet } from './sample-photos';
 import { SAMPLE_VERSES, samplePeople, samplePreset } from './sample-presets';
@@ -170,6 +170,8 @@ type SampleOverrides = Partial<{
   faith: Faith | null;
   /** Where the sample photos are served from (SAMPLE_PHOTO_BASE); renderers without the apps' files pass an origin. */
   photoBase: string;
+  /** The template's own sample (definition.sample): its programme and its words. */
+  sample: TemplateSample;
 }>;
 
 /**
@@ -177,8 +179,8 @@ type SampleOverrides = Partial<{
  * its tradition (the theme's faith, else its tags'). Every catalog preview,
  * editor and test uses it, so a template always shows the same names.
  */
-export function templateSampleContext(definition: { templateKey: string; theme: { faith?: Faith } }, overrides: Omit<SampleOverrides, 'seed' | 'faith'> = {}): RenderContext {
-  return sampleRenderContext({ ...overrides, seed: definition.templateKey, faith: definition.theme.faith ?? faithFromTags(overrides.tags) });
+export function templateSampleContext(definition: { templateKey: string; theme: { faith?: Faith }; sample?: TemplateSample }, overrides: Omit<SampleOverrides, 'seed' | 'faith' | 'sample'> = {}): RenderContext {
+  return sampleRenderContext({ ...overrides, seed: definition.templateKey, faith: definition.theme.faith ?? faithFromTags(overrides.tags), ...(definition.sample ? { sample: definition.sample } : {}) });
 }
 
 /** A long guest name per tradition, for the test matrix's long-name case. */
@@ -223,15 +225,23 @@ export function sampleRenderContext(overrides: SampleOverrides = {}): RenderCont
   const people = samplePeople(typeKey, overrides.tags, options);
   const verse = SAMPLE_VERSES[people.faith ?? 'any'];
   const at = (day: number, hourUtc: number) => new Date(Date.UTC(2026, 11, 14 + day, hourUtc, 30)).toISOString();
-  const fns: FunctionContext[] = preset.functions.map((name, i) => ({
-    id: `f${i + 1}`,
-    name,
-    description: i === 1 ? 'An evening to remember' : null,
-    startsAt: at(Math.floor(i / 2), i % 2 ? 13 : 4),
-    endsAt: null,
-    status: 'SCHEDULED',
-    venue,
-  }));
+  // A template's own programme: its functions at their wall-clock times on the first day, in the sample's time zone (IST).
+  const own = overrides.sample?.functions;
+  const ist = (time: string) => {
+    const [h, m] = time.split(':').map(Number) as [number, number];
+    return new Date(Date.UTC(2026, 11, 14, h, m) - 330 * 60_000).toISOString();
+  };
+  const fns: FunctionContext[] = own
+    ? own.map((fn, i) => ({ id: `f${i + 1}`, name: fn.name, description: null, startsAt: ist(fn.time), endsAt: null, status: 'SCHEDULED', venue }))
+    : preset.functions.map((name, i) => ({
+        id: `f${i + 1}`,
+        name,
+        description: i === 1 ? 'An evening to remember' : null,
+        startsAt: at(Math.floor(i / 2), i % 2 ? 13 : 4),
+        endsAt: null,
+        status: 'SCHEDULED',
+        venue,
+      }));
   // Real photographs of the family's tradition and the occasion (sample-photos.ts).
   const shots = samplePhotoSet(typeKey, people.tradition, overrides.tags);
   const photo = (name: Parameters<typeof samplePhoto>[0]): GalleryImage => samplePhoto(name, overrides.photoBase);
@@ -279,6 +289,8 @@ export function sampleRenderContext(overrides: SampleOverrides = {}): RenderCont
       quote: verse.quote,
       quoteBy: verse.by,
       menu: SAMPLE_MENUS[people.tradition],
+      // The template's own words win (a design's verse, its dress-code line).
+      ...overrides.sample?.custom,
     },
     announcements: [{ title: 'Shuttle service', body: 'Shuttles leave the hotel lobby every 30 minutes from 6 pm.', publishedAt: '2026-12-01T10:00:00.000Z' }],
   });

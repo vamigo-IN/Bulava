@@ -8,7 +8,10 @@ import { PhotoStack } from '../interactive';
 import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
 import { EDGE_HEIGHT, EndFlourish, Fleuron, Hangings, PhotoFrame, Seal, ShapedCard, Skyline, SuiteEdge, SWAG_EDGES, UnitSeparator, type Band, type Dress } from './dress';
+import { BloomFooter } from './bloom';
+import { Chevron, DECKLE_TEXT, RsvpSeal } from './deckle';
 import { RsvpAutoOpen } from './rsvp-open';
+import { SealDialog } from './seal-dialog';
 import { BAND_CLASS, BAND_FILL, cardClass, cx, dressFor, HEIRLOOM_PILL, initials, PillArrow, SectionShell, shell } from './shared';
 import { VistaFooter } from './vista';
 
@@ -90,6 +93,16 @@ export function Countdown(p: SectionProps) {
     minutes: p.t('template.countdown.minutes'),
     seconds: p.t('template.countdown.seconds'),
   };
+  if (variant === 'shimmer') {
+    // Candlelit gold figures with colons between them (the deckle look's countdown).
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={p.value('heading') ?? p.t('template.countdown.beginsIn')}>
+        <div className="bulava-deckle-rise">
+          <CountdownClock target={target} static={p.mode === 'thumbnail'} variant="shimmer" labels={labels} />
+        </div>
+      </SectionShell>
+    );
+  }
   if (variant === 'ornate') {
     // One row on the band: gold figures, the units' names, drawn separators and a flourish at each end.
     return (
@@ -324,6 +337,37 @@ export function Rsvp(p: SectionProps) {
   const paper: Dress = { ...d, band: 'plain' };
   const content = p.slots.rsvp ?? <ReplyPlaceholder d={paper} options={[p.t('rsvp.attending'), p.t('rsvp.maybe'), p.t('rsvp.declined')]} />;
   const heading = p.slots.rsvpHeading ?? p.value('heading') ?? p.t('rsvp.title');
+  if (p.instance.variant === 'seal') {
+    // A wax seal stamped RSVP under a script heading and a line: pressing it (or arriving at the section's address)
+    // opens the reply form over the page; a chevron and "Click to open" bob beneath it.
+    const title = p.slots.rsvpHeading ?? p.value('heading') ?? p.t('template.rsvp.attendance');
+    const line = p.value('text') ?? p.t('template.rsvp.prepare');
+    const trigger = (
+      <>
+        <span className="bulava-deckle-zoom block w-[190px] transition-transform duration-300 group-hover:scale-[1.03] [--dk-delay:0.5s]">
+          <RsvpSeal colors={p.colors} label={p.t('template.rsvp.seal')} className="block h-auto w-full" />
+        </span>
+        <span className="bulava-deckle-bob mt-[16px] block h-[16px] w-[25px] text-[var(--t-orn)]">
+          <Chevron up className="block h-full w-full" />
+        </span>
+        <span className="bulava-deckle-bob block text-[32px] leading-[50px] text-[var(--t-secondary-display)] [font-family:var(--t-heading)]">{p.t('template.rsvp.clickToOpen')}</span>
+      </>
+    );
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={title}>
+        <p className={cx('bulava-deckle-rise -mx-[8px] text-center', DECKLE_TEXT)}>{line}</p>
+        <div className="mt-6 text-center">
+          {p.mode === 'thumbnail' ? (
+            <span className="mx-auto flex flex-col items-center">{trigger}</span>
+          ) : (
+            <SealDialog sectionId={p.instance.id} trigger={trigger} label={title} closeLabel={p.t('template.rsvp.closeForm')} title={title}>
+              {content}
+            </SealDialog>
+          )}
+        </div>
+      </SectionShell>
+    );
+  }
   if (p.instance.variant === 'invite') {
     // A letter's close: the guest greeted by name, a line, and the reply card that opens where it is.
     const greeting = p.slots.rsvpHeading ?? (p.ctx.guest && p.mode !== 'thumbnail' ? p.t('invitation.dear', { guestName: p.ctx.guest.name }) : p.t('template.rsvp.dearAll'));
@@ -391,6 +435,7 @@ export function PhotoShare(p: SectionProps) {
  */
 export function Footer(p: SectionProps) {
   if (p.instance.variant === 'vista') return <VistaFooter {...p} />;
+  if (p.instance.variant === 'bloom') return <BloomFooter {...p} />;
   const hashtag = p.value('hashtag');
   const closing = p.value('closing') ?? p.t('template.footer.thanks');
   const photo = p.ctx.photoSlots?.closing?.url;

@@ -115,6 +115,16 @@ export const FONT_PAIRINGS: readonly FontPairing[] = [
       script: { family: 'Great Vibes', scripts: ['Latn'], fallbacks: deva.script },
     },
   },
+  {
+    // An engraved garden card: Imperial Script for headings, Fraunces' light display serif for reading, Beau Rivage for names.
+    key: 'engraved',
+    label: 'Engraved Garden',
+    fonts: {
+      heading: { family: 'Imperial Script', scripts: ['Latn'], fallbacks: deva.script },
+      body: { family: 'Fraunces', scripts: ['Latn'], fallbacks: deva.serif },
+      script: { family: 'Beau Rivage', scripts: ['Latn'], fallbacks: deva.script },
+    },
+  },
 ];
 
 export function fontPairing(key: string | undefined): FontPairing | undefined {

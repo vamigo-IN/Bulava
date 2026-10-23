@@ -55,6 +55,8 @@ const FONT_WEIGHTS: Partial<Record<FontFamily, number[]>> = {
   Montserrat: [300, 400, 500, 600, 700],
   'Baloo 2': [400, 500, 600, 700, 800],
   Lora: [400, 500, 600, 700],
+  Fraunces: [300, 400, 500, 600, 700],
+  Amiri: [400, 700],
 };
 
 const WEIGHT_NAMES = {

@@ -1,8 +1,12 @@
 import { loadFont as alexBrush } from '@remotion/google-fonts/AlexBrush';
+import { loadFont as amiri } from '@remotion/google-fonts/Amiri';
 import { loadFont as baloo } from '@remotion/google-fonts/Baloo2';
+import { loadFont as beauRivage } from '@remotion/google-fonts/BeauRivage';
 import { loadFont as cinzel } from '@remotion/google-fonts/Cinzel';
 import { loadFont as cormorant } from '@remotion/google-fonts/CormorantGaramond';
+import { loadFont as fraunces } from '@remotion/google-fonts/Fraunces';
 import { loadFont as greatVibes } from '@remotion/google-fonts/GreatVibes';
+import { loadFont as imperialScript } from '@remotion/google-fonts/ImperialScript';
 import { loadFont as italiana } from '@remotion/google-fonts/Italiana';
 import { loadFont as lora } from '@remotion/google-fonts/Lora';
 import { loadFont as marcellus } from '@remotion/google-fonts/Marcellus';
@@ -11,6 +15,7 @@ import { loadFont as notoSans } from '@remotion/google-fonts/NotoSans';
 import { loadFont as notoSansDevanagari } from '@remotion/google-fonts/NotoSansDevanagari';
 import { loadFont as notoSerif } from '@remotion/google-fonts/NotoSerif';
 import { loadFont as notoSerifDevanagari } from '@remotion/google-fonts/NotoSerifDevanagari';
+import { loadFont as ovo } from '@remotion/google-fonts/Ovo';
 import { loadFont as pacifico } from '@remotion/google-fonts/Pacifico';
 import { loadFont as parisienne } from '@remotion/google-fonts/Parisienne';
 import { loadFont as pinyon } from '@remotion/google-fonts/PinyonScript';
@@ -57,4 +62,10 @@ export function loadTemplateFonts(): void {
   load(() => pacifico('normal', { weights: ['400'], subsets: ['latin'] }));
   load(() => lora('normal', { weights: ['400', '500', '600', '700'], subsets: ['latin'] }));
   load(() => lora('italic', { weights: ['400', '500'], subsets: ['latin'] }));
+  // The engraved pairing (The Sacred Garden): script headings and names, Ovo's figures, Fraunces to read, Amiri's Arabic.
+  load(() => imperialScript('normal', { weights: ['400'], subsets: ['latin'] }));
+  load(() => beauRivage('normal', { weights: ['400'], subsets: ['latin'] }));
+  load(() => ovo('normal', { weights: ['400'], subsets: ['latin'] }));
+  load(() => fraunces('normal', { weights: ['300', '400', '600'], subsets: ['latin'] }));
+  load(() => amiri('normal', { weights: ['400', '700'], subsets: ['arabic'] }));
 }

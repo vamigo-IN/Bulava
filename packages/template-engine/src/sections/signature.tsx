@@ -1,6 +1,7 @@
 import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
 import { Seal, ShapedCard } from './dress';
+import { DeckleShell } from './deckle';
 import { cardClass, cx, dressFor, faces, SectionShell, shell } from './shared';
 
 /**
@@ -59,6 +60,16 @@ export function Quote(p: SectionProps) {
   const text = p.value('text');
   if (!text) return null;
   const by = p.value('by');
+  if (p.look === 'deckle') {
+    // Gold script, a line to a phrase as written; long verses step down so they stay a few lines.
+    const size = text.length > 150 ? 'text-[25px] leading-[31px]' : text.length > 80 ? 'text-[31px] leading-[36px]' : 'text-[41px] leading-[43px]';
+    return (
+      <DeckleShell id={p.instance.id} dress={dressFor(p, 'surface')} seed={p.index * 3 + 1}>
+        <p className={cx('bulava-deckle-fade -mx-[18px] text-center whitespace-pre-line text-balance text-[var(--t-secondary-display)] [font-family:var(--t-heading)]', size)}>{text}</p>
+        {by ? <p className="bulava-deckle-fade mt-3 text-center text-[17px] leading-[22px] font-light text-[var(--t-text)] [font-family:var(--t-body)]">{by}</p> : null}
+      </DeckleShell>
+    );
+  }
   if (p.instance.variant === 'verse') {
     return (
       <SectionShell {...shell(p)} dress={dressFor(p)} join="above">

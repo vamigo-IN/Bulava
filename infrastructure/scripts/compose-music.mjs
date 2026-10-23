@@ -4052,6 +4052,88 @@ const CATALOGUE_C = [
       },
     ],
   },
+  {
+    key: 'original-sacred-garden',
+    title: 'Garden of Noor',
+    mood: 'nikah: a barcarolle in 6/8 (bpm counts eighths: 66 to the dotted beat) in maqam Nahawand (E minor with the raised seventh); the piano sings over a rocking left hand and a soft string bed, a violin takes the theme on to G major, a bridge over the Andalusian cadence (Em D C B) closes on the Hijaz of the dominant (E D# C B) with an oud an octave below, qanun runs at the turns, a ney call, and a plagal close',
+    tonic: 'E3',
+    scale: 'minor',
+    bpm: 198,
+    meter: [6, 8],
+    rit: { from: 204, factor: 0.88 },
+    reverb: { room: 0.86, damp: 0.24, wet: 0.32, preDelay: 0.025 },
+    instruments: {
+      piano: { gain: 1.1, pan: 0.05, width: 5, send: 0.32, octave: 1, vel: 0.72 },
+      piano2: { gain: 0.55, pan: -0.12, width: -7, send: 0.3, octave: 0, vel: 0.55 },
+      strings: { gain: 0.36, pan: 0.1, width: 10, send: 0.45, octave: 0, vel: 0.5 },
+      violin: { gain: 0.85, pan: 0.26, width: 9, send: 0.45, octave: 1, vel: 0.72 },
+      violin2: { gain: 0.6, pan: 0.2, width: 8, send: 0.45, octave: 1, vel: 0.65 },
+      rabab: { gain: 0.95, pan: -0.32, width: -9, send: 0.34, octave: 1, vel: 0.72, highCut: 5200 },
+      swarmandal: { gain: 0.9, pan: 0.42, width: 12, send: 0.5, octave: 2, vel: 0.62 },
+      bansuri: { gain: 0.6, pan: -0.18, width: -8, send: 0.5, octave: 1, lowCut: 200, vel: 0.62 },
+    },
+    dynamics: [[0, 0.68], [12, 0.74], [60, 0.8], [108, 0.88], [138, 1], [156, 0.95], [192, 0.92], [204, 0.82], [216, 0.64]],
+    sections: [
+      {
+        // a qanun run opens the garden and a ney sighs on the sixth (B C B, the theme's first notes); the oud's Hijaz turn (G F# E D#) leads in
+        bars: 2,
+        chords: 'i:6 V7:6',
+        parts: { piano2: 'ballad', strings: 'pad', swarmandal: '1$:6 _:6', bansuri: '5:3 6>:2 5:1 | 5:2 _:4', rabab: '_:6 | _:2 3:1 2:1 1:1 7-#:1' },
+      },
+      {
+        // the piano's theme: a sigh on the sixth, the augmented second (C to D#) into the half cadence, then up to the high A and home
+        bars: 8,
+        chords: 'i:6 VI:6 iv:6 V:6 i:6 VI:3 VII:3 iv:3 V7:3 i:6',
+        parts: {
+          piano2: 'ballad',
+          strings: 'pad',
+          rabab: '1:3 _:45',
+          piano: '5:2 6:1 5:2 3:1 | 1+:3 7:2 6:1 | 6:2 5:1 4:3 | 5:2 6:1 7#:3 | 1+:2 2+:1 3+:3 | 4+:2 3+:1 2+:2 1+:1 | 6:2 5:1 4:2 2:1 | 1:6',
+        },
+      },
+      {
+        // the violin takes the theme with its slides, turns to G major (the relative major) and back to the dominant; the piano answers
+        bars: 8,
+        chords: 'i:6 VI:6 iv:6 V:6 III:6 VI:3 VII:3 iv:6 V:6',
+        parts: {
+          piano2: 'ballad',
+          strings: 'pad',
+          violin: '5:2 6:1 5:2 3:1 | 1+:3 7:2 6:1 | 6:2 5:1 4:3 | 5:2 6:1 7#>:3 | 5:2 7:1 2+:3 | 3+:3 2+:2 1+:1 | 6:2 1+:1 4+:3 | 3+:2 2+:1 7#:3',
+          piano: '_:12 | _:3 1+:1 7:1 6:1 | _:18 | _:3 1+:1 7:1 6:1 | _:6',
+        },
+      },
+      {
+        // the bridge over the Andalusian cadence: the violin sings and the oud answers; each half closes on the Hijaz of B (E D# C B), the second time with the oud an octave below
+        bars: 8,
+        chords: 'i:6 VII:6 VI:6 V:6 i:6 VII:6 VI:3 iv:3 V7:6',
+        parts: {
+          piano2: 'ballad',
+          strings: 'pad',
+          violin: '1+:3 7:2 1+:1 | 2+:3 1+:2 7:1 | 1+>:6 | 1+:2 7#:1 6:2 5:1 | 5:2 1+:1 3+>:3 | 4+:3 2+:3 | 1+:2 3+:1 1+:2 6:1 | 1+:2 7#:1 6:2 5:1',
+          rabab: '_:12 | _:3 3:1 2:1 1:1 | _:24 | 1:2 7-#:1 6-:2 5-:1',
+          swarmandal: '_:24 5$!:3 _:21',
+        },
+      },
+      {
+        // the theme on the piano again under the violin's descant, then both together to the cadence
+        bars: 8,
+        chords: 'i:6 VI:6 iv:6 V:6 i:6 VI:3 VII:3 iv:3 V7:3 i:6',
+        parts: {
+          piano2: 'ballad',
+          strings: 'pad',
+          swarmandal: '5-$:3 _:45',
+          piano: '5:2 6:1 5:2 3:1 | 1+:3 7:2 6:1 | 6:2 5:1 4:3 | 5:2 6:1 7#:3 | 1+:2 2+:1 3+:3 | 4+:2 3+:1 2+:2 1+:1 | 6:2 5:1 4:2 2:1 | 1:6',
+          violin2: '_:3 1+:3 | 3+:6 | 1+:3 6:3 | 7#:3 2+:3 | 1+:2 2+:1 3+:3 | 4+:2 3+:1 2+:2 1+:1 | 6:2 5:1 4:2 2:1 | 3:6',
+        },
+      },
+      {
+        // a plagal close (Am to Em): the oud's last turn down to E, the piano on the fifth, ringing into the next time round
+        bars: 2,
+        chords: 'iv:6 i:6',
+        parts: { piano2: 'ballad', strings: 'pad', piano: '1+:3 6:3 | 5:6', violin2: '4:6 | 3:6', rabab: '_:3 4:1 3:1 2:1 | 1:6' },
+      },
+    ],
+  },
 ];
 
 /** The catalogue in the order hosts see it. */
@@ -4059,6 +4141,7 @@ const ORDER = [
   'original-shehnai-darbar', 'original-mehfil-santoor', 'original-anand-dawn', 'original-processional', 'original-promise-strings', 'original-carnival-tumble',
   'original-ballroom-waltz', 'original-lori-music-box', 'original-prabhat-bansuri', 'original-ganga-bells', 'original-gayatri-drone', 'original-shubh-dhol',
   'original-sandhya-aarti', 'original-roshni-dhamaal', 'original-keynote-ambient', 'original-alma-anthem', 'original-mela-chowk', 'original-golden-veranda',
+  'original-sacred-garden',
 ];
 const ALL = [...CATALOGUE_A, ...CATALOGUE_B, ...CATALOGUE_C];
 const TRACKS = ORDER.map((key) => ALL.find((t) => t.key === key)).filter(Boolean);

@@ -1,5 +1,6 @@
 import {
   formatEventDate,
+  formatEventDateNumeric,
   formatEventDateShort,
   formatEventDateWithWeekday,
   formatEventTime,
@@ -123,6 +124,8 @@ function format(value: unknown, fmt: string | undefined, opts: ResolveOptions): 
       return formatEventDateWithWeekday(String(value), f);
     case 'dateShort':
       return formatEventDateShort(String(value), f);
+    case 'dateNumeric':
+      return formatEventDateNumeric(String(value), f);
     case 'time':
       return formatEventTime(String(value), f);
     case 'dateTime':

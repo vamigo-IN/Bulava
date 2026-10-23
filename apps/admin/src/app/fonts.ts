@@ -1,9 +1,13 @@
 import {
   Alex_Brush,
+  Amiri,
   Baloo_2,
+  Beau_Rivage,
   Cinzel,
   Cormorant_Garamond,
+  Fraunces,
   Great_Vibes,
+  Imperial_Script,
   Italiana,
   Lora,
   Marcellus,
@@ -12,6 +16,7 @@ import {
   Noto_Sans_Devanagari,
   Noto_Serif,
   Noto_Serif_Devanagari,
+  Ovo,
   Pacifico,
   Parisienne,
   Pinyon_Script,
@@ -55,6 +60,12 @@ const yatra = Yatra_One({ subsets: ['latin', 'devanagari'], weight: '400', varia
 const baloo = Baloo_2({ subsets: ['latin', 'devanagari'], variable: '--font-baloo', display: 'swap', preload: false });
 const pacifico = Pacifico({ subsets: ['latin'], weight: '400', variable: '--font-pacifico', display: 'swap', preload: false });
 const lora = Lora({ subsets: ['latin', 'latin-ext'], weight: ['400', '500', '600', '700'], style: ['normal', 'italic'], variable: '--font-lora', display: 'swap', preload: false });
+const imperialScript = Imperial_Script({ subsets: ['latin', 'latin-ext'], weight: '400', variable: '--font-imperial-script', display: 'swap', preload: false });
+const beauRivage = Beau_Rivage({ subsets: ['latin', 'latin-ext'], weight: '400', variable: '--font-beau-rivage', display: 'swap', preload: false });
+const ovo = Ovo({ subsets: ['latin'], weight: '400', variable: '--font-ovo', display: 'swap', preload: false });
+// The templates' Fraunces keeps its optical-size and softness axes (a light display cut for reading at large sizes).
+const frauncesText = Fraunces({ subsets: ['latin', 'latin-ext'], axes: ['opsz', 'SOFT'], variable: '--font-fraunces-text', display: 'swap', preload: false });
+const amiri = Amiri({ subsets: ['arabic'], weight: ['400', '700'], variable: '--font-amiri', display: 'swap', preload: false });
 
 export const fontVariables = [
   notoSans,
@@ -79,6 +90,11 @@ export const fontVariables = [
   baloo,
   pacifico,
   lora,
+  imperialScript,
+  beauRivage,
+  ovo,
+  frauncesText,
+  amiri,
 ]
   .map((f) => f.variable)
   .join(' ');

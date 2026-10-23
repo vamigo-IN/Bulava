@@ -32,6 +32,7 @@ export const ORIGINAL_TRACKS = [
   { slug: 'original-alma-anthem', file: 'original-alma-anthem.m4a', title: 'Alma Mater', artist: 'Bulava Originals', durationSeconds: 68 },
   { slug: 'original-mela-chowk', file: 'original-mela-chowk.m4a', title: 'Mela Chowk', artist: 'Bulava Originals', durationSeconds: 58 },
   { slug: 'original-golden-veranda', file: 'original-golden-veranda.m4a', title: 'Golden Veranda', artist: 'Bulava Originals', durationSeconds: 71 },
+  { slug: 'original-sacred-garden', file: 'original-sacred-garden.m4a', title: 'Garden of Noor', artist: 'Bulava Originals', durationSeconds: 66 },
 ] as const;
 
 export interface OriginalMusicResult {

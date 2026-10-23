@@ -10,8 +10,11 @@ export const id = z.string().regex(/^[a-z0-9][a-z0-9-_]{0,63}$/i, 'Use letters, 
 
 // ─────────────────────────── Values ───────────────────────────
 
-/** `initial` keeps a name's first letter, capitalised (monograms: {{couple.partnerOne|initial}}). */
-export const VALUE_FORMATS = ['date', 'dateWithWeekday', 'dateShort', 'time', 'upper', 'lower', 'dateTime', 'initial'] as const;
+/**
+ * `initial` keeps a name's first letter, capitalised (monograms: {{couple.partnerOne|initial}}); `dateNumeric` is a
+ * printed card's "27.09.26".
+ */
+export const VALUE_FORMATS = ['date', 'dateWithWeekday', 'dateShort', 'time', 'upper', 'lower', 'dateTime', 'initial', 'dateNumeric'] as const;
 
 export type Value =
   | { literal: string | number | boolean }
@@ -165,5 +168,10 @@ export const FONT_FAMILIES = [
   'Baloo 2',
   'Pacifico',
   'Lora',
+  'Imperial Script',
+  'Beau Rivage',
+  'Ovo',
+  'Fraunces',
+  'Amiri',
 ] as const;
 export type FontFamily = (typeof FONT_FAMILIES)[number];

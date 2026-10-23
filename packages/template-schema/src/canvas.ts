@@ -303,6 +303,15 @@ export const ILLUSTRATIONS = [
   'flowerBed',
   'floralStrand',
   'standingPeacock',
+  // The Sacred Garden (illustrations-garden.tsx, garden-flowers.tsx, garden-hall.tsx; ADR-081): a Mughal garden arch over a
+  // swan lake, the swans themselves, peonies and roses, and an inked domed hall.
+  'gardenArch',
+  'swanPair',
+  'peony',
+  'peonyBouquet',
+  'peonyCorner',
+  'roseVine',
+  'domedHall',
 ] as const;
 export type IllustrationName = (typeof ILLUSTRATIONS)[number];
 

@@ -49,8 +49,10 @@ export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
  *  modern      – editorial: large type, rules and numbers
  *  heirloom    – printed on ivory paper: gold capitals over italic serif headings, framed deep bands, each
  *                section's band and corner art chosen by the template (The Royal Heirloom)
+ *  deckle      – one phone-wide column on cream at every width: gold script headings over a light serif, the
+ *                template's paper sections joined into panels that tear open at their ends (The Sacred Garden)
  */
-export const LOOKS = ['classic', 'heritage', 'noir', 'royal', 'garden', 'celebration', 'modern', 'heirloom'] as const;
+export const LOOKS = ['classic', 'heritage', 'noir', 'royal', 'garden', 'celebration', 'modern', 'heirloom', 'deckle'] as const;
 export type LookName = (typeof LOOKS)[number];
 /** Camera moves through a video backdrop; near layers move more than far ones. */
 export const CAMERA_MOVES = ['still', 'push', 'pull', 'panLeft', 'panRight', 'rise', 'descend'] as const;
@@ -58,8 +60,11 @@ export type CameraMove = (typeof CAMERA_MOVES)[number];
 /** Named places a customer can put their own photos. */
 export const PHOTO_SLOTS = ['cover', 'partnerOne', 'partnerTwo', 'story', 'closing', 'venue'] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
-/** Opening animations played before a website invitation is revealed. */
-export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch', 'zipper', 'ribbon', 'arrival', 'doorway', 'silk', 'unfold'] as const;
+/**
+ * Opening animations played before a website invitation is revealed. sealedEnvelope: the whole screen is a paper
+ * envelope sealed with wax; a tap lifts the flap and the invitation comes up out of its light.
+ */
+export const INTROS = ['none', 'envelope', 'curtain', 'doors', 'gates', 'seal', 'lanterns', 'petals', 'celestial', 'scratch', 'zipper', 'ribbon', 'arrival', 'doorway', 'silk', 'unfold', 'sealedEnvelope'] as const;
 export type IntroName = (typeof INTROS)[number];
 /** Openings that move through a stage hero (ADR-078): only a template whose first section is a stage hero takes them. */
 export const STAGE_INTROS = ['arrival', 'doorway', 'silk', 'unfold'] as const;
@@ -378,6 +383,23 @@ export const AssetRefSchema = z.object({
   role: z.string().max(40),
 });
 
+/**
+ * What a template's previews show where its design has words of its own (catalogue previews, editors and the
+ * check matrix; never a host's page): a programme for its schedule (names at wall-clock times on the sample's
+ * first day) and text for its slots. The people still come from the template's key and tradition.
+ */
+export const TemplateSampleSchema = z
+  .object({
+    functions: z
+      .array(z.object({ name: z.string().min(1).max(60), time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM') }).strict())
+      .min(1)
+      .max(8)
+      .optional(),
+    custom: z.record(z.string().regex(/^[a-z][a-zA-Z0-9]{0,31}$/), z.string().max(600)).optional(),
+  })
+  .strict();
+export type TemplateSample = z.infer<typeof TemplateSampleSchema>;
+
 export const TemplateDefinitionSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -416,6 +438,8 @@ export const TemplateDefinitionSchema = z
       .optional(),
     canvas: z.object({ width: z.number().int().min(200).max(4096), height: z.number().int().min(200).max(4096), fps: z.number().int().min(12).max(60).default(30) }).optional(),
     scenes: z.array(SceneSchema).max(30).optional(),
+    /** The template's own preview sample (TemplateSampleSchema). */
+    sample: TemplateSampleSchema.optional(),
   })
   .superRefine((d, ctx) => {
     if (d.type === 'WEBSITE' && !d.website) {

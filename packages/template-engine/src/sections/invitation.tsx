@@ -1,6 +1,7 @@
 import { getLanguage } from '@bulava/localization';
 import type { SectionProps } from '../types';
 import { Crest, FleuronRule } from './dress';
+import { DECKLE_TEXT, DeckleShell } from './deckle';
 import { cx, dressFor, heirloomCaps, SectionShell, shell } from './shared';
 
 /**
@@ -10,6 +11,19 @@ import { cx, dressFor, heirloomCaps, SectionShell, shell } from './shared';
  * Props: eyebrow, lead, title, text.
  */
 export function Invitation(p: SectionProps) {
+  if (p.look === 'deckle') {
+    // A letter's greeting and its line, in the light serif (the deckle look sets no title: the hero carries the names).
+    const lead = p.value('lead') ?? p.t('template.invitation.dearFamily');
+    const text = p.value('text');
+    return (
+      <DeckleShell id={p.instance.id} dress={dressFor(p, 'surface')} seed={p.index * 3 + 1}>
+        <div className={cx('bulava-deckle-fade mx-auto max-w-[310px] text-center [--dk-delay:0.2s]', DECKLE_TEXT)}>
+          <p>{lead}</p>
+          {text ? <p className="whitespace-pre-line">{text}</p> : null}
+        </div>
+      </DeckleShell>
+    );
+  }
   const title = p.value('title') ?? p.ctx.event.title;
   if (!title) return null;
   const d = dressFor(p, 'surface');

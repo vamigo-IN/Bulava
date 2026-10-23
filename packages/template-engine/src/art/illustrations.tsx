@@ -13,6 +13,9 @@ import { CrescentStar, Cross, Ganesha, Khanda } from './illustrations-faith';
 import { Fanoos, GirihRosette, GoldenTemple, JaaliArch, LancetWindow, Lilies, PhulkariBagh, WeddingBells } from './illustrations-sacred';
 import { SatinBow, SatinRibbon, ScallopTag, WaxSeal, Zipper, ZipperPull } from './illustrations-atelier';
 import { ChhatriArt, FloralStrand, FlowerBed, MandapCanopy, PalaceArcade, PalaceFacadeArt, PalacePillar } from './illustrations-palace';
+import { GardenArch, SwanPair } from './illustrations-garden';
+import { DomedHall } from './garden-hall';
+import { Peony, PeonyBouquet, PeonyCorner, RoseVine } from './garden-flowers';
 import {
   BananaPlantArt,
   CandelabraArt,
@@ -146,6 +149,13 @@ const COMPONENTS: Record<IllustrationName, (props: IllustrationProps) => ReactNo
   mandapCanopy: MandapCanopy,
   flowerBed: FlowerBed,
   floralStrand: FloralStrand,
+  gardenArch: GardenArch,
+  swanPair: SwanPair,
+  peony: Peony,
+  peonyBouquet: PeonyBouquet,
+  peonyCorner: PeonyCorner,
+  roseVine: RoseVine,
+  domedHall: DomedHall,
 };
 
 /** Drawn to the layer's own size (frames, garlands, strings); the others keep their proportions inside it. */
@@ -263,6 +273,15 @@ export const ILLUSTRATION_ASPECT: Record<IllustrationName, number> = {
   mandapCanopy: 345 / 300,
   flowerBed: 6,
   floralStrand: 0.3,
+  // The Sacred Garden (ADR-081): the arch scene is a portrait page; the bouquet and the denser corner face a bottom-left
+  // corner, the vine a top-right one.
+  gardenArch: 450 / 800,
+  swanPair: 256 / 160,
+  peony: 110 / 100,
+  peonyBouquet: 220 / 330,
+  peonyCorner: 220 / 330,
+  roseVine: 276 / 363,
+  domedHall: 380 / 253,
 };
 
 export { JAALI_ARCH_OPENING, LANCET_OPENING } from './illustrations-sacred';

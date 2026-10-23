@@ -57,6 +57,13 @@ const KEYWORDS: Record<string, string> = {
   plane: 'travel flight airport arrival',
   cloche: 'menu food dinner dome serving',
   map: 'map directions location venue',
+  gardenArch: 'garden arch mughal swans lake jasmine nikah wedding portrait backdrop sacred garden',
+  swanPair: 'swans heart lake love couple pair birds',
+  peony: 'peony flower blush pink bloom',
+  peonyBouquet: 'peony rose bouquet flowers corner watercolour blush cream',
+  peonyCorner: 'peony rose flowers corner dense bouquet foot watercolour blush cream',
+  roseVine: 'rose vine corner leaves trailing flowers watercolour',
+  domedHall: 'mosque hall domes minaret venue sketch building islamic centre',
 };
 
 /** "royalPeacock" → "royal peacock". */

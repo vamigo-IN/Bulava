@@ -58,7 +58,7 @@ export function fillStyle(fill: Fill, colors: ThemeColors, ctx?: Pick<RenderCont
   }
 }
 
-const SCRIPT_FAMILIES = new Set(['Great Vibes', 'Pinyon Script', 'Parisienne', 'Alex Brush']);
+const SCRIPT_FAMILIES = new Set(['Great Vibes', 'Pinyon Script', 'Parisienne', 'Alex Brush', 'Imperial Script', 'Beau Rivage']);
 const SANS_FAMILIES = new Set(['Poppins', 'Noto Sans', 'Montserrat', 'Noto Sans Devanagari']);
 
 /** A font role (the theme's CSS variables, which follow the host's pairing) or a fixed family, as a CSS font stack. */

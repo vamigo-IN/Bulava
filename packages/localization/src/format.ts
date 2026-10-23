@@ -76,6 +76,30 @@ export function formatEventTime(value: Date | string, options: FormatOptions): s
   }).format(toDate(value));
 }
 
+/**
+ * e.g. "5 PM", "7:30 PM" / "17:00": a time on a printed programme, with the minutes only when they are not on
+ * the hour (the 12-hour clock's day period in capitals, as engraved cards set it).
+ */
+export function formatEventTimeShort(value: Date | string, options: FormatOptions): string {
+  const date = toDate(value);
+  const twelve = (options.hourCycle ?? 12) === 12;
+  const onHour = partsInZone(date, options.timeZone).minute === 0;
+  const text = new Intl.DateTimeFormat(localeFor(options), {
+    hour: twelve ? 'numeric' : '2-digit',
+    ...(onHour && twelve ? {} : { minute: '2-digit' }),
+    hour12: twelve,
+    timeZone: options.timeZone,
+  }).format(date);
+  return text.replace(/\b([ap])\.?\s?m\.?(?=\s|$)/gi, (_, p: string) => `${p.toUpperCase()}M`);
+}
+
+/** e.g. "27.09.26": the day, month and the year's last two figures joined by dots, as a printed card dates itself. */
+export function formatEventDateNumeric(value: Date | string, options: FormatOptions): string {
+  const parts = new Intl.DateTimeFormat(localeFor(options), { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: options.timeZone }).formatToParts(toDate(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('day')}.${part('month')}.${part('year')}`;
+}
+
 export function formatNumber(value: number, options: Pick<FormatOptions, 'language' | 'nativeDigits'>): string {
   return new Intl.NumberFormat(localeFor({ ...options, timeZone: 'UTC' })).format(value);
 }

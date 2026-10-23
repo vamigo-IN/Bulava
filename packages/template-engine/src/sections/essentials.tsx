@@ -1,14 +1,19 @@
 import { getLanguage } from '@bulava/localization';
 import type { IconName } from '@bulava/template-schema';
+import { Illustration } from '../art/illustrations';
 import { Icon } from '../canvas/icons';
 import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
+import { DECKLE_TEXT, DeckleShell } from './deckle';
 import { ShapedCard } from './dress';
 import { cx, dressFor, heirloomCaps, SectionShell, shell } from './shared';
 import { menuRows } from './signature';
 
+/** The deckle look's rose vines: a natural sage that stays in every preset. */
+const VINE = '#7c8f6a';
+
 interface Column {
-  key: 'stay' | 'travel' | 'gifts' | 'menu';
+  key: 'stay' | 'travel' | 'dressCode' | 'gifts' | 'menu';
   icon: IconName;
   label: string;
   text: string;
@@ -18,11 +23,12 @@ interface Column {
 const isLong = (text: string) => text.length > 160 || text.split('\n').length > 3;
 
 /**
- * essentials: where to stay, how to travel, the gift note and the menu, as one strip of columns under
- * gold line icons (a list on phones). Each empty column is left out; with none, the strip hides. The menu
+ * essentials: where to stay, how to travel, what to wear, the gift note and the menu, as one strip of columns
+ * under gold line icons (a list on phones). Each empty column is left out; with none, the strip hides. The menu
  * column names the courses ("Welcome · Starters · Mains · Dessert") and opens the whole menu, printed on
- * a cusped card, under the strip. Columns carry ids (`<id>-stay`, `-travel`, `-gifts`, `-menu`) for the
- * page menu. Props: stay, travel, gifts, menu.
+ * a cusped card, under the strip. Columns carry ids (`<id>-stay`, `-travel`, `-dressCode`, `-gifts`, `-menu`)
+ * for the page menu. The deckle look sets them one under another on a paper sheet, each under a gold script
+ * heading, with rose vines in two corners. Props: stay, travel, dressCode, gifts, menu.
  */
 export function Essentials(p: SectionProps) {
   const id = p.instance.id;
@@ -32,12 +38,59 @@ export function Essentials(p: SectionProps) {
   const all: Array<Omit<Column, 'text'> & { text: string | undefined }> = [
     { key: 'stay', icon: 'bed', label: p.t('template.essentials.stay'), text: p.value('stay') },
     { key: 'travel', icon: 'plane', label: p.t('template.essentials.travel'), text: p.value('travel') },
+    { key: 'dressCode', icon: 'sparkle', label: p.t('template.essentials.dressCode'), text: p.value('dressCode') },
     { key: 'gifts', icon: 'gift', label: p.t('template.essentials.gifts'), text: p.value('gifts') },
     { key: 'menu', icon: 'cloche', label: p.t('template.essentials.menu'), text: menuLine },
   ];
   const columns = all.filter((c): c is Column => !!c.text);
   if (!columns.length) return null;
   const d = dressFor(p, 'surface');
+  if (p.look === 'deckle') {
+    // What to wear first and the gifts next (as a card would say them), then the menu, the stay and the travel.
+    const order: Column['key'][] = ['dressCode', 'gifts', 'menu', 'stay', 'travel'];
+    const sorted = [...columns].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+    const vine = (className: string, flip?: boolean) => (
+      <div aria-hidden="true" className={cx('bulava-deckle-breathe pointer-events-none absolute', className)}>
+        <Illustration name="roseVine" color={VINE} colors={p.colors} w={276} h={363} style={{ display: 'block', width: '100%', height: '100%', transform: flip ? 'scale(-1, -1)' : undefined }} />
+      </div>
+    );
+    return (
+      <DeckleShell
+        id={id}
+        dress={d}
+        seed={p.index * 3 + 1}
+        className="overflow-hidden"
+        art={
+          <>
+            {vine('-top-[48px] -right-[34px] h-[330px] w-[251px] [--dk-origin:top_right]')}
+            {vine('-bottom-[44px] -left-[34px] h-[236px] w-[180px] [--dk-origin:bottom_left]', true)}
+          </>
+        }
+      >
+        <div className="relative space-y-[34px]">
+          {sorted.map((c) => (
+            <div key={c.key} id={`${id}-${c.key}`} className="text-center">
+              <h3 className="text-[41px] leading-[1.3] font-normal text-[var(--t-secondary-display)] [font-family:var(--t-heading)]">{c.key === 'gifts' ? p.t('template.essentials.giftPreference') : c.label}</h3>
+              {c.key === 'menu' && rows.length ? (
+                <ul className="bulava-deckle-rise mx-auto mt-2 max-w-[300px] space-y-3">
+                  {rows.map((row, i) => (
+                    <li key={i}>
+                      {row.course ? <p className="text-[28px] leading-[1.25] text-[var(--t-secondary-display)] [font-family:var(--t-heading)]">{row.course}</p> : null}
+                      <p className={cx(DECKLE_TEXT, 'text-[18px] leading-[24px]')}>{row.dishes}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={cx('bulava-deckle-rise mx-auto mt-2 max-w-[300px] whitespace-pre-line', DECKLE_TEXT)}>{c.text}</p>
+              )}
+            </div>
+          ))}
+        </div>
+        {/* Paper below the last line for the roses gathered in the bottom corner. */}
+        <div aria-hidden="true" className="h-[42px]" />
+      </DeckleShell>
+    );
+  }
   const paper = { ...d, band: 'plain' as const };
   const script = getLanguage(p.language).script;
   const still = p.mode === 'thumbnail';

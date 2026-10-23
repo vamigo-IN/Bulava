@@ -75,6 +75,13 @@ export function illustrationTint(name: IllustrationName): ColorRef {
     mandapCanopy: 'primary',
     flowerBed: '#7c8f6a',
     floralStrand: '#7c8f6a',
+    gardenArch: '#d9c09e',
+    swanPair: '#c9b9a0',
+    peony: '#8a9a6b',
+    peonyBouquet: '#8a9a6b',
+    peonyCorner: '#8a9a6b',
+    roseVine: '#7c8f6a',
+    domedHall: '#8c6a44',
   };
   return tints[name] ?? 'secondary';
 }

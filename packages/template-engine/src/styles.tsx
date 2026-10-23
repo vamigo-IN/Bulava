@@ -32,12 +32,12 @@ const STYLES = `
 .bulava-shimmer { animation: bulava-shimmer 5s ease-in-out infinite alternate; }
 .bulava-glint { animation: bulava-glint 3.6s ease-in-out infinite; }
 /* Bands: whole sections on the primary or accent colour, with inks computed for that colour (see themeStyle). */
-.bulava-band-primary { background-color: var(--t-primary); color: var(--bp-text); --t-text: var(--bp-text); --t-muted-ink: var(--bp-muted); --t-primary-ink: var(--bp-primary-ink); --t-secondary-ink: var(--bp-secondary-ink); --t-accent-ink: var(--bp-accent-ink); --t-heading-ink: var(--bp-accent-ink); --t-card: rgb(255 255 255 / 0.08); --t-card-alt: rgb(255 255 255 / 0.12); --t-line: color-mix(in srgb, var(--t-accent) 45%, transparent); --t-button: var(--bp-button); --t-on-button: var(--bp-on-button); --t-orn: var(--t-accent); --t-band: var(--t-primary); }
-.bulava-band-accent { background-color: var(--t-accent); color: var(--ba-text); --t-text: var(--ba-text); --t-muted-ink: var(--ba-muted); --t-primary-ink: var(--ba-primary-ink); --t-secondary-ink: var(--ba-secondary-ink); --t-accent-ink: var(--ba-accent-ink); --t-heading-ink: var(--ba-accent-ink); --t-card: rgb(255 255 255 / 0.1); --t-card-alt: rgb(255 255 255 / 0.16); --t-line: color-mix(in srgb, var(--t-primary) 35%, transparent); --t-button: var(--ba-button); --t-on-button: var(--ba-on-button); --t-orn: var(--t-primary); --t-band: var(--t-accent); }
+.bulava-band-primary { background-color: var(--t-primary); color: var(--bp-text); --t-text: var(--bp-text); --t-muted-ink: var(--bp-muted); --t-primary-ink: var(--bp-primary-ink); --t-secondary-ink: var(--bp-secondary-ink); --t-accent-ink: var(--bp-accent-ink); --t-heading-ink: var(--bp-accent-ink); --t-secondary-display: var(--bp-secondary-ink); --t-muted-display: var(--bp-muted); --t-card: rgb(255 255 255 / 0.08); --t-card-alt: rgb(255 255 255 / 0.12); --t-line: color-mix(in srgb, var(--t-accent) 45%, transparent); --t-button: var(--bp-button); --t-on-button: var(--bp-on-button); --t-orn: var(--t-accent); --t-band: var(--t-primary); }
+.bulava-band-accent { background-color: var(--t-accent); color: var(--ba-text); --t-text: var(--ba-text); --t-muted-ink: var(--ba-muted); --t-primary-ink: var(--ba-primary-ink); --t-secondary-ink: var(--ba-secondary-ink); --t-accent-ink: var(--ba-accent-ink); --t-heading-ink: var(--ba-accent-ink); --t-secondary-display: var(--ba-secondary-ink); --t-muted-display: var(--ba-muted); --t-card: rgb(255 255 255 / 0.1); --t-card-alt: rgb(255 255 255 / 0.16); --t-line: color-mix(in srgb, var(--t-primary) 35%, transparent); --t-button: var(--ba-button); --t-on-button: var(--ba-on-button); --t-orn: var(--t-primary); --t-band: var(--t-accent); }
 /* Dark stock (heroTone "dark"): the deep band, a shade darker than the primary one. */
-.bulava-band-deep { background-color: var(--t-deep); color: var(--bd-text); --t-text: var(--bd-text); --t-muted-ink: var(--bd-muted); --t-primary-ink: var(--bd-accent-ink); --t-secondary-ink: var(--bd-accent-ink); --t-accent-ink: var(--bd-accent-ink); --t-heading-ink: var(--bd-accent-ink); --t-card: rgb(255 255 255 / 0.07); --t-card-alt: rgb(255 255 255 / 0.11); --t-line: color-mix(in srgb, var(--t-accent) 40%, transparent); --t-button: var(--bd-button); --t-on-button: var(--bd-on-button); --t-orn: var(--t-accent); --t-band: var(--t-deep); }
+.bulava-band-deep { background-color: var(--t-deep); color: var(--bd-text); --t-text: var(--bd-text); --t-muted-ink: var(--bd-muted); --t-primary-ink: var(--bd-accent-ink); --t-secondary-ink: var(--bd-accent-ink); --t-accent-ink: var(--bd-accent-ink); --t-heading-ink: var(--bd-accent-ink); --t-secondary-display: var(--bd-accent-ink); --t-muted-display: var(--bd-muted); --t-card: rgb(255 255 255 / 0.07); --t-card-alt: rgb(255 255 255 / 0.11); --t-line: color-mix(in srgb, var(--t-accent) 40%, transparent); --t-button: var(--bd-button); --t-on-button: var(--bd-on-button); --t-orn: var(--t-accent); --t-band: var(--t-deep); }
 /* A light reply card on any band (the RSVP form inside it is the host's, drawn in dark ink). */
-.bulava-reply-card { background-color: var(--rc-bg); color: var(--rc-text); --t-text: var(--rc-text); --t-muted-ink: var(--rc-muted); --t-primary-ink: var(--rc-primary-ink); --t-secondary-ink: var(--rc-secondary-ink); --t-accent-ink: var(--rc-accent-ink); --t-heading-ink: var(--rc-primary-ink); --t-card: var(--rc-bg); --t-card-alt: var(--rc-bg); --t-line: color-mix(in srgb, var(--t-secondary) 45%, transparent); --t-button: var(--rc-button); --t-on-button: var(--rc-on-button); --t-orn: var(--t-secondary); }
+.bulava-reply-card { background-color: var(--rc-bg); color: var(--rc-text); --t-text: var(--rc-text); --t-muted-ink: var(--rc-muted); --t-primary-ink: var(--rc-primary-ink); --t-secondary-ink: var(--rc-secondary-ink); --t-accent-ink: var(--rc-accent-ink); --t-heading-ink: var(--rc-primary-ink); --t-secondary-display: var(--rc-secondary-ink); --t-muted-display: var(--rc-muted); --t-card: var(--rc-bg); --t-card-alt: var(--rc-bg); --t-line: color-mix(in srgb, var(--t-secondary) 45%, transparent); --t-button: var(--rc-button); --t-on-button: var(--rc-on-button); --t-orn: var(--t-secondary); }
 @keyframes bulava-flicker { 0%, 100% { transform: scale(1, 1) skewX(0deg); } 25% { transform: scale(0.94, 1.06) skewX(-2deg); } 50% { transform: scale(1.04, 0.96) skewX(2deg); } 75% { transform: scale(0.97, 1.03) skewX(-1deg); } }
 @keyframes bulava-glow { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
 @keyframes bulava-float-up { 0% { transform: translateY(0) translateX(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(-110vh) translateX(40px); opacity: 0; } }
@@ -128,6 +128,77 @@ const STYLES = `
 .bulava-heirloom-words[data-enter="play"] > :nth-child(7) { animation-delay: 0.54s; }
 @media (prefers-reduced-motion: reduce) {
   .bulava-heirloom-words[data-enter] > * { opacity: 1; animation: none; }
+}
+/* The deckle look (The Sacred Garden, ADR-081). Paper sections next to each other join into one sheet: the tears
+   between them go and their paper meets (by CSS, so a section that hides itself leaves no tear behind). Sections stay
+   put as they come into view (their paper never fades as a block); their words, art and figures come in instead. */
+.bulava-look-deckle { font-variation-settings: 'opsz' 72, 'SOFT' 50; }
+.bulava-template.reveal-ready.bulava-look-deckle .bulava-reveal { opacity: 1; transform: none; transition: none; }
+.bulava-deckle-paper + .bulava-deckle-paper { padding-top: 6px; }
+.bulava-deckle-paper + .bulava-deckle-paper .bulava-deckle-top { display: none; }
+.bulava-deckle-paper + .bulava-deckle-paper .bulava-deckle-body { top: 0; }
+.bulava-deckle-paper:has(+ .bulava-deckle-paper) { padding-bottom: 6px; }
+.bulava-deckle-paper:has(+ .bulava-deckle-paper) .bulava-deckle-bottom { display: none; }
+.bulava-deckle-paper:has(+ .bulava-deckle-paper) .bulava-deckle-body { bottom: 0; }
+.bulava-deckle-paper:has(+ .bulava-deckle-paper) .bulava-deckle-foot { bottom: -6px; }
+@keyframes bulava-dk-rise { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+@keyframes bulava-dk-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bulava-dk-zoom { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes bulava-dk-left { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+@keyframes bulava-dk-right { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes bulava-dk-breathe { from { transform: scale(1) rotate(0deg); } to { transform: scale(1.04) rotate(1.5deg); } }
+@keyframes bulava-dk-bob { 0%, 100% { transform: translateY(0); } 55% { transform: translateY(5px); } }
+@keyframes bulava-dk-petal { 0% { opacity: 0; transform: translate(0, 0) rotate(0deg); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dk-dx, 30px), var(--dk-dy, 160px)) rotate(var(--dk-rot, 40deg)); } }
+@keyframes bulava-dk-drift { 0% { opacity: 0; transform: translate(0, 0) rotate(0deg); } 12% { opacity: 0.95; } 82% { opacity: 0.85; } 100% { opacity: 0; transform: translate(var(--dk-dx, 30px), var(--dk-dy, 260px)) rotate(var(--dk-rot, 200deg)); } }
+.bulava-template.reveal-ready .bulava-reveal:not(.is-visible) :is(.bulava-deckle-rise, .bulava-deckle-fade, .bulava-deckle-zoom, .bulava-deckle-from-left, .bulava-deckle-from-right) { opacity: 0; }
+.bulava-reveal.is-visible .bulava-deckle-rise { animation: bulava-dk-rise 2s cubic-bezier(0.2, 0.7, 0.2, 1) var(--dk-delay, 0s) both; }
+.bulava-reveal.is-visible .bulava-deckle-fade { animation: bulava-dk-fade 1.5s ease-out var(--dk-delay, 0s) both; }
+.bulava-reveal.is-visible .bulava-deckle-zoom { animation: bulava-dk-zoom 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) var(--dk-delay, 0s) both; }
+.bulava-reveal.is-visible .bulava-deckle-from-left { animation: bulava-dk-left 2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.bulava-reveal.is-visible .bulava-deckle-from-right { animation: bulava-dk-right 2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.bulava-deckle-breathe { transform-origin: var(--dk-origin, center); animation: bulava-dk-breathe 4.2s ease-in-out infinite alternate; }
+.bulava-deckle-bob { animation: bulava-dk-bob 1.1s ease-in-out infinite; }
+.bulava-deckle-petal { opacity: 0; }
+.bulava-reveal.is-visible .bulava-deckle-petal { animation: bulava-dk-petal var(--dk-dur, 5s) ease-in var(--dk-delay, 0s) both; }
+.bulava-swans-blossom { opacity: 0; animation: bulava-dk-drift var(--dk-dur, 12s) linear var(--dk-delay, 0s) infinite; }
+.bulava-swans-words[data-enter="wait"] > * { opacity: 0; }
+.bulava-swans-words[data-enter="play"] > * { animation: bulava-dk-rise 2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.bulava-swans-words[data-enter="play"] > :nth-child(2) { animation-delay: 0.12s; }
+.bulava-swans-words[data-enter="play"] > :nth-child(3) { animation-delay: 0.24s; }
+.bulava-swans-words[data-enter="play"] > :nth-child(4) { animation-delay: 0.36s; }
+.bulava-swans-words[data-enter="play"] > :nth-child(5) { animation-delay: 0.6s; }
+/* The candlelit countdown (countdown "shimmer"): figures ink in from the left one after another and catch the light
+   twice; a changing figure rolls up out of sight as the new one rises. */
+@keyframes bulava-cd-ink { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@property --cd-pos { syntax: '<percentage>'; inherits: true; initial-value: 100%; }
+@keyframes bulava-cd-candle { 0%, 100% { --cd-pos: 100%; } 50% { --cd-pos: 0%; } }
+@keyframes bulava-roll-out { to { opacity: 0; transform: translateY(-60%); } }
+@keyframes bulava-roll-in { from { opacity: 0; transform: translateY(60%); } to { opacity: 1; transform: none; } }
+.bulava-cd-digit { background-image: linear-gradient(105deg, var(--t-secondary-display) 0%, var(--t-secondary-display) 25%, color-mix(in srgb, var(--t-secondary-display) 50%, var(--t-accent)) 46%, var(--t-accent) 52%, color-mix(in srgb, var(--t-secondary-display) 50%, var(--t-accent)) 58%, var(--t-secondary-display) 75%, var(--t-secondary-display) 100%); background-size: 300% 100%; background-position: var(--cd-pos, 100%) 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.bulava-template.reveal-ready .bulava-reveal:not(.is-visible) .bulava-cd-num { clip-path: inset(0 100% 0 0); }
+.bulava-template.reveal-ready .bulava-reveal:not(.is-visible) :is(.bulava-cd-sep, .bulava-cd-label) { opacity: 0; }
+.bulava-reveal.is-visible .bulava-cd-num { animation: bulava-cd-ink 1.1s cubic-bezier(0.4, 0, 0.2, 1) var(--cd-delay, 0s) both, bulava-cd-candle 4.5s ease-in-out calc(var(--cd-delay, 0s) + 1.1s) 2; }
+.bulava-reveal.is-visible :is(.bulava-cd-sep, .bulava-cd-label) { animation: bulava-dk-fade 0.8s ease var(--cd-delay, 0s) both; }
+.bulava-roll-out { animation: bulava-roll-out 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; }
+.bulava-roll-in { animation: bulava-roll-in 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.12s both; }
+/* The schedule's peony rides its stem down as the page scrolls (a scroll timeline); elsewhere it waits at the top. */
+.bulava-stem-ride { transform: translateY(-100%); }
+@keyframes bulava-stem-ride { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@supports (animation-timeline: view()) {
+  .bulava-stem { view-timeline-name: --bulava-stem; }
+  .bulava-stem-ride { animation: bulava-stem-ride linear both; animation-timeline: --bulava-stem; animation-range: cover 24% cover 72%; }
+}
+.bulava-seal-dialog[open] { animation: bulava-dk-zoom 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
+/* The sealed envelope's prompt: its letters breathe apart and the chevron nudges up (intro "sealedEnvelope"). */
+@keyframes bulava-env-pulse { 0%, 100% { letter-spacing: 0.26em; } 50% { letter-spacing: 0.3em; } }
+@keyframes bulava-env-nudge { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+.bulava-env-label { animation: bulava-env-pulse 2.4s ease-in-out 1.6s infinite; }
+.bulava-env-chevron { animation: bulava-env-nudge 2.4s ease-in-out 1.9s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .bulava-deckle-breathe, .bulava-deckle-bob, .bulava-stem-ride, .bulava-roll-out, .bulava-roll-in, .bulava-seal-dialog[open] { animation: none !important; }
+  .bulava-swans-blossom, .bulava-deckle-petal { display: none; }
+  .bulava-reveal.is-visible :is(.bulava-deckle-rise, .bulava-deckle-fade, .bulava-deckle-zoom, .bulava-deckle-from-left, .bulava-deckle-from-right, .bulava-cd-num, .bulava-cd-sep, .bulava-cd-label) { animation: none; }
+  .bulava-swans-words[data-enter] > * { opacity: 1; animation: none; }
 }
 `;
 

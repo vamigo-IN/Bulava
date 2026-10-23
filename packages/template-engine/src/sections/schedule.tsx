@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react';
-import { formatEventDateShort, formatEventDateWithWeekday, formatEventTime, getLanguage } from '@bulava/localization';
+import { formatEventDateShort, formatEventDateWithWeekday, formatEventTime, formatEventTimeShort, getLanguage } from '@bulava/localization';
 import type { FunctionContext, IconName } from '@bulava/template-schema';
 import { FunctionArt, FunctionMotif } from '../art/function-icons';
+import { Illustration } from '../art/illustrations';
 import { Diya } from '../art/motifs';
 import { LakePalaceVignette } from '../art/vignettes';
 import { Icon } from '../canvas/icons';
 import { FlipCard } from '../interactive';
 import { Glyph } from '../ornaments-suite';
 import type { SectionProps } from '../types';
+import { Crest } from './deckle';
 import { FleuronRule, Seal, ShapedCard, Skyline, type Dress } from './dress';
 import { cardClass, cx, dressFor, heirloomCaps, HEIRLOOM_PILL, PillArrow, SectionShell, shell } from './shared';
 
@@ -77,6 +79,57 @@ export function EventTimeline(p: SectionProps) {
   const suited = p.ornament !== 'none';
   const tone = p.instance.variant === 'timeline' || p.instance.variant === 'diya' ? 'plain' : 'surface';
   const d = dressFor(p, tone);
+
+  if (p.instance.variant === 'stem') {
+    // A programme on paper: each function's time at the left, its name at the right, a fine stem between them with a
+    // diamond at every function, and a blush peony that rides the stem down as the page scrolls (a scroll timeline:
+    // it waits at the first function where browsers have none, and for reduced motion). Functions on more than one
+    // day are grouped under each day's date.
+    const dayOf = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: p.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+    const multiDay = new Set(fns.map((fn) => (fn.startsAt ? dayOf(fn.startsAt) : ''))).size > 1;
+    const ovo = '[font-family:var(--font-ovo),Ovo,serif]';
+    const items: ReactNode[] = [];
+    let lastDay = '';
+    fns.forEach((fn, i) => {
+      const day = fn.startsAt ? dayOf(fn.startsAt) : '';
+      if (multiDay && fn.startsAt && day !== lastDay) {
+        items.push(
+          <li key={`d${fn.id}`} className="relative z-[1] h-[34px] py-[5px] text-center">
+            <span className={cx('inline-block px-5 text-[17px] leading-[24px] text-[var(--t-secondary-ink)]', ovo)} style={{ background: 'radial-gradient(closest-side, var(--t-surface) 72%, transparent)' }}>
+              {formatEventDateWithWeekday(fn.startsAt, fmt)}
+            </span>
+          </li>,
+        );
+      }
+      lastDay = day;
+      items.push(
+        <li key={fn.id} className="bulava-deckle-fade grid min-h-[78px] grid-cols-[1fr_56px_1fr] items-center" style={{ ['--dk-delay' as string]: `${Math.min(i, 5) * 0.1}s` }}>
+          <span className={cx('text-right text-[30px] leading-[1.2] tracking-[-0.02em] text-[var(--t-muted-display)]', ovo)}>{fn.startsAt ? formatEventTimeShort(fn.startsAt, fmt) : ''}</span>
+          <span aria-hidden="true" className="relative z-[1] mx-auto block size-[8px] rotate-45 bg-[var(--t-muted)]" />
+          <span className="mx-auto max-w-[100px] text-center">
+            <span className="block text-[20px] leading-[22px] font-light break-words text-[var(--t-text)] [font-family:var(--t-body)]">{fn.name}</span>
+            {status(fn)}
+          </span>
+        </li>,
+      );
+    });
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={p.value('heading') ?? p.t('template.schedule.ofEvents')} ornate="flourish">
+        <ol className="bulava-stem relative mx-auto max-w-[360px]">
+          {/* The stem runs from the first function's diamond to the last (a day's date may head the list). */}
+          <span aria-hidden="true" className={cx('absolute bottom-[39px] left-1/2 w-px -translate-x-1/2 bg-[var(--t-muted)] opacity-80', multiDay ? 'top-[73px]' : 'top-[39px]')} />
+          {fns.length > 1 ? (
+            <span aria-hidden="true" className={cx('bulava-stem-ride pointer-events-none absolute bottom-[39px] left-1/2 z-[2] w-[58px] -translate-x-1/2', multiDay ? 'top-[73px]' : 'top-[39px]')}>
+              <span className="absolute bottom-0 left-0 block h-[52px] w-[58px] translate-y-1/2">
+                <Illustration name="peony" color="#8a9a6b" colors={p.colors} w={110} h={100} style={{ display: 'block', width: '100%', height: '100%' }} />
+              </span>
+            </span>
+          ) : null}
+          {items}
+        </ol>
+      </SectionShell>
+    );
+  }
 
   if (p.instance.variant === 'arches') {
     // Cards under cusped arches, each with its function's illustration in the arch's head, all of one height
@@ -390,6 +443,72 @@ export function Venue(p: SectionProps) {
     ) : null;
   const heading = p.value('heading') ?? p.t('template.venue.title');
   const d = dressFor(p);
+
+  if (p.instance.variant === 'sketch') {
+    // A printed venue card: its name and address under a script heading and a small fleuron, an inked drawing of a
+    // domed hall with a few petals drifting across it, then the map in a gold frame between filigree crests (or,
+    // without a map, a quiet link to directions).
+    const place = [venue.address, venue.city].filter(Boolean).join(', ');
+    const petals = [
+      { x: 84, y: 4, dx: 26, dy: 170, r: -40, t: 6.5, delay: 0.2, s: 1 },
+      { x: 20, y: 0, dx: 36, dy: 130, r: 50, t: 5.5, delay: 0.8, s: 0.85 },
+      { x: 4, y: 40, dx: 46, dy: 150, r: -30, t: 7, delay: 1.6, s: 0.9 },
+      { x: 92, y: 46, dx: -40, dy: 140, r: 60, t: 6, delay: 0.5, s: 0.8 },
+      { x: 10, y: 80, dx: 30, dy: 60, r: -70, t: 4, delay: 2.2, s: 0.75 },
+      { x: 74, y: 90, dx: -34, dy: 54, r: 40, t: 3.6, delay: 1.2, s: 0.9 },
+    ];
+    const still = p.mode === 'thumbnail';
+    const route = q ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}` : venue.mapUrl;
+    const pill =
+      'inline-flex min-h-11 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--t-orn)_70%,transparent)] px-7 text-[17px] text-[var(--t-secondary-ink)] [font-family:var(--font-ovo),Ovo,serif] transition-colors hover:bg-[color-mix(in_srgb,var(--t-orn)_10%,transparent)]';
+    return (
+      <SectionShell {...shell(p)} dress={d} heading={p.value('heading') ?? p.t('template.venue.location')} ornate="fleuron">
+        <div className="text-center">
+          <p className="bulava-deckle-rise text-[20px] leading-[31px] font-light break-words text-[var(--t-text)] [font-family:var(--t-body)]">{venue.name}</p>
+          {place ? <p className="bulava-deckle-rise mx-auto mt-1 max-w-[310px] text-[17px] leading-[21px] font-light text-[var(--t-text)] [font-family:var(--t-body)]">{p.t('template.venue.addressLine', { address: place })}</p> : null}
+          <div className="relative mx-auto mt-5 aspect-[380/253] w-[min(100%,380px)]">
+            <div className="bulava-deckle-zoom absolute inset-0">
+              <Illustration name="domedHall" color="#8c6a44" colors={p.colors} w={380} h={253} style={{ display: 'block', width: '100%', height: '100%' }} />
+            </div>
+            {still
+              ? null
+              : petals.map((pt, i) => (
+                  <span
+                    key={i}
+                    aria-hidden="true"
+                    className="bulava-deckle-petal pointer-events-none absolute block w-[14px]"
+                    style={{ left: `${pt.x}%`, top: `${pt.y - 20}%`, scale: String(pt.s), ['--dk-dx' as string]: `${pt.dx}px`, ['--dk-dy' as string]: `${pt.dy}px`, ['--dk-rot' as string]: `${pt.r}deg`, ['--dk-dur' as string]: `${pt.t}s`, ['--dk-delay' as string]: `${pt.delay}s` }}
+                  >
+                    <svg viewBox="0 0 14 11" className="block h-auto w-full">
+                      <path d="M1 6 C2 1 8 -1 13 3 C11 8 6 11 1 6Z" fill={i % 3 === 0 ? '#f4d6cc' : i % 3 === 1 ? '#fbf3e6' : '#a7b689'} />
+                    </svg>
+                  </span>
+                ))}
+          </div>
+          {venue.embedUrl && !still ? (
+            <div className="bulava-deckle-zoom relative mx-auto mt-[54px] w-[min(100%,341px)]">
+              <Crest className="absolute -top-[30px] left-1/2 h-[42px] w-[190px] -translate-x-1/2 text-[var(--t-orn)]" />
+              <iframe
+                src={venue.embedUrl}
+                title={p.t('template.venue.map', { venue: venue.name })}
+                loading="lazy"
+                referrerPolicy="origin"
+                allowFullScreen
+                className="block aspect-square w-full rounded-[18px] border-2 border-[color-mix(in_srgb,var(--t-orn)_80%,transparent)] bg-[var(--t-surface)]"
+              />
+              <Crest under className="absolute -bottom-[30px] left-1/2 h-[42px] w-[190px] -translate-x-1/2 text-[var(--t-orn)]" />
+            </div>
+          ) : still || !route ? (
+            <span className={cx(pill, 'mt-7')}>{p.t('template.getDirections')}</span>
+          ) : (
+            <a href={route} target="_blank" rel="noopener noreferrer" className={cx(pill, 'mt-7')}>
+              {p.t('template.getDirections')}
+            </a>
+          )}
+        </div>
+      </SectionShell>
+    );
+  }
 
   if (p.instance.variant === 'photo') {
     // The venue's own photograph (photo.venue, never a portrait) across the left half, the words beside it.

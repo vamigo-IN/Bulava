@@ -3,6 +3,7 @@ import { canvasTemplates, retiredCanvasDesigns } from './canvas';
 import { canvasFilms } from './canvas-films';
 import { withFaith } from './faith';
 import { royalHeirloom } from './heirloom';
+import { sacredGarden } from './sacred-garden';
 import { STAGE_TEMPLATE_SPECS } from './stages';
 import { stageFilm, VIDEO_TEMPLATES } from './video';
 import { RETIRED_TEMPLATE_KEYS, WEBSITE_TEMPLATES } from './website';
@@ -14,7 +15,7 @@ export { EMBLEM_CATEGORIES, faithOf } from './faith';
 /** Every template with its faith applied (faith.ts): the tag, the theme's faith, the wording and the emblem. */
 const WEBSITES = WEBSITE_TEMPLATES.map(withFaith);
 /** Hand-made Signature websites of engine sections (heirloom.ts), at fixed sort orders that shift no other template. */
-const HEIRLOOM = [withFaith(royalHeirloom(-120))];
+const HEIRLOOM = [withFaith(royalHeirloom(-120)), withFaith(sacredGarden(-121))];
 const CANVAS_TEMPLATES = canvasTemplates(WEBSITE_TEMPLATES.length).map(withFaith);
 /** Films are made from canvas designs, including ones retired from the websites as lookalikes (their films stay). */
 const FILM_SOURCES = [...CANVAS_TEMPLATES, ...retiredCanvasDesigns().map(withFaith)];

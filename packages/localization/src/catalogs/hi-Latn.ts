@@ -44,4 +44,11 @@ export const hiLatn: Catalog = {
   'template.intro.doorway': 'Dwaar kholne ke liye tap kijiye',
   'template.intro.silk': 'Reshmi parda uthane ke liye upar kheenchiye',
   'template.intro.unfold': 'Nimantran kholne ke liye tap kijiye',
+  'template.hero.weddingDay': 'Shaadi ka din',
+  'template.invitation.dearFamily': 'Pyaare dosto aur parivaar',
+  'template.countdown.beginsIn': 'Jashn shuru hone mein',
+  'template.schedule.ofEvents': 'Karyakram',
+  'template.rsvp.attendance': 'Apni upasthiti confirm kijiye',
+  'template.rsvp.clickToOpen': 'Kholne ke liye tap kijiye',
+  'template.footer.hopeToSee': 'Aapka intezaar rahega!',
 };

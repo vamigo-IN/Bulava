@@ -60,7 +60,7 @@ export const FONTS: Record<'royal' | 'classic' | 'heritage' | 'modern' | 'editor
   },
 };
 /** A builder preset, or any FONT_PAIRINGS key (regal, romantic, elegant, grand, desi…). */
-export type FontPreset = keyof typeof FONTS | 'regal' | 'romantic' | 'elegant' | 'grand' | 'desi' | 'playful' | 'heirloom';
+export type FontPreset = keyof typeof FONTS | 'regal' | 'romantic' | 'elegant' | 'grand' | 'desi' | 'playful' | 'heirloom' | 'engraved';
 
 export function fontsFor(preset: FontPreset): Fonts {
   const fonts = (FONTS as Record<string, Fonts>)[preset] ?? fontPairing(preset)?.fonts;
@@ -118,6 +118,8 @@ export const SLOTS = {
   quote: { key: 'quote', label: 'A verse or a line from you', maxLength: 300 },
   quoteBy: { key: 'quoteBy', label: 'Quote attribution', maxLength: 80 },
   menu: { key: 'menu', label: 'Menu (one course per line: Course | dishes)', maxLength: 1500 },
+  dressCode: { key: 'dressCode', label: 'Dress code', maxLength: 300 },
+  welcome: { key: 'welcome', label: 'Welcome message', maxLength: 300 },
 } as const;
 export type SlotKey = keyof typeof SLOTS;
 

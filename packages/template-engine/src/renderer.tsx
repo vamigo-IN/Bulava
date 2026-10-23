@@ -329,7 +329,7 @@ export function TemplateRenderer({ definition: template, context, customization,
       {/* The camera rig runs on any stage the page shows (a stage hero further down, too). */}
       {mode !== 'thumbnail' && (stage || shown.some((s) => heroStage(s))) ? <StageRig rootId={rootId} /> : null}
       {mode === 'live' && ctx.music?.url ? (
-        <MusicPlayer url={ctx.music.url} title={ctx.music.title} vinyl={look === 'noir'} labels={{ play: t('template.music.play'), pause: t('template.music.pause') }} />
+        <MusicPlayer url={ctx.music.url} title={ctx.music.title} vinyl={look === 'noir'} round={look === 'deckle'} labels={{ play: t('template.music.play'), pause: t('template.music.pause') }} />
       ) : null}
       {slots.veil ? <WatermarkVeil text={slots.veil} /> : null}
       <SharedArt art={shared} ids={artRefs} colors={colors} />

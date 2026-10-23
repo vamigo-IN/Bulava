@@ -51,9 +51,33 @@ function FlipDigit({ value }: { value: string }) {
 }
 
 /**
+ * A figure that rolls when it changes: the old one rises away as the new one comes up from below
+ * (transform and opacity only, so it never repaints the page).
+ */
+function RollNumber({ value }: { value: string }) {
+  const [state, setState] = useState<{ old: string | null; now: string }>({ old: null, now: value });
+  useEffect(() => {
+    setState((s) => (s.now === value ? s : { old: s.now, now: value }));
+  }, [value]);
+  return (
+    <span className="relative block">
+      {state.old !== null ? (
+        <span key={`o${state.old}`} className="bulava-roll-out bulava-cd-digit absolute inset-0">
+          {state.old}
+        </span>
+      ) : null}
+      <span key={`n${state.now}`} className={state.old !== null ? 'bulava-roll-in bulava-cd-digit block' : 'bulava-cd-digit block'}>
+        {state.now}
+      </span>
+    </span>
+  );
+}
+
+/**
  * Live countdown. Renders a stable placeholder on the server to avoid hydration mismatch.
  * Variants: boxes, flip (flip-clock leaves), rings (each number in a double ring), inline
- * (one line: "42 days · 8 hours · 30 minutes").
+ * (one line: "42 days · 8 hours · 30 minutes"), shimmer (Ovo figures in candlelit gold that ink in
+ * one after another and roll as they change, colons between them, the units' names beneath).
  */
 export function CountdownClock({
   target,
@@ -66,7 +90,7 @@ export function CountdownClock({
   target: string;
   labels: Labels;
   static?: boolean;
-  variant?: 'boxes' | 'flip' | 'rings' | 'inline' | 'ornate';
+  variant?: 'boxes' | 'flip' | 'rings' | 'inline' | 'ornate' | 'shimmer';
   /** ornate: the drawn separator between the units and the flourish at each end (the left one; the right mirrors it). */
   ornament?: { separator: ReactNode; end: ReactNode };
   /** Spaced capitals for the units' names (Latin script only). */
@@ -125,6 +149,35 @@ export function CountdownClock({
             {ornament.end}
           </span>
         ) : null}
+      </div>
+    );
+  }
+
+  if (variant === 'shimmer') {
+    return (
+      <div className="flex items-start justify-center gap-[6px] [font-family:var(--font-ovo),Ovo,serif]" role="timer" aria-live="off" data-live="">
+        {cells.map(([key, n], i) => (
+          <Fragment key={key}>
+            {i ? (
+              <span aria-hidden="true" className="bulava-cd-sep flex h-[56px] items-center text-[52px] leading-none text-[var(--t-secondary-display)]" style={{ ['--cd-delay' as string]: `${0.25 + (i - 1) * 0.18}s` }}>
+                :
+              </span>
+            ) : null}
+            <span className="flex min-w-[64px] flex-col items-center">
+              <span className="sr-only">
+                {n === null ? '–' : n} {labels[key]}
+              </span>
+              <span aria-hidden="true" className="block h-[56px] overflow-hidden text-[45px] leading-[56px] [font-variant-numeric:lining-nums_tabular-nums]">
+                <span className="bulava-cd-num block text-[var(--t-secondary-display)]" style={{ ['--cd-delay' as string]: `${i * 0.18}s` }}>
+                  <RollNumber value={n === null ? '––' : key === 'days' ? String(n) : String(n).padStart(2, '0')} />
+                </span>
+              </span>
+              <span aria-hidden="true" className="bulava-cd-label mt-[8px] text-[19px] leading-[1.2] text-[var(--t-secondary-ink)]" style={{ ['--cd-delay' as string]: `${0.9 + i * 0.18}s` }}>
+                {labels[key]}
+              </span>
+            </span>
+          </Fragment>
+        ))}
       </div>
     );
   }

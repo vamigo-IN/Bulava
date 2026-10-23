@@ -159,6 +159,7 @@ export const enMarketing = {
   'intro.name.doorway': 'carved doors that open',
   'intro.name.silk': 'a silk curtain that rises',
   'intro.name.unfold': 'a card that unfolds in 3D',
+  'intro.name.sealedEnvelope': 'a wax-sealed envelope that lifts open',
   'home.spotlight.eyebrow': 'Spotlight',
   'home.spotlight.point2': 'One page per guest, showing only their functions',
   'home.spotlight.point3': 'Per-function RSVP with headcount and meal choice',

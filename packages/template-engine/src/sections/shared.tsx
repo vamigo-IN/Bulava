@@ -8,6 +8,7 @@ import { textureStyle } from '../canvas/colors';
 import { deepOf } from '../theme';
 import type { RenderMode, SectionProps } from '../types';
 import { decorOf } from './decor';
+import { DeckleShell } from './deckle';
 import { dressOf, EDGE_HEIGHT, onDark, SuiteCorners, SuiteDivider, SuiteEdge, SWAG_EDGES, type Band, type Dress } from './dress';
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
@@ -41,6 +42,9 @@ export function bandFor(look: LookName, index: number, tone: 'plain' | 'surface'
     // Paper by default; the template chooses each section's band (`band`), dark bands are the deep colour.
     case 'heirloom':
       return tone === 'surface' ? 'surface' : tone === 'inverse' ? 'deep' : 'plain';
+    // Cream, or a sheet of deckle-edged paper (the template chooses each section's band); never a dark band.
+    case 'deckle':
+      return tone === 'plain' ? 'plain' : 'surface';
     default:
       return tone === 'surface' ? 'surface' : tone === 'inverse' ? 'primary' : 'plain';
   }
@@ -271,6 +275,7 @@ export function SectionShell({
   join,
   bleed,
   artRefs,
+  ornate,
 }: {
   id: string;
   heading?: string;
@@ -307,9 +312,18 @@ export function SectionShell({
   bleed?: boolean;
   /** The page's shared drawings (SectionProps.artRefs). */
   artRefs?: Readonly<Record<string, string>>;
+  /** The deckle look's heading ornament: gold swashes either side, or a small fleuron beneath. */
+  ornate?: 'flourish' | 'fleuron';
 }) {
   const dress = given ?? dressOf(ornament, look, colors, bandOverride ?? bandFor(look, index, tone, dark), themeDress);
   const band = dress.band;
+  if (look === 'deckle') {
+    return (
+      <DeckleShell id={id} dress={dress} heading={heading} flourish={ornate === 'flourish'} fleuron={ornate === 'fleuron'} className={className} bleed={bleed} seed={index * 3 + 1}>
+        {children}
+      </DeckleShell>
+    );
+  }
   if (look === 'heirloom') {
     return (
       <HeirloomShell id={id} dress={dress} heading={heading} eyebrow={eyebrow} className={className} wide={wide} decor={decor} mode={mode} script={script} join={join} bleed={bleed} artRefs={artRefs}>

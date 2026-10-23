@@ -6,12 +6,26 @@ import { INTRO_OPEN_EVENT } from './intro';
 /**
  * Background music for website invitations. Browsers only allow audio after a
  * user gesture, so playback starts when the guest opens the intro (or taps this
- * button), never on page load. Pauses while the tab is hidden.
+ * button), never on page load. Pauses while the tab is hidden. The button is a
+ * record for noir pages, a deep round button with pause and play glyphs for the
+ * deckle look (`round`, which waits until an opening has lifted, as a printed invitation's
+ * would), else a small disc with a sound-bar meter.
  */
-export function MusicPlayer({ url, title, labels, vinyl = false }: { url: string; title: string; labels: { play: string; pause: string }; vinyl?: boolean }) {
+export function MusicPlayer({ url, title, labels, vinyl = false, round = false }: { url: string; title: string; labels: { play: string; pause: string }; vinyl?: boolean; round?: boolean }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const resumeOnShow = useRef(false);
+  // An opening locks the page's scroll while it covers it (IntroOverlay): the round button waits for it to lift.
+  const [covered, setCovered] = useState(false);
+  useEffect(() => {
+    if (!round) return;
+    const html = document.documentElement;
+    const check = () => setCovered(html.style.overflow === 'hidden');
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(html, { attributes: true, attributeFilter: ['style'] });
+    return () => observer.disconnect();
+  }, [round]);
 
   useEffect(() => {
     const start = () => {
@@ -68,6 +82,28 @@ export function MusicPlayer({ url, title, labels, vinyl = false }: { url: string
               ▶
             </span>
           ) : null}
+        </button>
+      ) : round ? (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-pressed={playing}
+          aria-label={`${playing ? labels.pause : labels.play}: ${title}`}
+          title={title}
+          tabIndex={covered ? -1 : undefined}
+          aria-hidden={covered || undefined}
+          className={`fixed right-5 bottom-5 z-50 flex size-[60px] items-center justify-center rounded-full bg-[var(--t-primary)] text-[var(--t-on-primary)] shadow-[0_4px_6px_rgba(0,0,0,0.1)] transition-[opacity,transform] duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--t-accent)] ${covered ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+        >
+          <svg viewBox="0 0 24 24" className="size-[30px]" fill="currentColor" aria-hidden="true">
+            {playing ? (
+              <>
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </>
+            ) : (
+              <polygon points="7,4 19,12 7,20" />
+            )}
+          </svg>
         </button>
       ) : (
       <button

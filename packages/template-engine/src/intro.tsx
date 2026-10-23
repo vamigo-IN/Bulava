@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { IntroName, StageIntro, ThemeColors } from '@bulava/template-schema';
 import { cuspedHead } from './art/kit';
 import { easeInOut, RibbonCover, ZipperCover, type CoverProps } from './covers';
@@ -42,6 +42,8 @@ const DURATION: Record<IntroVariant, number> = {
   doorway: 2400,
   silk: 2000,
   unfold: 2400,
+  // The flap lifts (1.4 s), the light rises, then the page comes up out of it.
+  sealedEnvelope: 2600,
 };
 
 /** Openings the guest pulls (ADR-074): the invitation shows through them as they open. */
@@ -206,6 +208,7 @@ export function IntroOverlay({
       style={{ opacity: opening ? 0 : 1, transitionDelay: opening ? `${fadeDelay}ms` : '0ms' }}
     >
       {shown === 'envelope' ? <Envelope opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
+      {shown === 'sealedEnvelope' ? <SealedEnvelope opening={opening} monogram={coverMonogram ?? monogram} label={openLabel} onOpen={open} /> : null}
       {shown === 'curtain' || shown === 'doors' ? <Panels variant={shown} palace={shown === 'doors' && frame === 'cusped'} opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
       {shown === 'gates' ? <Gates opening={opening} monogram={monogram} label={openLabel} onOpen={open} /> : null}
       {shown === 'seal' ? <Seal opening={opening} monogram={monogram} label={labels.seal} onOpen={open} /> : null}
@@ -252,6 +255,177 @@ function Envelope({ opening, monogram, label, onOpen }: PartProps) {
         </div>
       </div>
       <span className="mt-8 bulava-breathe text-sm tracking-[0.3em] uppercase text-[var(--t-primary-ink)]">{label}</span>
+    </button>
+  );
+}
+
+/** Twelve directions round a circle (30° steps) for the wax's lobes, without runtime trigonometry. */
+const WAX_DIAL: ReadonlyArray<readonly [number, number]> = [
+  [1, 0],
+  [0.866, 0.5],
+  [0.5, 0.866],
+  [0, 1],
+  [-0.5, 0.866],
+  [-0.866, 0.5],
+  [-1, 0],
+  [-0.866, -0.5],
+  [-0.5, -0.866],
+  [0, -1],
+  [0.5, -0.866],
+  [0.866, -0.5],
+];
+
+/** The wax pool's outline round (cx, cy): twelve points joined by bulges outward, each a little different. */
+function waxOutline(cx: number, cy: number, r: number): string {
+  const radius = (i: number) => r * (0.93 + rand(i % 12, 7) * 0.08);
+  const at = (i: number, k: number) => [cx + WAX_DIAL[i % 12]![0] * k, cy + WAX_DIAL[i % 12]![1] * k] as const;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  let d = `M${at(0, radius(0)).map(round).join(' ')}`;
+  for (let i = 0; i < 12; i++) {
+    const [ax, ay] = WAX_DIAL[i]!;
+    const [bx, by] = WAX_DIAL[(i + 1) % 12]!;
+    const mx = (ax + bx) / 2;
+    const my = (ay + by) / 2;
+    const len = Math.sqrt(mx * mx + my * my) || 1;
+    const bulge = r * (1.13 + rand(i, 11) * 0.06);
+    const end = at(i + 1, radius(i + 1));
+    d += ` Q${round(cx + (mx / len) * bulge)} ${round(cy + (my / len) * bulge)} ${round(end[0])} ${round(end[1])}`;
+  }
+  return `${d}Z`;
+}
+
+/** A sprig embossed in paper: a gently curving stem with paired leaves and three small flowers, ~150 units tall. */
+function Sprig({ id }: { id: string }) {
+  const leaves: ReactNode[] = [];
+  for (let k = 0; k < 7; k++) {
+    const y = -18 - k * 19;
+    const x = Math.round((k % 2 ? 3 : -2) * 10) / 10;
+    leaves.push(<ellipse key={`a${k}`} cx={x - 7} cy={y} rx="7" ry="2.6" transform={`rotate(-32 ${x - 7} ${y})`} />);
+    leaves.push(<ellipse key={`b${k}`} cx={x + 7} cy={y - 8} rx="6.4" ry="2.4" transform={`rotate(32 ${x + 7} ${y - 8})`} />);
+  }
+  const flower = (cx: number, cy: number, r: number, key: string) => (
+    <g key={key}>
+      {[0, 72, 144, 216, 288].map((a) => (
+        <ellipse key={a} cx={cx} cy={cy - r * 0.9} rx={r * 0.55} ry={r * 0.9} transform={`rotate(${a} ${cx} ${cy})`} />
+      ))}
+      <circle cx={cx} cy={cy} r={r * 0.32} />
+    </g>
+  );
+  return (
+    <g id={id} fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round">
+      <path d="M0 0 C7 -40 -7 -84 2 -148" />
+      {leaves}
+      {flower(-15, -58, 5.5, 'f1')}
+      {flower(14, -104, 5, 'f2')}
+      {flower(2, -156, 5.5, 'f3')}
+    </g>
+  );
+}
+
+/** Three copies of a shape, so it reads as pressed into the paper: a shadow below, a highlight above, the paper between. */
+function Embossed({ href, transform, paper }: { href: string; transform: string; paper: string }) {
+  return (
+    <g transform={transform}>
+      <use href={href} transform="translate(0.9 1)" style={{ color: 'rgba(90, 64, 40, 0.28)' }} />
+      <use href={href} transform="translate(-0.7 -0.8)" style={{ color: 'rgba(255, 255, 255, 0.95)' }} />
+      <use href={href} style={{ color: paper }} />
+    </g>
+  );
+}
+
+/**
+ * The sealed envelope (sealedEnvelope): the whole screen is a portrait envelope of cream paper, its flaps embossed
+ * with sprigs, sealed where they meet with a pool of wine wax pressed with the couple's initials; "Tap to open"
+ * breathes beneath it over a chevron. On a tap the seal warms, the top flap lifts away on its hinge carrying the seal,
+ * light rises from inside and the invitation comes up out of it. Paper, wax and gold come from the palette.
+ */
+function SealedEnvelope({ opening, monogram, label, onOpen }: PartProps) {
+  const id = `env${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const paper = 'color-mix(in srgb, var(--t-surface) 55%, #ffffff)';
+  const fold = 'color-mix(in srgb, var(--t-surface) 82%, #ffffff)';
+  const inside = 'color-mix(in srgb, var(--t-surface) 70%, var(--t-secondary))';
+  const initials = monogram.replace(/\s+/g, '');
+  // Sprigs on the flaps: two on each side flap, two on the bottom flap, two on the top flap (which turns with it).
+  const sides = ['translate(34 470) scale(1.15)', 'translate(64 300) rotate(4) scale(0.92)', 'translate(326 470) scale(-1.15 1.15)', 'translate(296 300) rotate(-4) scale(-0.92 0.92)', 'translate(118 628) rotate(-14) scale(0.82)', 'translate(242 628) rotate(14) scale(-0.82 0.82)'];
+  const top = ['translate(116 230) rotate(-22) scale(0.86)', 'translate(244 230) rotate(22) scale(-0.86 0.86)'];
+  return (
+    <button type="button" onClick={onOpen} aria-label={label} className="absolute inset-0 flex cursor-pointer items-center justify-center [-webkit-tap-highlight-color:transparent]">
+      <span
+        className="relative block aspect-[9/16] w-[min(100vw,440px,calc(100dvh*0.5625))] transition-transform duration-[900ms] ease-[cubic-bezier(.3,.1,.2,1)]"
+        style={{ perspective: '1400px', transform: opening ? 'scale(1.04)' : 'none', transitionDelay: opening ? '900ms' : '0ms' }}
+      >
+        {/* The envelope: its inside and the light in it, the side and bottom flaps, the sprigs pressed into them. */}
+        <svg viewBox="0 0 360 640" aria-hidden="true" className="absolute inset-0 block h-full w-full drop-shadow-[0_18px_30px_rgba(80,56,30,0.18)]">
+          <defs>
+            <Sprig id={`${id}s`} />
+            <radialGradient id={`${id}l`} cx="50%" cy="34%" r="60%">
+              <stop offset="0" stopColor="#fffaf0" />
+              <stop offset="0.45" stopColor="#ffe9c4" stopOpacity="0.85" />
+              <stop offset="1" stopColor="#ffe9c4" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="360" height="640" style={{ fill: inside }} />
+          <rect width="360" height="640" fill={`url(#${id}l)`} className="transition-opacity duration-[1100ms]" style={{ opacity: opening ? 1 : 0, transitionDelay: opening ? '350ms' : '0ms' }} />
+          <path d="M0 0 L182 330 L0 640Z" style={{ fill: fold }} />
+          <path d="M360 0 L178 330 L360 640Z" style={{ fill: fold }} />
+          <path d="M0 0 L182 330 L0 640Z" fill="rgba(90, 64, 40, 0.035)" />
+          <path d="M0 640 L180 334 L360 640Z" style={{ fill: paper }} />
+          <path d="M0 640 L180 334 L360 640" fill="none" stroke="rgba(90, 64, 40, 0.16)" strokeWidth="1.2" />
+          <path d="M1 641 L180 336 L359 641" fill="none" stroke="rgba(255, 255, 255, 0.9)" strokeWidth="1" transform="translate(0 1.6)" />
+          {sides.map((tf, i) => (
+            <Embossed key={i} href={`#${id}s`} transform={tf} paper={i < 4 ? fold : paper} />
+          ))}
+        </svg>
+        {/* The top flap on its hinge, the seal at its point: it turns up and over, and the seal goes with it. */}
+        <span
+          className="absolute inset-0 block origin-top transition-transform duration-[1150ms] ease-[cubic-bezier(.55,.05,.25,1)] [transform-style:preserve-3d]"
+          style={{ transform: opening ? 'rotateX(178deg)' : 'rotateX(0deg)', transitionDelay: opening ? '260ms' : '0ms' }}
+        >
+          <svg viewBox="0 0 360 640" aria-hidden="true" className="absolute inset-0 block h-full w-full [backface-visibility:hidden]">
+            <defs>
+              <Sprig id={`${id}t`} />
+            </defs>
+            <path d="M0 0 H360 L180 330Z" fill="rgba(90, 64, 40, 0.14)" transform="translate(0 4)" />
+            <path d="M0 0 H360 L180 322Z" style={{ fill: paper }} />
+            <path d="M0 0 L180 322 L360 0" fill="none" stroke="rgba(255, 255, 255, 0.85)" strokeWidth="1.2" />
+            {top.map((tf, i) => (
+              <Embossed key={i} href={`#${id}t`} transform={tf} paper={paper} />
+            ))}
+          </svg>
+          <svg viewBox="0 0 360 640" aria-hidden="true" className="absolute inset-0 block h-full w-full [backface-visibility:hidden] [transform:rotateY(180deg)]">
+            <path d="M0 0 H360 L180 322Z" style={{ fill: 'color-mix(in srgb, var(--t-surface) 88%, #7a5a36)' }} />
+          </svg>
+          <span className="absolute top-[50.3%] left-1/2 block w-[31%] -translate-x-1/2 -translate-y-1/2 [backface-visibility:hidden]">
+            <svg viewBox="0 0 120 120" aria-hidden="true" className="block h-auto w-full transition-[filter] duration-500" style={{ filter: opening ? 'drop-shadow(0 0 14px rgba(255, 214, 150, 0.9))' : 'drop-shadow(0 6px 8px rgba(60, 10, 18, 0.35))' }}>
+              <defs>
+                <radialGradient id={`${id}w`} cx="38%" cy="32%" r="74%">
+                  <stop offset="0" style={{ stopColor: 'color-mix(in srgb, var(--t-primary) 72%, #ffffff)' }} />
+                  <stop offset="0.5" style={{ stopColor: 'var(--t-primary)' }} />
+                  <stop offset="1" style={{ stopColor: 'color-mix(in srgb, var(--t-primary) 62%, #000000)' }} />
+                </radialGradient>
+                <linearGradient id={`${id}g`} x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" style={{ stopColor: 'color-mix(in srgb, var(--t-secondary) 60%, #ffffff)' }} />
+                  <stop offset="0.5" style={{ stopColor: 'var(--t-secondary)' }} />
+                  <stop offset="1" style={{ stopColor: 'color-mix(in srgb, var(--t-secondary) 75%, #000000)' }} />
+                </linearGradient>
+              </defs>
+              <path d={waxOutline(60, 60, 50)} fill={`url(#${id}w)`} />
+              <circle cx="60" cy="60" r="36" style={{ fill: 'color-mix(in srgb, var(--t-primary) 88%, #000000)' }} />
+              <circle cx="60" cy="60" r="36" fill="none" style={{ stroke: 'color-mix(in srgb, var(--t-primary) 55%, #000000)' }} strokeWidth="2.2" />
+              <circle cx="60.6" cy="60.8" r="32" fill="none" style={{ stroke: 'color-mix(in srgb, var(--t-primary) 70%, #ffffff)' }} strokeWidth="0.7" opacity="0.6" />
+              <ellipse cx="45" cy="36" rx="16" ry="6" fill="#ffffff" opacity="0.14" transform="rotate(-28 45 36)" />
+              <text x="60" y="70" textAnchor="middle" fontSize={initials.length > 3 ? 22 : 30} fill={`url(#${id}g)`} style={{ fontFamily: 'var(--t-script)' }}>
+                {initials}
+              </text>
+            </svg>
+          </span>
+        </span>
+      </span>
+      {/* The prompt, over the envelope's lower half: a chevron pointing up and the words in spaced capitals. */}
+      <span className="pointer-events-none absolute bottom-[30%] left-1/2 flex -translate-x-1/2 flex-col items-center gap-[7px] transition-opacity duration-300" style={{ opacity: opening ? 0 : 1 }}>
+        <span aria-hidden="true" className="bulava-env-chevron block size-[10px] rotate-[-45deg] border-t-[1.5px] border-r-[1.5px] border-[var(--t-secondary-ink)]" />
+        <span className="bulava-env-label text-[11px] tracking-[0.26em] whitespace-nowrap text-[var(--t-secondary-ink)] uppercase [font-family:var(--font-cinzel),Cinzel,Georgia,serif]">{label}</span>
+      </span>
     </button>
   );
 }
